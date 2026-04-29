@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     set({
-      user: data?.session?.user ?? null,
+      user: data?.session?.user as any || null,
       loading: false
     })
   } catch (err) {
