@@ -56,7 +56,7 @@ export default function Dashboard() {
 
   // Phase progress data
   const phaseData = PHASES.map((ph, i) => {
-    const pts = tasks.filter(t => t.ph === ph)
+    const pts = tasks.filter(t => t.phase === ph)
     const pd = pts.filter(t => t.status === 'Completed').length
     return { name: ph.split(' ').slice(0, 2).join(' '), pct: pts.length ? Math.round(pd / pts.length * 100) : 0, color: PHASE_COLORS[i], total: pts.length, done: pd }
   }).filter(p => p.total > 0)
