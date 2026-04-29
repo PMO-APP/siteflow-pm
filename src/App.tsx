@@ -42,7 +42,7 @@ export default function App() {
           .select('*')
           .eq('id', session.user.id)
           .single()
-        setUser(data || null)
+        setUser(session.user as any)
       }
       setLoading(false)
     })
@@ -55,7 +55,7 @@ export default function App() {
           .select('*')
           .eq('id', session.user.id)
           .single()
-        setUser(data || null)
+        setUser(session.user as any)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
