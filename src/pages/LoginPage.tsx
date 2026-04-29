@@ -20,15 +20,26 @@ export default function LoginPage() {
     setError('')
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { data: { full_name: name } }
-        })
-        if (error) throw error
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-      }
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: name } }
+  })
+
+  if (error) throw error
+
+  alert("Account created successfully. Please check your email to verify your account.")
+
+} else {
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  })
+
+  if (error) throw error
+
+  window.location.href = "/"
+}
     } catch (err: any) {
       setError(err.message || 'Authentication failed')
     } finally {
