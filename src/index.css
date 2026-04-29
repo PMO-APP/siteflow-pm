@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --gold: #c49e48;
+    --gold2: #e3c06a;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  html, body, #root {
+    @apply h-full overflow-hidden;
+  }
+
+  body {
+    @apply bg-[#0c1014] text-[#ede8de] font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(196, 158, 72, 0.2);
+    border-radius: 2px;
+  }
+
+  input[type='date'] {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[#161f28] border border-white/[0.06] rounded-lg overflow-hidden;
+  }
+
+  .card-head {
+    @apply px-4 py-3 border-b border-white/[0.06] flex items-center justify-between;
+  }
+
+  .card-title {
+    @apply font-display text-[15px] font-semibold text-[#ede8de] tracking-wide;
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-md font-sans text-[13px]
+           font-semibold cursor-pointer transition-all duration-150 border-none outline-none;
+  }
+
+  .btn-gold {
+    @apply btn bg-[#c49e48] text-[#0c1014] hover:bg-[#e3c06a];
+  }
+
+  .btn-ghost {
+    @apply btn bg-white/5 text-[#bfb9ae] border border-white/[0.08] hover:bg-white/10;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-[12px];
+  }
+
+  .form-label {
+    @apply block text-[10px] font-mono font-semibold text-[#6e7d8c]
+           uppercase tracking-widest mb-1.5;
+  }
+
+  .form-control {
+    @apply w-full px-3 py-2 bg-[#1c2a36] border border-white/[0.08] rounded-md
+           text-[#ede8de] text-[13px] font-sans outline-none
+           focus:border-[#c49e48] transition-colors placeholder:text-[#6e7d8c];
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full
+           text-[9px] font-mono font-bold uppercase tracking-wider;
+  }
+
+  .badge-red    { @apply badge bg-red-500/10 text-red-400 border border-red-500/20; }
+  .badge-amber  { @apply badge bg-amber-500/10 text-amber-400 border border-amber-500/20; }
+  .badge-green  { @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .badge-blue   { @apply badge bg-blue-500/10 text-blue-400 border border-blue-500/20; }
+  .badge-muted  { @apply badge bg-white/5 text-[#6e7d8c] border border-white/[0.06]; }
+  .badge-gold   { @apply badge bg-[#c49e48]/15 text-[#c49e48] border border-[#c49e48]/20; }
+
+  .tbl {
+    @apply w-full border-collapse;
+  }
+
+  .tbl th {
+    @apply bg-[#1c2a36] text-[#6e7d8c] px-3 py-2 text-left
+           text-[9px] font-mono uppercase tracking-widest
+           border-b border-white/[0.06] whitespace-nowrap font-normal;
+  }
+
+  .tbl td {
+    @apply px-3 py-2 border-b border-white/[0.03] text-[12px] text-[#bfb9ae]
+           align-middle;
+  }
+
+  .tbl tr:hover td {
+    @apply bg-white/[0.015];
+  }
+
+  .tbl-action {
+    @apply px-2 py-1 rounded text-[10px] font-mono text-[#6e7d8c]
+           border border-white/[0.06] bg-transparent cursor-pointer
+           hover:bg-[#c49e48]/10 hover:text-[#c49e48] hover:border-[#c49e48]/20
+           transition-all;
+  }
+
+  .input-search {
+    @apply form-control text-[12px] pl-8;
+  }
+
+  .page-header {
+    @apply flex items-center justify-between mb-5;
+  }
+
+  .page-title {
+    @apply font-display text-2xl font-semibold text-[#ede8de];
+  }
+
+  .stat-card {
+    @apply card p-4 relative overflow-hidden;
+  }
+
+  .stat-number {
+    @apply font-display text-4xl font-bold text-[#ede8de] leading-none;
+  }
+
+  .stat-label {
+    @apply text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1.5;
+  }
+
+  .stat-sub {
+    @apply text-[11px] text-[#6e7d8c] mt-1;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-2.5 px-4 py-2 cursor-pointer
+           text-[#6e7d8c] text-[12px] font-medium
+           transition-all duration-150 border-l-2 border-transparent
+           hover:text-[#bfb9ae] hover:bg-white/[0.025];
+  }
+
+  .nav-item.active {
+    @apply text-[#c49e48] border-l-[#c49e48] bg-[#c49e48]/10;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-50
+           flex items-center justify-center p-4;
+  }
+
+  .modal {
+    @apply bg-[#161f28] border border-[#c49e48]/20 rounded-xl
+           w-full max-w-xl max-h-[90vh] overflow-y-auto
+           shadow-2xl;
+  }
+
+  .modal-head {
+    @apply px-5 py-4 border-b border-white/[0.06]
+           flex items-start gap-3 sticky top-0 bg-[#161f28] z-10;
+  }
+
+  .modal-title {
+    @apply font-display text-[18px] font-semibold text-[#ede8de] flex-1 leading-snug;
+  }
+
+  .section-title {
+    @apply font-display text-[18px] font-semibold text-[#ede8de] mb-4;
+  }
+
+  .gold-bar {
+    @apply absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#c49e48] to-[#e3c06a];
+  }
+
+  .empty-state {
+    @apply text-center py-12 text-[#6e7d8c];
+  }
+}
+
+/* Mobile optimisations */
+@media (max-width: 768px) {
+  .hide-mobile { display: none !important; }
+  .tbl th, .tbl td { @apply px-2 py-1.5 text-[11px]; }
+}
+
+/* Animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-in { animation: slideIn 0.2s ease; }
+
+@keyframes pulse-gold {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.pulse-gold { animation: pulse-gold 2s ease-in-out infinite; }

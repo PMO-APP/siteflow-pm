@@ -1,0 +1,88 @@
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/store/auth'
+import Layout from '@/components/layout/Layout'
+import LoginPage from '@/pages/LoginPage'
+import Dashboard from '@/pages/Dashboard'
+import SchedulePage from '@/pages/SchedulePage'
+import ProcurementPage from '@/pages/ProcurementPage'
+import ApprovalsPage from '@/pages/ApprovalsPage'
+import SitePage from '@/pages/SitePage'
+import SnagsPage from '@/pages/SnagsPage'
+import DocumentsPage from '@/pages/DocumentsPage'
+import FinancialPage from '@/pages/FinancialPage'
+import RiskPage from '@/pages/RiskPage'
+import TeamPage from '@/pages/TeamPage'
+import ReportsPage from '@/pages/ReportsPage'
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuthStore()
+  if (loading) return (
+    <div className="h-full flex items-center justify-center bg-[#0c1014]">
+      <div className="text-center">
+        <div className="font-display text-3xl text-[#c49e48] mb-2">Lakowe SPA</div>
+        <div className="text-[#6e7d8c] text-sm">Loading…</div>
+      </div>
+    </div>
+  )
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
+
+export default function App() {
+  const { setUser, setLoading } = useAuthStore()
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setUser(data || null)
+      }
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setUser(data || null)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [setUser, setLoading])
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
+          <Route index element={<Dashboard />} />
+          <Route path="schedule" element={<SchedulePage />} />
+          <Route path="procurement" element={<ProcurementPage />} />
+          <Route path="approvals" element={<ApprovalsPage />} />
+          <Route path="site" element={<SitePage />} />
+          <Route path="snags" element={<SnagsPage />} />
+          <Route path="documents" element={<DocumentsPage />} />
+          <Route path="financial" element={<FinancialPage />} />
+          <Route path="risk" element={<RiskPage />} />
+          <Route path="team" element={<TeamPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
