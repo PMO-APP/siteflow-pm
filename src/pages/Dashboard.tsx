@@ -6,7 +6,7 @@ import { useProcurement } from '@/hooks/useData'
 import { useApprovals } from '@/hooks/useData'
 import { useSnags } from '@/hooks/useData'
 import { useRisks } from '@/hooks/useData'
-import { useFinancial } from '@/hooks/useData'
+import { useFinancial, useProjects } from '@/hooks/useData'
 import { fdate, urgencyColor, formatCurrency, PROJECT_END, PROJECT_START } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
@@ -21,7 +21,8 @@ export default function Dashboard() {
   const { data: snags = [] } = useSnags()
   const { data: risks = [] } = useRisks()
   const { data: financial = [] } = useFinancial()
-
+const { data: projects = [] } = useProjects()
+const project = projects[0]
   const today = new Date()
   const daysLeft = Math.max(0, differenceInDays(PROJECT_END, today))
   const totalDays = differenceInDays(PROJECT_END, PROJECT_START)
