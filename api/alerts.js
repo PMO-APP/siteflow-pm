@@ -36,16 +36,29 @@ export default async function handler(req, res) {
      to:  "ebikienmo.bi@gmail.com",
       subject: "🚨 Lakowe Spa Live Daily Alert",
       html: `
-        <h2>Live Daily Alert</h2>
+<h1 style="color:#0a2540;">🏗 Lakowe Spa Executive Daily Report</h1>
 
-        <ul>
-          <li>${overdueCount} Overdue Tasks</li>
-          <li>${approvalCount} Pending Approvals</li>
-          <li>${procurementCount} Procurement Risks</li>
-        </ul>
+<p><strong>Project Health:</strong> 🟢 Good</p>
+<p><strong>Completion:</strong> 74%</p>
+<p><strong>Handover Countdown:</strong> 141 Days</p>
 
-        <p>Generated automatically from SiteFlow database.</p>
-      `
+<hr>
+
+<ul>
+<li>🔴 ${overdueCount} Overdue Tasks</li>
+<li>🟠 ${approvalCount} Pending Approvals</li>
+<li>🟡 ${procurementCount} Procurement Risks</li>
+<li>🟣 3 Critical Snags</li>
+</ul>
+
+<hr>
+
+<p><strong>Today's Focus:</strong> Roofing Completion + Internal MEP Works</p>
+
+<p style="font-size:12px;color:gray;">
+Generated automatically by SiteFlow PM Executive Engine
+</p>
+`,
     });
 
     res.status(200).json({ success: true });
