@@ -96,11 +96,11 @@ export default function Layout() {
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
-              {user ? getInitials(user.full_name) : 'U'}
+              {user ? getInitials(user.user_metadata?.full_name || user.email) : 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-[#ede8de] truncate">{user?.full_name}</div>
-              <div className="text-[9px] text-[#6e7d8c] capitalize">{user?.role}</div>
+              <div className="text-[11px] font-medium text-[#ede8de] truncate">{user?.user_metadata?.full_name || user?.email}</div>
+              <div className="text-[9px] text-[#6e7d8c] capitalize">Admin User</div>
             </div>
             <button onClick={signOut} className="text-[#6e7d8c] hover:text-red-400 transition-colors" title="Sign out">
               <LogOut size={13} />
