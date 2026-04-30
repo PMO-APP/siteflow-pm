@@ -26,6 +26,11 @@ export default async function handler(req, res) {
       .from("procurement")
       .select("*")
       .lte("days_remaining", 14);
+    const { data: project } = await supabase
+  .from("projects")
+  .select("*")
+  .eq("project_name", "Lakowe Spa")
+  .single();
 
     const overdueCount = tasks?.length || 0;
     const approvalCount = approvals?.length || 0;
