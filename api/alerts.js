@@ -33,10 +33,7 @@ export default async function handler(req, res) {
 
     await resend.emails.send({
       from: "onboarding@resend.dev",
-     to: [
-    "ebikienmo.bi@gmail.com",
-    "e.bio-ibogomo@mixtafrica.com"
-  ],
+     to:  "ebikienmo.bi@gmail.com",
       subject: "🚨 Lakowe Spa Live Daily Alert",
       html: `
         <h2>Live Daily Alert</h2>
