@@ -43,9 +43,15 @@ export default async function handler(req, res) {
       html: `
 <h1 style="color:#0a2540;">🏗 Lakowe Spa Executive Daily Report</h1>
 
-<p><strong>Project Health:</strong> 🟢 Good</p>
-<p><strong>Completion:</strong> 74%</p>
-<p><strong>Handover Countdown:</strong> 141 Days</p>
+<p><strong>Project Health:</strong> 🟢 ${project.health_status}</p>
+
+<p><strong>Completion:</strong> ${project.completion_percent}%</p>
+
+<p><strong>Handover Countdown:</strong> ${
+Math.ceil(
+(new Date(project.handover_date) - new Date()) /
+(1000 * 60 * 60 * 24)
+)} Days</p>
 
 <hr>
 
