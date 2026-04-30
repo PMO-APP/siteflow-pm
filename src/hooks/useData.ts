@@ -330,3 +330,15 @@ export const usePhotos = (filter: Record<string, string>) => useQuery({
     return data
   },
 })
+export const useProjects = () =>
+  useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+
+      if (error) throw error
+      return data
+    }
+  })
