@@ -22,7 +22,7 @@ export default function Dashboard() {
   const { data: risks = [] } = useRisks()
   const { data: financial = [] } = useFinancial()
 const { data: projects = [] } = useProjects()
-const project = Array.isArray(projects) ? projects[0] : projects
+const project = projects?.[0] || {}
   const today = new Date()
   const daysLeft = Math.max(0, differenceInDays(PROJECT_END, today))
   const totalDays = differenceInDays(PROJECT_END, PROJECT_START)
@@ -32,7 +32,7 @@ const project = Array.isArray(projects) ? projects[0] : projects
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
   const overdue = tasks.filter(t => t.rag === 'RED').length
- const progressPct = Number(project?.completion_percent || 0)
+ const progressPct = Number(project.completion_percent ?? 0)
 
   const procRisks = procs.filter(p => {
     const d = p.order_by_date ? differenceInDays(new Date(p.order_by_date), today) : null
