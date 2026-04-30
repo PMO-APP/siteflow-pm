@@ -31,7 +31,7 @@ export default function Dashboard() {
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
   const overdue = tasks.filter(t => t.rag === 'RED').length
-  const progressPct = tasks.length ? Math.round(done / tasks.length * 100) : 0
+ const progressPct = project?.completion_percent || 0
 
   const procRisks = procs.filter(p => {
     const d = p.order_by_date ? differenceInDays(new Date(p.order_by_date), today) : null
