@@ -35,28 +35,19 @@ export default function App() {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        setUser(session.user as any)
-      }
-      setLoading(false)
-    })
+   supabase.auth.getSession().then(({ data: { session } }) => {
+  if (session?.user) {
+    setUser(session.user as any)
+  }
+  setLoading(false)
+})
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        setUser(session.user as any)
-      } else if (event === 'SIGNED_OUT') {
+    if (event === 'SIGNED_IN' && session?.user) {
+  setUser(session.user as any)
+}
+      else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
     })
