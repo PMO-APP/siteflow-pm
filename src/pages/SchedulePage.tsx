@@ -22,10 +22,10 @@ export default function SchedulePage() {
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
 
   const today = new Date()
-  const getTaskProgress = (t: Task) => {
-    if (t.status === 'Completed') return 100
-    if (t.status === 'Not Started') return 0
-    return Number(getTaskProgress(t) || 0)
+  const getTaskProgress = (t: Task): number => {
+  if (t.status === 'Completed') return 100
+  if (t.status === 'Not Started') return 0
+  return Number(t.progress_pct || 0)
 }
 
   const filtered = tasks.filter(t => {
