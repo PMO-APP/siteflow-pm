@@ -8,11 +8,19 @@ import TaskModal from '@/components/modules/schedule/TaskModal'
 import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
 
-const PHASES = ['All','Approval Schedule','Program Schedule','Internal "Wet works" (Contractor)','External Works Phase','Internal works & Interior Design']
 type View = 'list' | 'gantt' | 'milestones'
 
 export default function SchedulePage() {
   const { data: tasks = [], isLoading } = useTasks()
+  const PHASES = [
+ 'All',
+ 'Foundation Works',
+ 'Superstructure',
+ 'Approval Schedule',
+ 'Internal "Wet works" (Contractor)',
+ 'External Works Phase',
+ 'Internal works & Interior Design'
+]
   const updateTask = useUpdateTask()
   const [view, setView] = useState<View>('list')
   const [search, setSearch] = useState('')
