@@ -15,6 +15,7 @@ import FinancialPage from '@/pages/FinancialPage'
 import RiskPage from '@/pages/RiskPage'
 import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
+import RecoveryForecastPage from './pages/RecoveryForecastPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -60,6 +61,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
+          <Route path="/recovery" element={<RecoveryForecastPage />} />
           <Route index element={<Dashboard />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="procurement" element={<ProcurementPage />} />
