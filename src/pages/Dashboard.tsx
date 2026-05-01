@@ -10,8 +10,18 @@ import { useFinancial, useProjects } from '@/hooks/useData'
 import { fdate, urgencyColor, formatCurrency, PROJECT_END, PROJECT_START } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
-const PHASES = ['Approval Schedule','Program Schedule','Internal "Wet works" (Contractor)','External Works Phase','Internal works & Interior Design']
-const PHASE_COLORS = ['#c49e48','#4599d4','#9b7fd4','#3fad78','#e05252']
+const phaseList = [...new Set(tasks.map(t => t.phase).filter(Boolean))]
+
+const colorPool = [
+ '#c49e48',
+ '#4599d4',
+ '#9b7fd4',
+ '#3fad78',
+ '#e05252',
+ '#6b8e23',
+ '#d4960e',
+ '#8a5cf6'
+]
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -84,11 +94,30 @@ const varianceStatus =
   const certifiedTotal = financial.filter(f => f.type === 'Payment' && f.status === 'Certified').reduce((s, f) => s + f.amount, 0)
 
   // Phase progress data
-  const phaseData = PHASES.map((ph, i) => {
-    const pts = tasks.filter(t => t.phase === ph)
-    const pd = pts.filter(t => t.status === 'Completed').length
-    return { name: ph.split(' ').slice(0, 2).join(' '), pct: pts.length ? Math.round(pd / pts.length * 100) : 0, color: PHASE_COLORS[i], total: pts.length, done: pd }
-  }).filter(p => p.total > 0)
+  const phaseData = phaseList.map((ph, i) => {
+  const pts = tasks.filter(t => t.phase === ph)
+
+  const completedWeight = pts.reduce((sum, t) => {
+    if (t.status === 'Completed') return sum + 100
+    if (t.status === 'In Progress') return sum + Number(t.progress_pct || 0)
+    return sum
+  }, 0)
+
+  const pct =
+    pts.length === 0
+      ? 0
+      : Math.round(completedWeight / pts.length)
+
+  const done = pts.filter(t => t.status === 'Completed').length
+
+  return {
+    name: ph,
+    pct,
+    total: pts.length,
+    done,
+    color: colorPool[i % colorPool.length]
+  }
+})
 
   // Task status pie
   const statusPie = [
