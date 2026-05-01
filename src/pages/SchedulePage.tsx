@@ -31,6 +31,7 @@ const getTaskProgress = (t: Task): number => {
 
 const getRag = (t: Task): string => {
   if (t.status === 'Completed') return 'DONE'
+  if (!t.finish_date) return 'GREEN'
 
   const finish = new Date(t.finish_date)
   const daysLeft =
