@@ -33,14 +33,7 @@ const project = projects?.[0] || {}
     ? 0
     : Math.min(100, Math.round((elapsed / totalDays) * 100))
 
-const variancePct = progressPct - plannedPct
 
-const varianceStatus =
-  variancePct >= 3
-    ? 'AHEAD'
-    : variancePct <= -3
-    ? 'BEHIND'
-    : 'ON TRACK'
 
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
@@ -61,7 +54,14 @@ const progressPct =
         tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
         tasks.length
       )
+const variancePct = progressPct - plannedPct
 
+const varianceStatus =
+  variancePct >= 3
+    ? 'AHEAD'
+    : variancePct <= -3
+    ? 'BEHIND'
+    : 'ON TRACK'
   const procRisks = procs.filter(p => {
     const d = p.order_by_date ? differenceInDays(new Date(p.order_by_date), today) : null
     return d !== null && d <= 14 && p.status !== 'Delivered' && p.status !== 'Ordered'
