@@ -32,7 +32,10 @@ const project = projects?.[0] || {}
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
   const overdue = tasks.filter(t => t.rag === 'RED').length
- const progressPct = Number(project.completion_percent ?? 0)
+ const progressPct =
+  Number(projects?.[0]?.completion_percent) ||
+  Number(project?.completion_percent) ||
+  10
 
   const procRisks = procs.filter(p => {
     const d = p.order_by_date ? differenceInDays(new Date(p.order_by_date), today) : null
