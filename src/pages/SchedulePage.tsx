@@ -13,13 +13,13 @@ type View = 'list' | 'gantt' | 'milestones'
 export default function SchedulePage() {
   const { data: tasks = [], isLoading } = useTasks()
   const PHASES = [
- 'All',
+  'All',
  'Foundation Works',
  'Superstructure',
  'Approval Schedule',
  'Internal "Wet works" (Contractor)',
  'External Works Phase',
- 'Internal works & Interior Design'
+ 'Internal works & Interior Design
 ]
   const updateTask = useUpdateTask()
   const [view, setView] = useState<View>('list')
@@ -50,13 +50,15 @@ const getRag = (t: Task): string => {
   return 'GREEN'
 }
 
-  const filtered = tasks.filter(t => {
+  const filtered = tasks
+  .filter(t => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !String(t.task_number).includes(search)) return false
     if (phaseFilter !== 'All' && t.phase !== phaseFilter) return false
     if (ragFilter && getRag(t) !== ragFilter) return false
     if (statusFilter && (t.status || 'Not Started') !== statusFilter) return false
     return true
   })
+  .sort((a,b) => Number(a.task_number) - Number(b.task_number))
 
   const grouped = PHASES.slice(1).reduce((acc, ph) => {
     const pts = filtered.filter(t => t.phase === ph)
