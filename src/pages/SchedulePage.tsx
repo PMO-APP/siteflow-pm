@@ -12,15 +12,7 @@ type View = 'list' | 'gantt' | 'milestones'
 
 export default function SchedulePage() {
   const { data: tasks = [], isLoading } = useTasks()
- const PHASES = [
-  'All',
-  'Foundation Works',
-  'Superstructure',
-  'Approval Schedule',
-  'Internal "Wet works" (Contractor)',
-  'External Works Phase',
-  'Internal works & Interior Design'
-]
+ const PHASES = ['All', ...Array.from(new Set(tasks.map(t => t.phase).filter(Boolean)))]
   const updateTask = useUpdateTask()
   const [view, setView] = useState<View>('list')
   const [search, setSearch] = useState('')
