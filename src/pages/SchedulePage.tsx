@@ -22,16 +22,28 @@ export default function SchedulePage() {
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
 
   const today = new Date()
-  const getTaskProgress = (t: Task): number => {
+
+const getTaskProgress = (t {
   if (t.status === 'Completed') return 100
   if (t.status === 'Not Started') return 0
   return Number(t.progress_pct || 0)
 }
+  const getRag = (t: Task): string => {
+  if (t.status === 'Completed') return 'DONE'
+
+  const finish = new Date(t.finish_date)
+  const daysLeft =
+    (finish.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+
+  if (today > finish && getTaskProgress(t) < 100) return 'RED'
+  if (daysLeft <= 3) return 'AMBER'
+  return 'GREEN'
+}.
 
   const filtered = tasks.filter(t => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !String(t.task_number).includes(search)) return false
     if (phaseFilter !== 'All' && t.phase !== phaseFilter) return false
-    if (ragFilter && t.rag !== ragFilter) return false
+    if (ragFilter && getRag(t) !== ragFilter) return false
     if (statusFilter && (t.status || 'Not Started') !== statusFilter) return false
     return true
   })
@@ -46,8 +58,8 @@ export default function SchedulePage() {
     total: tasks.length,
     done: tasks.filter(t => t.status === 'Completed').length,
     inProg: tasks.filter(t => t.status === 'In Progress').length,
-    red: tasks.filter(t => t.rag === 'RED').length,
-    amber: tasks.filter(t => t.rag === 'AMBER').length,
+    red: tasks.filter(t => getRag(t) === 'RED').length,
+    amber: tasks.filter(t => getRag(t) === 'AMBER').length,
   }
 
   return (
@@ -139,7 +151,7 @@ export default function SchedulePage() {
                       <td colSpan={13} className="font-display text-[12px] font-semibold text-[#ede8de] py-2">{phase}</td>
                     </tr>
                     {pts.map(t => {
-                      const rag = t.status === 'Completed' ? '' : (t.rag || computeRAG(t))
+                      const rag = t.status === 'Completed' ? '' : (getRag(t) || computeRAG(t))
                       const procDays = t.procurement_deadline ? differenceInDays(new Date(t.procurement_deadline), today) : null
                       const apprDays = t.approval_deadline ? differenceInDays(new Date(t.approval_deadline), today) : null
                       return (
