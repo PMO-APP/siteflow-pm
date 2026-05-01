@@ -23,12 +23,13 @@ export default function SchedulePage() {
 
   const today = new Date()
 
-const getTaskProgress = (t {
+const getTaskProgress = (t: Task): number => {
   if (t.status === 'Completed') return 100
   if (t.status === 'Not Started') return 0
   return Number(t.progress_pct || 0)
 }
-  const getRag = (t: Task): string => {
+
+const getRag = (t: Task): string => {
   if (t.status === 'Completed') return 'DONE'
 
   const finish = new Date(t.finish_date)
@@ -38,7 +39,7 @@ const getTaskProgress = (t {
   if (today > finish && getTaskProgress(t) < 100) return 'RED'
   if (daysLeft <= 3) return 'AMBER'
   return 'GREEN'
-}.
+}
 
   const filtered = tasks.filter(t => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !String(t.task_number).includes(search)) return false
