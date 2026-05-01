@@ -22,6 +22,11 @@ export default function SchedulePage() {
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
 
   const today = new Date()
+  const getTaskProgress = (t: Task) => {
+    if (t.status === 'Completed') return 100
+    if (t.status === 'Not Started') return 0
+    return Number(getTaskProgress(t) || 0)
+}
 
   const filtered = tasks.filter(t => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !String(t.task_number).includes(search)) return false
@@ -160,9 +165,9 @@ export default function SchedulePage() {
                           <td className="hide-mobile">
                             <div className="flex items-center gap-2">
                               <div className="h-1 w-16 bg-white/5 rounded-full overflow-hidden">
-                                <div className="h-full bg-[#c49e48] rounded-full" style={{ width: `${t.progress_pct}%` }} />
+                                <div className="h-full bg-[#c49e48] rounded-full" style={{ width: `${getTaskProgress(t)}%` }} />
                               </div>
-                              <span className="text-[10px] text-[#6e7d8c]">{t.progress_pct}%</span>
+                              <span className="text-[10px] text-[#6e7d8c]">{getTaskProgress(t)}%</span>
                             </div>
                           </td>
                           <td className="hide-mobile text-[#6e7d8c] text-[11px]">{t.responsible || '—'}</td>
