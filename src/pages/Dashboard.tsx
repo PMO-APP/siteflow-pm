@@ -31,11 +31,23 @@ const project = projects?.[0] || {}
 
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
-  const overdue = tasks.filter(t => t.rag === 'RED').length
- const progressPct =
-  Number(projects?.[0]?.completion_percent) ||
-  Number(project?.completion_percent) ||
-  10
+  const overdue = tasks.filter(t => {
+  if (!t.finish_date) return false
+  return new Date(t.finish_date) < today && t.status !== 'Completed'
+}).length
+const getTaskProgress = (t: any): number => {
+  if (t.status === 'Completed') return 100
+  if (t.status === 'Not Started') return 0
+  return Number(t.progress_pct || 0)
+}
+
+const progressPct =
+  tasks.length === 0
+    ? 0
+    : Math.round(
+        tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
+        tasks.length
+      )
 
   const procRisks = procs.filter(p => {
     const d = p.order_by_date ? differenceInDays(new Date(p.order_by_date), today) : null
