@@ -10,7 +10,7 @@ import { useFinancial, useProjects } from '@/hooks/useData'
 import { fdate, urgencyColor, formatCurrency, PROJECT_END, PROJECT_START } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
-const phaseList = [...new Set(tasks.map(t => t.phase).filter(Boolean))]
+
 
 const colorPool = [
  '#c49e48',
@@ -26,6 +26,7 @@ const colorPool = [
 export default function Dashboard() {
   const navigate = useNavigate()
   const { data: tasks = [] } = useTasks()
+ const phaseList = [...new Set(tasks.map((t:any) => t.phase).filter(Boolean))]
   const { data: procs = [] } = useProcurement()
   const { data: approvals = [] } = useApprovals()
   const { data: snags = [] } = useSnags()
