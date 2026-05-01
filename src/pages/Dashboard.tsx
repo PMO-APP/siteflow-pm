@@ -28,6 +28,19 @@ const project = projects?.[0] || {}
   const totalDays = differenceInDays(PROJECT_END, PROJECT_START)
   const elapsed = differenceInDays(today, PROJECT_START)
   const timelinePct = Math.min(100, Math.max(0, Math.round(elapsed / totalDays * 100)))
+  const plannedPct =
+  totalDays === 0
+    ? 0
+    : Math.min(100, Math.round((elapsed / totalDays) * 100))
+
+const variancePct = progressPct - plannedPct
+
+const varianceStatus =
+  variancePct >= 3
+    ? 'AHEAD'
+    : variancePct <= -3
+    ? 'BEHIND'
+    : 'ON TRACK'
 
   const done = tasks.filter(t => t.status === 'Completed').length
   const inProg = tasks.filter(t => t.status === 'In Progress').length
@@ -143,9 +156,22 @@ const progressPct =
       </div>
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         {[
           { label: 'Progress', value: `${progressPct}%`, sub: `${done}/${tasks.length} tasks`, color: 'c-gold', icon: TrendingUp, link: '/schedule' },
+      {
+  label: 'Schedule Variance',
+  value: `${variancePct}%`,
+  sub: varianceStatus,
+  color:
+    variancePct <= -3
+      ? 'c-red'
+      : variancePct >= 3
+      ? 'c-grn'
+      : 'c-amr',
+  icon: TrendingUp,
+  link: '/schedule'
+},
           { label: 'Overdue Tasks', value: overdue, sub: 'RED status', color: overdue > 0 ? 'c-red' : 'c-grn', icon: Clock, link: '/schedule' },
           { label: 'Pending Approvals', value: pendingApprovals, sub: `${overdueApprovals} overdue`, color: pendingApprovals > 5 ? 'c-amr' : 'c-grn', icon: FileCheck, link: '/approvals' },
           { label: 'Procurement Risks', value: procRisks, sub: 'Order due ≤14d', color: procRisks > 0 ? 'c-red' : 'c-grn', icon: Package, link: '/procurement' },
