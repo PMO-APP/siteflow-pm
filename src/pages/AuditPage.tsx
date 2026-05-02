@@ -112,8 +112,19 @@ export default function AuditPage() {
                 </td>
 
                 <td className="px-3">
-                  {log.action}
-                </td>
+  <span
+    className={
+      log.action === 'DELETE' ||
+      log.description?.includes('CRITICAL')
+        ? 'text-red-400 font-semibold'
+        : log.action === 'UPDATE'
+        ? 'text-amber-400 font-semibold'
+        : 'text-emerald-400 font-semibold'
+    }
+  >
+    {log.action}
+  </span>
+</td>
 
                 <td className="px-3">
                   {log.description}
