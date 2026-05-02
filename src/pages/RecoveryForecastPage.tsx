@@ -63,85 +63,148 @@ export default function RecoveryForecastPage() {
 
   // ================= ENGINE =================
 
-  const engine = useMemo(() => {
-    const today = new Date()
+ const engine = useMemo(() => {
+  const today = new Date()
 
-    const delayedTasks = tasks.filter((task) => {
-      const finish = new Date(task.finish_date)
-      return finish < today && Number(task.progress_pct) < 100
+  const daysBetween = (a: Date, b: Date) =>
+    Math.ceil((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
+
+  // ---------- Helpers ----------
+  const parseDeps = (dep: string | null) =>
+    dep
+      ? dep
+          .split(',')
+          .map((x) => Number(x.trim()))
+          .filter(Boolean)
+      : []
+
+  // Build reverse dependency map
+  const downstreamMap: Record<number, number[]> = {}
+
+  tasks.forEach((task) => {
+    const deps = parseDeps(task.dependencies)
+
+    deps.forEach((d) => {
+      if (!downstreamMap[d]) downstreamMap[d] = []
+      downstreamMap[d].push(task.task_number)
     })
+  })
 
-    const totalDelayDays = delayedTasks.reduce((sum, task) => {
+  const delayedTasks = tasks.filter((task) => {
+    const finish = new Date(task.finish_date)
+    return finish < today && Number(task.progress_pct) < 100
+  })
+
+  const totalDelayDays = delayedTasks.reduce((sum, task) => {
+    const finish = new Date(task.finish_date)
+    const late = Math.max(0, daysBetween(today, finish))
+    return sum + late
+  }, 0)
+
+  // ---------- Smart Critical Detection ----------
+  const criticalTasks = tasks
+    .map((task) => {
       const finish = new Date(task.finish_date)
-      const diff =
-        Math.ceil(
-          (today.getTime() - finish.getTime()) /
-            (1000 * 60 * 60 * 24)
-        ) || 0
+      const start = new Date(task.start_date)
 
-      return sum + diff
-    }, 0)
+      const lateDays =
+        finish < today && task.progress_pct < 100
+          ? Math.max(0, daysBetween(today, finish))
+          : 0
 
-    const projectFinish =
-      tasks.length > 0
-        ? new Date(
-            tasks.reduce((latest, task) =>
-              new Date(task.finish_date) >
-              new Date(latest.finish_date)
-                ? task
-                : latest
-            ).finish_date
-          )
-        : today
+      const daysToFinish = daysBetween(finish, today)
 
-    const forecastFinish = new Date(projectFinish)
-    forecastFinish.setDate(
-      projectFinish.getDate() + totalDelayDays
-    )
+      // expected progress by elapsed duration
+      const totalDur = Math.max(1, task.duration_days)
+      const elapsed = Math.max(
+        0,
+        daysBetween(today, start)
+      )
 
-    const criticalRed = tasks.filter(
-      (t) => t.rag === 'RED'
-    ).length
+      const expectedProgress = Math.min(
+        100,
+        Math.round((elapsed / totalDur) * 100)
+      )
 
-    const amber = tasks.filter(
-      (t) => t.rag === 'AMBER'
-    ).length
+      const progressLag = Math.max(
+        0,
+        expectedProgress - Number(task.progress_pct)
+      )
 
-    const recoverable =
-      totalDelayDays <= 14
-        ? 'YES'
-        : totalDelayDays <= 30
-        ? 'RISK'
-        : 'NO'
+      const downstream = downstreamMap[task.task_number]?.length || 0
 
-    const requiredAcceleration =
-      totalDelayDays === 0
-        ? '0%'
-        : `${Math.min(
-            50,
-            Math.round((totalDelayDays / 30) * 100)
-          )}%`
+      // score model
+      let score = 0
 
-    const completionConfidence =
-      totalDelayDays <= 7
-        ? '92%'
-        : totalDelayDays <= 14
-        ? '78%'
-        : totalDelayDays <= 30
-        ? '56%'
-        : '34%'
+      score += lateDays * 4
+      score += progressLag * 0.8
+      score += downstream * 12
+      score += task.duration_days > 10 ? 10 : 0
+      score += daysToFinish <= 30 ? 10 : 0
+      score += task.rag === 'RED' ? 20 : task.rag === 'AMBER' ? 10 : 0
 
-    return {
-      delayedTasks,
-      totalDelayDays,
-      forecastFinish,
-      criticalRed,
-      amber,
-      recoverable,
-      requiredAcceleration,
-      completionConfidence,
-    }
-  }, [tasks])
+      return {
+        ...task,
+        score: Math.round(score),
+        lateDays,
+        progressLag,
+        downstream,
+      }
+    })
+    .filter((t) => t.score >= 25)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+
+  // ---------- Forecast ----------
+  const projectFinish =
+    tasks.length > 0
+      ? new Date(
+          tasks.reduce((latest, task) =>
+            new Date(task.finish_date) >
+            new Date(latest.finish_date)
+              ? task
+              : latest
+          ).finish_date
+        )
+      : today
+
+  const forecastFinish = new Date(projectFinish)
+  forecastFinish.setDate(projectFinish.getDate() + totalDelayDays)
+
+  const recoverable =
+    totalDelayDays <= 14
+      ? 'YES'
+      : totalDelayDays <= 30
+      ? 'RISK'
+      : 'NO'
+
+  const requiredAcceleration =
+    totalDelayDays === 0
+      ? '0%'
+      : `${Math.min(
+          50,
+          Math.round((totalDelayDays / 30) * 100)
+        )}%`
+
+  const completionConfidence =
+    totalDelayDays <= 7
+      ? '92%'
+      : totalDelayDays <= 14
+      ? '78%'
+      : totalDelayDays <= 30
+      ? '56%'
+      : '34%'
+
+  return {
+    delayedTasks,
+    criticalTasks,
+    totalDelayDays,
+    forecastFinish,
+    recoverable,
+    requiredAcceleration,
+    completionConfidence,
+  }
+}, [tasks])
 
   // ================= KPI =================
 
@@ -271,30 +334,27 @@ export default function RecoveryForecastPage() {
               </tr>
             </thead>
 
-            <tbody>
-              {engine.delayedTasks.map((task) => (
-                <tr
-                  key={task.id}
-                  className="border-b border-slate-800"
-                >
-                  <td className="py-2">
-                    {task.task_number}
-                  </td>
-                  <td className="py-2">
-                    {task.name}
-                  </td>
-                  <td className="py-2">
-                    {task.phase}
-                  </td>
-                  <td className="py-2">
-                    {task.finish_date}
-                  </td>
-                  <td className="py-2">
-                    {task.progress_pct}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+           <tbody>
+  {engine.criticalTasks.length === 0 ? (
+    <tr>
+      <td colSpan={5} className="py-6 text-center text-emerald-400">
+        No critical delayed activities detected. Project stable.
+      </td>
+    </tr>
+  ) : (
+    engine.criticalTasks.map((task) => (
+      <tr key={task.id} className="border-b border-slate-800">
+        <td className="py-2">{task.task_number}</td>
+        <td className="py-2">{task.name}</td>
+        <td className="py-2">{task.phase}</td>
+        <td className="py-2">{task.finish_date}</td>
+        <td className="py-2 text-red-400 font-semibold">
+          Risk {task.score}
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
           </table>
         </div>
       </div>
