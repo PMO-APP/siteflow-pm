@@ -1,3 +1,5 @@
+import { getRole } from '@/lib/access'
+import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Search, Upload, FileText, Download, ExternalLink } from 'lucide-react'
 import { useDocuments, useUpsertDocument } from '@/hooks/useData'
@@ -98,6 +100,11 @@ function DocModal({ item, onClose }: { item: Document | null; onClose: () => voi
 }
 
 export default function DocumentsPage() {
+  const { user } = useAuthStore()
+const role = getRole(user?.email)
+
+const canEdit =
+  canEditPage(role, 'documents')
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
   const [search, setSearch] = useState('')
@@ -136,7 +143,12 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="space-y-4">
+   <div className="space-y-4">
+  {!canEdit && (
+    <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+      Document Library View
+    </div>
+  )}
       {/* Breakdown chips */}
       <div className="flex flex-wrap gap-2">
         {Object.entries(byType).filter(([, v]) => v > 0).map(([type, count]) => (
@@ -163,9 +175,15 @@ export default function DocumentsPage() {
           <option value="">All Status</option>
           {STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <button className="btn-gold btn-sm btn ml-auto" onClick={() => setModal('new')}>
-          <Plus size={13} /> Register Doc
-        </button>
+        {canEdit && (
+  <button
+    className="btn-gold btn-sm btn ml-auto"
+    onClick={() => setModal('new')}
+  >
+    <Plus size={13} />
+    Register Doc
+  </button>
+)}
       </div>
 
       {/* Table */}
@@ -207,7 +225,18 @@ export default function DocumentsPage() {
                           <Download size={10} />
                         </a>
                       )}
-                      <button className="tbl-action" onClick={() => setModal(d)}>Edit</button>
+                      {canEdit ? (
+  <button
+    className="tbl-action"
+    onClick={() => setModal(d)}
+  >
+    Edit
+  </button>
+) : (
+  <span className="text-[#6e7d8c] text-[11px] px-2">
+    View
+  </span>
+)}
                     </div>
                   </td>
                 </tr>
@@ -217,7 +246,7 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      {modal !== null && (
+      {modal !== null && canEdit && (
         <DocModal item={modal === 'new' ? null : modal as Document} onClose={() => setModal(null)} />
       )}
     </div>
