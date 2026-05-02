@@ -16,6 +16,7 @@ import RiskPage from '@/pages/RiskPage'
 import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from './pages/RecoveryForecastPage'
+import { getRole } from '@/lib/access'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -32,7 +33,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { setUser, setLoading } = useAuthStore()
+  const { user, setUser, setLoading } = useAuthStore()
+  const role = getRole(user?.email)
 
   useEffect(() => {
     // Get initial session
@@ -56,26 +58,149 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [setUser, setLoading])
 
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
-          <Route path="/recovery" element={<RecoveryForecastPage />} />
-          <Route index element={<Dashboard />} />
-          <Route path="schedule" element={<SchedulePage />} />
-          <Route path="procurement" element={<ProcurementPage />} />
-          <Route path="approvals" element={<ApprovalsPage />} />
-          <Route path="site" element={<SitePage />} />
-          <Route path="snags" element={<SnagsPage />} />
-          <Route path="documents" element={<DocumentsPage />} />
-          <Route path="financial" element={<FinancialPage />} />
-          <Route path="risk" element={<RiskPage />} />
-          <Route path="team" element={<TeamPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
+ return (
+  <BrowserRouter>
+    <Routes>
+
+      <Route
+        path="/login"
+        element={<LoginPage />}
+      />
+
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
+        <Route
+          index
+          element={<Dashboard />}
+        />
+
+        <Route
+          path="recovery"
+          element={
+            <RecoveryForecastPage />
+          }
+        />
+
+        {(role === 'admin' ||
+          role === 'project') && (
+          <>
+            <Route
+              path="schedule"
+              element={
+                <SchedulePage />
+              }
+            />
+            <Route
+              path="procurement"
+              element={
+                <ProcurementPage />
+              }
+            />
+            <Route
+              path="approvals"
+              element={
+                <ApprovalsPage />
+              }
+            />
+            <Route
+              path="site"
+              element={<SitePage />}
+            />
+            <Route
+              path="snags"
+              element={
+                <SnagsPage />
+              }
+            />
+            <Route
+              path="documents"
+              element={
+                <DocumentsPage />
+              }
+            />
+            <Route
+              path="financial"
+              element={
+                <FinancialPage />
+              }
+            />
+            <Route
+              path="risk"
+              element={<RiskPage />}
+            />
+            <Route
+              path="team"
+              element={<TeamPage />}
+            />
+            <Route
+              path="reports"
+              element={
+                <ReportsPage />
+              }
+            />
+          </>
+        )}
+
+        {role === 'design' && (
+          <>
+            <Route
+              path="documents"
+              element={
+                <DocumentsPage />
+              }
+            />
+            <Route
+              path="snags"
+              element={
+                <SnagsPage />
+              }
+            />
+            <Route
+              path="risk"
+              element={<RiskPage />}
+            />
+          </>
+        )}
+
+        {role === 'costing' && (
+          <>
+            <Route
+              path="financial"
+              element={
+                <FinancialPage />
+              }
+            />
+            <Route
+              path="snags"
+              element={
+                <SnagsPage />
+              }
+            />
+            <Route
+              path="risk"
+              element={<RiskPage />}
+            />
+          </>
+        )}
+      </Route>
+
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/"
+            replace
+          />
+        }
+      />
+
+    </Routes>
+  </BrowserRouter>
+)
 }
