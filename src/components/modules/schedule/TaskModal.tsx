@@ -69,12 +69,29 @@ if (task.finish_date !== form.finish_date) {
       )
 
     if (diffDays > 0 && diffDays < 7) {
-      changes.push(
-        `Delay Warning: +${diffDays} days`
-      )
-    }
+  changes.push(
+    `Delay Warning: +${diffDays} days`
+  )
+
+  await supabase
+    .from('notifications')
+    .insert({
+      user_id: user?.id,
+      type: 'warning',
+      title: 'Delay Warning',
+      message: `${form.name} delayed by ${diffDays} days`
+    })
+}
 
     if (diffDays >= 7) {
+      await supabase
+  .from('notifications')
+  .insert({
+    user_id: user?.id,
+    type: 'alert',
+    title: 'Critical Delay',
+    message: `${form.name} delayed by ${diffDays} days`
+  })
   changes.push(
     `CRITICAL DELAY CHANGE: +${diffDays} days`
   )
@@ -98,6 +115,14 @@ if (task.finish_date !== form.finish_date) {
 }
 
     if (diffDays < 0) {
+      await supabase
+  .from('notifications')
+  .insert({
+    user_id: user?.id,
+    type: 'success',
+    title: 'Recovery Achieved',
+    message: `${form.name} recovered ${Math.abs(diffDays)} days`
+  })
   changes.push(
     `Recovered ${Math.abs(diffDays)} days`
   )
