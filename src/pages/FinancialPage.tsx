@@ -1,3 +1,4 @@
+import { logAudit } from '@/lib/audit'
 import { getRole } from '@/lib/access'
 import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
@@ -49,10 +50,29 @@ const canEdit =
   }
 
   const save = async () => {
-    const id = modal !== 'new' ? (modal as FinancialItem).id : undefined
-    await upsert.mutateAsync({ id, ...form, submitted_by: user?.id })
-    setModal(null)
-  }
+  const id =
+    modal !== 'new'
+      ? (modal as FinancialItem).id
+      : undefined
+
+  await upsert.mutateAsync({
+    id,
+    ...form,
+    submitted_by: user?.id
+  })
+
+  await logAudit(
+    user,
+    modal === 'new'
+      ? 'CREATE'
+      : 'UPDATE',
+    'Financial',
+    id || 'new',
+    `${form.type}: ${form.description}`
+  )
+
+  setModal(null)
+}
 
   // Calculations
   const contractSum = items.filter(i => i.type === 'Contract Sum').reduce((s, i) => s + i.amount, 0)
