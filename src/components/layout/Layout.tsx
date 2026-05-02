@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
   HardHat, AlertTriangle, FolderOpen, DollarSign, Shield,
-  Users, FileText, Bell, LogOut, Menu, X, ChevronDown, BarChart3
+  Users, FileText, Bell, LogOut, Menu, X, ChevronDown, BarChart3, ShieldCheck
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
@@ -25,6 +25,7 @@ const NAV = [
   { to: '/risk', icon: Shield, label: 'Risk Register' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/reports', icon: FileText, label: 'Reports' },
+  { to: '/audit', icon: ShieldCheck, label: 'Audit Trail' },
 ]
 
 export default function Layout() {
@@ -36,9 +37,13 @@ const role = getRole(user?.email)
   const daysLeft = differenceInDays(PROJECT_END, new Date())
 
   const allowedNav = NAV.filter(item => {
-  if (role === 'admin' || role === 'project') {
-    return true
-  }
+  if (role === 'admin') {
+  return true
+}
+
+if (role === 'project') {
+  return item.to !== '/audit'
+}
 
   if (role === 'design') {
     return [
