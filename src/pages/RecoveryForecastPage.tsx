@@ -194,16 +194,37 @@ export default function RecoveryForecastPage() {
       : totalDelayDays <= 30
       ? '56%'
       : '34%'
+const recommendations = criticalTasks.slice(0, 6).map((task) => {
+  if (task.progressLag > 20)
+    return `Deploy additional manpower to ${task.name}`
 
-  return {
-    delayedTasks,
-    criticalTasks,
-    totalDelayDays,
-    forecastFinish,
-    recoverable,
-    requiredAcceleration,
-    completionConfidence,
-  }
+  if (task.downstream >= 2)
+    return `Prioritize ${task.name} because it blocks successor activities`
+
+  if (task.lateDays > 5)
+    return `Introduce weekend/overtime shifts for ${task.name}`
+
+  if (task.duration_days > 15)
+    return `Split ${task.name} into zones for parallel execution`
+
+  if (task.phase.toLowerCase().includes('interior'))
+    return `Fast-track materials procurement for ${task.name}`
+
+  if (task.phase.toLowerCase().includes('m&e'))
+    return `Run parallel inspections for ${task.name}`
+
+  return `Track ${task.name} daily with 48-hour commitments`
+})
+ return {
+  delayedTasks,
+  criticalTasks,
+  recommendations,
+  totalDelayDays,
+  forecastFinish,
+  recoverable,
+  requiredAcceleration,
+  completionConfidence,
+}
 }, [tasks])
 
   // ================= KPI =================
@@ -365,14 +386,15 @@ export default function RecoveryForecastPage() {
           Recommended Recovery Actions
         </h2>
 
-        <div className="space-y-3 text-sm text-slate-300">
-          <Action text="Deploy extra manpower to RED critical tasks" />
-          <Action text="Run parallel trades where dependencies allow" />
-          <Action text="Weekend overtime on critical path tasks" />
-          <Action text="Expedite procurement long-lead materials" />
-          <Action text="Daily contractor review with 48hr commitments" />
-          <Action text="Split zones to accelerate finishes" />
-        </div>
+       <div className="space-y-3 text-sm text-slate-300">
+  {engine.recommendations.length === 0 ? (
+    <Action text="Project stable. No urgent recovery action required." />
+  ) : (
+    engine.recommendations.map((item, i) => (
+      <Action key={i} text={item} />
+    ))
+  )}
+</div>
       </div>
     </div>
   )
