@@ -1,3 +1,6 @@
+import { useAuthStore } from '@/store/auth'
+import { getRole } from '@/lib/access'
+import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Search } from 'lucide-react'
 import { useSnags, useUpsertSnag } from '@/hooks/useData'
@@ -121,6 +124,11 @@ export default function SnagsPage() {
   const [sevFilter, setSevFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
   const [view, setView] = useState<'list' | 'room'>('list')
+  const { user } = useAuthStore()
+const role = getRole(user?.email)
+
+const canEdit =
+  canEditPage(role, 'snags')
 
   const filtered = snags.filter(s => {
     if (search && !s.title.toLowerCase().includes(search.toLowerCase()) && !String(s.snag_number).includes(search)) return false
@@ -149,6 +157,11 @@ export default function SnagsPage() {
 
   return (
     <div className="space-y-4">
+      {!canEdit && (
+  <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+    View Only Mode
+  </div>
+)}
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -189,9 +202,15 @@ export default function SnagsPage() {
           <option value="">All Status</option>
           {STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <button className="btn-gold btn-sm btn ml-auto" onClick={() => setModal('new')}>
-          <Plus size={13} /> Log Snag
-        </button>
+       {canEdit && (
+  <button
+    className="btn-gold btn-sm btn ml-auto"
+    onClick={() => setModal('new')}
+  >
+    <Plus size={13} />
+    Log Snag
+  </button>
+)}
       </div>
 
       {/* Room view */}
@@ -215,7 +234,9 @@ export default function SnagsPage() {
               </div>
               <div className="divide-y divide-white/[0.04]">
                 {g.snags.map(s => (
-                  <div key={s.id} className="flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-white/[0.02]" onClick={() => setModal(s)}>
+                  <div key={s.id} className="flex items-start gap-3 px-4 py-2.5 ${canEdit ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-default'} hover:bg-white/[0.02]" onClick={() => {
+  if (canEdit) setModal(s)
+}}>
                     <span className={`badge ${sevBadge(s.severity)} mt-0.5 flex-shrink-0`}>{s.severity}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] text-[#bfb9ae]">#{s.snag_number} — {s.title}</div>
@@ -262,7 +283,22 @@ export default function SnagsPage() {
                     <td className="hide-mobile">{fdate(s.raised_date)}</td>
                     <td className="hide-mobile">{fdate(s.target_close_date)}</td>
                     <td className="hide-mobile text-[11px] text-[#6e7d8c]">{s.assigned_contractor || '—'}</td>
-                    <td><button className="tbl-action" onClick={() => setModal(s)}>Edit</button></td>
+                    <td>
+  {canEdit ? (
+    <button
+      className="tbl-action"
+      onClick={() => {
+  if (canEdit) setModal(s)
+}}
+    >
+      Edit
+    </button>
+  ) : (
+    <span className="text-[#6e7d8c] text-[11px]">
+      View
+    </span>
+  )}
+</td>
                   </tr>
                 ))}
               </tbody>
