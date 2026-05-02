@@ -1,3 +1,4 @@
+import { getRole } from '@/lib/access'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import {
@@ -30,10 +31,45 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
   const { user, signOut } = useAuthStore()
+const role = getRole(user?.email)
   const location = useLocation()
   const daysLeft = differenceInDays(PROJECT_END, new Date())
 
-  const currentPage = NAV.find(n => n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to))
+  const allowedNav = NAV.filter(item => {
+  if (role === 'admin' || role === 'project') {
+    return true
+  }
+
+  if (role === 'design') {
+    return [
+      '/',
+      '/recovery',
+      '/documents',
+      '/snags',
+      '/risk',
+    ].includes(item.to)
+  }
+
+  if (role === 'costing') {
+    return [
+      '/',
+      '/recovery',
+      '/financial',
+      '/snags',
+      '/risk',
+    ].includes(item.to)
+  }
+
+  return [
+    '/',
+    '/recovery',
+  ].includes(item.to)
+})
+  const currentPage = allowedNav.find(n =>
+  n.exact
+    ? location.pathname === n.to
+    : location.pathname.startsWith(n.to)
+)
   const pageTitle = currentPage?.label || 'Dashboard'
 
   return (
@@ -60,6 +96,11 @@ export default function Layout() {
             Lakowe Lakes<br />SPA Centre
           </div>
           <div className="text-[10px] text-[#6e7d8c] mt-1">Mixta Africa · Lagos</div>
+          {role === 'guest' && (
+  <div className="mt-2 inline-block px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-semibold tracking-wide text-amber-400">
+    Executive View
+  </div>
+)}
         </div>
 
         {/* Countdown */}
@@ -79,7 +120,7 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-2">
-          {NAV.map(({ to, icon: Icon, label, exact }) => (
+          {allowedNav.map(({ to, icon: Icon, label, exact }) => (
             <NavLink
               key={to}
               to={to}
@@ -101,7 +142,18 @@ export default function Layout() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[11px] font-medium text-[#ede8de] truncate">{user?.full_name || 'User'}</div>
-              <div className="text-[9px] text-[#6e7d8c] capitalize">Admin User</div>
+              <div className="text-[9px] text-[#6e7d8c] capitalize">{
+  role === 'guest'
+    ? 'Management'
+    : role === 'project'
+    ? 'Project Team'
+    : role === 'design'
+    ? 'Design Team'
+    : role === 'costing'
+    ? 'Costing Team'
+    : 'Administrator'
+}
+              </div>
             </div>
             <button onClick={signOut} className="text-[#6e7d8c] hover:text-red-400 transition-colors" title="Sign out">
               <LogOut size={13} />
