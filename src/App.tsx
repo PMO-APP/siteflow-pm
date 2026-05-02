@@ -1,3 +1,4 @@
+import AuditPage from '@/pages/AuditPage'
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -144,6 +145,12 @@ export default function App() {
                 <ReportsPage />
               }
             />
+            {role === 'admin' && (
+  <Route
+    path="audit"
+    element={<AuditPage />}
+  />
+)}
           </>
         )}
 
