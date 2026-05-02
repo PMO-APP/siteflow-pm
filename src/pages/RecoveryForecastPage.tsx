@@ -356,14 +356,14 @@ const recommendations = criticalTasks.slice(0, 6).map((task) => {
             </thead>
 
            <tbody>
-  {engine.criticalTasks.length === 0 ? (
+  {engine.delayedTasks.length === 0 ? (
     <tr>
       <td colSpan={5} className="py-6 text-center text-emerald-400">
         No critical delayed activities detected. Project stable.
       </td>
     </tr>
   ) : (
-    engine.criticalTasks.map((task) => (
+    engine.delayedTasks.map((task) => (
       <tr key={task.id} className="border-b border-slate-800">
         <td className="py-2">{task.task_number}</td>
         <td className="py-2">{task.name}</td>
