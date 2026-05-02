@@ -194,26 +194,47 @@ export default function RecoveryForecastPage() {
       : totalDelayDays <= 30
       ? '56%'
       : '34%'
-const recommendations = criticalTasks.slice(0, 6).map((task) => {
-  if (task.progressLag > 20)
-    return `Deploy additional manpower to ${task.name}`
+const sourceTasks =
+  delayedTasks.length > 0
+    ? delayedTasks
+    : criticalTasks
 
-  if (task.downstream >= 2)
-    return `Prioritize ${task.name} because it blocks successor activities`
+const recommendations = sourceTasks.slice(0, 6).map((task) => {
+  const taskName = task.name.toLowerCase()
 
-  if (task.lateDays > 5)
-    return `Introduce weekend/overtime shifts for ${task.name}`
+  if (
+    taskName.includes('block') ||
+    taskName.includes('tiling') ||
+    taskName.includes('plaster')
+  ) {
+    return `Add additional labour crew to ${task.name}`
+  }
 
-  if (task.duration_days > 15)
-    return `Split ${task.name} into zones for parallel execution`
+  if (
+    taskName.includes('door') ||
+    taskName.includes('window') ||
+    taskName.includes('sanitary')
+  ) {
+    return `Fast-track materials delivery for ${task.name}`
+  }
 
-  if (task.phase.toLowerCase().includes('interior'))
-    return `Fast-track materials procurement for ${task.name}`
+  if (
+    taskName.includes('m&e') ||
+    taskName.includes('electrical') ||
+    taskName.includes('plumbing')
+  ) {
+    return `Run extended hours and parallel inspections for ${task.name}`
+  }
 
-  if (task.phase.toLowerCase().includes('m&e'))
-    return `Run parallel inspections for ${task.name}`
+  if (task.downstream >= 2) {
+    return `Prioritize ${task.name} urgently because successor tasks depend on it`
+  }
 
-  return `Track ${task.name} daily with 48-hour commitments`
+  if (task.duration_days > 10) {
+    return `Split ${task.name} into work zones for parallel execution`
+  }
+
+  return `Daily review and 48-hour action plan for ${task.name}`
 })
  return {
   delayedTasks,
