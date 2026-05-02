@@ -1,3 +1,5 @@
+import { getRole } from '@/lib/access'
+import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import { useFinancial, useUpsertFinancial } from '@/hooks/useData'
@@ -13,6 +15,10 @@ export default function FinancialPage() {
   const { data: items = [], isLoading } = useFinancial()
   const upsert = useUpsertFinancial()
   const { user } = useAuthStore()
+  const role = getRole(user?.email)
+
+const canEdit =
+  canEditPage(role, 'financial')
   const [modal, setModal] = useState<FinancialItem | null | 'new'>(null)
 
   const [form, setForm] = useState({
@@ -78,6 +84,11 @@ export default function FinancialPage() {
 
   return (
     <div className="space-y-4">
+      {!canEdit && (
+  <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+    View Only Mode
+  </div>
+)}
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
@@ -117,7 +128,15 @@ export default function FinancialPage() {
       {/* Table */}
       <div className="flex justify-between items-center">
         <div className="font-display text-[16px] font-semibold text-[#ede8de]">Financial Register</div>
-        <button className="btn-gold btn-sm btn" onClick={openNew}><Plus size={13} /> Add Item</button>
+        {canEdit && (
+  <button
+    className="btn-gold btn-sm btn"
+    onClick={openNew}
+  >
+    <Plus size={13} />
+    Add Item
+  </button>
+)}
       </div>
 
       <div className="card">
@@ -145,7 +164,22 @@ export default function FinancialPage() {
                     </span>
                   </td>
                   <td>{fdate(item.submitted_date)}</td>
-                  <td><button className="tbl-action" onClick={() => openEdit(item)}>Edit</button></td>
+                  <td>
+  {canEdit ? (
+    <button
+      className="tbl-action"
+      onClick={() =>
+        openEdit(item)
+      }
+    >
+      Edit
+    </button>
+  ) : (
+    <span className="text-[#6e7d8c] text-[11px]">
+      View
+    </span>
+  )}
+</td>
                 </tr>
               ))}
             </tbody>
@@ -154,7 +188,7 @@ export default function FinancialPage() {
       </div>
 
       {/* Modal */}
-      {modal !== null && (
+      {modal !== null && canEdit && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="gold-bar" />
