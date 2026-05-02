@@ -1,3 +1,4 @@
+import { logAudit } from '@/lib/audit'
 import { useAuthStore } from '@/store/auth'
 import { getRole } from '@/lib/access'
 import { canEditPage } from '@/lib/permissions'
@@ -19,6 +20,7 @@ const ROOMS = [
 
 function SnagModal({ item, onClose }: { item: Snag | null; onClose: () => void }) {
   const upsert = useUpsertSnag()
+  const { user } = useAuthStore()
   const [form, setForm] = useState({
     title: item?.title || '',
     description: item?.description || '',
@@ -35,9 +37,31 @@ function SnagModal({ item, onClose }: { item: Snag | null; onClose: () => void }
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
   const save = async () => {
-    await upsert.mutateAsync({ id: item?.id, ...form })
-    onClose()
-  }
+    if (!form.title.trim()) return
+    if (
+  form.status === 'Closed' &&
+  !form.closed_date
+) {
+  form.closed_date =
+    new Date()
+      .toISOString()
+      .slice(0,10)
+}
+  await upsert.mutateAsync({
+    id: item?.id,
+    ...form
+  })
+
+  await logAudit(
+    user,
+    item ? 'UPDATE' : 'CREATE',
+    'Snags',
+    item?.id || 'new',
+    form.title
+  )
+
+  onClose()
+}
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -234,9 +258,17 @@ const canEdit =
               </div>
               <div className="divide-y divide-white/[0.04]">
                 {g.snags.map(s => (
-                  <div key={s.id} className="flex items-start gap-3 px-4 py-2.5 ${canEdit ? 'cursor-pointer hover:bg-white/[0.02]' : 'cursor-default'} hover:bg-white/[0.02]" onClick={() => {
-  if (canEdit) setModal(s)
-}}>
+                  <div
+  key={s.id}
+  className={`flex items-start gap-3 px-4 py-2.5 ${
+    canEdit
+      ? 'cursor-pointer hover:bg-white/[0.02]'
+      : 'cursor-default'
+  }`}
+  onClick={() => {
+    if (canEdit) setModal(s)
+  }}
+>
                     <span className={`badge ${sevBadge(s.severity)} mt-0.5 flex-shrink-0`}>{s.severity}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-[12px] text-[#bfb9ae]">#{s.snag_number} — {s.title}</div>
@@ -307,7 +339,7 @@ const canEdit =
         </div>
       )}
 
-      {modal !== null && (
+      {modal !== null && canEdit && (
         <SnagModal item={modal === 'new' ? null : modal as Snag} onClose={() => setModal(null)} />
       )}
     </div>
