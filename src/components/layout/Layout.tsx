@@ -23,6 +23,7 @@ const NAV = [
   { to: '/documents', icon: FolderOpen, label: 'Documents' },
   { to: '/financial', icon: DollarSign, label: 'Financial' },
   { to: '/risk', icon: Shield, label: 'Risk Register' },
+  { to: '/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/team', icon: Users, label: 'Team' },
   { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/audit', icon: ShieldCheck, label: 'Audit Trail' },
