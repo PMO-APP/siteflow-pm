@@ -1,3 +1,4 @@
+import RiskTrendPage from '@/pages/RiskTrendPage'
 import AuditPage from '@/pages/AuditPage'
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
@@ -135,6 +136,10 @@ export default function App() {
               path="risk"
               element={<RiskPage />}
             />
+            <Route
+  path="risk-trends"
+  element={<RiskTrendPage />}
+/>
             <Route
               path="team"
               element={<TeamPage />}
