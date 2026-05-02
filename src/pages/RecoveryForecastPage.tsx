@@ -334,51 +334,55 @@ const recommendations = criticalTasks.slice(0, 6).map((task) => {
       </div>
 
       {/* Delayed Tasks Table */}
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-4">
-          Critical Delayed Activities
-        </h2>
+<div className="card p-5">
+  <h2 className="text-lg font-semibold mb-4">
+    Critical Delayed Activities
+  </h2>
 
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="text-slate-400 border-b border-slate-700">
-              <tr>
-                <th className="text-left py-2">#</th>
-                <th className="text-left py-2">Task</th>
-                <th className="text-left py-2">Phase</th>
-                <th className="text-left py-2">
-                  Planned Finish
-                </th>
-                <th className="text-left py-2">
-                  Progress
-                </th>
-              </tr>
-            </thead>
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm">
+      <thead className="text-slate-400 border-b border-slate-800">
+        <tr>
+          <th className="text-left py-3">#</th>
+          <th className="text-left">Task</th>
+          <th className="text-left">Phase</th>
+          <th className="text-left">Planned Finish</th>
+          <th className="text-left">Progress</th>
+        </tr>
+      </thead>
 
-           <tbody>
-  {engine.delayedTasks.length === 0 ? (
-    <tr>
-      <td colSpan={5} className="py-6 text-center text-emerald-400">
-        No critical delayed activities detected. Project stable.
-      </td>
-    </tr>
-  ) : (
-    engine.delayedTasks.map((task) => (
-      <tr key={task.id} className="border-b border-slate-800">
-        <td className="py-2">{task.task_number}</td>
-        <td className="py-2">{task.name}</td>
-        <td className="py-2">{task.phase}</td>
-        <td className="py-2">{task.finish_date}</td>
-        <td className="py-2 text-red-400 font-semibold">
-          Risk {task.score}
-        </td>
-      </tr>
-    ))
-  )}
-</tbody>
-          </table>
-        </div>
-      </div>
+      <tbody>
+        {engine.delayedTasks.length === 0 ? (
+          <tr>
+            <td
+              colSpan={5}
+              className="py-6 text-center text-emerald-400"
+            >
+              No delayed critical activities.
+            </td>
+          </tr>
+        ) : (
+          engine.delayedTasks.map((task) => (
+            <tr
+              key={task.id}
+              className="border-b border-slate-900"
+            >
+              <td className="py-3">
+                {task.task_number}
+              </td>
+              <td>{task.name}</td>
+              <td>{task.phase}</td>
+              <td>{task.finish_date}</td>
+              <td className="text-red-400">
+                {task.progress_pct}%
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
 
       {/* Recovery Actions */}
       <div className="card p-5">
@@ -387,7 +391,7 @@ const recommendations = criticalTasks.slice(0, 6).map((task) => {
         </h2>
 
        <div className="space-y-3 text-sm text-slate-300">
-  {engine.recommendations.length === 0 ? (
+  {engine.delayedTasks.length === 0 && engine.criticalTasks.length === 0 ? (
     <Action text="Project stable. No urgent recovery action required." />
   ) : (
     engine.recommendations.map((item, i) => (
