@@ -3,7 +3,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
   HardHat, AlertTriangle, FolderOpen, DollarSign, Shield,
-  Users, FileText, Bell, LogOut, Menu, X, ChevronDown
+  Users, FileText, Bell, LogOut, Menu, X, ChevronDown, BarChart3
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
@@ -14,6 +14,7 @@ import NotificationsPanel from '@/components/modules/dashboard/NotificationsPane
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/schedule', icon: CalendarDays, label: 'Schedule' },
+  { to: '/recovery', icon: BarChart3, label: 'Recovery Forecast' },
   { to: '/procurement', icon: ShoppingCart, label: 'Procurement' },
   { to: '/approvals', icon: CheckSquare, label: 'Approvals' },
   { to: '/site', icon: HardHat, label: 'Site Progress' },
