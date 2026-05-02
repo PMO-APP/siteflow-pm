@@ -1,3 +1,6 @@
+import { supabase } from '@/lib/supabase'
+import { getRole } from '@/lib/access'
+import { logAudit } from '@/lib/audit'
 import { useState } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks'
@@ -14,6 +17,7 @@ interface Props {
 
 export default function TaskModal({ task, onClose }: Props) {
   const { user } = useAuthStore()
+  const role = getRole(user?.email)
   const create = useCreateTask()
   const update = useUpdateTask()
   const del = useDeleteTask()
@@ -36,20 +40,183 @@ export default function TaskModal({ task, onClose }: Props) {
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
   const save = async () => {
-    if (!form.name.trim()) return
-    if (task) {
-      await update.mutateAsync({ id: task.id, ...form })
-    } else {
-      await create.mutateAsync({ ...form, rag: '', created_by: user?.id } as any)
+  if (!form.name.trim()) return
+
+  if (task) {
+    await update.mutateAsync({
+      id: task.id,
+      ...form
+    })
+
+  const changes: string[] = []
+
+if (task.finish_date !== form.finish_date) {
+  const oldDate = task.finish_date
+  const newDate = form.finish_date
+
+  changes.push(
+    `Finish Date ${oldDate || '-'}→${newDate || '-'}`
+  )
+
+  if (oldDate && newDate) {
+    const oldD = new Date(oldDate)
+    const newD = new Date(newDate)
+
+    const diffDays =
+      Math.round(
+        (newD.getTime() - oldD.getTime()) /
+        (1000 * 60 * 60 * 24)
+      )
+
+    if (diffDays > 0 && diffDays < 7) {
+      changes.push(
+        `Delay Warning: +${diffDays} days`
+      )
     }
-    onClose()
+
+    if (diffDays >= 7) {
+  changes.push(
+    `CRITICAL DELAY CHANGE: +${diffDays} days`
+  )
+
+  await supabase
+    .from('risks')
+    .upsert(
+  {
+    title: `${form.name} causing critical delay`,
+    category: 'Schedule',
+    owner: form.responsible || 'PM',
+    severity: 'High',
+    status: 'Open',
+    mitigation: 'Immediate recovery plan required',
+    source: 'Auto from Schedule'
+  },
+  {
+    onConflict: 'title,source'
+  }
+)
+}
+
+    if (diffDays < 0) {
+  changes.push(
+    `Recovered ${Math.abs(diffDays)} days`
+  )
+
+  await supabase
+    .from('risks')
+    .update({
+      severity: 'Medium',
+      status: 'Monitoring',
+      mitigation: 'Delay partially recovered'
+    })
+    .eq(
+      'title',
+      `${form.name} causing critical delay`
+    )
+    .eq(
+      'source',
+      'Auto from Schedule'
+    )
+
+  if (Math.abs(diffDays) >= 7) {
+    await supabase
+      .from('risks')
+      .update({
+        severity: 'Low',
+        status: 'Closed',
+        mitigation:
+          'Recovered through programme acceleration'
+      })
+      .eq(
+        'title',
+        `${form.name} causing critical delay`
+      )
+      .eq(
+        'source',
+        'Auto from Schedule'
+      )
+  }
+}
+  }
+}
+
+if (task.start_date !== form.start_date) {
+  changes.push(
+    `Start Date ${task.start_date || '-'}→${form.start_date || '-'}`
+  )
+}
+
+if (task.progress_pct !== form.progress_pct) {
+  changes.push(
+    `Progress ${task.progress_pct}%→${form.progress_pct}%`
+  )
+}
+
+if (task.status !== form.status) {
+  changes.push(
+    `Status ${task.status}→${form.status}`
+  )
+}
+
+if (task.dependencies !== form.dependencies) {
+  changes.push(
+    `Deps ${task.dependencies || '-'}→${form.dependencies || '-'}`
+  )
+}
+
+if (task.responsible !== form.responsible) {
+  changes.push(
+    `Owner ${task.responsible || '-'}→${form.responsible || '-'}`
+  )
+}
+
+const desc =
+  changes.length > 0
+    ? changes.join(' | ')
+    : `${form.name} updated`
+
+await logAudit(
+  user,
+  'UPDATE',
+  'Schedule',
+  task.id,
+  desc
+)
+
+  } else {
+    await create.mutateAsync({
+      ...form,
+      rag: '',
+      created_by: user?.id
+    } as any)
+
+    await logAudit(
+      user,
+      'CREATE',
+      'Schedule',
+      'new',
+      `${form.name}`
+    )
   }
 
+  onClose()
+}
+
   const remove = async () => {
-    if (!task || !confirm('Delete this task?')) return
-    await del.mutateAsync(task.id)
-    onClose()
-  }
+  if (!task || !confirm('Delete this task?')) return
+
+  await del.mutateAsync(task.id)
+
+  await logAudit(
+    user,
+    'DELETE',
+    'Schedule',
+    task.id,
+    task.name
+  )
+
+  onClose()
+}
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -57,7 +224,14 @@ export default function TaskModal({ task, onClose }: Props) {
         <div className="gold-bar" />
         <div className="modal-head">
           <div className="modal-title">{task ? `Edit Task #${task.task_number}` : 'New Task'}</div>
-          {task && <button onClick={remove} className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"><Trash2 size={14} /></button>}
+          {task && role === 'admin' && (
+  <button
+    onClick={remove}
+    className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"
+  >
+    <Trash2 size={14} />
+  </button>
+)}
           <button onClick={onClose} className="text-[#6e7d8c] hover:text-[#ede8de] transition-colors p-1"><X size={16} /></button>
         </div>
 
