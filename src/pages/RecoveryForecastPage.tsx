@@ -226,9 +226,9 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
     return `Run extended hours and parallel inspections for ${task.name}`
   }
 
-  if (task.downstream >= 2) {
-    return `Prioritize ${task.name} urgently because successor tasks depend on it`
-  }
+  if (task.dependencies) {
+  return `Prioritize ${task.name} as linked successor activities may be impacted`
+}
 
   if (task.duration_days > 10) {
     return `Split ${task.name} into work zones for parallel execution`
