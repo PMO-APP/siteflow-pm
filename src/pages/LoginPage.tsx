@@ -240,7 +240,29 @@ if (msg.includes('invalid')) {
                onClick={() => {
   setError('')
   setSuccess('')
-  setMode(mode === 'login' ? 'signup' : 'login')
+
+  const nextMode =
+    mode === 'login'
+      ? 'signup'
+      : 'login'
+
+  setMode(nextMode)
+
+  if (nextMode === 'signup') {
+    setName('')
+    setEmail('')
+    setPassword('')
+    setRememberMe(false)
+  } else {
+    const savedEmail =
+      localStorage.getItem('savedEmail')
+
+    const savedPassword =
+      localStorage.getItem('savedPassword')
+
+    setEmail(savedEmail || '')
+    setPassword(savedPassword || '')
+  }
 }}
                 className="text-[12px] text-[#6e7d8c] hover:text-[#c49e48] transition-colors"
               >
