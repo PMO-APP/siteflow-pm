@@ -386,12 +386,59 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
         </p>
       </div>
 
-      return (
-  <div className="space-y-5 text-white">
-
     <div className="grid md:grid-cols-3 gap-4">
-      ...
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-2">
+      Executive Summary
+    </h2>
+    <p className="text-slate-300">
+      {engine.summary}
+    </p>
+  </div>
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-3">
+      Recovery Probability
+    </h2>
+
+    <div className="w-full bg-slate-800 h-4 rounded-full overflow-hidden">
+      <div
+        className="h-4 bg-emerald-500"
+        style={{ width: `${engine.recoveryScore}%` }}
+      />
     </div>
+
+    <p className="mt-2 text-sm text-slate-400">
+      {engine.recoveryScore}% likelihood of meeting completion date
+    </p>
+  </div>
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-4">
+      Delay Heatmap
+    </h2>
+
+    <div className="space-y-3">
+      {Object.entries(engine.phaseHeatmap).map(([phase, count]: any) => (
+        <div key={phase}>
+          <div className="flex justify-between text-sm mb-1">
+            <span>{phase}</span>
+            <span>{count}</span>
+          </div>
+
+          <div className="w-full h-3 bg-slate-800 rounded">
+            <div
+              className="h-3 bg-red-500 rounded"
+              style={{ width: `${count * 20}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+
+</div>
       {/* KPI Row */}
       <div className="grid md:grid-cols-5 gap-4">
         {kpis.map((item) => {
