@@ -245,9 +245,100 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
   recoverable,
   requiredAcceleration,
   completionConfidence,
+
+  summary:
+    totalDelayDays === 0
+      ? 'Project currently on track with no active delays.'
+      : totalDelayDays <= 7
+      ? 'Minor delays detected. Recoverable with immediate action.'
+      : totalDelayDays <= 14
+      ? 'Moderate delays affecting programme. Recovery measures required.'
+      : 'Major delays threatening completion date. Executive intervention required.',
+
+  recoveryScore:
+    totalDelayDays === 0
+      ? 95
+      : totalDelayDays <= 7
+      ? 80
+      : totalDelayDays <= 14
+      ? 65
+      : totalDelayDays <= 30
+      ? 45
+      : 20,
+
+  phaseHeatmap: tasks.reduce((acc: any, task) => {
+    const finish = new Date(task.finish_date)
+    const delayed =
+      finish < today &&
+      Number(task.progress_pct) < 100
+
+    if (!acc[task.phase]) acc[task.phase] = 0
+    if (delayed) acc[task.phase] += 1
+
+    return acc
+  }, {}),
 }
 }, [tasks])
 
+  <div className="grid md:grid-cols-3 gap-4">
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-2">
+      Executive Summary
+    </h2>
+    <p className="text-slate-300">
+      {engine.summary}
+    </p>
+  </div>
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-3">
+      Recovery Probability
+    </h2>
+
+    <div className="w-full bg-slate-800 h-4 rounded-full overflow-hidden">
+      <div
+        className="h-4 bg-emerald-500"
+        style={{
+          width: `${engine.recoveryScore}%`,
+        }}
+      />
+    </div>
+
+    <p className="mt-2 text-sm text-slate-400">
+      {engine.recoveryScore}% likelihood of meeting completion date
+    </p>
+  </div>
+
+  <div className="card p-5">
+    <h2 className="text-lg font-semibold mb-4">
+      Delay Heatmap
+    </h2>
+
+    <div className="space-y-3">
+      {Object.entries(engine.phaseHeatmap).map(
+        ([phase, count]: any) => (
+          <div key={phase}>
+            <div className="flex justify-between text-sm mb-1">
+              <span>{phase}</span>
+              <span>{count}</span>
+            </div>
+
+            <div className="w-full h-3 bg-slate-800 rounded">
+              <div
+                className="h-3 bg-red-500 rounded"
+                style={{
+                  width: `${count * 20}%`,
+                }}
+              />
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  </div>
+
+</div>
   // ================= KPI =================
 
   const kpis: KPI[] = [
