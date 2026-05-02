@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/lib/supabase'
@@ -11,41 +12,110 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [name, setName] = useState('')
+  const [success, setSuccess] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
+const [showPassword, setShowPassword] = useState(false)
+  useEffect(() => {
+  const savedEmail =
+    localStorage.getItem('savedEmail')
+
+  const savedPassword =
+    localStorage.getItem('savedPassword')
+
+  if (savedEmail) setEmail(savedEmail)
+
+  if (savedPassword) {
+    setPassword(savedPassword)
+    setRememberMe(true)
+  }
+}, [])
 
   if (user) return <Navigate to="/" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      if (mode === 'signup') {
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: name } }
-  })
+  e.preventDefault()
+  setLoading(true)
+  setError('')
+  setSuccess('')
 
-  if (error) throw error
+  try {
+    if (mode === 'signup') {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: name },
+          emailRedirectTo:
+            'https://siteflow-pm-n8fp-2q49fgxpq-ebi-bio-ibogomos-projects.vercel.app/login',
+        },
+      })
 
-  alert("Account created successfully. Please check your email to verify your account.")
+      if (error) throw error
 
-} else {
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
+      setName('')
+      setEmail('')
+      setPassword('')
+
+      setSuccess(
+        'Account created successfully. Please check your email to verify your account.'
+      )
+    } else {
+      const { error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+      if (error) throw error
+
+      localStorage.setItem(
+  'savedEmail',
+  email
+)
+
+if (rememberMe) {
+  localStorage.setItem(
+    'savedPassword',
     password
-  })
-
-  if (error) throw error
-
-  window.location.href = "/"
+  )
+} else {
+  localStorage.removeItem(
+    'savedPassword'
+  )
 }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed')
-    } finally {
-      setLoading(false)
+
+window.location.href = '/'
     }
+  } catch (err: any) {
+    const msg =
+  err.message?.toLowerCase() || ''
+
+if (msg.includes('invalid')) {
+  setError(
+    'Incorrect email or password.'
+  )
+} else if (
+  msg.includes('already')
+) {
+  setError(
+    'You already have an account. Please sign in.'
+  )
+} else if (
+  msg.includes('confirm')
+) {
+  setError(
+    'Please verify your email first.'
+  )
+} else {
+  setError(
+    err.message ||
+      'Unable to continue.'
+  )
+}
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="h-full flex items-center justify-center bg-[#0c1014] p-4">
@@ -70,6 +140,11 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
+            {success && (
+  <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+    {success}
+  </div>
+)}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
@@ -96,18 +171,61 @@ export default function LoginPage() {
                   required
                 />
               </div>
-              <div>
-                <label className="form-label">Password</label>
-                <input
-                  className="form-control"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
-              </div>
+             <div>
+  <label className="form-label">
+    Password
+  </label>
+
+  <div className="relative">
+    <input
+      className="form-control pr-10"
+      type={
+        showPassword
+          ? 'text'
+          : 'password'
+      }
+      value={password}
+      onChange={e =>
+        setPassword(
+          e.target.value
+        )
+      }
+      placeholder="••••••••"
+      required
+      minLength={6}
+    />
+
+    <button
+      type="button"
+      onClick={() =>
+        setShowPassword(
+          !showPassword
+        )
+      }
+      className="absolute right-3 top-3 text-[#6e7d8c]"
+    >
+      {showPassword ? (
+        <EyeOff size={16} />
+      ) : (
+        <Eye size={16} />
+      )}
+    </button>
+  </div>
+</div>
+           {mode === 'login' && (
+  <div className="flex items-center gap-2 text-sm text-slate-400">
+    <input
+      type="checkbox"
+      checked={rememberMe}
+      onChange={() =>
+        setRememberMe(!rememberMe)
+      }
+    />
+    <span>
+      Remember me
+    </span>
+  </div>
+)}
               <button
                 type="submit"
                 disabled={loading}
@@ -119,7 +237,11 @@ export default function LoginPage() {
 
             <div className="mt-4 text-center">
               <button
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+               onClick={() => {
+  setError('')
+  setSuccess('')
+  setMode(mode === 'login' ? 'signup' : 'login')
+}}
                 className="text-[12px] text-[#6e7d8c] hover:text-[#c49e48] transition-colors"
               >
                 {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
@@ -129,7 +251,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mt-4 text-[10px] text-[#6e7d8c]">
-          Completion Target: 18 September 2026
+          Developed by E.B.I
         </div>
       </div>
     </div>
