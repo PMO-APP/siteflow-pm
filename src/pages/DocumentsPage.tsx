@@ -1,3 +1,4 @@
+import { logAudit } from '@/lib/audit'
 import { getRole } from '@/lib/access'
 import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
@@ -34,25 +35,61 @@ function DocModal({ item, onClose }: { item: Document | null; onClose: () => voi
   })
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    const result = await uploadFile('documents', file, 'docs')
-    if (result) {
-      set('storage_path', result.path)
-      set('public_url', result.publicUrl)
-      set('file_size_kb', Math.round(file.size / 1024))
-      set('file_type', file.type)
-    }
-    setUploading(false)
+  const handleFile = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = e.target.files?.[0]
+
+  if (!file) return
+
+  setUploading(true)
+
+  const result = await uploadFile(
+    'documents',
+    file,
+    'docs'
+  )
+
+  if (result) {
+    set('storage_path', result.path)
+    set('public_url', result.publicUrl)
+    set(
+      'file_size_kb',
+      Math.round(file.size / 1024)
+    )
+    set('file_type', file.type)
+
+    await logAudit(
+      user,
+      'UPLOAD',
+      'Documents',
+      item?.id || 'new',
+      `${form.title || file.name} Rev ${form.revision}`
+    )
   }
 
+  setUploading(false)
+}
+
   const save = async () => {
-    if (!form.title.trim()) return
-    await upsert.mutateAsync({ id: item?.id, ...form, uploaded_by: user?.id })
-    onClose()
-  }
+  if (!form.title.trim()) return
+
+  await upsert.mutateAsync({
+    id: item?.id,
+    ...form,
+    uploaded_by: user?.id
+  })
+
+  await logAudit(
+    user,
+    item ? 'UPDATE' : 'CREATE',
+    'Documents',
+    item?.id || 'new',
+    `${form.title} Rev ${form.revision}`
+  )
+
+  onClose()
+}
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
