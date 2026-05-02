@@ -280,17 +280,6 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
 }
 }, [tasks])
 
-  <div className="grid md:grid-cols-3 gap-4">
-
-  <div className="card p-5">
-    <h2 className="text-lg font-semibold mb-2">
-      Executive Summary
-    </h2>
-    <p className="text-slate-300">
-      {engine.summary}
-    </p>
-  </div>
-
   <div className="card p-5">
     <h2 className="text-lg font-semibold mb-3">
       Recovery Probability
@@ -397,6 +386,12 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
         </p>
       </div>
 
+      return (
+  <div className="space-y-5 text-white">
+
+    <div className="grid md:grid-cols-3 gap-4">
+      ...
+    </div>
       {/* KPI Row */}
       <div className="grid md:grid-cols-5 gap-4">
         {kpis.map((item) => {
