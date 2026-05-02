@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Bell, X, Check, AlertTriangle, Info, CheckCircle } from 'lucide-react'
 import { useNotifications } from '@/hooks/useData'
 import { useAuthStore } from '@/store/auth'
@@ -11,6 +12,28 @@ export default function NotificationsPanel({ onClose }: Props) {
   const { user } = useAuthStore()
   const { data: notifications = [] } = useNotifications(user?.id)
   const qc = useQueryClient()
+  useEffect(() => {
+  const channel = supabase
+    .channel('live-notifications')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+      },
+      () => {
+        qc.invalidateQueries({
+          queryKey: ['notifications'],
+        })
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [qc])
 
   const markRead = async (id: string) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id)
