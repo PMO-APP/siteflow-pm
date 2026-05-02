@@ -412,13 +412,15 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
         </h2>
 
        <div className="space-y-3 text-sm text-slate-300">
-  {engine.delayedTasks.length === 0 && engine.criticalTasks.length === 0 ? (
-    <Action text="Project stable. No urgent recovery action required." />
-  ) : (
-    engine.recommendations.map((item, i) => (
-      <Action key={i} text={item} />
-    ))
-  )}
+ {engine.delayedTasks.length === 0 ? (
+  <div className="text-emerald-400 text-sm">
+    No recovery action required. Project on track.
+  </div>
+) : (
+  engine.recommendations.map((item, i) => (
+    <Action key={i} text={item} />
+  ))
+)}
 </div>
       </div>
     </div>
