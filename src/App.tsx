@@ -1,3 +1,4 @@
+import ProjectsPage from '@/pages/ProjectsPage'
 import RiskTrendPage from '@/pages/RiskTrendPage'
 import AuditPage from '@/pages/AuditPage'
 import { useEffect } from 'react'
@@ -68,7 +69,14 @@ export default function App() {
         path="/login"
         element={<LoginPage />}
       />
-
+<Route
+  path="/projects"
+  element={
+    <RequireAuth>
+      <ProjectsPage />
+    </RequireAuth>
+  }
+/>
       <Route
         path="/"
         element={
