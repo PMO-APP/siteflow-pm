@@ -76,9 +76,6 @@ export const useUpdateTask = () => {
 
 export const useCreateTask = () => {
   const qc = useQueryClient()
-  const { projectId } =
-    useProjectStore()
-  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (task: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'duration_days'>) => {
       const { data, error } = await supabase.from('tasks').insert({
