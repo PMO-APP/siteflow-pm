@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -7,17 +8,47 @@ import type {
 } from '@/types'
 
 // ─── PROCUREMENT ───────────────────────────────────────
-export const useProcurement = () => useQuery({
-  queryKey: ['procurement'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('procurement_items').select('*').order('order_by_date')
-    if (error) throw error
-    return data as ProcurementItem[]
-  },
-})
+export const useProcurement = () => {
+  const { projectId } =
+    useProjectStore()
+
+  return useQuery({
+    queryKey: [
+      'procurement',
+      projectId
+    ],
+
+    enabled:
+      !!projectId,
+
+    queryFn: async () => {
+      const { data, error } =
+        await supabase
+          .from(
+            'procurement_items'
+          )
+          .select('*')
+          .eq(
+            'project_id',
+            projectId
+          )
+          .order(
+            'order_by_date'
+          )
+
+      if (error)
+        throw error
+
+      return data as ProcurementItem[]
+    },
+  })
+}
 
 export const useUpsertProcurement = () => {
   const qc = useQueryClient()
+
+  const { projectId } =
+    useProjectStore()
   return useMutation({
     mutationFn: async (item: Partial<ProcurementItem> & { id?: string }) => {
       const { id, ...rest } = item
@@ -26,12 +57,15 @@ export const useUpsertProcurement = () => {
         if (error) throw error
         return data
       } else {
-        const { data, error } = await supabase.from('procurement_items').insert(rest).select().single()
+        const { data, error } = await supabase.from('procurement_items').insert({
+  ...rest,
+  project_id: projectId
+}).select().single()
         if (error) throw error
         return data
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['procurement'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['procurement', projectId] }),
   })
 }
 
@@ -47,17 +81,45 @@ export const useDeleteProcurement = () => {
 }
 
 // ─── APPROVALS ─────────────────────────────────────────
-export const useApprovals = () => useQuery({
-  queryKey: ['approvals'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('approvals').select('*').order('deadline')
-    if (error) throw error
-    return data as Approval[]
-  },
-})
+export const useApprovals = () => {
+  const { projectId } =
+    useProjectStore()
+
+  return useQuery({
+    queryKey: [
+      'approvals',
+      projectId
+    ],
+
+    enabled:
+      !!projectId,
+
+    queryFn: async () => {
+      const { data, error } =
+        await supabase
+          .from('approvals')
+          .select('*')
+          .eq(
+            'project_id',
+            projectId
+          )
+          .order(
+            'deadline'
+          )
+
+      if (error)
+        throw error
+
+      return data as Approval[]
+    },
+  })
+}
 
 export const useUpsertApproval = () => {
   const qc = useQueryClient()
+
+  const { projectId } =
+    useProjectStore()
   return useMutation({
     mutationFn: async (item: Partial<Approval> & { id?: string }) => {
       const { id, ...rest } = item
@@ -66,12 +128,15 @@ export const useUpsertApproval = () => {
         if (error) throw error
         return data
       } else {
-        const { data, error } = await supabase.from('approvals').insert(rest).select().single()
+        const { data, error } = await supabase.from('approvals').insert({
+  ...rest,
+  project_id: projectId
+}).select().single()
         if (error) throw error
         return data
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals', projectId] }),
   })
 }
 
@@ -105,17 +170,50 @@ export const useUpsertSiteReport = () => {
 }
 
 // ─── SNAGS ─────────────────────────────────────────────
-export const useSnags = () => useQuery({
-  queryKey: ['snags'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('snags').select('*, profiles(full_name, role)').order('created_at', { ascending: false })
-    if (error) throw error
-    return data as Snag[]
-  },
-})
+export const useSnags = () => {
+  const { projectId } =
+    useProjectStore()
+
+  return useQuery({
+    queryKey: [
+      'snags',
+      projectId
+    ],
+
+    enabled:
+      !!projectId,
+
+    queryFn: async () => {
+      const { data, error } =
+        await supabase
+          .from('snags')
+          .select(
+            '*, profiles(full_name, role)'
+          )
+          .eq(
+            'project_id',
+            projectId
+          )
+          .order(
+            'created_at',
+            {
+              ascending: false
+            }
+          )
+
+      if (error)
+        throw error
+
+      return data as Snag[]
+    },
+  })
+}
 
 export const useUpsertSnag = () => {
   const qc = useQueryClient()
+
+  const { projectId } =
+    useProjectStore()
   return useMutation({
     mutationFn: async (item: Partial<Snag> & { id?: string }) => {
       const { id, profiles, ...rest } = item as any
@@ -124,12 +222,15 @@ export const useUpsertSnag = () => {
         if (error) throw error
         return data
       } else {
-        const { data, error } = await supabase.from('snags').insert(rest).select().single()
+        const { data, error } = await supabase.from('snags').insert({
+  ...rest,
+  project_id: projectId
+}).select().single()
         if (error) throw error
         return data
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['snags'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['snags', projectId] }),
   })
 }
 
@@ -163,17 +264,45 @@ export const useUpsertDocument = () => {
 }
 
 // ─── FINANCIAL ─────────────────────────────────────────
-export const useFinancial = () => useQuery({
-  queryKey: ['financial'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('financial_items').select('*').order('created_at')
-    if (error) throw error
-    return data as FinancialItem[]
-  },
-})
+export const useFinancial = () => {
+  const { projectId } =
+    useProjectStore()
+
+  return useQuery({
+    queryKey: [
+      'financial',
+      projectId
+    ],
+
+    enabled:
+      !!projectId,
+
+    queryFn: async () => {
+      const { data, error } =
+        await supabase
+          .from('financial_items')
+          .select('*')
+          .eq(
+            'project_id',
+            projectId
+          )
+          .order(
+            'created_at'
+          )
+
+      if (error)
+        throw error
+
+      return data as FinancialItem[]
+    },
+  })
+}
 
 export const useUpsertFinancial = () => {
   const qc = useQueryClient()
+
+  const { projectId } =
+    useProjectStore()
   return useMutation({
     mutationFn: async (item: Partial<FinancialItem> & { id?: string }) => {
       const { id, ...rest } = item
@@ -182,27 +311,60 @@ export const useUpsertFinancial = () => {
         if (error) throw error
         return data
       } else {
-        const { data, error } = await supabase.from('financial_items').insert(rest).select().single()
+        const { data, error } = await supabase.from('financial_items').insert({
+  ...rest,
+  project_id: projectId
+}).select().single()
         if (error) throw error
         return data
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['financial'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['financial', projectId] }),
   })
 }
 
 // ─── RISKS ─────────────────────────────────────────────
-export const useRisks = () => useQuery({
-  queryKey: ['risks'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('risks').select('*').order('risk_score', { ascending: false })
-    if (error) throw error
-    return data as Risk[]
-  },
-})
+export const useRisks = () => {
+  const { projectId } =
+    useProjectStore()
+
+  return useQuery({
+    queryKey: [
+      'risks',
+      projectId
+    ],
+
+    enabled:
+      !!projectId,
+
+    queryFn: async () => {
+      const { data, error } =
+        await supabase
+          .from('risks')
+          .select('*')
+          .eq(
+            'project_id',
+            projectId
+          )
+          .order(
+            'risk_score',
+            {
+              ascending: false
+            }
+          )
+
+      if (error)
+        throw error
+
+      return data as Risk[]
+    },
+  })
+}
 
 export const useUpsertRisk = () => {
   const qc = useQueryClient()
+  const { projectId } =
+    useProjectStore()
   return useMutation({
     mutationFn: async (item: Partial<Risk> & { id?: string }) => {
       const { id, ...rest } = item
@@ -211,12 +373,15 @@ export const useUpsertRisk = () => {
         if (error) throw error
         return data
       } else {
-        const { data, error } = await supabase.from('risks').insert(rest).select().single()
+        const { data, error } = await supabase.from('risks').insert({
+  ...rest,
+  project_id: projectId
+}).select().single()
         if (error) throw error
         return data
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['risks'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['risks', projectId] }),
   })
 }
 
