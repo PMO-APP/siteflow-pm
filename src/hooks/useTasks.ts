@@ -68,15 +68,23 @@ export const useUpdateTask = () => {
       if (error) throw error
       return data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+    onSuccess: () => qc.invalidateQueries({
+  queryKey: ['tasks']
+}),
   })
 }
 
 export const useCreateTask = () => {
   const qc = useQueryClient()
+  const { projectId } =
+    useProjectStore()
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (task: Omit<Task, 'id' | 'created_at' | 'updated_at' | 'duration_days'>) => {
-      const { data, error } = await supabase.from('tasks').insert(task).select().single()
+      const { data, error } = await supabase.from('tasks').insert({
+  ...task,
+  project_id: projectId
+}).select().single()
       if (error) throw error
       return data
     },
