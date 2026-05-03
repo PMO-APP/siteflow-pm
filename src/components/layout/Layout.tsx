@@ -1,6 +1,9 @@
+import { supabase } from '@/lib/supabase'
+import { parseISO } from 'date-fns'
+import { useProjectStore } from '@/store/project'
 import { getRole } from '@/lib/access'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
   HardHat, AlertTriangle, FolderOpen, DollarSign, Shield,
@@ -8,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
-import { PROJECT_END } from '@/lib/utils'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 
@@ -33,9 +35,43 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
   const { user, signOut } = useAuthStore()
+
+const { projectName } =
+  useProjectStore()
 const role = getRole(user?.email)
   const location = useLocation()
-  const daysLeft = differenceInDays(PROJECT_END, new Date())
+  const [handoverDate, setHandoverDate] =
+  useState<Date | null>(null)
+  useEffect(() => {
+  loadProject()
+}, [projectName])
+
+async function loadProject() {
+  const { data } =
+    await supabase
+      .from('projects')
+      .select('handover_date')
+      .eq(
+        'project_name',
+        projectName
+      )
+      .single()
+
+  if (data?.handover_date) {
+    setHandoverDate(
+      parseISO(
+        data.handover_date
+      )
+    )
+  }
+}
+  const daysLeft =
+handoverDate
+  ? differenceInDays(
+      handoverDate,
+      new Date()
+    )
+  : 0
 
   const allowedNav = NAV.filter(item => {
   if (role === 'admin') {
@@ -99,9 +135,11 @@ if (role === 'project') {
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
           <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-[#c49e48] mb-1">Project Command</div>
           <div className="font-display text-[17px] font-bold text-[#ede8de] leading-tight">
-            Lakowe Lakes<br />SPA Centre
-          </div>
-          <div className="text-[10px] text-[#6e7d8c] mt-1">Mixta Africa · Lagos</div>
+  {projectName}
+</div>
+          <div className="text-[10px] text-[#6e7d8c] mt-1">
+  Active Project
+</div>
           {role === 'guest' && (
   <div className="mt-2 inline-block px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-semibold tracking-wide text-amber-400">
     Executive View
@@ -119,7 +157,17 @@ if (role === 'project') {
               <div className={`text-[10px] font-semibold ${daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'}`}>
                 DAYS LEFT
               </div>
-              <div className="text-[9px] text-[#6e7d8c]">18 Sep 2026</div>
+              <div className="text-[9px] text-[#6e7d8c]">{handoverDate
+  ? handoverDate.toLocaleDateString(
+      'en-GB',
+      {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }
+    )
+  : '-'}
+              </div>
             </div>
           </div>
         </div>
