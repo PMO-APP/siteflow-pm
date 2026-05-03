@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import ProjectsPage from '@/pages/ProjectsPage'
 import RiskTrendPage from '@/pages/RiskTrendPage'
 import AuditPage from '@/pages/AuditPage'
@@ -34,9 +35,30 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
+function RequireProject({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const { projectId } =
+    useProjectStore()
+
+  if (!projectId) {
+    return (
+      <Navigate
+        to="/projects"
+        replace
+      />
+    )
+  }
+
+  return <>{children}</>
+}
 
 export default function App() {
   const { user, setUser, setLoading } = useAuthStore()
+  const { projectId } =
+  useProjectStore()
   const role = getRole(user?.email)
 
   useEffect(() => {
@@ -78,17 +100,19 @@ export default function App() {
   }
 />
       <Route
-        path="/"
-        element={
-          <RequireAuth>
-            <Layout />
-          </RequireAuth>
-        }
-      >
+  path="/"
+  element={
+    <RequireAuth>
+      <RequireProject>
+        <Layout />
+      </RequireProject>
+    </RequireAuth>
+  }
+>
         <Route
-          index
-          element={<Dashboard />}
-        />
+  index
+  element={<Dashboard />}
+/>
 
         <Route
           path="recovery"
