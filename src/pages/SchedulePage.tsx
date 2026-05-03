@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { useState } from 'react'
 import { Plus, Calendar, List, BarChart2, Flag, Search, Filter } from 'lucide-react'
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from '@/hooks/useTasks'
@@ -11,7 +12,20 @@ import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
 type View = 'list' | 'gantt' | 'milestones'
 
 export default function SchedulePage() {
-  const { data: tasks = [], isLoading } = useTasks()
+  const {
+  projectId,
+  projectName
+} = useProjectStore()
+const {
+  data: allTasks = [],
+  isLoading
+} = useTasks()
+
+const tasks =
+  allTasks.filter(
+    (t:any) =>
+      t.project_id === projectId
+  )
  const PHASES = ['All', ...Array.from(new Set(tasks.map(t => t.phase).filter(Boolean)))]
   const updateTask = useUpdateTask()
   const [view, setView] = useState<View>('list')
@@ -68,6 +82,15 @@ const getRag = (t: Task): string => {
 
   return (
     <div className="space-y-4">
+      <div>
+  <div className="text-xl font-semibold text-[#ede8de]">
+    Master Schedule
+  </div>
+
+  <div className="text-[11px] text-[#6e7d8c] mt-1">
+    {projectName}
+  </div>
+</div>
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
