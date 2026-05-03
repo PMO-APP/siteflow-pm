@@ -26,7 +26,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-[#0c1014]">
       <div className="text-center">
-        <div className="font-display text-3xl text-[#c49e48] mb-2">Lakowe SPA</div>
+        <div className="font-display text-3xl text-[#c49e48] mb-2">Project Management App</div>
         <div className="text-[#6e7d8c] text-sm">Loading…</div>
       </div>
     </div>
