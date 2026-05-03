@@ -16,6 +16,7 @@ export type TaskStatus = 'Not Started' | 'In Progress' | 'Completed' | 'On Hold'
 export type RAG = 'RED' | 'AMBER' | 'GREEN' | ''
 
 export interface Task {
+  project_id?: number
   id: string
   task_number?: number
   name: string
