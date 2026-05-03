@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { supabase } from '@/lib/supabase'
 import { getRole } from '@/lib/access'
 import { logAudit } from '@/lib/audit'
@@ -16,7 +17,11 @@ interface Props {
 }
 
 export default function TaskModal({ task, onClose }: Props) {
-  const { user } = useAuthStore()
+  const { user } =
+  useAuthStore()
+
+const { projectId } =
+  useProjectStore()
   const role = getRole(user?.email)
   const create = useCreateTask()
   const update = useUpdateTask()
@@ -44,9 +49,10 @@ export default function TaskModal({ task, onClose }: Props) {
 
   if (task) {
     await update.mutateAsync({
-      id: task.id,
-      ...form
-    })
+  id: task.id,
+  ...form,
+  project_id: projectId
+})
 
   const changes: string[] = []
 
@@ -106,7 +112,8 @@ if (task.finish_date !== form.finish_date) {
     severity: 'High',
     status: 'Open',
     mitigation: 'Immediate recovery plan required',
-    source: 'Auto from Schedule'
+    source: 'Auto from Schedule',
+    project_id: projectId,
   },
   {
     onConflict: 'title,source'
@@ -142,6 +149,7 @@ if (task.finish_date !== form.finish_date) {
       'source',
       'Auto from Schedule'
     )
+      .eq('project_id', projectId)
 
   if (Math.abs(diffDays) >= 7) {
     await supabase
@@ -160,6 +168,7 @@ if (task.finish_date !== form.finish_date) {
         'source',
         'Auto from Schedule'
       )
+    .eq('project_id', projectId)
   }
 }
   }
@@ -209,11 +218,12 @@ await logAudit(
 )
 
   } else {
-    await create.mutateAsync({
-      ...form,
-      rag: '',
-      created_by: user?.id
-    } as any)
+await create.mutateAsync({
+  ...form,
+  rag: '',
+  created_by: user?.id,
+  project_id: projectId
+} as any)
 
     await logAudit(
       user,
