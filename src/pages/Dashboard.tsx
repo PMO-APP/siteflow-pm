@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { differenceInDays } from 'date-fns'
 import { AlertTriangle, TrendingUp, Clock, CheckCircle, Package, FileCheck, Shield, DollarSign, HardHat, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -25,17 +26,79 @@ const colorPool = [
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { data: tasks = [] } = useTasks()
+ const { projectId, projectName } =
+  useProjectStore()
+  const { data: allTasks = [] } =
+  useTasks()
+
+const tasks =
+  allTasks.filter(
+    (t:any) =>
+      t.project_id === projectId
+  )
  const phaseList = [...new Set(tasks.map((t:any) => t.phase).filter(Boolean))]
-  const { data: procs = [] } = useProcurement()
-  const { data: approvals = [] } = useApprovals()
-  const { data: snags = [] } = useSnags()
-  const { data: risks = [] } = useRisks()
-  const { data: financial = [] } = useFinancial()
+  const { data: allProcs = [] } =
+  useProcurement()
+
+const procs =
+  allProcs.filter(
+    (p:any) =>
+      p.project_id === projectId
+  )
+  const { data: allApprovals = [] } =
+  useApprovals()
+
+const approvals =
+  allApprovals.filter(
+    (a:any) =>
+      a.project_id === projectId
+  )
+  const { data: allSnags = [] } =
+  useSnags()
+
+const snags =
+  allSnags.filter(
+    (s:any) =>
+      s.project_id === projectId
+  )
+  const { data: allRisks = [] } =
+  useRisks()
+
+const risks =
+  allRisks.filter(
+    (r:any) =>
+      r.project_id === projectId
+  )
+  const { data: allFinancial = [] } =
+  useFinancial()
+
+const financial =
+  allFinancial.filter(
+    (f:any) =>
+      f.project_id === projectId
+  )
 const { data: projects = [] } = useProjects()
-const project = projects?.[0] || {}
+const project =
+  projects.find(
+    (p:any) =>
+      p.id === projectId
+  ) || {}
   const today = new Date()
-  const daysLeft = Math.max(0, differenceInDays(PROJECT_END, today))
+  const targetDate =
+  project?.handover_date
+    ? new Date(
+        project.handover_date
+      )
+    : PROJECT_END
+
+const daysLeft =
+Math.max(
+  0,
+  differenceInDays(
+    targetDate,
+    today
+  )
+)
   const totalDays = differenceInDays(PROJECT_END, PROJECT_START)
   const elapsed = differenceInDays(today, PROJECT_START)
   const timelinePct = Math.min(100, Math.max(0, Math.round(elapsed / totalDays * 100)))
@@ -167,8 +230,19 @@ const varianceStatus =
             <div className="text-[10px] font-mono uppercase tracking-widest text-[#6e7d8c] mt-1">Days Remaining</div>
           </div>
           <div className="flex-1">
+           <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
+  {projectName}
+</div>
             <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">Formal Handover Target</div>
-            <div className="font-display text-xl font-semibold text-[#ede8de]">18 September 2026</div>
+            <div className="font-display text-xl font-semibold text-[#ede8de]">{targetDate.toLocaleDateString(
+  'en-GB',
+  {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  }
+)}
+            </div>
             <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-[#c49e48] to-[#e3c06a]" style={{ width: `${timelinePct}%` }} />
             </div>
