@@ -40,14 +40,14 @@ async function loadProjects() {
   setLoading(false)
 } 
 
-  function openProject(p: any) {
-    setProject(
-      p.id,
-      p.project_name
-    )
+ function openProject(p: any) {
+  setProject(
+    p.id,
+    p.project_name
+  )
 
-    navigate('/')
-  }
+  navigate('/app')
+}
 async function createProject() {
   if (!newProjectName) return
 
