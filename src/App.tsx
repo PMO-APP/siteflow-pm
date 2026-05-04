@@ -1,3 +1,4 @@
+import LandingPage from '@/pages/LandingPage'
 import { useProjectStore } from '@/store/project'
 import ProjectsPage from '@/pages/ProjectsPage'
 import RiskTrendPage from '@/pages/RiskTrendPage'
@@ -24,32 +25,30 @@ import { getRole } from '@/lib/access'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
-  if (loading) return (
-    <div className="h-full flex items-center justify-center bg-[#0c1014]">
-      <div className="text-center">
-        <div className="font-display text-3xl text-[#c49e48] mb-2">Project Management App</div>
-        <div className="text-[#6e7d8c] text-sm">Loading…</div>
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-[#0c1014]">
+        <div className="text-center">
+          <div className="font-display text-3xl text-[#c49e48] mb-2">
+            PMOCorex
+          </div>
+          <div className="text-[#6e7d8c] text-sm">Loading…</div>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
   if (!user) return <Navigate to="/login" replace />
+
   return <>{children}</>
 }
-function RequireProject({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const { projectId } =
-    useProjectStore()
+
+function RequireProject({ children }: { children: React.ReactNode }) {
+  const { projectId } = useProjectStore()
 
   if (!projectId) {
-    return (
-      <Navigate
-        to="/projects"
-        replace
-      />
-    )
+    return <Navigate to="/projects" replace />
   }
 
   return <>{children}</>
@@ -57,25 +56,23 @@ function RequireProject({
 
 export default function App() {
   const { user, setUser, setLoading } = useAuthStore()
-  const { projectId } =
-  useProjectStore()
   const role = getRole(user?.email)
 
   useEffect(() => {
-    // Get initial session
-   supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session?.user) {
-    setUser(session.user as any)
-  }
-  setLoading(false)
-})
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user as any)
+      }
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session?.user) {
-  setUser(session.user as any)
-}
-      else if (event === 'SIGNED_OUT') {
+      setLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user as any)
+      } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
     })
@@ -83,168 +80,80 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [setUser, setLoading])
 
- return (
-  <BrowserRouter>
-    <Routes>
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* PUBLIC LANDING PAGE */}
+        <Route path="/" element={<LandingPage />} />
 
-      <Route
-        path="/login"
-        element={<LoginPage />}
-      />
-<Route
-  path="/projects"
-  element={
-    <RequireAuth>
-      <ProjectsPage />
-    </RequireAuth>
-  }
-/>
-      <Route
-  path="/"
-  element={
-    <RequireAuth>
-      <RequireProject>
-        <Layout />
-      </RequireProject>
-    </RequireAuth>
-  }
->
-        <Route
-  index
-  element={<Dashboard />}
-/>
+        {/* LOGIN */}
+        <Route path="/login" element={<LoginPage />} />
 
+        {/* PROJECT HUB */}
         <Route
-          path="recovery"
+          path="/projects"
           element={
-            <RecoveryForecastPage />
+            <RequireAuth>
+              <ProjectsPage />
+            </RequireAuth>
           }
         />
 
-        {(role === 'admin' ||
-          role === 'project') && (
-          <>
-            <Route
-              path="schedule"
-              element={
-                <SchedulePage />
-              }
-            />
-            <Route
-              path="procurement"
-              element={
-                <ProcurementPage />
-              }
-            />
-            <Route
-              path="approvals"
-              element={
-                <ApprovalsPage />
-              }
-            />
-            <Route
-              path="site"
-              element={<SitePage />}
-            />
-            <Route
-              path="snags"
-              element={
-                <SnagsPage />
-              }
-            />
-            <Route
-              path="documents"
-              element={
-                <DocumentsPage />
-              }
-            />
-            <Route
-              path="financial"
-              element={
-                <FinancialPage />
-              }
-            />
-            <Route
-              path="risk"
-              element={<RiskPage />}
-            />
-            <Route
-  path="risk-trends"
-  element={<RiskTrendPage />}
-/>
-            <Route
-              path="team"
-              element={<TeamPage />}
-            />
-            <Route
-              path="reports"
-              element={
-                <ReportsPage />
-              }
-            />
-            {role === 'admin' && (
-  <Route
-    path="audit"
-    element={<AuditPage />}
-  />
-)}
-          </>
-        )}
+        {/* MAIN APP */}
+        <Route
+          path="/app"
+          element={
+            <RequireAuth>
+              <RequireProject>
+                <Layout />
+              </RequireProject>
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Dashboard />} />
 
-        {role === 'design' && (
-          <>
-            <Route
-              path="documents"
-              element={
-                <DocumentsPage />
-              }
-            />
-            <Route
-              path="snags"
-              element={
-                <SnagsPage />
-              }
-            />
-            <Route
-              path="risk"
-              element={<RiskPage />}
-            />
-          </>
-        )}
+          <Route path="recovery" element={<RecoveryForecastPage />} />
 
-        {role === 'costing' && (
-          <>
-            <Route
-              path="financial"
-              element={
-                <FinancialPage />
-              }
-            />
-            <Route
-              path="snags"
-              element={
-                <SnagsPage />
-              }
-            />
-            <Route
-              path="risk"
-              element={<RiskPage />}
-            />
-          </>
-        )}
-      </Route>
+          {(role === 'admin' || role === 'project') && (
+            <>
+              <Route path="schedule" element={<SchedulePage />} />
+              <Route path="procurement" element={<ProcurementPage />} />
+              <Route path="approvals" element={<ApprovalsPage />} />
+              <Route path="site" element={<SitePage />} />
+              <Route path="snags" element={<SnagsPage />} />
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="financial" element={<FinancialPage />} />
+              <Route path="risk" element={<RiskPage />} />
+              <Route path="risk-trends" element={<RiskTrendPage />} />
+              <Route path="team" element={<TeamPage />} />
+              <Route path="reports" element={<ReportsPage />} />
 
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to="/"
-            replace
-          />
-        }
-      />
+              {role === 'admin' && (
+                <Route path="audit" element={<AuditPage />} />
+              )}
+            </>
+          )}
 
-    </Routes>
-  </BrowserRouter>
-)
+          {role === 'design' && (
+            <>
+              <Route path="documents" element={<DocumentsPage />} />
+              <Route path="snags" element={<SnagsPage />} />
+              <Route path="risk" element={<RiskPage />} />
+            </>
+          )}
+
+          {role === 'costing' && (
+            <>
+              <Route path="financial" element={<FinancialPage />} />
+              <Route path="snags" element={<SnagsPage />} />
+              <Route path="risk" element={<RiskPage />} />
+            </>
+          )}
+        </Route>
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
