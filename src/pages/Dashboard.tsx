@@ -275,7 +275,15 @@ const varianceStatus =
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
         <div className="relative flex items-center gap-8">
           <div>
-            <div className={`font-display text-7xl font-black leading-none ${daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'}`}>{daysLeft}</div>
+           <div
+  className={`font-display text-7xl font-black leading-none ${
+    daysLeft !== null && daysLeft < 60
+      ? 'text-red-400'
+      : 'text-[#c49e48]'
+  }`}
+>
+  {daysLeft ?? '-'}
+</div>
             <div className="text-[10px] font-mono uppercase tracking-widest text-[#6e7d8c] mt-1">Days Remaining</div>
           </div>
           <div className="flex-1">
