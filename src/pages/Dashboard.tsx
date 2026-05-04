@@ -8,7 +8,7 @@ import { useApprovals } from '@/hooks/useData'
 import { useSnags } from '@/hooks/useData'
 import { useRisks } from '@/hooks/useData'
 import { useFinancial, useProjects } from '@/hooks/useData'
-import { fdate, urgencyColor, formatCurrency, PROJECT_END, PROJECT_START } from '@/lib/utils'
+import { fdate, urgencyColor, formatCurrency } from '@/lib/utils'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 
@@ -84,28 +84,72 @@ const project =
       p.id === projectId
   ) || {}
   const today = new Date()
-  const targetDate =
+
+const projectStartDate =
+  project?.start_date
+    ? new Date(project.start_date)
+    : null
+
+const targetDate =
   project?.handover_date
-    ? new Date(
-        project.handover_date
-      )
-    : PROJECT_END
+    ? new Date(project.handover_date)
+    : null
+
+const hasTimeline =
+  !!projectStartDate && !!targetDate
 
 const daysLeft =
-Math.max(
-  0,
-  differenceInDays(
-    targetDate,
-    today
-  )
-)
-  const totalDays = differenceInDays(PROJECT_END, PROJECT_START)
-  const elapsed = differenceInDays(today, PROJECT_START)
-  const timelinePct = Math.min(100, Math.max(0, Math.round(elapsed / totalDays * 100)))
-  const plannedPct =
-  totalDays === 0
-    ? 0
-    : Math.min(100, Math.round((elapsed / totalDays) * 100))
+  targetDate
+    ? Math.max(
+        0,
+        differenceInDays(
+          targetDate,
+          today
+        )
+      )
+    : null
+
+const totalDays =
+  hasTimeline
+    ? Math.max(
+        1,
+        differenceInDays(
+          targetDate!,
+          projectStartDate!
+        )
+      )
+    : 0
+
+const elapsed =
+  hasTimeline
+    ? differenceInDays(
+        today,
+        projectStartDate!
+      )
+    : 0
+
+const timelinePct =
+  hasTimeline
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            (elapsed / totalDays) * 100
+          )
+        )
+      )
+    : 0
+
+const plannedPct =
+  hasTimeline
+    ? Math.min(
+        100,
+        Math.round(
+          (elapsed / totalDays) * 100
+        )
+      )
+    : 0
 
 
 
@@ -128,10 +172,15 @@ const progressPct =
         tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
         tasks.length
       )
-const variancePct = progressPct - plannedPct
+const variancePct =
+  hasTimeline && tasks.length > 0
+    ? progressPct - plannedPct
+    : null
 
 const varianceStatus =
-  variancePct >= 3
+  variancePct === null
+    ? 'NO BASELINE'
+    : variancePct >= 3
     ? 'AHEAD'
     : variancePct <= -3
     ? 'BEHIND'
@@ -217,7 +266,7 @@ const varianceStatus =
   if (criticalSnags > 0) alerts.push({ level: 'red', msg: `${criticalSnags} critical snag${criticalSnags > 1 ? 's' : ''} open — blocking handover`, action: '/snags' })
   if (highRisks > 0) alerts.push({ level: 'red', msg: `${highRisks} high-scoring risk${highRisks > 1 ? 's require' : ' requires'} immediate mitigation`, action: '/risk' })
   if (procRisks > 0) alerts.push({ level: 'amber', msg: `${procRisks} procurement item${procRisks > 1 ? 's' : ''} approaching or past order deadline`, action: '/procurement' })
-  if (daysLeft < 60) alerts.push({ level: 'amber', msg: `Only ${daysLeft} days to handover — review critical path immediately`, action: '/schedule' })
+  if (daysLeft !== null && daysLeft < 60) alerts.push({ level: 'amber', msg: `Only ${daysLeft ?? '-'} days to handover — review critical path immediately`, action: '/schedule' })
 
   return (
     <div className="space-y-5">
@@ -234,14 +283,16 @@ const varianceStatus =
   {projectName}
 </div>
             <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">Formal Handover Target</div>
-            <div className="font-display text-xl font-semibold text-[#ede8de]">{targetDate.toLocaleDateString(
-  'en-GB',
-  {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }
-)}
+            <div className="font-display text-xl font-semibold text-[#ede8de]">{targetDate
+  ? targetDate.toLocaleDateString(
+      'en-GB',
+      {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      }
+    )
+  : 'No handover date set'}
             </div>
             <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-gradient-to-r from-[#c49e48] to-[#e3c06a]" style={{ width: `${timelinePct}%` }} />
@@ -265,14 +316,19 @@ const varianceStatus =
           { label: 'Progress', value: `${progressPct}%`, sub: `${done}/${tasks.length} tasks`, color: 'c-gold', icon: TrendingUp, link: '/schedule' },
       {
   label: 'Schedule Variance',
-  value: `${variancePct}%`,
+ value:
+  variancePct === null
+    ? '—'
+    : `${variancePct}%`,
   sub: varianceStatus,
   color:
-    variancePct <= -3
-      ? 'c-red'
-      : variancePct >= 3
-      ? 'c-grn'
-      : 'c-amr',
+  variancePct === null
+    ? 'c-amr'
+    : variancePct <= -3
+    ? 'c-red'
+    : variancePct >= 3
+    ? 'c-grn'
+    : 'c-amr',
   icon: TrendingUp,
   link: '/schedule'
 },
