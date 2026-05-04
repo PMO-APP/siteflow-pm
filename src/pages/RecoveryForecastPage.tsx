@@ -1,3 +1,5 @@
+import { useProjectStore } from '@/store/project'
+
 // ===============================================
 // FULL RECOVERY FORECAST ENGINE
 // React + TypeScript + Supabase
@@ -19,6 +21,7 @@ import { supabase } from '@/lib/supabase'
 
 type Task = {
   id: string
+  project_id?: number
   task_number: number
   name: string
   phase: string
@@ -43,23 +46,36 @@ type KPI = {
 export default function RecoveryForecastPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const { projectId } = useProjectStore()
 
   useEffect(() => {
-    fetchTasks()
-  }, [])
+  fetchTasks()
+}, [projectId])
 
   async function fetchTasks() {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('task_number', { ascending: true })
+  setLoading(true)
 
-    if (!error && data) {
-      setTasks(data as Task[])
-    }
-
+  if (!projectId) {
+    setTasks([])
     setLoading(false)
+    return
   }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('task_number', { ascending: true })
+
+  if (error) {
+    console.error(error)
+    setTasks([])
+  } else {
+    setTasks(data as Task[])
+  }
+
+  setLoading(false)
+}
 
   // ================= ENGINE =================
 
@@ -170,7 +186,6 @@ export default function RecoveryForecastPage() {
 
   const forecastFinish = new Date(projectFinish)
   forecastFinish.setDate(projectFinish.getDate() + totalDelayDays)
-
   const recoverable =
     totalDelayDays <= 14
       ? 'YES'
@@ -325,6 +340,13 @@ const recommendations = sourceTasks.slice(0, 6).map((task) => {
       </div>
     )
   }
+  if (tasks.length === 0) {
+  return (
+    <div className="card p-8 text-slate-400">
+      No recovery forecast data available for this project yet.
+    </div>
+  )
+}
 
   return (
     <div className="space-y-5 text-white">
