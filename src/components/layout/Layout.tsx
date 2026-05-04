@@ -223,13 +223,27 @@ if (role === 'project') {
         <header className="bg-[#111820] border-b border-[#c49e48]/15 px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0 relative">
           <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[#c49e48]/30 to-transparent" />
           <button
-            className="lg:hidden text-[#6e7d8c] hover:text-[#ede8de] transition-colors"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu size={18} />
-          </button>
-         const navigate = useNavigate()
-          <div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
+  className="lg:hidden text-[#6e7d8c] hover:text-[#ede8de] transition-colors"
+  onClick={() => setSidebarOpen(true)}
+>
+  <Menu size={18} />
+</button>
+
+<div className="flex items-center gap-2 flex-1">
+  <button onClick={() => navigate(-1)} className="btn-ghost btn-sm btn">
+    ← Back
+  </button>
+
+  <button onClick={() => navigate('/projects')} className="btn-ghost btn-sm btn">
+    Projects Hub
+  </button>
+
+  <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de] ml-2">
+    {pageTitle}
+  </div>
+</div>
+
+<div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
             {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
           <button
