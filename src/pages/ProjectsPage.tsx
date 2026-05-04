@@ -6,6 +6,8 @@ import { useProjectStore } from '@/store/project'
 export default function ProjectsPage() {
   const [projects, setProjects] =
     useState<any[]>([])
+   const [loading, setLoading] =
+    useState (true)
 
   const navigate = useNavigate()
 
@@ -16,7 +18,9 @@ export default function ProjectsPage() {
     loadProjects()
   }, [])
 
- async function loadProjects() {
+async function loadProjects() {
+  setLoading(true)
+
   const { data, error } =
     await supabase
       .from('projects')
@@ -26,12 +30,13 @@ export default function ProjectsPage() {
   if (error) {
     console.error('Projects load error:', error)
     alert(error.message)
+    setLoading(false)
     return
   }
 
   setProjects(data || [])
-}
-  
+  setLoading(false)
+} 
 
   function openProject(p: any) {
     setProject(
@@ -91,11 +96,17 @@ export default function ProjectsPage() {
         ))}
       </div>
 
-      {projects.length === 0 && (
-        <div className="card p-8 text-slate-400 text-sm mt-5">
-          No projects found. Please check Supabase permissions.
-        </div>
-      )}
+      {loading && (
+  <div className="card p-8 text-slate-400 text-sm mt-5">
+    Loading projects…
+  </div>
+)}
+
+{!loading && projects.length === 0 && (
+  <div className="card p-8 text-slate-400 text-sm mt-5">
+    No projects found. Please check Supabase permissions.
+  </div>
+)}
 
     </div>
   </div>
