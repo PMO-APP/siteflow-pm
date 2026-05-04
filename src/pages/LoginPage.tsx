@@ -124,19 +124,15 @@ if (msg.includes('invalid')) {
     <div className="h-full flex items-center justify-center bg-[#0c1014] p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center mb-8">
-         <div className="font-display text-4xl font-bold text-[#c49e48] mb-1">
-  Project Management App
-</div>
+       <div className="text-center mb-8">
+  <div className="font-display text-4xl font-bold text-[#c49e48] mb-1">
+    PMOCorex
+  </div>
 
-<div className="text-[#6e7d8c] text-sm">
-  Portfolio Control Centre
+  <div className="text-[#6e7d8c] text-sm">
+    The Portfolio Control System for Project Delivery
+  </div>
 </div>
-
-<div className="text-[#6e7d8c] text-xs mt-1">
-  Manage Projects Across Mixta Africa
-</div>
-        </div>
 
         {/* Card */}
         <div className="card relative">
