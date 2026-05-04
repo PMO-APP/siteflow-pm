@@ -30,7 +30,7 @@ const [showPassword, setShowPassword] = useState(false)
   }
 }, [])
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/projects" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
@@ -83,6 +83,9 @@ if (rememberMe) {
     'savedPassword'
   )
 }
+
+localStorage.removeItem('projectId')
+localStorage.removeItem('projectName')
 
 window.location.href = '/projects'
     }
