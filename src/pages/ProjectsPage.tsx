@@ -8,6 +8,8 @@ export default function ProjectsPage() {
     useState<any[]>([])
    const [loading, setLoading] =
     useState (true)
+  const [showModal, setShowModal] = useState(false)
+const [newProjectName, setNewProjectName] = useState('')
 
   const navigate = useNavigate()
 
@@ -46,7 +48,27 @@ async function loadProjects() {
 
     navigate('/')
   }
+async function createProject() {
+  if (!newProjectName) return
 
+  const { error } = await supabase
+    .from('projects')
+    .insert([
+      {
+        project_name: newProjectName,
+        status: 'Active'
+      }
+    ])
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  setShowModal(false)
+  setNewProjectName('')
+  loadProjects()
+}
   return (
   <div className="min-h-screen bg-[#0c1014] px-6 py-12">
   <div className="max-w-6xl mx-auto">
@@ -64,7 +86,7 @@ async function loadProjects() {
 
   <button
     className="btn-gold btn-sm btn"
-    onClick={() => alert('Create Project form coming next')}
+   onClick={() => setShowModal(true)}
   >
     + New Project
   </button>
@@ -109,6 +131,38 @@ async function loadProjects() {
 )}
 
     </div>
+    {showModal && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="card p-6 w-full max-w-sm">
+      <h2 className="text-lg font-semibold text-white mb-4">
+        Create New Project
+      </h2>
+
+      <input
+        className="form-control mb-4"
+        placeholder="Project Name"
+        value={newProjectName}
+        onChange={e => setNewProjectName(e.target.value)}
+      />
+
+      <div className="flex justify-end gap-2">
+        <button
+          className="btn"
+          onClick={() => setShowModal(false)}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="btn-gold btn"
+          onClick={createProject}
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+)}
   </div>
 )
 }
