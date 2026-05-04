@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { parseISO } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { getRole } from '@/lib/access'
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
@@ -40,6 +40,7 @@ const { projectName } =
   useProjectStore()
 const role = getRole(user?.email)
   const location = useLocation()
+  const navigate = useNavigate()
   const [handoverDate, setHandoverDate] =
   useState<Date | null>(null)
   useEffect(() => {
@@ -227,9 +228,7 @@ if (role === 'project') {
           >
             <Menu size={18} />
           </button>
-          <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de] flex-1">
-            {pageTitle}
-          </div>
+         const navigate = useNavigate()
           <div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
             {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
           </div>
