@@ -51,7 +51,7 @@ const { projectId } =
     await update.mutateAsync({
   id: task.id,
   ...form,
-  project_id: projectId
+  project_id: projectId ?? undefined
 })
 
   const changes: string[] = []
@@ -113,7 +113,7 @@ if (task.finish_date !== form.finish_date) {
     status: 'Open',
     mitigation: 'Immediate recovery plan required',
     source: 'Auto from Schedule',
-    project_id: projectId,
+    project_id: projectId ?? undefined,
   },
   {
     onConflict: 'title,source'
@@ -222,7 +222,7 @@ await create.mutateAsync({
   ...form,
   rag: '',
   created_by: user?.id,
-  project_id: projectId
+  project_id: projectId ?? undefined
 } as any)
 
     await logAudit(
