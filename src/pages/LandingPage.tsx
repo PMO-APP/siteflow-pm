@@ -62,7 +62,7 @@ export default function LandingPage() {
 
           <div className="flex gap-4 items-center">
             <button
-              onClick={() => navigate('/signin')}
+              onClick={() => navigate('/Login')}
               className="text-sm text-slate-300 hover:text-[#c49e48]"
             >
               Sign In
@@ -104,7 +104,7 @@ export default function LandingPage() {
               </button>
 
               <button
-                onClick={() => navigate('/signin')}
+                onClick={() => navigate('/Login')}
                 className="btn-ghost btn px-6 py-3"
               >
                 Sign In
