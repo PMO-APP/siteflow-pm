@@ -26,7 +26,7 @@ export default function SignUpPage() {
         password,
         options: {
           data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/signin`,
+          emailRedirectTo: `${window.location.origin}/Login`,
         },
       })
 
@@ -183,7 +183,7 @@ export default function SignUpPage() {
               <div className="mt-6 text-center text-xs text-slate-500">
                 Already have an account?{' '}
                 <button
-                  onClick={() => navigate('/signin')}
+                  onClick={() => navigate('/Login')}
                   className="text-[#c49e48] hover:underline"
                 >
                   Sign in
