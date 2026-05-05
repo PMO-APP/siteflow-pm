@@ -8,7 +8,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import Layout from '@/components/layout/Layout'
-import LoginPage from '@/pages/LoginPage'
+import SignInPage from '@/pages/SignInPage'
+import SignUpPage from '@/pages/SignUpPage'
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
 import ProcurementPage from '@/pages/ProcurementPage'
@@ -87,7 +88,8 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* LOGIN */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signin" element={<SignInPage />} />
+<Route path="/signup" element={<SignUpPage />} />
 
         {/* PROJECT HUB */}
         <Route
