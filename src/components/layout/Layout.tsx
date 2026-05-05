@@ -1,3 +1,4 @@
+import { useBrowserBranding } from '@/hooks/useBrowserBranding'
 import { supabase } from '@/lib/supabase'
 import { parseISO } from 'date-fns'
 import { useProjectStore } from '@/store/project'
@@ -32,6 +33,7 @@ const NAV = [
 ]
 
 export default function Layout() {
+  useBrowserBranding()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
   const { user, signOut } = useAuthStore()
