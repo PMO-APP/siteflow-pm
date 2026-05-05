@@ -1,4 +1,12 @@
-import { ArrowRight, ShieldCheck, BarChart3, ClipboardCheck, Clock, FileText, Layers } from 'lucide-react'
+import {
+  ArrowRight,
+  ShieldCheck,
+  BarChart3,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  Layers,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 const FEATURES = [
@@ -9,7 +17,7 @@ const FEATURES = [
   },
   {
     title: 'Schedule Intelligence',
-    desc: 'Track progress, delay risk, recovery forecasts, and critical activities.',
+    desc: 'Track progress, delays, recovery forecasts, and critical activities.',
     icon: Clock,
   },
   {
@@ -39,11 +47,9 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0c1014] text-white overflow-hidden">
-      {/* Background glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(196,158,72,0.18),transparent_35%),radial-gradient(circle_at_top_left,rgba(69,153,212,0.10),transparent_30%)]" />
 
       <div className="relative z-10">
-        {/* NAV */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
           <div>
             <div className="text-2xl font-bold text-[#c49e48]">
@@ -54,16 +60,16 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-4 items-center">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signin')}
               className="text-sm text-slate-300 hover:text-[#c49e48]"
             >
               Sign In
             </button>
 
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signup')}
               className="btn-gold btn-sm btn"
             >
               Get Started
@@ -71,7 +77,6 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* HERO */}
         <section className="max-w-7xl mx-auto px-6 pt-16 pb-20 grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="inline-flex mb-5 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
@@ -91,7 +96,7 @@ export default function LandingPage() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/signup')}
                 className="btn-gold btn px-6 py-3"
               >
                 Start Managing Projects
@@ -99,7 +104,7 @@ export default function LandingPage() {
               </button>
 
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/signin')}
                 className="btn-ghost btn px-6 py-3"
               >
                 Sign In
@@ -108,21 +113,22 @@ export default function LandingPage() {
 
             <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
               <div>
-                <div className="text-2xl font-bold text-white">360°</div>
+                <div className="text-2xl font-bold">360°</div>
                 <div className="text-xs text-slate-500">Project visibility</div>
               </div>
+
               <div>
-                <div className="text-2xl font-bold text-white">AI</div>
+                <div className="text-2xl font-bold">AI</div>
                 <div className="text-xs text-slate-500">Delay insights</div>
               </div>
+
               <div>
-                <div className="text-2xl font-bold text-white">PMO</div>
+                <div className="text-2xl font-bold">PMO</div>
                 <div className="text-xs text-slate-500">Control layer</div>
               </div>
             </div>
           </div>
 
-          {/* Mock dashboard */}
           <div className="relative">
             <div className="absolute -inset-4 bg-[#c49e48]/20 blur-3xl rounded-full" />
 
@@ -131,7 +137,9 @@ export default function LandingPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                <span className="ml-3 text-xs text-slate-500">PMOCorex Dashboard</span>
+                <span className="ml-3 text-xs text-slate-500">
+                  PMOCorex Dashboard
+                </span>
               </div>
 
               <div className="p-5 space-y-5">
@@ -142,16 +150,24 @@ export default function LandingPage() {
                     ['Pending Approvals', '14', 'text-amber-400'],
                   ].map(([label, value, color]) => (
                     <div key={label} className="rounded-xl bg-[#1c2a36] p-4">
-                      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-                      <div className="text-xs text-slate-500 mt-1">{label}</div>
+                      <div className={`text-2xl font-bold ${color}`}>
+                        {value}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        {label}
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 <div className="rounded-xl bg-[#1c2a36] p-4">
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm text-slate-300">Recovery Forecast</span>
-                    <span className="text-sm text-[#c49e48]">On Watch</span>
+                    <span className="text-sm text-slate-300">
+                      Recovery Forecast
+                    </span>
+                    <span className="text-sm text-[#c49e48]">
+                      On Watch
+                    </span>
                   </div>
                   <div className="h-2 bg-slate-800 rounded">
                     <div className="h-2 bg-[#c49e48] rounded w-[68%]" />
@@ -160,7 +176,9 @@ export default function LandingPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-[#1c2a36] p-4 h-28">
-                    <div className="text-sm text-slate-300 mb-3">Risk Heatmap</div>
+                    <div className="text-sm text-slate-300 mb-3">
+                      Risk Heatmap
+                    </div>
                     <div className="space-y-2">
                       <div className="h-2 bg-red-500 rounded w-4/5" />
                       <div className="h-2 bg-amber-400 rounded w-2/3" />
@@ -169,9 +187,15 @@ export default function LandingPage() {
                   </div>
 
                   <div className="rounded-xl bg-[#1c2a36] p-4 h-28">
-                    <div className="text-sm text-slate-300 mb-3">Snag Close-out</div>
-                    <div className="text-3xl font-bold text-emerald-400">86%</div>
-                    <div className="text-xs text-slate-500">handover readiness</div>
+                    <div className="text-sm text-slate-300 mb-3">
+                      Snag Close-out
+                    </div>
+                    <div className="text-3xl font-bold text-emerald-400">
+                      86%
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      handover readiness
+                    </div>
                   </div>
                 </div>
               </div>
@@ -179,7 +203,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* FEATURES */}
         <section className="max-w-7xl mx-auto px-6 pb-20">
           <div className="mb-8">
             <h2 className="text-3xl font-bold">
@@ -216,7 +239,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* CTA */}
         <section className="max-w-7xl mx-auto px-6 pb-16">
           <div className="rounded-2xl border border-[#c49e48]/20 bg-gradient-to-r from-[#161f28] to-[#1c2a36] p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
             <div>
@@ -229,7 +251,7 @@ export default function LandingPage() {
             </div>
 
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/signup')}
               className="btn-gold btn px-6 py-3"
             >
               Launch PMOCorex
