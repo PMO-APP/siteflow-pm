@@ -1,3 +1,4 @@
+import DeliveryPulse from '@/components/dashboard/DeliveryPulse'
 import AIInsights from '@/components/dashboard/AIInsights'
 import { useProjectStore } from '@/store/project'
 import { differenceInDays } from 'date-fns'
@@ -360,7 +361,13 @@ const varianceStatus =
           </div>
         ))}
       </div>
-<AIInsights
+<DeliveryPulse
+  progress={progressPct}
+  variance={variancePct}
+  openRisks={openRisks}
+  overdueTasks={overdue}
+/>
+     <AIInsights
         overdueTasks={overdue}
         procurementRisks={procRisks}
         highRisks={highRisks}
