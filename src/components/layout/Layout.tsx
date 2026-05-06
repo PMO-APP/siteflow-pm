@@ -6,9 +6,22 @@ import { getRole } from '@/lib/access'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
-  LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
-  HardHat, AlertTriangle, FolderOpen, DollarSign, Shield,
-  Users, FileText, Bell, LogOut, Menu, BarChart3, ShieldCheck
+  LayoutDashboard,
+  CalendarDays,
+  ShoppingCart,
+  CheckSquare,
+  HardHat,
+  AlertTriangle,
+  FolderOpen,
+  DollarSign,
+  Shield,
+  Users,
+  FileText,
+  Bell,
+  LogOut,
+  Menu,
+  BarChart3,
+  ShieldCheck,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
@@ -39,17 +52,28 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
+  const [organizationName, setOrganizationName] = useState('')
+  const [portfolioName, setPortfolioName] = useState('')
 
   const { user, signOut } = useAuthStore()
-  const { projectName } = useProjectStore()
-  const role = getRole(user?.email)
 
+  const {
+    projectName,
+    organizationId,
+    portfolioId,
+  } = useProjectStore()
+
+  const role = getRole(user?.email)
   const location = useLocation()
   const navigate = useNavigate()
 
   useEffect(() => {
     loadProject()
   }, [projectName])
+
+  useEffect(() => {
+    loadWorkspaceContext()
+  }, [organizationId, portfolioId])
 
   async function loadProject() {
     if (!projectName) {
@@ -67,6 +91,32 @@ export default function Layout() {
       setHandoverDate(parseISO(data.handover_date))
     } else {
       setHandoverDate(null)
+    }
+  }
+
+  async function loadWorkspaceContext() {
+    if (organizationId) {
+      const { data } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organizationId)
+        .single()
+
+      setOrganizationName(data?.name || '')
+    } else {
+      setOrganizationName('')
+    }
+
+    if (portfolioId) {
+      const { data } = await supabase
+        .from('portfolios')
+        .select('name')
+        .eq('id', portfolioId)
+        .single()
+
+      setPortfolioName(data?.name || '')
+    } else {
+      setPortfolioName('')
     }
   }
 
@@ -98,10 +148,7 @@ export default function Layout() {
       ].includes(item.to)
     }
 
-    return [
-      '/app',
-      '/app/recovery',
-    ].includes(item.to)
+    return ['/app', '/app/recovery'].includes(item.to)
   })
 
   const currentPage = allowedNav.find(n =>
@@ -134,13 +181,39 @@ export default function Layout() {
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
           <PMOCorexLogo size={34} />
 
-          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
-            <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-              Active Project
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+                Organization
+              </div>
+
+              <div className="mt-1 truncate text-xs font-semibold text-[#ede8de]">
+                {organizationName || 'No organization'}
+              </div>
             </div>
 
-            <div className="mt-1 truncate text-sm font-semibold text-[#ede8de]">
-              {projectName || 'No Project Selected'}
+            <div className="h-px bg-white/[0.06]" />
+
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+                Portfolio
+              </div>
+
+              <div className="mt-1 truncate text-xs font-semibold text-[#ede8de]">
+                {portfolioName || 'No portfolio'}
+              </div>
+            </div>
+
+            <div className="h-px bg-white/[0.06]" />
+
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+                Project
+              </div>
+
+              <div className="mt-1 truncate text-sm font-bold text-[#c49e48]">
+                {projectName || 'No project selected'}
+              </div>
             </div>
 
             {role === 'guest' && (
@@ -252,7 +325,7 @@ export default function Layout() {
             <Menu size={18} />
           </button>
 
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
               onClick={() => navigate(-1)}
               className="btn-ghost btn-sm btn"
@@ -264,11 +337,34 @@ export default function Layout() {
               onClick={() => navigate('/projects')}
               className="btn-ghost btn-sm btn"
             >
-              Projects Hub
+              Workspace Hub
             </button>
 
-            <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de] ml-2">
-              {pageTitle}
+            <div className="ml-2 min-w-0">
+  <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de]">
+    {pageTitle}
+  </div>
+
+  <div className="hidden md:flex items-center gap-1 text-[10px] text-[#6e7d8c] mt-0.5 truncate">
+    <span>{organizationName || 'Organization'}</span>
+    <span>/</span>
+    <span>{portfolioName || 'Portfolio'}</span>
+    <span>/</span>
+    <span className="text-[#c49e48]">
+      {projectName || 'Project'}
+    </span>
+  </div>
+</div>
+
+              <div className="hidden md:flex items-center gap-1 text-[10px] text-[#6e7d8c] mt-0.5 truncate">
+                <span>{organizationName || 'Organization'}</span>
+                <span>/</span>
+                <span>{portfolioName || 'Portfolio'}</span>
+                <span>/</span>
+                <span className="text-[#c49e48]">
+                  {projectName || 'Project'}
+                </span>
+              </div>
             </div>
           </div>
 
