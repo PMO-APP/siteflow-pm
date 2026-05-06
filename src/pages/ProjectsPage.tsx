@@ -59,7 +59,12 @@ export default function ProjectsPage() {
   }
 
   function openProject(p: any) {
-    setProject(p.id, p.project_name)
+    setProject(
+  p.id,
+  p.project_name,
+  p.organization_id || null,
+  p.portfolio_id || null
+)
     navigate('/app')
   }
 
