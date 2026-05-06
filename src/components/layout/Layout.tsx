@@ -44,6 +44,7 @@ const NAV = [
   { to: '/app/team', icon: Users, label: 'Team' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
   { to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
+  { to: '/app/team-access', icon: Users, label: 'Team Access' },
 ]
 
 export default function Layout() {
