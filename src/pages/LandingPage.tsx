@@ -79,6 +79,13 @@ export default function LandingPage() {
 
           <div className="flex gap-4 items-center">
             <button
+  type="button"
+  onClick={() => navigate('/pricing')}
+  className="text-sm text-slate-300 hover:text-[#c49e48] transition"
+>
+  Pricing
+</button>
+            <button
               type="button"
               onClick={goToSignIn}
               className="text-sm text-slate-300 hover:text-[#c49e48] transition"
