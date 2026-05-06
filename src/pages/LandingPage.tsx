@@ -66,7 +66,7 @@ const STEPS = [
 export default function LandingPage() {
   const navigate = useNavigate()
 
-  const goToSignIn = () => navigate('/signin')
+  const goToSignIn = () => navigate('/Login')
   const goToSignUp = () => navigate('/signup')
 
   return (
