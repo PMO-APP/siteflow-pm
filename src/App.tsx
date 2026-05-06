@@ -1,3 +1,4 @@
+import AcceptInvitePage from '@/pages/AcceptInvitePage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import PricingPage from '@/pages/PricingPage'
 import LandingPage from '@/pages/LandingPage'
@@ -132,6 +133,7 @@ export default function App() {
               <Route path="risk-trends" element={<RiskTrendPage />} />
               <Route path="team" element={<TeamPage />} />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
               {role === 'admin' && (
                 <Route path="audit" element={<AuditPage />} />
