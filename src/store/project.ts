@@ -3,34 +3,72 @@ import { create } from 'zustand'
 interface ProjectState {
   projectId: number | null
   projectName: string
-  setProject: (id: number, name: string) => void
+  organizationId: number | null
+  portfolioId: number | null
+
+  setProject: (
+    id: number,
+    name: string,
+    organizationId?: number | null,
+    portfolioId?: number | null
+  ) => void
+
   clearProject: () => void
 }
 
 export const useProjectStore = create<ProjectState>(set => ({
-  projectId: localStorage.getItem('projectId')
-    ? Number(localStorage.getItem('projectId'))
-    : null,
+  projectId:
+    Number(localStorage.getItem('projectId')) || null,
 
-  projectName: localStorage.getItem('projectName') || '',
+  projectName:
+    localStorage.getItem('projectName') || '',
 
-  setProject: (id, name) => {
+  organizationId:
+    Number(localStorage.getItem('organizationId')) || null,
+
+  portfolioId:
+    Number(localStorage.getItem('portfolioId')) || null,
+
+  setProject: (
+    id,
+    name,
+    organizationId = null,
+    portfolioId = null
+  ) => {
     localStorage.setItem('projectId', String(id))
     localStorage.setItem('projectName', name)
 
+    if (organizationId) {
+      localStorage.setItem('organizationId', String(organizationId))
+    } else {
+      localStorage.removeItem('organizationId')
+    }
+
+    if (portfolioId) {
+      localStorage.setItem('portfolioId', String(portfolioId))
+    } else {
+      localStorage.removeItem('portfolioId')
+    }
+
     set({
       projectId: id,
-      projectName: name
+      projectName: name,
+      organizationId,
+      portfolioId,
     })
   },
 
   clearProject: () => {
     localStorage.removeItem('projectId')
     localStorage.removeItem('projectName')
+    localStorage.removeItem('organizationId')
+    localStorage.removeItem('portfolioId')
 
     set({
       projectId: null,
-      projectName: ''
+      projectName: '',
+      organizationId: null,
+      portfolioId: null,
     })
-  }
+  },
 }))
