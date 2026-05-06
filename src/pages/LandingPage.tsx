@@ -6,8 +6,11 @@ import {
   Clock,
   FileText,
   Layers,
+  Gauge,
+  Briefcase,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 const FEATURES = [
   {
@@ -42,8 +45,29 @@ const FEATURES = [
   },
 ]
 
+const STEPS = [
+  {
+    title: 'Create Projects',
+    desc: 'Set up each project with its own dashboard, schedule, risks, and records.',
+    icon: Briefcase,
+  },
+  {
+    title: 'Track Execution',
+    desc: 'Monitor programme, approvals, procurement, snags, financials, and reports.',
+    icon: Gauge,
+  },
+  {
+    title: 'Control Delivery',
+    desc: 'Escalate risks early, act faster, and keep leadership informed.',
+    icon: ShieldCheck,
+  },
+]
+
 export default function LandingPage() {
   const navigate = useNavigate()
+
+  const goToSignIn = () => navigate('/signin')
+  const goToSignUp = () => navigate('/signup')
 
   return (
     <div className="min-h-screen bg-[#0c1014] text-white overflow-hidden">
@@ -51,25 +75,20 @@ export default function LandingPage() {
 
       <div className="relative z-10">
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div>
-            <div className="text-2xl font-bold text-[#c49e48]">
-              PMOCorex
-            </div>
-            <div className="text-[11px] text-slate-500 tracking-widest uppercase">
-              Portfolio Control System
-            </div>
-          </div>
+          <PMOCorexLogo size={38} />
 
           <div className="flex gap-4 items-center">
             <button
-              onClick={() => navigate('/Login')}
-              className="text-sm text-slate-300 hover:text-[#c49e48]"
+              type="button"
+              onClick={goToSignIn}
+              className="text-sm text-slate-300 hover:text-[#c49e48] transition"
             >
               Sign In
             </button>
 
             <button
-              onClick={() => navigate('/signup')}
+              type="button"
+              onClick={goToSignUp}
               className="btn-gold btn-sm btn"
             >
               Get Started
@@ -96,7 +115,8 @@ export default function LandingPage() {
 
             <div className="mt-8 flex flex-wrap gap-4">
               <button
-                onClick={() => navigate('/signup')}
+                type="button"
+                onClick={goToSignUp}
                 className="btn-gold btn px-6 py-3"
               >
                 Start Managing Projects
@@ -104,7 +124,8 @@ export default function LandingPage() {
               </button>
 
               <button
-                onClick={() => navigate('/Login')}
+                type="button"
+                onClick={goToSignIn}
                 className="btn-ghost btn px-6 py-3"
               >
                 Sign In
@@ -204,8 +225,11 @@ export default function LandingPage() {
         </section>
 
         <section className="max-w-7xl mx-auto px-6 pb-20">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold">
+          <div className="text-center mb-10">
+            <div className="text-xs uppercase tracking-[0.35em] text-[#c49e48]">
+              Platform Modules
+            </div>
+            <h2 className="text-3xl font-bold mt-3">
               Built for control, clarity, and delivery confidence.
             </h2>
             <p className="text-slate-400 mt-2">
@@ -239,6 +263,77 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section className="max-w-7xl mx-auto px-6 pb-20">
+          <div className="grid md:grid-cols-3 gap-5">
+            {STEPS.map((step, index) => {
+              const Icon = step.icon
+
+              return (
+                <div key={step.title} className="card p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="w-10 h-10 rounded-lg bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
+                      <Icon size={18} className="text-[#c49e48]" />
+                    </div>
+                    <div className="text-4xl font-black text-white/5">
+                      0{index + 1}
+                    </div>
+                  </div>
+
+                  <h3 className="text-lg font-semibold">
+                    {step.title}
+                  </h3>
+
+                  <p className="text-sm text-slate-400 mt-2">
+                    {step.desc}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 pb-20">
+          <div className="text-center mb-10">
+            <div className="text-xs uppercase tracking-[0.35em] text-[#c49e48]">
+              Product Preview
+            </div>
+            <h2 className="text-3xl font-bold mt-3">
+              See PMOCorex in action.
+            </h2>
+            <p className="text-slate-400 mt-2">
+              Add real product screenshots here once your dashboard views are ready.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              ['Executive Dashboard', '/dashboard.png'],
+              ['Risk Register', '/risk.png'],
+              ['Schedule Control', '/schedule.png'],
+            ].map(([title, img]) => (
+              <div key={title} className="card p-3">
+                <div className="aspect-video rounded-lg bg-[#111820] border border-white/[0.06] overflow-hidden flex items-center justify-center">
+                  <img
+                    src={img}
+                    alt={title}
+                    className="w-full h-full object-cover"
+                    onError={e => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                  <div className="text-xs text-slate-500">
+                    {title} screenshot
+                  </div>
+                </div>
+
+                <div className="text-sm text-white mt-3">
+                  {title}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="max-w-7xl mx-auto px-6 pb-16">
           <div className="rounded-2xl border border-[#c49e48]/20 bg-gradient-to-r from-[#161f28] to-[#1c2a36] p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
             <div>
@@ -251,7 +346,8 @@ export default function LandingPage() {
             </div>
 
             <button
-              onClick={() => navigate('/signup')}
+              type="button"
+              onClick={goToSignUp}
               className="btn-gold btn px-6 py-3"
             >
               Launch PMOCorex
