@@ -141,34 +141,69 @@ export const useUpsertApproval = () => {
 }
 
 // ─── SITE REPORTS ──────────────────────────────────────
-export const useSiteReports = () => useQuery({
-  queryKey: ['site_reports'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('site_reports').select('*').order('report_date', { ascending: false })
-    if (error) throw error
-    return data as SiteReport[]
-  },
-})
+export const useSiteReports = () => {
+  const { projectId } = useProjectStore()
 
-export const useUpsertSiteReport = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (item: Partial<SiteReport> & { id?: string }) => {
-      const { id, ...rest } = item
-      if (id) {
-        const { data, error } = await supabase.from('site_reports').update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id).select().single()
-        if (error) throw error
-        return data
-      } else {
-        const { data, error } = await supabase.from('site_reports').insert(rest).select().single()
-        if (error) throw error
-        return data
-      }
+  return useQuery({
+    queryKey: ['site_reports', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('site_reports')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('report_date', { ascending: false })
+
+      if (error) throw error
+      return data as SiteReport[]
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['site_reports'] }),
   })
 }
 
+export const useUpsertSiteReport = () => {
+  const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
+  return useMutation({
+    mutationFn: async (item: Partial<SiteReport> & { id?: string }) => {
+      if (!projectId) throw new Error('No project selected')
+
+      const { id, ...rest } = item
+
+      if (id) {
+        const { data, error } = await supabase
+          .from('site_reports')
+          .update({
+            ...rest,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('project_id', projectId)
+          .select()
+          .single()
+
+        if (error) throw error
+        return data
+      }
+
+      const { data, error } = await supabase
+        .from('site_reports')
+        .insert({
+          ...rest,
+          project_id: projectId,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['site_reports', projectId],
+      }),
+  })
+}
 // ─── SNAGS ─────────────────────────────────────────────
 export const useSnags = () => {
   const { projectId } =
@@ -235,31 +270,67 @@ export const useUpsertSnag = () => {
 }
 
 // ─── DOCUMENTS ─────────────────────────────────────────
-export const useDocuments = () => useQuery({
-  queryKey: ['documents'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('documents').select('*').order('created_at', { ascending: false })
-    if (error) throw error
-    return data as Document[]
-  },
-})
+export const useDocuments = () => {
+  const { projectId } = useProjectStore()
+
+  return useQuery({
+    queryKey: ['documents', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data as Document[]
+    },
+  })
+}
 
 export const useUpsertDocument = () => {
   const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
   return useMutation({
     mutationFn: async (item: Partial<Document> & { id?: string }) => {
+      if (!projectId) throw new Error('No project selected')
+
       const { id, ...rest } = item
+
       if (id) {
-        const { data, error } = await supabase.from('documents').update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id).select().single()
-        if (error) throw error
-        return data
-      } else {
-        const { data, error } = await supabase.from('documents').insert(rest).select().single()
+        const { data, error } = await supabase
+          .from('documents')
+          .update({
+            ...rest,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('project_id', projectId)
+          .select()
+          .single()
+
         if (error) throw error
         return data
       }
+
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({
+          ...rest,
+          project_id: projectId,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents'] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['documents', projectId],
+      }),
   })
 }
 
@@ -386,31 +457,67 @@ export const useUpsertRisk = () => {
 }
 
 // ─── MEETINGS ──────────────────────────────────────────
-export const useMeetings = () => useQuery({
-  queryKey: ['meetings'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('meetings').select('*').order('meeting_date', { ascending: false })
-    if (error) throw error
-    return data as Meeting[]
-  },
-})
+export const useMeetings = () => {
+  const { projectId } = useProjectStore()
+
+  return useQuery({
+    queryKey: ['meetings', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('meeting_date', { ascending: false })
+
+      if (error) throw error
+      return data as Meeting[]
+    },
+  })
+}
 
 export const useUpsertMeeting = () => {
   const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
   return useMutation({
     mutationFn: async (item: Partial<Meeting> & { id?: string }) => {
+      if (!projectId) throw new Error('No project selected')
+
       const { id, ...rest } = item
+
       if (id) {
-        const { data, error } = await supabase.from('meetings').update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id).select().single()
-        if (error) throw error
-        return data
-      } else {
-        const { data, error } = await supabase.from('meetings').insert(rest).select().single()
+        const { data, error } = await supabase
+          .from('meetings')
+          .update({
+            ...rest,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('project_id', projectId)
+          .select()
+          .single()
+
         if (error) throw error
         return data
       }
+
+      const { data, error } = await supabase
+        .from('meetings')
+        .insert({
+          ...rest,
+          project_id: projectId,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['meetings'] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['meetings', projectId],
+      }),
   })
 }
 
@@ -440,31 +547,67 @@ export const useAddComment = () => {
 }
 
 // ─── CONTRACTOR SCORES ─────────────────────────────────
-export const useContractorScores = () => useQuery({
-  queryKey: ['contractor_scores'],
-  queryFn: async () => {
-    const { data, error } = await supabase.from('contractor_scores').select('*').order('created_at', { ascending: false })
-    if (error) throw error
-    return data as ContractorScore[]
-  },
-})
+export const useContractorScores = () => {
+  const { projectId } = useProjectStore()
+
+  return useQuery({
+    queryKey: ['contractor_scores', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contractor_scores')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data as ContractorScore[]
+    },
+  })
+}
 
 export const useUpsertContractorScore = () => {
   const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
   return useMutation({
     mutationFn: async (item: Partial<ContractorScore> & { id?: string }) => {
+      if (!projectId) throw new Error('No project selected')
+
       const { id, ...rest } = item
+
       if (id) {
-        const { data, error } = await supabase.from('contractor_scores').update(rest).eq('id', id).select().single()
-        if (error) throw error
-        return data
-      } else {
-        const { data, error } = await supabase.from('contractor_scores').insert(rest).select().single()
+        const { data, error } = await supabase
+          .from('contractor_scores')
+          .update({
+            ...rest,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', id)
+          .eq('project_id', projectId)
+          .select()
+          .single()
+
         if (error) throw error
         return data
       }
+
+      const { data, error } = await supabase
+        .from('contractor_scores')
+        .insert({
+          ...rest,
+          project_id: projectId,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contractor_scores'] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['contractor_scores', projectId],
+      }),
   })
 }
 
