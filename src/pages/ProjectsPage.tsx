@@ -134,19 +134,18 @@ export default function ProjectsPage() {
   ).length
 
   return (
-    <div className="min-h-screen bg-[#0c1014] text-white px-6 pt-8 pb-40 overflow-y-auto">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* TOPBAR */}
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-[#0c1014] text-white overflow-x-hidden">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-40 space-y-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="text-left"
+            className="text-left w-fit"
           >
             <PMOCorexLogo size={40} />
           </button>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button
               onClick={() => setShowOrgModal(true)}
               className="btn-ghost btn-sm btn"
@@ -173,8 +172,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* HERO */}
-        <div className="relative overflow-hidden rounded-3xl border border-[#c49e48]/20 bg-gradient-to-r from-[#111820] via-[#162230] to-[#111820] p-8">
+        <div className="relative overflow-hidden rounded-3xl border border-[#c49e48]/20 bg-gradient-to-r from-[#111820] via-[#162230] to-[#111820] p-5 sm:p-8">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
           <div className="relative max-w-3xl">
@@ -182,17 +180,17 @@ export default function ProjectsPage() {
               Workspace Hub
             </div>
 
-            <h1 className="text-4xl font-black">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight">
               Choose your delivery environment.
             </h1>
 
-            <p className="text-slate-400 mt-3 leading-relaxed">
+            <p className="text-slate-400 mt-4 leading-relaxed max-w-2xl text-sm sm:text-base">
               Create organizations, group projects into portfolios,
               and manage each project from its own PMOCorex command centre.
             </p>
           </div>
 
-          <div className="relative mt-8 grid md:grid-cols-4 gap-4">
+          <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <MetricCard
               title="Organizations"
               value={organizations.length}
@@ -219,7 +217,6 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* CONTENT */}
         {loading ? (
           <div className="card p-8 text-slate-400">
             Loading workspace…
@@ -243,8 +240,8 @@ export default function ProjectsPage() {
                 )
 
                 return (
-                  <div key={org.id} className="card p-5">
-                    <div className="flex items-center justify-between mb-5">
+                  <div key={org.id} className="card p-4 sm:p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
                       <div>
                         <div className="flex items-center gap-2">
                           <Building2
@@ -268,14 +265,14 @@ export default function ProjectsPage() {
                           setSelectedOrgId(org.id)
                           setShowProjectModal(true)
                         }}
-                        className="btn-gold btn-sm btn"
+                        className="btn-gold btn-sm btn w-fit"
                       >
                         <Plus size={14} />
                         Add Project
                       </button>
                     </div>
 
-                    <div className="grid lg:grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                       {orgPortfolios.map(portfolio => {
                         const portfolioProjects = projects.filter(
                           p => p.portfolio_id === portfolio.id
@@ -284,9 +281,9 @@ export default function ProjectsPage() {
                         return (
                           <div
                             key={portfolio.id}
-                            className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4"
+                            className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5"
                           >
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Layers
@@ -358,7 +355,7 @@ export default function ProjectsPage() {
             )}
 
             {projects.filter(p => !p.organization_id).length > 0 && (
-              <div className="card p-5">
+              <div className="card p-4 sm:p-5">
                 <div className="mb-4">
                   <h2 className="text-xl font-bold text-[#ede8de]">
                     Unassigned Projects
@@ -369,7 +366,7 @@ export default function ProjectsPage() {
                   </p>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {projects
                     .filter(p => !p.organization_id)
                     .map(project => (
@@ -385,11 +382,9 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {/* EXTRA BOTTOM SPACE */}
-        <div className="h-24" />
+        <div className="h-32" />
       </div>
 
-      {/* ORGANIZATION MODAL */}
       {showOrgModal && (
         <Modal
           title="Create Organization"
@@ -411,7 +406,6 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {/* PORTFOLIO MODAL */}
       {showPortfolioModal && (
         <Modal
           title="Create Portfolio"
@@ -447,7 +441,6 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {/* PROJECT MODAL */}
       {showProjectModal && (
         <Modal
           title="Create Project"
@@ -533,7 +526,7 @@ function ProjectCard({ project, onClick }: any) {
   return (
     <div
       onClick={onClick}
-      className="group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 cursor-pointer hover:border-[#c49e48]/40 transition"
+      className="group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 cursor-pointer hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -552,12 +545,12 @@ function ProjectCard({ project, onClick }: any) {
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between gap-3">
         <span className="text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1">
           {project.status || 'Active'}
         </span>
 
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-slate-500 truncate">
           Target: {project.handover_date || 'Not set'}
         </span>
       </div>
