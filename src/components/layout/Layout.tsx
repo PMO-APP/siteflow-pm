@@ -8,246 +8,286 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, ShoppingCart, CheckSquare,
   HardHat, AlertTriangle, FolderOpen, DollarSign, Shield,
-  Users, FileText, Bell, LogOut, Menu, X, ChevronDown, BarChart3, ShieldCheck
+  Users, FileText, Bell, LogOut, Menu, BarChart3, ShieldCheck
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
+import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 const NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/schedule', icon: CalendarDays, label: 'Schedule' },
-  { to: '/recovery', icon: BarChart3, label: 'Recovery Forecast' },
-  { to: '/procurement', icon: ShoppingCart, label: 'Procurement' },
-  { to: '/approvals', icon: CheckSquare, label: 'Approvals' },
-  { to: '/site', icon: HardHat, label: 'Site Progress' },
-  { to: '/snags', icon: AlertTriangle, label: 'Snag List' },
-  { to: '/documents', icon: FolderOpen, label: 'Documents' },
-  { to: '/financial', icon: DollarSign, label: 'Financial' },
-  { to: '/risk', icon: Shield, label: 'Risk Register' },
-  { to: '/risk-trends', icon: Shield, label: 'Risk Trends' },
-  { to: '/team', icon: Users, label: 'Team' },
-  { to: '/reports', icon: FileText, label: 'Reports' },
-  { to: '/audit', icon: ShieldCheck, label: 'Audit Trail' },
+  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+  { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
+  { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
+  { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
+  { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
+  { to: '/app/site', icon: HardHat, label: 'Site Progress' },
+  { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
+  { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
+  { to: '/app/financial', icon: DollarSign, label: 'Financial' },
+  { to: '/app/risk', icon: Shield, label: 'Risk Register' },
+  { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
+  { to: '/app/team', icon: Users, label: 'Team' },
+  { to: '/app/reports', icon: FileText, label: 'Reports' },
+  { to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
 ]
 
 export default function Layout() {
   useBrowserBranding()
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
-  const { user, signOut } = useAuthStore()
+  const [handoverDate, setHandoverDate] = useState<Date | null>(null)
 
-const { projectName } =
-  useProjectStore()
-const role = getRole(user?.email)
+  const { user, signOut } = useAuthStore()
+  const { projectName } = useProjectStore()
+  const role = getRole(user?.email)
+
   const location = useLocation()
   const navigate = useNavigate()
-  const [handoverDate, setHandoverDate] =
-  useState<Date | null>(null)
-  useEffect(() => {
-  loadProject()
-}, [projectName])
 
-async function loadProject() {
-  const { data } =
-    await supabase
+  useEffect(() => {
+    loadProject()
+  }, [projectName])
+
+  async function loadProject() {
+    if (!projectName) {
+      setHandoverDate(null)
+      return
+    }
+
+    const { data } = await supabase
       .from('projects')
       .select('handover_date')
-      .eq(
-        'project_name',
-        projectName
-      )
+      .eq('project_name', projectName)
       .single()
 
-  if (data?.handover_date) {
-    setHandoverDate(
-      parseISO(
-        data.handover_date
-      )
-    )
+    if (data?.handover_date) {
+      setHandoverDate(parseISO(data.handover_date))
+    } else {
+      setHandoverDate(null)
+    }
   }
-}
-  const daysLeft =
-handoverDate
-  ? differenceInDays(
-      handoverDate,
-      new Date()
-    )
-  : 0
+
+  const daysLeft = handoverDate
+    ? differenceInDays(handoverDate, new Date())
+    : null
 
   const allowedNav = NAV.filter(item => {
-  if (role === 'admin') {
-  return true
-}
+    if (role === 'admin') return true
+    if (role === 'project') return item.to !== '/app/audit'
 
-if (role === 'project') {
-  return item.to !== '/audit'
-}
+    if (role === 'design') {
+      return [
+        '/app',
+        '/app/recovery',
+        '/app/documents',
+        '/app/snags',
+        '/app/risk',
+      ].includes(item.to)
+    }
 
-  if (role === 'design') {
+    if (role === 'costing') {
+      return [
+        '/app',
+        '/app/recovery',
+        '/app/financial',
+        '/app/snags',
+        '/app/risk',
+      ].includes(item.to)
+    }
+
     return [
-      '/',
-      '/recovery',
-      '/documents',
-      '/snags',
-      '/risk',
+      '/app',
+      '/app/recovery',
     ].includes(item.to)
-  }
+  })
 
-  if (role === 'costing') {
-    return [
-      '/',
-      '/recovery',
-      '/financial',
-      '/snags',
-      '/risk',
-    ].includes(item.to)
-  }
-
-  return [
-    '/',
-    '/recovery',
-  ].includes(item.to)
-})
   const currentPage = allowedNav.find(n =>
-  n.exact
-    ? location.pathname === n.to
-    : location.pathname.startsWith(n.to)
-)
+    n.exact
+      ? location.pathname === n.to
+      : location.pathname.startsWith(n.to)
+  )
+
   const pageTitle = currentPage?.label || 'Dashboard'
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Mobile overlay */}
+    <div className="flex h-screen bg-[#0a0e12] text-white overflow-hidden">
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
 
-      {/* Sidebar */}
-      <aside className={`
-        fixed lg:relative z-30 h-full w-[220px] flex-shrink-0
-        bg-[#111820] border-r border-[#c49e48]/15
-        flex flex-col transform transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        {/* Gold top line */}
-        <div className="h-[2px] bg-gradient-to-r from-[#c49e48] to-transparent flex-shrink-0" />
+      <aside
+        className={`
+          fixed lg:relative z-30 h-full w-[280px] flex-shrink-0
+          border-r border-white/[0.06] bg-[#0f141a]/95 backdrop-blur-xl
+          flex flex-col transform transition-transform duration-200
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+      >
+        <div className="h-[2px] bg-gradient-to-r from-[#c49e48] via-[#e3c06a] to-transparent flex-shrink-0" />
 
-        {/* Brand */}
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
-          <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-[#c49e48] mb-1">Project Command</div>
-          <div className="font-display text-[17px] font-bold text-[#ede8de] leading-tight">
-  {projectName}
-</div>
-          <div className="text-[10px] text-[#6e7d8c] mt-1">
-  Active Project
-</div>
-          {role === 'guest' && (
-  <div className="mt-2 inline-block px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-semibold tracking-wide text-amber-400">
-    Executive View
-  </div>
-)}
+          <PMOCorexLogo size={34} />
+
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
+            <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+              Active Project
+            </div>
+
+            <div className="mt-1 truncate text-sm font-semibold text-[#ede8de]">
+              {projectName || 'No Project Selected'}
+            </div>
+
+            {role === 'guest' && (
+              <div className="mt-2 inline-block px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-semibold tracking-wide text-amber-400">
+                Executive View
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Countdown */}
         <div className="px-4 py-3 border-b border-white/[0.06] flex-shrink-0">
-          <div className="flex items-center gap-3 bg-[#1c2a36] rounded-lg px-3 py-2.5">
-            <div className={`font-display text-3xl font-bold leading-none ${daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'}`}>
-              {Math.max(0, daysLeft)}
+          <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#111820] px-3 py-3">
+            <div
+              className={`font-display text-3xl font-black leading-none ${
+                daysLeft !== null && daysLeft < 60
+                  ? 'text-red-400'
+                  : 'text-[#c49e48]'
+              }`}
+            >
+              {daysLeft !== null ? Math.max(0, daysLeft) : '-'}
             </div>
+
             <div>
-              <div className={`text-[10px] font-semibold ${daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'}`}>
+              <div
+                className={`text-[10px] font-semibold ${
+                  daysLeft !== null && daysLeft < 60
+                    ? 'text-red-400'
+                    : 'text-[#c49e48]'
+                }`}
+              >
                 DAYS LEFT
               </div>
-              <div className="text-[9px] text-[#6e7d8c]">{handoverDate
-  ? handoverDate.toLocaleDateString(
-      'en-GB',
-      {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }
-    )
-  : '-'}
+
+              <div className="text-[9px] text-[#6e7d8c]">
+                {handoverDate
+                  ? handoverDate.toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'No handover date'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
           {allowedNav.map(({ to, icon: Icon, label, exact }) => (
             <NavLink
               key={to}
               to={to}
               end={exact}
               onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
+                  isActive
+                    ? 'bg-[#c49e48]/12 text-[#c49e48] border-[#c49e48]/20'
+                    : 'text-slate-400 border-transparent hover:text-white hover:bg-white/[0.04]'
+                }`
+              }
             >
-              <Icon size={14} className="flex-shrink-0" />
+              <Icon size={15} className="flex-shrink-0" />
               <span>{label}</span>
             </NavLink>
           ))}
         </nav>
 
-        {/* User footer */}
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
+          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
               {user ? getInitials(user.full_name || 'User') : 'U'}
             </div>
+
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-[#ede8de] truncate">{user?.full_name || 'User'}</div>
-              <div className="text-[9px] text-[#6e7d8c] capitalize">{
-  role === 'guest'
-    ? 'Management'
-    : role === 'project'
-    ? 'Project Team'
-    : role === 'design'
-    ? 'Design Team'
-    : role === 'costing'
-    ? 'Costing Team'
-    : 'Administrator'
-}
+              <div className="text-[11px] font-medium text-[#ede8de] truncate">
+                {user?.full_name || 'User'}
+              </div>
+
+              <div className="text-[9px] text-[#6e7d8c] capitalize">
+                {role === 'guest'
+                  ? 'Management'
+                  : role === 'project'
+                  ? 'Project Team'
+                  : role === 'design'
+                  ? 'Design Team'
+                  : role === 'costing'
+                  ? 'Costing Team'
+                  : 'Administrator'}
               </div>
             </div>
-            <button onClick={signOut} className="text-[#6e7d8c] hover:text-red-400 transition-colors" title="Sign out">
-              <LogOut size={13} />
+
+            <button
+              onClick={signOut}
+              className="text-[#6e7d8c] hover:text-red-400 transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={14} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Topbar */}
-        <header className="bg-[#111820] border-b border-[#c49e48]/15 px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0 relative">
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[#c49e48]/30 to-transparent" />
+        <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[#0c1014]/80 backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
           <button
-  className="lg:hidden text-[#6e7d8c] hover:text-[#ede8de] transition-colors"
-  onClick={() => setSidebarOpen(true)}
->
-  <Menu size={18} />
-</button>
+            className="lg:hidden text-[#6e7d8c] hover:text-[#ede8de] transition-colors"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu size={18} />
+          </button>
 
-<div className="flex items-center gap-2 flex-1">
-  <button onClick={() => navigate(-1)} className="btn-ghost btn-sm btn">
-    ← Back
-  </button>
+          <div className="flex items-center gap-2 flex-1">
+            <button
+              onClick={() => navigate(-1)}
+              className="btn-ghost btn-sm btn"
+            >
+              ← Back
+            </button>
 
-  <button onClick={() => navigate('/projects')} className="btn-ghost btn-sm btn">
-    Projects Hub
-  </button>
+            <button
+              onClick={() => navigate('/projects')}
+              className="btn-ghost btn-sm btn"
+            >
+              Projects Hub
+            </button>
 
-  <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de] ml-2">
-    {pageTitle}
-  </div>
-</div>
-
-<div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
-            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+            <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de] ml-2">
+              {pageTitle}
+            </div>
           </div>
+
+          <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span className="text-[11px] text-emerald-400">
+              Live
+            </span>
+          </div>
+
+          <div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
+            {new Date().toLocaleDateString('en-GB', {
+              weekday: 'short',
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </div>
+
           <button
             className="relative text-[#6e7d8c] hover:text-[#c49e48] transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
@@ -257,15 +297,13 @@ if (role === 'project') {
           </button>
         </header>
 
-        {/* Notifications panel */}
         {notifsOpen && (
           <div className="absolute top-14 right-4 z-40 w-80">
             <NotificationsPanel onClose={() => setNotifsOpen(false)} />
           </div>
         )}
 
-        {/* Page content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6 animate-in">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 animate-in bg-[#0c1014]">
           <Outlet />
         </div>
       </main>
