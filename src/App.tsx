@@ -1,3 +1,4 @@
+import PricingPage from '@/pages/PricingPage'
 import LandingPage from '@/pages/LandingPage'
 import { useProjectStore } from '@/store/project'
 import ProjectsPage from '@/pages/ProjectsPage'
@@ -100,6 +101,7 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route path="/pricing" element={<PricingPage />} />
 
         {/* MAIN APP */}
         <Route
