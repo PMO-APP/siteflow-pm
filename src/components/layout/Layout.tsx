@@ -183,7 +183,13 @@ export default function Layout() {
         <div className="h-[2px] bg-gradient-to-r from-[#c49e48] via-[#e3c06a] to-transparent flex-shrink-0" />
 
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
-          <PMOCorexLogo size={34} />
+          <button
+  type="button"
+  onClick={() => navigate('/')}
+  className="text-left"
+>
+  <PMOCorexLogo size={34} />
+</button>
 
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
             <div>
