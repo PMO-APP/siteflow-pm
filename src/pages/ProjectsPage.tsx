@@ -130,10 +130,16 @@ export default function ProjectsPage() {
   const activeProjects = projects.filter(p => (p.status || 'Active') === 'Active').length
 
   return (
-    <div className="min-h-screen bg-[#0c1014] text-white px-6 py-8">
+    <div className="min-h-screen bg-[#0c1014] text-white px-6 pt-8 pb-24">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
-          <PMOCorexLogo size={40} />
+         <button
+  type="button"
+  onClick={() => navigate('/')}
+  className="text-left"
+>
+  <PMOCorexLogo size={40} />
+</button>
 
           <div className="flex gap-3">
             <button
