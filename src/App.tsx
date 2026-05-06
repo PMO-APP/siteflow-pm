@@ -24,7 +24,7 @@ import FinancialPage from '@/pages/FinancialPage'
 import RiskPage from '@/pages/RiskPage'
 import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
-import RecoveryForecastPage from './pages/RecoveryForecastPage'
+import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 import { getRole } from '@/lib/access'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -32,12 +32,14 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#0c1014]">
+      <div className="h-screen flex items-center justify-center bg-[#0c1014]">
         <div className="text-center">
           <div className="font-display text-3xl text-[#c49e48] mb-2">
             PMOCorex
           </div>
-          <div className="text-[#6e7d8c] text-sm">Loading…</div>
+          <div className="text-[#6e7d8c] text-sm">
+            Loading…
+          </div>
         </div>
       </div>
     )
@@ -66,6 +68,8 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user as any)
+      } else {
+        setUser(null)
       }
 
       setLoading(false)
@@ -76,9 +80,13 @@ export default function App() {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user as any)
-      } else if (event === 'SIGNED_OUT') {
+      }
+
+      if (event === 'SIGNED_OUT') {
         setUser(null)
       }
+
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
@@ -87,14 +95,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* PUBLIC LANDING PAGE */}
+        {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signin" element={<LoginPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-        {/* LOGIN */}
-        <Route path="/Login" element={<LoginPage />} />
-<Route path="/signup" element={<SignUpPage />} />
-
-        {/* PROJECT HUB */}
+        {/* WORKSPACE HUB */}
         <Route
           path="/projects"
           element={
@@ -103,8 +112,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route path="/pricing" element={<PricingPage />} />
-<Route path="team-access" element={<TeamAccessPage />} />
+
         {/* MAIN APP */}
         <Route
           path="/app"
@@ -117,44 +125,23 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-
           <Route path="recovery" element={<RecoveryForecastPage />} />
 
-          {(role === 'admin' || role === 'project') && (
-            <>
-              <Route path="schedule" element={<SchedulePage />} />
-              <Route path="procurement" element={<ProcurementPage />} />
-              <Route path="approvals" element={<ApprovalsPage />} />
-              <Route path="site" element={<SitePage />} />
-              <Route path="snags" element={<SnagsPage />} />
-              <Route path="documents" element={<DocumentsPage />} />
-              <Route path="financial" element={<FinancialPage />} />
-              <Route path="risk" element={<RiskPage />} />
-              <Route path="risk-trends" element={<RiskTrendPage />} />
-              <Route path="team" element={<TeamPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="/accept-invite" element={<AcceptInvitePage />} />
+          <Route path="schedule" element={<SchedulePage />} />
+          <Route path="procurement" element={<ProcurementPage />} />
+          <Route path="approvals" element={<ApprovalsPage />} />
+          <Route path="site" element={<SitePage />} />
+          <Route path="snags" element={<SnagsPage />} />
+          <Route path="documents" element={<DocumentsPage />} />
+          <Route path="financial" element={<FinancialPage />} />
+          <Route path="risk" element={<RiskPage />} />
+          <Route path="risk-trends" element={<RiskTrendPage />} />
+          <Route path="team" element={<TeamPage />} />
+          <Route path="team-access" element={<TeamAccessPage />} />
+          <Route path="reports" element={<ReportsPage />} />
 
-              {role === 'admin' && (
-                <Route path="audit" element={<AuditPage />} />
-              )}
-            </>
-          )}
-
-          {role === 'design' && (
-            <>
-              <Route path="documents" element={<DocumentsPage />} />
-              <Route path="snags" element={<SnagsPage />} />
-              <Route path="risk" element={<RiskPage />} />
-            </>
-          )}
-
-          {role === 'costing' && (
-            <>
-              <Route path="financial" element={<FinancialPage />} />
-              <Route path="snags" element={<SnagsPage />} />
-              <Route path="risk" element={<RiskPage />} />
-            </>
+          {role === 'admin' && (
+            <Route path="audit" element={<AuditPage />} />
           )}
         </Route>
 
