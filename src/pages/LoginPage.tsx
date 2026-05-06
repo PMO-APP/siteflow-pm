@@ -46,10 +46,12 @@ export default function SignInPage() {
         localStorage.removeItem('savedPassword')
       }
 
-      localStorage.removeItem('projectId')
-      localStorage.removeItem('projectName')
+     localStorage.removeItem('projectId')
+localStorage.removeItem('projectName')
+localStorage.removeItem('organizationId')
+localStorage.removeItem('portfolioId')
 
-      window.location.href = '/projects'
+window.location.href = '/projects'
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
 
