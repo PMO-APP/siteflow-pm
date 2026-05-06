@@ -5,8 +5,10 @@ import {
   ShieldCheck,
   Mail,
   Building2,
+  Send,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/store/auth'
 
 const ROLES = [
   'owner',
@@ -18,13 +20,16 @@ const ROLES = [
 ]
 
 export default function TeamAccessPage() {
+  const { user } = useAuthStore()
+
   const [organizations, setOrganizations] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
+  const [invites, setInvites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [showModal, setShowModal] = useState(false)
   const [organizationId, setOrganizationId] = useState('')
-  const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('')
   const [role, setRole] = useState('viewer')
 
   useEffect(() => {
@@ -34,20 +39,21 @@ export default function TeamAccessPage() {
   async function load() {
     setLoading(true)
 
-    const [{ data: orgs }, { data: mems, error }] =
-      await Promise.all([
-        supabase
-          .from('organizations')
-          .select('*')
-          .order('created_at'),
-
-        supabase
-          .from('organization_members')
-          .select('*, organizations(name)')
-          .order('created_at', {
-            ascending: false,
-          }),
-      ])
+    const [
+      { data: orgs },
+      { data: mems },
+      { data: invs, error },
+    ] = await Promise.all([
+      supabase.from('organizations').select('*').order('created_at'),
+      supabase
+        .from('organization_members')
+        .select('*, organizations(name)')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('organization_invites')
+        .select('*, organizations(name)')
+        .order('created_at', { ascending: false }),
+    ])
 
     if (error) {
       alert(error.message)
@@ -57,31 +63,43 @@ export default function TeamAccessPage() {
 
     setOrganizations(orgs || [])
     setMembers(mems || [])
+    setInvites(invs || [])
     setLoading(false)
   }
 
-  async function addMember() {
-    if (!organizationId || !userId || !role) {
+  async function sendInvite() {
+    if (!organizationId || !email || !role) {
       alert('Please complete all fields')
       return
     }
 
-    const { error } = await supabase
-      .from('organization_members')
+    const { data, error } = await supabase
+      .from('organization_invites')
       .insert({
         organization_id: Number(organizationId),
-        user_id: userId,
+        email: email.toLowerCase().trim(),
         role,
+        invited_by: user?.id,
       })
+      .select()
+      .single()
 
     if (error) {
       alert(error.message)
       return
     }
 
+    const inviteLink = `${window.location.origin}/accept-invite?token=${data.token}`
+
+    await navigator.clipboard.writeText(inviteLink)
+
+    alert(
+      'Invite created. The invite link has been copied. Send it to the user by email or WhatsApp.'
+    )
+
     setShowModal(false)
     setOrganizationId('')
-    setUserId('')
+    setEmail('')
     setRole('viewer')
     load()
   }
@@ -98,11 +116,11 @@ export default function TeamAccessPage() {
             </div>
 
             <h1 className="text-3xl font-black text-white">
-              Manage organization access.
+              Invite your project team.
             </h1>
 
             <p className="text-slate-400 mt-2 max-w-2xl">
-              Add users to organizations and assign roles for portfolio and project delivery control.
+              Invite members by email and assign organization-level roles.
             </p>
           </div>
 
@@ -111,52 +129,109 @@ export default function TeamAccessPage() {
             className="btn-gold btn"
           >
             <Plus size={15} />
-            Add Member
+            Invite Member
           </button>
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <Metric
-          title="Organizations"
-          value={organizations.length}
-          icon={Building2}
-        />
-
-        <Metric
-          title="Members"
-          value={members.length}
-          icon={Users}
-        />
-
-        <Metric
-          title="Roles"
-          value={ROLES.length}
-          icon={ShieldCheck}
-        />
+        <Metric title="Organizations" value={organizations.length} icon={Building2} />
+        <Metric title="Members" value={members.length} icon={Users} />
+        <Metric title="Pending Invites" value={invites.filter(i => i.status === 'pending').length} icon={Send} />
       </div>
 
       <div className="card overflow-hidden">
         <div className="card-head">
           <div>
-            <div className="card-title">
-              Organization Members
-            </div>
-
+            <div className="card-title">Pending Invitations</div>
             <div className="text-xs text-slate-500 mt-1">
-              Control who can access each organization.
+              Users invited to join organizations.
             </div>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-6 text-slate-400">
-            Loading members…
-          </div>
-        ) : members.length === 0 ? (
+          <div className="p-6 text-slate-400">Loading invites…</div>
+        ) : invites.length === 0 ? (
           <div className="empty-state py-12">
-            <div className="text-3xl mb-3">👥</div>
-            <p>No organization members added yet.</p>
+            <p>No invitations sent yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Organization</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Invite Link</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {invites.map(invite => {
+                  const link = `${window.location.origin}/accept-invite?token=${invite.token}`
+
+                  return (
+                    <tr key={invite.id}>
+                      <td>{invite.organizations?.name || 'Organization'}</td>
+
+                      <td className="text-slate-300">
+                        {invite.email}
+                      </td>
+
+                      <td>
+                        <span className="badge badge-muted capitalize">
+                          {invite.role?.replace('_', ' ')}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`badge ${
+                            invite.status === 'accepted'
+                              ? 'badge-green'
+                              : 'badge-amber'
+                          }`}
+                        >
+                          {invite.status}
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(link)
+                            alert('Invite link copied')
+                          }}
+                          className="tbl-action"
+                        >
+                          Copy Link
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Organization Members</div>
+            <div className="text-xs text-slate-500 mt-1">
+              Accepted members with access to organizations.
+            </div>
+          </div>
+        </div>
+
+        {members.length === 0 ? (
+          <div className="empty-state py-12">
+            <p>No members added yet.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -173,17 +248,7 @@ export default function TeamAccessPage() {
               <tbody>
                 {members.map(member => (
                   <tr key={member.id}>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <Building2
-                          size={14}
-                          className="text-[#c49e48]"
-                        />
-                        <span className="text-[#ede8de]">
-                          {member.organizations?.name || 'Organization'}
-                        </span>
-                      </div>
-                    </td>
+                    <td>{member.organizations?.name || 'Organization'}</td>
 
                     <td className="font-mono text-xs text-slate-400">
                       {member.user_id}
@@ -197,8 +262,7 @@ export default function TeamAccessPage() {
 
                     <td className="text-slate-500 text-xs">
                       {member.created_at
-                        ? new Date(member.created_at)
-                            .toLocaleDateString('en-GB')
+                        ? new Date(member.created_at).toLocaleDateString('en-GB')
                         : '-'}
                     </td>
                   </tr>
@@ -214,7 +278,7 @@ export default function TeamAccessPage() {
           <div className="card w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-white">
-                Add Organization Member
+                Invite Member
               </h2>
 
               <button
@@ -225,41 +289,29 @@ export default function TeamAccessPage() {
               </button>
             </div>
 
-            <label className="form-label">
-              Organization
-            </label>
+            <label className="form-label">Organization</label>
             <select
               className="form-control mb-4"
               value={organizationId}
-              onChange={e =>
-                setOrganizationId(e.target.value)
-              }
+              onChange={e => setOrganizationId(e.target.value)}
             >
-              <option value="">
-                Select organization
-              </option>
+              <option value="">Select organization</option>
 
               {organizations.map(org => (
-                <option
-                  key={org.id}
-                  value={org.id}
-                >
+                <option key={org.id} value={org.id}>
                   {org.name}
                 </option>
               ))}
             </select>
 
-            <label className="form-label">
-              User ID
-            </label>
+            <label className="form-label">Email Address</label>
             <div className="relative mb-4">
               <input
                 className="form-control pl-9"
-                placeholder="Paste Supabase user UUID"
-                value={userId}
-                onChange={e =>
-                  setUserId(e.target.value)
-                }
+                type="email"
+                placeholder="team@company.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
               />
 
               <Mail
@@ -268,9 +320,7 @@ export default function TeamAccessPage() {
               />
             </div>
 
-            <label className="form-label">
-              Role
-            </label>
+            <label className="form-label">Role</label>
             <select
               className="form-control mb-5"
               value={role}
@@ -284,14 +334,14 @@ export default function TeamAccessPage() {
             </select>
 
             <button
-              onClick={addMember}
+              onClick={sendInvite}
               className="btn-gold btn w-full justify-center"
             >
-              Add Member
+              Create Invite Link
             </button>
 
             <div className="text-xs text-slate-500 mt-4 leading-relaxed">
-              For now, paste the user UUID from Supabase Authentication. Later, this can become a proper email invite flow.
+              This creates a secure invite link. Email sending can be automated later with Supabase Edge Functions.
             </div>
           </div>
         </div>
