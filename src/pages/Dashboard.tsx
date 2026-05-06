@@ -1,3 +1,4 @@
+import AIInsights from '@/components/dashboard/AIInsights'
 import { useProjectStore } from '@/store/project'
 import { differenceInDays } from 'date-fns'
 import { AlertTriangle, TrendingUp, Clock, CheckCircle, Package, FileCheck, Shield, DollarSign, HardHat, ChevronRight } from 'lucide-react'
@@ -359,7 +360,21 @@ const varianceStatus =
           </div>
         ))}
       </div>
-
+<AIInsights
+        overdueTasks={overdue}
+        procurementRisks={procRisks}
+        highRisks={highRisks}
+        variance={variancePct ?? 0}
+        handoverConfidence={
+          variancePct === null
+            ? 0
+            : variancePct >= 0
+            ? 92
+            : variancePct >= -5
+            ? 78
+            : 61
+        }
+      />
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
