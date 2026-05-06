@@ -1,3 +1,4 @@
+import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary'
 import DeliveryPulse from '@/components/dashboard/DeliveryPulse'
 import AIInsights from '@/components/dashboard/AIInsights'
 import { useProjectStore } from '@/store/project'
@@ -534,6 +535,16 @@ export default function Dashboard() {
             : 61
         }
       />
+      <ExecutiveSummary
+  projectName={projectName}
+  progress={progressPct}
+  variance={variancePct}
+  overdueTasks={overdue}
+  openRisks={openRisks}
+  highRisks={highRisks}
+  pendingApprovals={pendingApprovals}
+  procurementRisks={procRisks}
+/>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="card">
