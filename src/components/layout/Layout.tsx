@@ -51,9 +51,12 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
-  const [handoverDate, setHandoverDate] = useState<Date | null>(null)
-  const [organizationName, setOrganizationName] = useState('')
-  const [portfolioName, setPortfolioName] = useState('')
+  const [handoverDate, setHandoverDate] =
+    useState<Date | null>(null)
+  const [organizationName, setOrganizationName] =
+    useState('')
+  const [portfolioName, setPortfolioName] =
+    useState('')
 
   const { user, signOut } = useAuthStore()
 
@@ -341,20 +344,9 @@ export default function Layout() {
             </button>
 
             <div className="ml-2 min-w-0">
-  <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de]">
-    {pageTitle}
-  </div>
-
-  <div className="hidden md:flex items-center gap-1 text-[10px] text-[#6e7d8c] mt-0.5 truncate">
-    <span>{organizationName || 'Organization'}</span>
-    <span>/</span>
-    <span>{portfolioName || 'Portfolio'}</span>
-    <span>/</span>
-    <span className="text-[#c49e48]">
-      {projectName || 'Project'}
-    </span>
-  </div>
-</div>
+              <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de]">
+                {pageTitle}
+              </div>
 
               <div className="hidden md:flex items-center gap-1 text-[10px] text-[#6e7d8c] mt-0.5 truncate">
                 <span>{organizationName || 'Organization'}</span>
