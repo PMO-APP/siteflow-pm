@@ -60,11 +60,12 @@ export default function ProjectsPage() {
 
   function openProject(p: any) {
     setProject(
-  p.id,
-  p.project_name,
-  p.organization_id || null,
-  p.portfolio_id || null
-)
+      p.id,
+      p.project_name,
+      p.organization_id || null,
+      p.portfolio_id || null
+    )
+
     navigate('/app')
   }
 
@@ -127,19 +128,23 @@ export default function ProjectsPage() {
   }
 
   const totalProjects = projects.length
-  const activeProjects = projects.filter(p => (p.status || 'Active') === 'Active').length
+
+  const activeProjects = projects.filter(
+    p => (p.status || 'Active') === 'Active'
+  ).length
 
   return (
-    <div className="min-h-screen bg-[#0c1014] text-white px-6 pt-8 pb-24">
+    <div className="min-h-screen bg-[#0c1014] text-white px-6 pt-8 pb-40 overflow-y-auto">
       <div className="max-w-7xl mx-auto space-y-8">
+        {/* TOPBAR */}
         <div className="flex items-center justify-between">
-         <button
-  type="button"
-  onClick={() => navigate('/')}
-  className="text-left"
->
-  <PMOCorexLogo size={40} />
-</button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-left"
+          >
+            <PMOCorexLogo size={40} />
+          </button>
 
           <div className="flex gap-3">
             <button
@@ -168,6 +173,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
+        {/* HERO */}
         <div className="relative overflow-hidden rounded-3xl border border-[#c49e48]/20 bg-gradient-to-r from-[#111820] via-[#162230] to-[#111820] p-8">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
@@ -181,19 +187,39 @@ export default function ProjectsPage() {
             </h1>
 
             <p className="text-slate-400 mt-3 leading-relaxed">
-              Create organizations, group projects into portfolios, and manage each
-              project from its own PMOCorex command centre.
+              Create organizations, group projects into portfolios,
+              and manage each project from its own PMOCorex command centre.
             </p>
           </div>
 
           <div className="relative mt-8 grid md:grid-cols-4 gap-4">
-            <MetricCard title="Organizations" value={organizations.length} icon={Building2} />
-            <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
-            <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
-            <MetricCard title="Active" value={activeProjects} icon={Activity} />
+            <MetricCard
+              title="Organizations"
+              value={organizations.length}
+              icon={Building2}
+            />
+
+            <MetricCard
+              title="Portfolios"
+              value={portfolios.length}
+              icon={Briefcase}
+            />
+
+            <MetricCard
+              title="Projects"
+              value={totalProjects}
+              icon={FolderKanban}
+            />
+
+            <MetricCard
+              title="Active"
+              value={activeProjects}
+              icon={Activity}
+            />
           </div>
         </div>
 
+        {/* CONTENT */}
         {loading ? (
           <div className="card p-8 text-slate-400">
             Loading workspace…
@@ -221,14 +247,19 @@ export default function ProjectsPage() {
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Building2 size={18} className="text-[#c49e48]" />
+                          <Building2
+                            size={18}
+                            className="text-[#c49e48]"
+                          />
+
                           <h2 className="text-xl font-bold text-[#ede8de]">
                             {org.name}
                           </h2>
                         </div>
 
                         <p className="text-sm text-slate-500 mt-1">
-                          {orgPortfolios.length} portfolio(s) • {orgProjects.length} project(s)
+                          {orgPortfolios.length} portfolio(s) •{' '}
+                          {orgProjects.length} project(s)
                         </p>
                       </div>
 
@@ -258,14 +289,19 @@ export default function ProjectsPage() {
                             <div className="flex items-center justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Layers size={16} className="text-[#c49e48]" />
+                                  <Layers
+                                    size={16}
+                                    className="text-[#c49e48]"
+                                  />
+
                                   <div className="font-semibold text-white">
                                     {portfolio.name}
                                   </div>
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description || 'Project delivery portfolio'}
+                                  {portfolio.description ||
+                                    'Project delivery portfolio'}
                                 </div>
                               </div>
 
@@ -300,7 +336,8 @@ export default function ProjectsPage() {
                           </div>
 
                           <div className="text-sm text-slate-500 mt-2">
-                            Create portfolios like Affordable, Luxury, Infrastructure, or Commercial.
+                            Create portfolios like Affordable,
+                            Luxury, Infrastructure, or Commercial.
                           </div>
 
                           <button
@@ -326,6 +363,7 @@ export default function ProjectsPage() {
                   <h2 className="text-xl font-bold text-[#ede8de]">
                     Unassigned Projects
                   </h2>
+
                   <p className="text-sm text-slate-500">
                     These projects are not yet linked to an organization or portfolio.
                   </p>
@@ -346,10 +384,17 @@ export default function ProjectsPage() {
             )}
           </div>
         )}
+
+        {/* EXTRA BOTTOM SPACE */}
+        <div className="h-24" />
       </div>
 
+      {/* ORGANIZATION MODAL */}
       {showOrgModal && (
-        <Modal title="Create Organization" onClose={() => setShowOrgModal(false)}>
+        <Modal
+          title="Create Organization"
+          onClose={() => setShowOrgModal(false)}
+        >
           <input
             className="form-control mb-4"
             placeholder="Organization name"
@@ -357,20 +402,28 @@ export default function ProjectsPage() {
             onChange={e => setNewOrgName(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={createOrganization}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createOrganization}
+          >
             Create Organization
           </button>
         </Modal>
       )}
 
+      {/* PORTFOLIO MODAL */}
       {showPortfolioModal && (
-        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
+        <Modal
+          title="Create Portfolio"
+          onClose={() => setShowPortfolioModal(false)}
+        >
           <select
             className="form-control mb-4"
             value={selectedOrgId}
             onChange={e => setSelectedOrgId(Number(e.target.value))}
           >
             <option value="">Select organization</option>
+
             {organizations.map(org => (
               <option key={org.id} value={org.id}>
                 {org.name}
@@ -380,19 +433,26 @@ export default function ProjectsPage() {
 
           <input
             className="form-control mb-4"
-            placeholder="Portfolio name, e.g. Affordable Projects"
+            placeholder="Portfolio name"
             value={newPortfolioName}
             onChange={e => setNewPortfolioName(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={createPortfolio}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createPortfolio}
+          >
             Create Portfolio
           </button>
         </Modal>
       )}
 
+      {/* PROJECT MODAL */}
       {showProjectModal && (
-        <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
+        <Modal
+          title="Create Project"
+          onClose={() => setShowProjectModal(false)}
+        >
           <select
             className="form-control mb-4"
             value={selectedOrgId}
@@ -402,6 +462,7 @@ export default function ProjectsPage() {
             }}
           >
             <option value="">Select organization</option>
+
             {organizations.map(org => (
               <option key={org.id} value={org.id}>
                 {org.name}
@@ -415,8 +476,13 @@ export default function ProjectsPage() {
             onChange={e => setSelectedPortfolioId(Number(e.target.value))}
           >
             <option value="">Select portfolio</option>
+
             {portfolios
-              .filter(p => !selectedOrgId || p.organization_id === selectedOrgId)
+              .filter(
+                p =>
+                  !selectedOrgId ||
+                  p.organization_id === selectedOrgId
+              )
               .map(port => (
                 <option key={port.id} value={port.id}>
                   {port.name}
@@ -431,7 +497,10 @@ export default function ProjectsPage() {
             onChange={e => setNewProjectName(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={createProject}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createProject}
+          >
             Create Project
           </button>
         </Modal>
@@ -500,7 +569,10 @@ function EmptyHub({ title, message, action }: any) {
   return (
     <div className="card p-10 text-center">
       <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-        <Building2 size={24} className="text-[#c49e48]" />
+        <Building2
+          size={24}
+          className="text-[#c49e48]"
+        />
       </div>
 
       <div className="text-xl font-bold text-white">
@@ -511,7 +583,10 @@ function EmptyHub({ title, message, action }: any) {
         {message}
       </div>
 
-      <button onClick={action} className="btn-gold btn mt-5">
+      <button
+        onClick={action}
+        className="btn-gold btn mt-5"
+      >
         Create Organization
       </button>
     </div>
