@@ -322,14 +322,59 @@ export default function Dashboard() {
   }
 
   if (daysLeft !== null && daysLeft < 60) {
-    alerts.push({
-      level: 'amber',
-      msg: `Only ${daysLeft} days to handover — review critical path immediately`,
-      action: route('/schedule'),
-    })
+  alerts.push({
+    level: 'amber',
+    msg: `Only ${daysLeft} days to handover — review critical path immediately`,
+    action: route('/schedule'),
+  })
+}
+
+// ==========================================
+// AI HANDOVER CONFIDENCE ENGINE
+// ==========================================
+const calculateHandoverConfidence = () => {
+  if (tasks.length === 0) return null
+
+  let score = 100
+
+  const taskCompletionFactor = 100 - progressPct
+
+  const overdueRatio =
+    tasks.length > 0 ? overdue / tasks.length : 0
+
+  const riskRatio =
+    risks.length > 0 ? highRisks / risks.length : 0
+
+  const snagRatio =
+    snags.length > 0 ? criticalSnags / snags.length : 0
+
+  const approvalRatio =
+    approvals.length > 0 ? overdueApprovals / approvals.length : 0
+
+  const procurementRatio =
+    procs.length > 0 ? procRisks / procs.length : 0
+
+  score -= taskCompletionFactor * 0.25
+  score -= overdueRatio * 25
+  score -= riskRatio * 20
+  score -= snagRatio * 18
+  score -= approvalRatio * 15
+  score -= procurementRatio * 15
+
+  if (variancePct !== null && variancePct < 0) {
+    score -= Math.abs(variancePct) * 1.5
   }
 
-  return (
+  if (!targetDate || !projectStartDate) {
+    score -= 10
+  }
+
+  return Math.max(20, Math.min(95, Math.round(score)))
+}
+
+const handoverConfidence = calculateHandoverConfidence()
+
+return (
     <div className="space-y-5">
       <div className="relative bg-gradient-to-r from-[#161f28] via-[#1c2a36] to-[#161f28] border border-[#c49e48]/15 rounded-xl p-5 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
@@ -521,20 +566,12 @@ export default function Dashboard() {
       />
 
       <AIInsights
-        overdueTasks={overdue}
-        procurementRisks={procRisks}
-        highRisks={highRisks}
-        variance={variancePct ?? 0}
-        handoverConfidence={
-          variancePct === null
-            ? 0
-            : variancePct >= 0
-            ? 92
-            : variancePct >= -5
-            ? 78
-            : 61
-        }
-      />
+  overdueTasks={overdue}
+  procurementRisks={procRisks}
+  highRisks={highRisks}
+  variance={variancePct ?? 0}
+  handoverConfidence={handoverConfidence ?? 0}
+/>
       <ExecutiveSummary
   projectName={projectName}
   progress={progressPct}
