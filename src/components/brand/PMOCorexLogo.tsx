@@ -1,5 +1,5 @@
 export function PMOCorexLogo({
-  size = 36,
+  size = 34,
   showText = true,
 }: {
   size?: number
