@@ -47,24 +47,33 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { projectId, projectName } = useProjectStore()
 
-  const { data: tasks = [] } = useTasks()
-  const { data: procs = [] } = useProcurement()
-  const { data: approvals = [] } = useApprovals()
-  const { data: snags = [] } = useSnags()
-  const { data: risks = [] } = useRisks()
-  const { data: financial = [] } = useFinancial()
-  const { data: projects = [] } = useProjects()
+  const { data: taskData = [] } = useTasks()
+  const { data: procData = [] } = useProcurement()
+  const { data: approvalData = [] } = useApprovals()
+  const { data: snagData = [] } = useSnags()
+  const { data: riskData = [] } = useRisks()
+  const { data: financialData = [] } = useFinancial()
+  const { data: projectData = [] } = useProjects()
 
-  const project =
-    projects.find((p: any) => p.id === projectId) || {}
+  const tasks = taskData as any[]
+  const procs = procData as any[]
+  const approvals = approvalData as any[]
+  const snags = snagData as any[]
+  const risks = riskData as any[]
+  const financial = financialData as any[]
+  const projects = projectData as any[]
+
+  const project = projects.find((p: any) => p.id === projectId) || {}
 
   const today = new Date()
 
-  const projectStartDate =
-    project?.start_date ? new Date(project.start_date) : null
+  const projectStartDate = project?.start_date
+    ? new Date(project.start_date)
+    : null
 
-  const targetDate =
-    project?.handover_date ? new Date(project.handover_date) : null
+  const targetDate = project?.handover_date
+    ? new Date(project.handover_date)
+    : null
 
   const hasTimeline = !!projectStartDate && !!targetDate
 
@@ -81,26 +90,17 @@ export default function Dashboard() {
     : 0
 
   const timelinePct = hasTimeline
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          Math.round((elapsed / totalDays) * 100)
-        )
-      )
+    ? Math.min(100, Math.max(0, Math.round((elapsed / totalDays) * 100)))
     : 0
 
   const plannedPct = hasTimeline
-    ? Math.min(
-        100,
-        Math.round((elapsed / totalDays) * 100)
-      )
+    ? Math.min(100, Math.round((elapsed / totalDays) * 100))
     : 0
 
-  const done = tasks.filter(t => t.status === 'Completed').length
-  const inProg = tasks.filter(t => t.status === 'In Progress').length
+  const done = tasks.filter((t: any) => t.status === 'Completed').length
+  const inProg = tasks.filter((t: any) => t.status === 'In Progress').length
 
-  const overdue = tasks.filter(t => {
+  const overdue = tasks.filter((t: any) => {
     if (!t.finish_date) return false
     return new Date(t.finish_date) < today && t.status !== 'Completed'
   }).length
@@ -115,14 +115,14 @@ export default function Dashboard() {
     tasks.length === 0
       ? 0
       : Math.round(
-          tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
-            tasks.length
+          tasks.reduce(
+            (sum: number, t: any) => sum + getTaskProgress(t),
+            0
+          ) / tasks.length
         )
 
   const variancePct =
-    hasTimeline && tasks.length > 0
-      ? progressPct - plannedPct
-      : null
+    hasTimeline && tasks.length > 0 ? progressPct - plannedPct : null
 
   const varianceStatus =
     variancePct === null
@@ -133,7 +133,7 @@ export default function Dashboard() {
       ? 'BEHIND'
       : 'ON TRACK'
 
-  const procRisks = procs.filter(p => {
+  const procRisks = procs.filter((p: any) => {
     const d = p.order_by_date
       ? differenceInDays(new Date(p.order_by_date), today)
       : null
@@ -146,64 +146,65 @@ export default function Dashboard() {
     )
   }).length
 
-  const pendingApprovals =
-    approvals.filter(a => a.status !== 'Approved' && a.status !== 'Rejected')
-      .length
+  const pendingApprovals = approvals.filter(
+    (a: any) => a.status !== 'Approved' && a.status !== 'Rejected'
+  ).length
 
-  const overdueApprovals = approvals.filter(a => {
+  const overdueApprovals = approvals.filter((a: any) => {
     if (a.status === 'Approved') return false
     return a.deadline
       ? differenceInDays(new Date(a.deadline), today) < 0
       : false
   }).length
 
-  const openSnags = snags.filter(s => s.status !== 'Closed').length
+  const openSnags = snags.filter((s: any) => s.status !== 'Closed').length
 
-  const criticalSnags =
-    snags.filter(s => s.severity === 'Critical' && s.status !== 'Closed')
-      .length
+  const criticalSnags = snags.filter(
+    (s: any) => s.severity === 'Critical' && s.status !== 'Closed'
+  ).length
 
-  const openRisks = risks.filter(r => r.status === 'Open').length
+  const openRisks = risks.filter((r: any) => r.status === 'Open').length
 
-  const highRisks =
-    risks.filter(r => r.status === 'Open' && (r.risk_score || 0) >= 12)
-      .length
+  const highRisks = risks.filter(
+    (r: any) => r.status === 'Open' && Number(r.risk_score || 0) >= 12
+  ).length
 
-  const contractSum =
-    financial
-      .filter(f => f.type === 'Contract Sum')
-      .reduce((s, f) => s + f.amount, 0)
+  const contractSum = financial
+    .filter((f: any) => f.type === 'Contract Sum')
+    .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
 
-  const variationsTotal =
-    financial
-      .filter(f => f.type === 'Variation' && f.status === 'Approved')
-      .reduce(
-        (s, f) => s + (f.direction === 'Addition' ? f.amount : -f.amount),
-        0
-      )
+  const variationsTotal = financial
+    .filter((f: any) => f.type === 'Variation' && f.status === 'Approved')
+    .reduce(
+      (s: number, f: any) =>
+        s + (f.direction === 'Addition' ? Number(f.amount || 0) : -Number(f.amount || 0)),
+      0
+    )
 
-  const certifiedTotal =
-    financial
-      .filter(f => f.type === 'Payment' && f.status === 'Certified')
-      .reduce((s, f) => s + f.amount, 0)
+  const certifiedTotal = financial
+    .filter((f: any) => f.type === 'Payment' && f.status === 'Certified')
+    .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
 
-  const phaseList = [
-    ...new Set(tasks.map((t: any) => t.phase).filter(Boolean)),
-  ]
+  const phaseList: string[] = Array.from(
+    new Set(
+      tasks
+        .map((t: any) => t.phase)
+        .filter((phase: any): phase is string => Boolean(phase))
+    )
+  )
 
-  const phaseData = phaseList.map((ph, i) => {
-    const pts = tasks.filter(t => t.phase === ph)
+  const phaseData = phaseList.map((ph: string, i: number) => {
+    const pts = tasks.filter((t: any) => t.phase === ph)
 
-    const completedWeight = pts.reduce((sum, t) => {
+    const completedWeight = pts.reduce((sum: number, t: any) => {
       if (t.status === 'Completed') return sum + 100
       if (t.status === 'In Progress') return sum + Number(t.progress_pct || 0)
       return sum
     }, 0)
 
-    const pct =
-      pts.length === 0 ? 0 : Math.round(completedWeight / pts.length)
+    const pct = pts.length === 0 ? 0 : Math.round(completedWeight / pts.length)
 
-    const completed = pts.filter(t => t.status === 'Completed').length
+    const completed = pts.filter((t: any) => t.status === 'Completed').length
 
     return {
       name: ph,
@@ -222,7 +223,7 @@ export default function Dashboard() {
       value: tasks.length - done - inProg,
       color: '#2a3a4a',
     },
-  ].filter(s => s.value > 0)
+  ].filter((s: any) => s.value > 0)
 
   const deadlines: {
     name: string
@@ -231,7 +232,7 @@ export default function Dashboard() {
     days: number
   }[] = []
 
-  tasks.forEach(t => {
+  tasks.forEach((t: any) => {
     if (t.procurement_deadline) {
       const d = differenceInDays(new Date(t.procurement_deadline), today)
       if (d >= 0 && d <= 21) {
@@ -258,8 +259,8 @@ export default function Dashboard() {
   })
 
   approvals
-    .filter(a => a.status !== 'Approved')
-    .forEach(a => {
+    .filter((a: any) => a.status !== 'Approved')
+    .forEach((a: any) => {
       if (a.deadline) {
         const d = differenceInDays(new Date(a.deadline), today)
         if (d >= 0 && d <= 21) {
@@ -322,59 +323,118 @@ export default function Dashboard() {
   }
 
   if (daysLeft !== null && daysLeft < 60) {
-  alerts.push({
-    level: 'amber',
-    msg: `Only ${daysLeft} days to handover — review critical path immediately`,
-    action: route('/schedule'),
-  })
-}
-
-// ==========================================
-// AI HANDOVER CONFIDENCE ENGINE
-// ==========================================
-const calculateHandoverConfidence = () => {
-  if (tasks.length === 0) return null
-
-  let score = 100
-
-  const taskCompletionFactor = 100 - progressPct
-
-  const overdueRatio =
-    tasks.length > 0 ? overdue / tasks.length : 0
-
-  const riskRatio =
-    risks.length > 0 ? highRisks / risks.length : 0
-
-  const snagRatio =
-    snags.length > 0 ? criticalSnags / snags.length : 0
-
-  const approvalRatio =
-    approvals.length > 0 ? overdueApprovals / approvals.length : 0
-
-  const procurementRatio =
-    procs.length > 0 ? procRisks / procs.length : 0
-
-  score -= taskCompletionFactor * 0.25
-  score -= overdueRatio * 25
-  score -= riskRatio * 20
-  score -= snagRatio * 18
-  score -= approvalRatio * 15
-  score -= procurementRatio * 15
-
-  if (variancePct !== null && variancePct < 0) {
-    score -= Math.abs(variancePct) * 1.5
+    alerts.push({
+      level: 'amber',
+      msg: `Only ${daysLeft} days to handover — review critical path immediately`,
+      action: route('/schedule'),
+    })
   }
 
-  if (!targetDate || !projectStartDate) {
-    score -= 10
+  const calculateHandoverConfidence = () => {
+    if (tasks.length === 0) return null
+
+    let score = 100
+
+    const taskCompletionFactor = 100 - progressPct
+    const overdueRatio = tasks.length > 0 ? overdue / tasks.length : 0
+    const riskRatio = risks.length > 0 ? highRisks / risks.length : 0
+    const snagRatio = snags.length > 0 ? criticalSnags / snags.length : 0
+    const approvalRatio =
+      approvals.length > 0 ? overdueApprovals / approvals.length : 0
+    const procurementRatio = procs.length > 0 ? procRisks / procs.length : 0
+
+    score -= taskCompletionFactor * 0.25
+    score -= overdueRatio * 25
+    score -= riskRatio * 20
+    score -= snagRatio * 18
+    score -= approvalRatio * 15
+    score -= procurementRatio * 15
+
+    if (variancePct !== null && variancePct < 0) {
+      score -= Math.abs(variancePct) * 1.5
+    }
+
+    if (!targetDate || !projectStartDate) {
+      score -= 10
+    }
+
+    return Math.max(20, Math.min(95, Math.round(score)))
   }
 
-  return Math.max(20, Math.min(95, Math.round(score)))
-}
+  const handoverConfidence = calculateHandoverConfidence()
 
-const handoverConfidence = calculateHandoverConfidence()
+  const kpiCards = [
+    {
+      label: 'Progress',
+      value: `${progressPct}%`,
+      sub: `${done}/${tasks.length} tasks`,
+      color: 'c-gold',
+      icon: TrendingUp,
+      link: route('/schedule'),
+    },
+    {
+      label: 'Schedule Variance',
+      value: variancePct === null ? '—' : `${variancePct}%`,
+      sub: varianceStatus,
+      color:
+        variancePct === null
+          ? 'c-amr'
+          : variancePct <= -3
+          ? 'c-red'
+          : variancePct >= 3
+          ? 'c-grn'
+          : 'c-amr',
+      icon: TrendingUp,
+      link: route('/schedule'),
+    },
+    {
+      label: 'Overdue Tasks',
+      value: overdue,
+      sub: 'RED status',
+      color: overdue > 0 ? 'c-red' : 'c-grn',
+      icon: Clock,
+      link: route('/schedule'),
+    },
+    {
+      label: 'Pending Approvals',
+      value: pendingApprovals,
+      sub: `${overdueApprovals} overdue`,
+      color: pendingApprovals > 5 ? 'c-amr' : 'c-grn',
+      icon: FileCheck,
+      link: route('/approvals'),
+    },
+    {
+      label: 'Procurement Risks',
+      value: procRisks,
+      sub: 'Order due ≤14d',
+      color: procRisks > 0 ? 'c-red' : 'c-grn',
+      icon: Package,
+      link: route('/procurement'),
+    },
+    {
+      label: 'Open Snags',
+      value: openSnags,
+      sub: `${criticalSnags} critical`,
+      color:
+        criticalSnags > 0
+          ? 'c-red'
+          : openSnags > 0
+          ? 'c-amr'
+          : 'c-grn',
+      icon: AlertTriangle,
+      link: route('/snags'),
+    },
+    {
+      label: 'Open Risks',
+      value: openRisks,
+      sub: `${highRisks} high`,
+      color: highRisks > 0 ? 'c-red' : 'c-grn',
+      icon: Shield,
+      link: route('/risk'),
+    },
+  ]
 
-return (
+  return (
     <div className="space-y-5">
       <div className="relative bg-gradient-to-r from-[#161f28] via-[#1c2a36] to-[#161f28] border border-[#c49e48]/15 rounded-xl p-5 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
@@ -430,7 +490,7 @@ return (
           <div className="hidden lg:flex flex-col gap-2">
             {alerts.slice(0, 2).map((a, i) => (
               <div
-                key={i}
+                key={`${a.msg}-${i}`}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium cursor-pointer ${
                   a.level === 'red'
                     ? 'bg-red-500/10 text-red-400 border border-red-500/20'
@@ -439,7 +499,7 @@ return (
                 onClick={() => navigate(a.action)}
               >
                 <AlertTriangle size={11} />
-                {a.msg.length > 45 ? a.msg.slice(0, 45) + '…' : a.msg}
+                {a.msg.length > 45 ? `${a.msg.slice(0, 45)}…` : a.msg}
               </div>
             ))}
           </div>
@@ -447,115 +507,42 @@ return (
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        {[
-          {
-            label: 'Progress',
-            value: `${progressPct}%`,
-            sub: `${done}/${tasks.length} tasks`,
-            color: 'c-gold',
-            icon: TrendingUp,
-            link: route('/schedule'),
-          },
-          {
-            label: 'Schedule Variance',
-            value: variancePct === null ? '—' : `${variancePct}%`,
-            sub: varianceStatus,
-            color:
-              variancePct === null
-                ? 'c-amr'
-                : variancePct <= -3
-                ? 'c-red'
-                : variancePct >= 3
-                ? 'c-grn'
-                : 'c-amr',
-            icon: TrendingUp,
-            link: route('/schedule'),
-          },
-          {
-            label: 'Overdue Tasks',
-            value: overdue,
-            sub: 'RED status',
-            color: overdue > 0 ? 'c-red' : 'c-grn',
-            icon: Clock,
-            link: route('/schedule'),
-          },
-          {
-            label: 'Pending Approvals',
-            value: pendingApprovals,
-            sub: `${overdueApprovals} overdue`,
-            color: pendingApprovals > 5 ? 'c-amr' : 'c-grn',
-            icon: FileCheck,
-            link: route('/approvals'),
-          },
-          {
-            label: 'Procurement Risks',
-            value: procRisks,
-            sub: 'Order due ≤14d',
-            color: procRisks > 0 ? 'c-red' : 'c-grn',
-            icon: Package,
-            link: route('/procurement'),
-          },
-          {
-            label: 'Open Snags',
-            value: openSnags,
-            sub: `${criticalSnags} critical`,
-            color:
-              criticalSnags > 0
-                ? 'c-red'
-                : openSnags > 0
-                ? 'c-amr'
-                : 'c-grn',
-            icon: AlertTriangle,
-            link: route('/snags'),
-          },
-          {
-            label: 'Open Risks',
-            value: openRisks,
-            sub: `${highRisks} high`,
-            color: highRisks > 0 ? 'c-red' : 'c-grn',
-            icon: Shield,
-            link: route('/risk'),
-          },
-        ].map(k => (
-          <div
-            key={k.label}
-            className="stat-card cursor-pointer hover:border-[#c49e48]/20 transition-colors group"
-            onClick={() => navigate(k.link)}
-          >
+        {kpiCards.map((k: any) => {
+          const Icon = k.icon
+
+          return (
             <div
-              className={`gold-bar ${
-                k.color === 'c-red'
-                  ? '!bg-red-500'
-                  : k.color === 'c-amr'
-                  ? '!bg-amber-500'
-                  : k.color === 'c-grn'
-                  ? '!bg-emerald-500'
-                  : ''
-              }`}
-            />
-
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="stat-number text-3xl">
-                  {k.value}
-                </div>
-
-                <div className="stat-label">
-                  {k.label}
-                </div>
-
-                <div className="stat-sub">
-                  {k.sub}
-                </div>
-              </div>
-
-              <k.icon
-                size={16}
-                className="text-[#6e7d8c] group-hover:text-[#c49e48] transition-colors mt-1"
+              key={k.label}
+              className="stat-card cursor-pointer hover:border-[#c49e48]/20 transition-colors group"
+              onClick={() => navigate(k.link)}
+            >
+              <div
+                className={`gold-bar ${
+                  k.color === 'c-red'
+                    ? '!bg-red-500'
+                    : k.color === 'c-amr'
+                    ? '!bg-amber-500'
+                    : k.color === 'c-grn'
+                    ? '!bg-emerald-500'
+                    : ''
+                }`}
               />
+
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="stat-number text-3xl">{k.value}</div>
+                  <div className="stat-label">{k.label}</div>
+                  <div className="stat-sub">{k.sub}</div>
+                </div>
+
+                <Icon
+                  size={16}
+                  className="text-[#6e7d8c] group-hover:text-[#c49e48] transition-colors mt-1"
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <DeliveryPulse
@@ -566,22 +553,23 @@ return (
       />
 
       <AIInsights
-  overdueTasks={overdue}
-  procurementRisks={procRisks}
-  highRisks={highRisks}
-  variance={variancePct ?? 0}
-  handoverConfidence={handoverConfidence ?? 0}
-/>
+        overdueTasks={overdue}
+        procurementRisks={procRisks}
+        highRisks={highRisks}
+        variance={variancePct ?? 0}
+        handoverConfidence={handoverConfidence ?? 0}
+      />
+
       <ExecutiveSummary
-  projectName={projectName}
-  progress={progressPct}
-  variance={variancePct}
-  overdueTasks={overdue}
-  openRisks={openRisks}
-  highRisks={highRisks}
-  pendingApprovals={pendingApprovals}
-  procurementRisks={procRisks}
-/>
+        projectName={projectName}
+        progress={progressPct}
+        variance={variancePct}
+        overdueTasks={overdue}
+        openRisks={openRisks}
+        highRisks={highRisks}
+        pendingApprovals={pendingApprovals}
+        procurementRisks={procRisks}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="card">
@@ -597,11 +585,9 @@ return (
 
           <div className="p-4 space-y-3">
             {phaseData.length === 0 ? (
-              <div className="empty-state py-8">
-                No phase data yet.
-              </div>
+              <div className="empty-state py-8">No phase data yet.</div>
             ) : (
-              phaseData.map(ph => (
+              phaseData.map((ph: any) => (
                 <div key={ph.name}>
                   <div className="flex justify-between items-center mb-1">
                     <div className="text-[11px] text-[#bfb9ae] font-medium">
@@ -651,15 +637,15 @@ return (
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {statusPie.map((e, i) => (
-                        <Cell key={i} fill={e.color} />
+                      {statusPie.map((e: any) => (
+                        <Cell key={e.name} fill={e.color} />
                       ))}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
 
                 <div className="space-y-2 flex-1">
-                  {statusPie.map(s => (
+                  {statusPie.map((s: any) => (
                     <div key={s.name} className="flex items-center gap-2">
                       <div
                         className="w-2 h-2 rounded-full flex-shrink-0"
@@ -717,14 +703,12 @@ return (
                 value: certifiedTotal,
                 color: 'text-blue-400',
               },
-            ].map(f => (
+            ].map((f: any) => (
               <div
                 key={f.label}
                 className="flex justify-between items-center py-1.5 border-b border-white/[0.04] last:border-0"
               >
-                <div className="text-[11px] text-[#6e7d8c]">
-                  {f.label}
-                </div>
+                <div className="text-[11px] text-[#6e7d8c]">{f.label}</div>
 
                 <div className={`text-[12px] font-mono font-medium ${f.color}`}>
                   {f.value === 0 ? 'TBC' : formatCurrency(f.value)}
@@ -753,7 +737,7 @@ return (
             ) : (
               alerts.map((a, i) => (
                 <div
-                  key={i}
+                  key={`${a.msg}-${i}`}
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors ${
                     a.level === 'red'
                       ? 'border-l-2 border-red-500'
@@ -798,9 +782,9 @@ return (
                 <p>No deadlines in next 21 days ✅</p>
               </div>
             ) : (
-              deadlines.slice(0, 10).map((d, i) => (
+              deadlines.slice(0, 10).map((d: any, i: number) => (
                 <div
-                  key={i}
+                  key={`${d.name}-${i}`}
                   className="flex items-center gap-3 px-4 py-2.5"
                 >
                   <div
@@ -827,7 +811,11 @@ return (
                     </div>
                   </div>
 
-                  <div className={`text-[11px] font-bold font-mono ${urgencyColor(d.days)}`}>
+                  <div
+                    className={`text-[11px] font-bold font-mono ${urgencyColor(
+                      d.days
+                    )}`}
+                  >
                     {d.days === 0 ? 'TODAY' : `${d.days}d`}
                   </div>
                 </div>
@@ -864,13 +852,13 @@ return (
               <tbody>
                 {tasks
                   .filter(
-                    t =>
+                    (t: any) =>
                       t.rag === 'RED' ||
                       t.rag === 'AMBER' ||
                       t.status === 'In Progress'
                   )
                   .slice(0, 6)
-                  .map(t => (
+                  .map((t: any) => (
                     <tr key={t.id}>
                       <td className="font-mono text-[#6e7d8c] text-[10px]">
                         #{t.task_number}
@@ -913,16 +901,13 @@ return (
                   ))}
 
                 {tasks.filter(
-                  t =>
+                  (t: any) =>
                     t.rag === 'RED' ||
                     t.rag === 'AMBER' ||
                     t.status === 'In Progress'
                 ).length === 0 && (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="text-center py-6 text-[#6e7d8c]"
-                    >
+                    <td colSpan={5} className="text-center py-6 text-[#6e7d8c]">
                       No active or at-risk tasks ✅
                     </td>
                   </tr>
@@ -945,10 +930,11 @@ return (
 
           <div className="divide-y divide-white/[0.04] max-h-64 overflow-y-auto">
             {risks
-              .filter(r => r.status === 'Open')
+              .filter((r: any) => r.status === 'Open')
               .slice(0, 6)
-              .map(r => {
-                const score = r.risk_score || r.likelihood * r.impact
+              .map((r: any) => {
+                const score = Number(r.risk_score || r.likelihood * r.impact || 0)
+
                 const lvl =
                   score >= 15
                     ? 'badge-red'
@@ -978,7 +964,7 @@ return (
                 )
               })}
 
-            {risks.filter(r => r.status === 'Open').length === 0 && (
+            {risks.filter((r: any) => r.status === 'Open').length === 0 && (
               <div className="empty-state py-8">
                 <p>No open risks</p>
               </div>
