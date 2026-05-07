@@ -66,9 +66,11 @@ export default function App() {
   const { user, setUser, setLoading } = useAuthStore()
   const role = getRole(user?.email)
 
-  useEffect(() => {
+useEffect(() => {
   async function loadUser() {
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
 
     if (!session?.user) {
       setUser(null)
@@ -96,31 +98,33 @@ export default function App() {
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (!session?.user) {
-      setUser(null)
+  } = supabase.auth.onAuthStateChange(
+    async (_event, session) => {
+      if (!session?.user) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      setUser({
+        ...session.user,
+        ...profile,
+        full_name: profile?.full_name || 'Admin',
+        role: profile?.role || 'admin',
+      } as any)
+
       setLoading(false)
-      return
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-
-    setUser({
-      ...session.user,
-      ...profile,
-      full_name: profile?.full_name || 'Admin',
-      role: profile?.role || 'admin',
-    } as any)
-
-    setLoading(false)
-  })
+  )
 
   return () => subscription.unsubscribe()
-}, [setUser, setLoading]), [setUser, setLoading])
+}, [setUser, setLoading]), [setUser, setLoading]), [setUser, setLoading])
 
   return (
     <BrowserRouter>
