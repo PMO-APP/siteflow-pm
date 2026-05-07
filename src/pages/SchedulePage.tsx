@@ -178,11 +178,13 @@ export default function SchedulePage() {
 
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex rounded-md overflow-hidden border border-white/[0.08]">
-          {[
-            ['list', List, 'List'],
-            ['gantt', BarChart2, 'Gantt'],
-            ['milestones', Flag, 'Milestones'],
-          ].map(([value, Icon, label]) => (
+          {(
+  [
+    ['list', List, 'List'],
+    ['gantt', BarChart2, 'Gantt'],
+    ['milestones', Flag, 'Milestones'],
+  ] as [View, React.ElementType, string][]
+).map(([value, Icon, label]) => (
             <button
               key={value as string}
               onClick={() => setView(value as View)}
