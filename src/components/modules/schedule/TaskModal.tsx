@@ -9,6 +9,23 @@ import { useAuthStore } from '@/store/auth'
 import type { Task } from '@/types'
 import { fdate } from '@/lib/utils'
 
+const PHASES = [
+  'Approval Schedule',
+  'Program Schedule',
+  'Site Preparation',
+  'Substructure',
+  'Foundation',
+  'Superstructure',
+  'Blockwork',
+  'Roofing',
+  'Internal "Wet works" (Contractor)',
+  'MEP Works',
+  'External Works Phase',
+  'Internal works & Interior Design',
+  'Finishes',
+  'Snagging',
+  'Handover',
+]
 
 interface Props {
   task: Task | null
@@ -27,7 +44,7 @@ export default function TaskModal({ task, onClose }: Props) {
   const [error, setError] = useState('')
 
   const [form, setForm] = useState({
-    task_number: task?.task_number || '',
+    task_number: task?.task_number ?? 0,
     name: task?.name || '',
     phase: task?.phase || PHASES[1],
     start_date: task?.start_date || '',
@@ -42,7 +59,7 @@ export default function TaskModal({ task, onClose }: Props) {
     approval_deadline: task?.approval_deadline || '',
   })
 
-  const set = (key: string, value: any) => {
+  const updateField = (key: string, value: any) => {
     setForm(prev => {
       const next = {
         ...prev,
@@ -77,11 +94,7 @@ export default function TaskModal({ task, onClose }: Props) {
 
   const cleanPayload = () => {
     return {
-      task_number:
-        form.task_number === ''
-          ? null
-          : Number(form.task_number),
-
+      task_number: Number(form.task_number || 0),
       name: form.name.trim(),
       phase: form.phase,
       start_date: cleanDate(form.start_date),
@@ -201,6 +214,10 @@ export default function TaskModal({ task, onClose }: Props) {
                 .eq('project_id', projectId)
             }
           }
+        }
+
+        if (task.phase !== payload.phase) {
+          changes.push(`Phase ${task.phase || '-'} → ${payload.phase || '-'}`)
         }
 
         if (task.start_date !== payload.start_date) {
@@ -357,7 +374,7 @@ export default function TaskModal({ task, onClose }: Props) {
                 className="form-control"
                 type="number"
                 value={form.task_number}
-                onChange={e => set('task_number', e.target.value)}
+                onChange={e => updateField('task_number', Number(e.target.value))}
                 placeholder="e.g. 1"
               />
             </div>
@@ -368,20 +385,31 @@ export default function TaskModal({ task, onClose }: Props) {
             <input
               className="form-control"
               value={form.name}
-              onChange={e => set('name', e.target.value)}
+              onChange={e => updateField('name', e.target.value)}
               placeholder="Task name…"
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-           
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="form-label">Phase</label>
+              <select
+                className="form-control"
+                value={form.phase}
+                onChange={e => updateField('phase', e.target.value)}
+              >
+                {PHASES.map(phase => (
+                  <option key={phase}>{phase}</option>
+                ))}
+              </select>
+            </div>
 
             <div>
               <label className="form-label">Status</label>
               <select
                 className="form-control"
                 value={form.status}
-                onChange={e => set('status', e.target.value)}
+                onChange={e => updateField('status', e.target.value)}
               >
                 {[
                   'Not Started',
@@ -389,8 +417,8 @@ export default function TaskModal({ task, onClose }: Props) {
                   'Completed',
                   'On Hold',
                   'Blocked',
-                ].map(s => (
-                  <option key={s}>{s}</option>
+                ].map(status => (
+                  <option key={status}>{status}</option>
                 ))}
               </select>
             </div>
@@ -403,7 +431,7 @@ export default function TaskModal({ task, onClose }: Props) {
                 type="date"
                 className="form-control"
                 value={form.start_date}
-                onChange={e => set('start_date', e.target.value)}
+                onChange={e => updateField('start_date', e.target.value)}
               />
             </div>
 
@@ -413,7 +441,7 @@ export default function TaskModal({ task, onClose }: Props) {
                 type="date"
                 className="form-control"
                 value={form.finish_date}
-                onChange={e => set('finish_date', e.target.value)}
+                onChange={e => updateField('finish_date', e.target.value)}
               />
             </div>
           </div>
@@ -424,7 +452,7 @@ export default function TaskModal({ task, onClose }: Props) {
               <input
                 className="form-control"
                 value={form.dependencies}
-                onChange={e => set('dependencies', e.target.value)}
+                onChange={e => updateField('dependencies', e.target.value)}
                 placeholder="e.g. 1, 3"
               />
             </div>
@@ -434,7 +462,7 @@ export default function TaskModal({ task, onClose }: Props) {
               <input
                 className="form-control"
                 value={form.responsible}
-                onChange={e => set('responsible', e.target.value)}
+                onChange={e => updateField('responsible', e.target.value)}
                 placeholder="Name or company…"
               />
             </div>
@@ -450,7 +478,7 @@ export default function TaskModal({ task, onClose }: Props) {
               min={0}
               max={100}
               value={form.progress_pct}
-              onChange={e => set('progress_pct', Number(e.target.value))}
+              onChange={e => updateField('progress_pct', Number(e.target.value))}
               className="w-full accent-[#c49e48] bg-[#1c2a36] h-1.5 rounded-full"
             />
           </div>
@@ -462,7 +490,7 @@ export default function TaskModal({ task, onClose }: Props) {
                 type="date"
                 className="form-control"
                 value={form.procurement_deadline}
-                onChange={e => set('procurement_deadline', e.target.value)}
+                onChange={e => updateField('procurement_deadline', e.target.value)}
               />
             </div>
 
@@ -472,7 +500,7 @@ export default function TaskModal({ task, onClose }: Props) {
                 type="date"
                 className="form-control"
                 value={form.approval_deadline}
-                onChange={e => set('approval_deadline', e.target.value)}
+                onChange={e => updateField('approval_deadline', e.target.value)}
               />
             </div>
           </div>
@@ -482,7 +510,7 @@ export default function TaskModal({ task, onClose }: Props) {
               type="checkbox"
               id="milestone"
               checked={form.is_milestone}
-              onChange={e => set('is_milestone', e.target.checked)}
+              onChange={e => updateField('is_milestone', e.target.checked)}
               className="accent-[#c49e48]"
             />
 
@@ -500,7 +528,7 @@ export default function TaskModal({ task, onClose }: Props) {
               className="form-control"
               rows={3}
               value={form.notes}
-              onChange={e => set('notes', e.target.value)}
+              onChange={e => updateField('notes', e.target.value)}
               placeholder="Notes…"
             />
           </div>
