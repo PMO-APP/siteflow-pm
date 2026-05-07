@@ -137,7 +137,7 @@ export default function App() {
   return () => {
     subscription.unsubscribe()
   }
-}, [setUser, setLoading]), [setUser, setLoading])
+}, [setUser, setLoading])
 
   return (
     <BrowserRouter>
