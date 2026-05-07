@@ -39,9 +39,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
           <div className="font-display text-3xl text-[#c49e48] mb-2">
             PMOCorex
           </div>
-          <div className="text-[#6e7d8c] text-sm">
-            Loading…
-          </div>
+          <div className="text-[#6e7d8c] text-sm">Loading…</div>
         </div>
       </div>
     )
@@ -66,40 +64,12 @@ export default function App() {
   const { user, setUser, setLoading } = useAuthStore()
   const role = getRole(user?.email)
 
-useEffect(() => {
-  async function loadUser() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
 
-    if (!session?.user) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single()
-
-    setUser({
-      ...session.user,
-      ...profile,
-      full_name: profile?.full_name || 'Admin',
-      role: profile?.role || 'admin',
-    } as any)
-
-    setLoading(false)
-  }
-
-  loadUser()
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange(
-    async (_event, session) => {
       if (!session?.user) {
         setUser(null)
         setLoading(false)
@@ -121,15 +91,42 @@ useEffect(() => {
 
       setLoading(false)
     }
-  )
 
-  return () => subscription.unsubscribe()
-}, [setUser, setLoading]), [setUser, setLoading]), [setUser, setLoading])
+    loadUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      setUser({
+        ...session.user,
+        ...profile,
+        full_name: profile?.full_name || 'Admin',
+        role: profile?.role || 'admin',
+      } as any)
+
+      setLoading(false)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [setUser, setLoading])
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -137,7 +134,6 @@ useEffect(() => {
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-        {/* WORKSPACE HUB */}
         <Route
           path="/projects"
           element={
@@ -147,7 +143,6 @@ useEffect(() => {
           }
         />
 
-        {/* MAIN APP */}
         <Route
           path="/app"
           element={
@@ -160,7 +155,6 @@ useEffect(() => {
         >
           <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
-
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="procurement" element={<ProcurementPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
@@ -174,14 +168,13 @@ useEffect(() => {
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="profile" element={<ProfilePage />} />
-<Route path="settings" element={<SettingsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
 
           {role === 'admin' && (
             <Route path="audit" element={<AuditPage />} />
           )}
         </Route>
 
-        {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
