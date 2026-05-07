@@ -1,3 +1,4 @@
+
 import { useBrowserBranding } from '@/hooks/useBrowserBranding'
 import { supabase } from '@/lib/supabase'
 import { parseISO } from 'date-fns'
@@ -28,6 +29,10 @@ import { differenceInDays } from 'date-fns'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import {
+  Settings,
+  UserCircle,
+} from 'lucide-react'
 
 const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -43,6 +48,8 @@ const NAV = [
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/team', icon: Users, label: 'Team' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
+  { to: '/app/profile', icon: UserCircle, label: 'Profile' },
+{ to: '/app/settings', icon: Settings, label: 'Settings' },
   { to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
   { to: '/app/team-access', icon: Users, label: 'Team Access' },
 ]
@@ -294,12 +301,12 @@ export default function Layout() {
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
           <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5">
             <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
-              {user ? getInitials(user.full_name || 'User') : 'U'}
+             {user ? getInitials(user.full_name || 'Admin') : 'A'}
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="text-[11px] font-medium text-[#ede8de] truncate">
-                {user?.full_name || 'User'}
+                {user?.full_name || 'Admin'}
               </div>
 
               <div className="text-[9px] text-[#6e7d8c] capitalize">
