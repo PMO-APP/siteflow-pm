@@ -65,7 +65,8 @@ export default function App() {
   const role = getRole(user?.email)
 
   useEffect(() => {
-    async function loadUser() {
+  async function loadUser() {
+    try {
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -76,30 +77,39 @@ export default function App() {
         return
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
+
+      if (error) {
+        console.error('Profile error:', error)
+      }
 
       setUser({
         ...session.user,
-        ...profile,
+        ...(profile || {}),
+        email: profile?.email || session.user.email,
         full_name: profile?.full_name || 'Admin',
         role: profile?.role || 'admin',
       } as any)
-
+    } catch (err) {
+      console.error('Auth load error:', err)
+      setUser(null)
+    } finally {
       setLoading(false)
     }
+  }
 
-    loadUser()
+  loadUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    try {
       if (!session?.user) {
         setUser(null)
-        setLoading(false)
         return
       }
 
@@ -107,22 +117,27 @@ export default function App() {
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
       setUser({
         ...session.user,
-        ...profile,
+        ...(profile || {}),
+        email: profile?.email || session.user.email,
         full_name: profile?.full_name || 'Admin',
         role: profile?.role || 'admin',
       } as any)
-
+    } catch (err) {
+      console.error('Auth change error:', err)
+      setUser(null)
+    } finally {
       setLoading(false)
-    })
-
-    return () => {
-      subscription.unsubscribe()
     }
-  }, [setUser, setLoading])
+  })
+
+  return () => {
+    subscription.unsubscribe()
+  }
+}, [setUser, setLoading]), [setUser, setLoading])
 
   return (
     <BrowserRouter>
