@@ -376,13 +376,208 @@ export default function LandingPage() {
 }
 
 function PreviewDashboard() {
-  return <div className="card p-6">Dashboard Preview</div>
+  return (
+    <div className="card p-4">
+      <div className="aspect-video rounded-xl bg-[#0f151c] border border-white/[0.06] overflow-hidden">
+        <div className="h-8 border-b border-white/[0.06] flex items-center gap-2 px-3">
+          <span className="w-2 h-2 rounded-full bg-red-400" />
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <span className="ml-2 text-[10px] text-slate-500">
+            Demo Project Dashboard
+          </span>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="rounded-xl bg-[#162230] border border-[#c49e48]/10 p-4">
+            <div className="flex items-center gap-5">
+              <div>
+                <div className="text-4xl font-black text-[#c49e48]">128</div>
+                <div className="text-[9px] text-slate-500 uppercase tracking-widest">
+                  Days left
+                </div>
+              </div>
+
+              <div className="flex-1">
+                <div className="text-[10px] text-slate-500 uppercase tracking-widest">
+                  Demo Residential Project
+                </div>
+
+                <div className="text-sm font-semibold mt-1">
+                  Formal Handover Target
+                </div>
+
+                <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full w-[62%] bg-[#c49e48] rounded-full" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              ['62%', 'Progress'],
+              ['-4%', 'Variance'],
+              ['6', 'Risks'],
+              ['11', 'Approvals'],
+            ].map(([value, label]) => (
+              <div
+                key={label}
+                className="rounded-lg bg-[#162230] border border-white/[0.05] p-3"
+              >
+                <div className="text-lg font-bold text-white">{value}</div>
+                <div className="text-[9px] text-slate-500 mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-[#162230] p-3">
+              <div className="text-[10px] text-slate-400 mb-2">
+                Phase Progress
+              </div>
+              <div className="space-y-2">
+                <div className="h-1.5 bg-[#c49e48] rounded w-[85%]" />
+                <div className="h-1.5 bg-blue-400 rounded w-[58%]" />
+                <div className="h-1.5 bg-emerald-400 rounded w-[34%]" />
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-[#162230] p-3">
+              <div className="text-[10px] text-slate-400 mb-2">
+                AI Insight
+              </div>
+              <div className="text-xl font-bold text-emerald-400">74%</div>
+              <div className="text-[9px] text-slate-500">
+                handover confidence
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-sm text-white mt-3">Executive Dashboard</div>
+      <div className="text-xs text-slate-500 mt-1">
+        Portfolio-ready view of progress, risks, timelines, and alerts.
+      </div>
+    </div>
+  )
 }
 
 function PreviewRisk() {
-  return <div className="card p-6">Risk Preview</div>
+  return (
+    <div className="card p-4">
+      <div className="aspect-video rounded-xl bg-[#0f151c] border border-white/[0.06] overflow-hidden">
+        <div className="h-8 border-b border-white/[0.06] flex items-center px-3">
+          <span className="text-[10px] text-slate-500">
+            Risk Intelligence
+          </span>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ['9', 'Open'],
+              ['3', 'High'],
+              ['5', 'Watch'],
+            ].map(([value, label]) => (
+              <div
+                key={label}
+                className="rounded-lg bg-[#162230] border border-white/[0.05] p-3"
+              >
+                <div className="text-xl font-bold text-[#c49e48]">{value}</div>
+                <div className="text-[9px] text-slate-500">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl bg-[#162230] p-3">
+            <div className="text-[10px] text-slate-400 mb-3">
+              Risk Heatmap
+            </div>
+            <div className="space-y-2">
+              <div className="h-2 bg-red-500 rounded w-[82%]" />
+              <div className="h-2 bg-amber-400 rounded w-[64%]" />
+              <div className="h-2 bg-emerald-400 rounded w-[38%]" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {[
+              ['Procurement delay', 'High'],
+              ['Approval dependency', 'Medium'],
+              ['Site access constraint', 'Watch'],
+            ].map(([item, tag]) => (
+              <div
+                key={item}
+                className="flex items-center justify-between rounded-lg bg-[#162230] px-3 py-2"
+              >
+                <span className="text-[11px] text-slate-300">{item}</span>
+                <span className="text-[9px] text-[#c49e48]">{tag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="text-sm text-white mt-3">Risk Register</div>
+      <div className="text-xs text-slate-500 mt-1">
+        Turn delivery threats into structured risk intelligence.
+      </div>
+    </div>
+  )
 }
 
 function PreviewSchedule() {
-  return <div className="card p-6">Schedule Preview</div>
+  return (
+    <div className="card p-4">
+      <div className="aspect-video rounded-xl bg-[#0f151c] border border-white/[0.06] overflow-hidden">
+        <div className="h-8 border-b border-white/[0.06] flex items-center px-3">
+          <span className="text-[10px] text-slate-500">
+            Schedule Control
+          </span>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="rounded-xl bg-[#162230] p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] text-slate-400">
+                Recovery Forecast
+              </div>
+              <div className="text-[10px] text-amber-400">On Watch</div>
+            </div>
+
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full w-[58%] bg-amber-400 rounded-full" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {[
+              ['Foundation close-out', 'Complete', '100%'],
+              ['Superstructure works', 'Active', '64%'],
+              ['Finishes package', 'Watch', '32%'],
+              ['External works', 'Pending', '12%'],
+            ].map(([task, status, pct]) => (
+              <div
+                key={task}
+                className="grid grid-cols-[1fr_auto_auto] gap-3 items-center rounded-lg bg-[#162230] px-3 py-2"
+              >
+                <span className="text-[11px] text-slate-300 truncate">
+                  {task}
+                </span>
+                <span className="text-[9px] text-slate-500">{status}</span>
+                <span className="text-[9px] text-[#c49e48]">{pct}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="text-sm text-white mt-3">Schedule Control</div>
+      <div className="text-xs text-slate-500 mt-1">
+        Track progress, variance, deadlines, and recovery actions.
+      </div>
+    </div>
+  )
 }
