@@ -12,9 +12,17 @@
     @apply box-border;
   }
 
-  html, body, #root {
-    @apply h-full overflow-hidden;
-  }
+  html,
+body,
+#root {
+  @apply min-h-full;
+}
+
+body {
+  @apply bg-[#0c1014] text-[#ede8de] font-sans antialiased;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
 
   body {
     @apply bg-[#0c1014] text-[#ede8de] font-sans antialiased;
