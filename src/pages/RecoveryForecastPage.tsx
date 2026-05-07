@@ -34,34 +34,87 @@ type KPI = {
 
 export default function RecoveryForecastPage() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [project, setProject] = useState<any>(null)
+  const [procurement, setProcurement] = useState<any[]>([])
+  const [approvals, setApprovals] = useState<any[]>([])
+  const [snags, setSnags] = useState<any[]>([])
+  const [risks, setRisks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
   const { projectId } = useProjectStore()
 
   useEffect(() => {
-    fetchTasks()
+    fetchRecoveryData()
   }, [projectId])
 
-  async function fetchTasks() {
+  async function fetchRecoveryData() {
     setLoading(true)
 
     if (!projectId) {
       setTasks([])
+      setProject(null)
+      setProcurement([])
+      setApprovals([])
+      setSnags([])
+      setRisks([])
       setLoading(false)
       return
     }
 
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('task_number', { ascending: true })
+    const [
+      taskRes,
+      projectRes,
+      procurementRes,
+      approvalRes,
+      snagRes,
+      riskRes,
+    ] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('task_number', { ascending: true }),
 
-    if (error) {
-      console.error(error)
-      setTasks([])
-    } else {
-      setTasks((data || []) as Task[])
-    }
+      supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single(),
+
+      supabase
+        .from('procurement_items')
+        .select('*')
+        .eq('project_id', projectId),
+
+      supabase
+        .from('approvals')
+        .select('*')
+        .eq('project_id', projectId),
+
+      supabase
+        .from('snags')
+        .select('*')
+        .eq('project_id', projectId),
+
+      supabase
+        .from('risks')
+        .select('*')
+        .eq('project_id', projectId),
+    ])
+
+    if (taskRes.error) console.error(taskRes.error)
+    if (projectRes.error) console.error(projectRes.error)
+    if (procurementRes.error) console.error(procurementRes.error)
+    if (approvalRes.error) console.error(approvalRes.error)
+    if (snagRes.error) console.error(snagRes.error)
+    if (riskRes.error) console.error(riskRes.error)
+
+    setTasks((taskRes.data || []) as Task[])
+    setProject(projectRes.data || null)
+    setProcurement(procurementRes.data || [])
+    setApprovals(approvalRes.data || [])
+    setSnags(snagRes.data || [])
+    setRisks(riskRes.data || [])
 
     setLoading(false)
   }
@@ -82,26 +135,37 @@ export default function RecoveryForecastPage() {
       task => safeDate(task.start_date) && safeDate(task.finish_date)
     )
 
+    const totalTasks = validTasks.length
+
     const delayedTasks = validTasks.filter(task => {
       const finish = safeDate(task.finish_date)
-      return !!finish && finish < today && Number(task.progress_pct || 0) < 100
-    })
 
-    const totalTasks = validTasks.length
+      return (
+        !!finish &&
+        finish < today &&
+        Number(task.progress_pct || 0) < 100 &&
+        task.status !== 'Completed'
+      )
+    })
 
     const completedTasks = validTasks.filter(
       t => Number(t.progress_pct || 0) >= 100 || t.status === 'Completed'
     ).length
 
-    const avgProgress =
+    const calculatedProgress =
       totalTasks === 0
-        ? 0
+        ? Number(project?.completion_percent || 0)
         : Math.round(
             validTasks.reduce((sum, t) => {
               if (t.status === 'Completed') return sum + 100
               return sum + Number(t.progress_pct || 0)
             }, 0) / totalTasks
           )
+
+    const progressPct =
+      Number(project?.completion_percent || 0) > 0
+        ? Number(project.completion_percent)
+        : calculatedProgress
 
     const taskDelayDays = delayedTasks.map(task => {
       const finish = safeDate(task.finish_date)
@@ -126,27 +190,105 @@ export default function RecoveryForecastPage() {
       t => t.status === 'In Progress' || Number(t.progress_pct || 0) > 0
     ).length
 
+    const openRisks = risks.filter(r => r.status === 'Open').length
+
+    const highRisks = risks.filter(
+      r => r.status === 'Open' && Number(r.risk_score || 0) >= 12
+    ).length
+
+    const openSnags = snags.filter(s => s.status !== 'Closed').length
+
+    const criticalSnags = snags.filter(
+      s => s.status !== 'Closed' && s.severity === 'Critical'
+    ).length
+
+    const pendingApprovals = approvals.filter(
+      a => a.status !== 'Approved' && a.status !== 'Rejected'
+    ).length
+
+    const overdueApprovals = approvals.filter(a => {
+      if (a.status === 'Approved') return false
+      const deadline = safeDate(a.deadline)
+      return !!deadline && deadline < today
+    }).length
+
+    const procurementRisks = procurement.filter(p => {
+      if (p.status === 'Delivered' || p.status === 'Ordered') return false
+
+      const orderDate = safeDate(p.order_by_date)
+      if (!orderDate) return false
+
+      const daysToOrder = daysBetween(orderDate, today)
+
+      return daysToOrder <= 14
+    }).length
+
+    const projectStartDate = safeDate(project?.start_date)
+    const targetDate = safeDate(project?.handover_date)
+
+    const hasTimeline = !!projectStartDate && !!targetDate
+
+    const plannedPct =
+      hasTimeline && targetDate && projectStartDate
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(
+                (daysBetween(today, projectStartDate) /
+                  Math.max(1, daysBetween(targetDate, projectStartDate))) *
+                  100
+              )
+            )
+          )
+        : null
+
+    const variancePct =
+      plannedPct !== null ? progressPct - plannedPct : null
+
     let confidenceScore = 100
 
-    confidenceScore -= worstDelay * 1.2
-    confidenceScore -= avgTaskDelay * 0.8
-    confidenceScore -= redTasks * 6
+    confidenceScore -= (100 - progressPct) * 0.2
+    confidenceScore -= worstDelay * 1.1
+    confidenceScore -= avgTaskDelay * 0.7
+    confidenceScore -= redTasks * 5
     confidenceScore -= amberTasks * 2
+    confidenceScore -= procurementRisks * 2
+    confidenceScore -= highRisks * 6
+    confidenceScore -= openRisks * 1.5
+    confidenceScore -= criticalSnags * 6
+    confidenceScore -= openSnags * 1
+    confidenceScore -= overdueApprovals * 5
+    confidenceScore -= pendingApprovals * 1
 
-    if (avgProgress < 25) confidenceScore -= 20
-    else if (avgProgress < 50) confidenceScore -= 10
-    else if (avgProgress >= 75) confidenceScore += 5
+    if (variancePct !== null && variancePct < 0) {
+      confidenceScore -= Math.abs(variancePct) * 2
+    }
 
-    if (delayedTasks.length > 5) confidenceScore -= 15
-    if (activeTasks === 0 && totalTasks > 0) confidenceScore -= 10
+    if (activeTasks === 0 && totalTasks > 0) {
+      confidenceScore -= 10
+    }
 
-    confidenceScore = Math.max(5, Math.min(98, Math.round(confidenceScore)))
+    if (project?.health_status === 'Good') {
+      confidenceScore += 5
+    }
+
+    if (project?.health_status === 'At Risk') {
+      confidenceScore -= 10
+    }
+
+    if (project?.health_status === 'Critical') {
+      confidenceScore -= 20
+    }
+
+    confidenceScore = Math.max(5, Math.min(95, Math.round(confidenceScore)))
 
     let recoveryScore = confidenceScore
 
-    if (worstDelay > 30) recoveryScore -= 20
-    if (redTasks >= 5) recoveryScore -= 15
-    if (avgProgress >= 70 && worstDelay <= 14) recoveryScore += 8
+    if (worstDelay > 30) recoveryScore -= 15
+    if (redTasks >= 5) recoveryScore -= 10
+    if (procurementRisks >= 10) recoveryScore -= 10
+    if (progressPct >= 70 && worstDelay <= 14) recoveryScore += 8
 
     recoveryScore = Math.max(5, Math.min(95, Math.round(recoveryScore)))
 
@@ -172,7 +314,9 @@ export default function RecoveryForecastPage() {
           })
         : null
 
-    const forecastFinish = latestTask
+    const forecastFinish = targetDate
+      ? new Date(targetDate)
+      : latestTask
       ? new Date(latestTask.finish_date)
       : new Date()
 
@@ -185,7 +329,10 @@ export default function RecoveryForecastPage() {
       if (!acc[phase]) acc[phase] = 0
 
       const delayed =
-        !!finish && finish < today && Number(task.progress_pct || 0) < 100
+        !!finish &&
+        finish < today &&
+        Number(task.progress_pct || 0) < 100 &&
+        task.status !== 'Completed'
 
       if (delayed) acc[phase] += 1
 
@@ -203,9 +350,7 @@ export default function RecoveryForecastPage() {
             : 0
 
         const totalDur = Math.max(1, Number(task.duration_days || 1))
-
-        const elapsed =
-          start ? Math.max(0, daysBetween(today, start)) : 0
+        const elapsed = start ? Math.max(0, daysBetween(today, start)) : 0
 
         const expectedProgress = Math.min(
           100,
@@ -239,13 +384,16 @@ export default function RecoveryForecastPage() {
 
     if (confidenceScore >= 85) {
       summary =
-        'Project delivery performance is healthy with strong recovery capability and manageable execution risks.'
+        'Project delivery performance is healthy. Current risks are manageable, but continued monitoring is required.'
     } else if (confidenceScore >= 65) {
       summary =
-        'Project is experiencing moderate delivery pressure. Recovery actions are required to maintain the target completion date.'
+        'Project is experiencing moderate delivery pressure. Recovery actions are required to protect the handover target.'
+    } else if (confidenceScore >= 45) {
+      summary =
+        'Project delivery is under significant stress. Procurement, risk, approval, snag, and schedule items require coordinated intervention.'
     } else {
       summary =
-        'Project delivery is under significant stress. Delays and execution risks may threaten the completion timeline.'
+        'Project is in critical delivery condition. Executive intervention is required to protect completion, cost, and handover readiness.'
     }
 
     const recommendations: string[] = []
@@ -258,16 +406,24 @@ export default function RecoveryForecastPage() {
       recommendations.push('Introduce a recovery programme with parallel work fronts.')
     }
 
-    if (avgProgress < 50) {
+    if (procurementRisks > 0) {
+      recommendations.push('Fast-track procurement items that may delay finishing activities.')
+    }
+
+    if (highRisks > 0) {
+      recommendations.push('Hold a risk mitigation session for high-impact open risks.')
+    }
+
+    if (pendingApprovals > 0) {
+      recommendations.push('Close pending approvals to prevent decision bottlenecks.')
+    }
+
+    if (criticalSnags > 0) {
+      recommendations.push('Assign critical snags to owners with target close-out dates.')
+    }
+
+    if (progressPct < 50) {
       recommendations.push('Increase workforce productivity and tighten site supervision.')
-    }
-
-    if (delayedTasks.length > 3) {
-      recommendations.push('Conduct weekly delay review meetings with contractors.')
-    }
-
-    if (amberTasks > 3) {
-      recommendations.push('Convert AMBER activities into short-term action plans before they become critical.')
     }
 
     if (recommendations.length === 0) {
@@ -280,7 +436,7 @@ export default function RecoveryForecastPage() {
       recommendations,
       totalDelayDays: worstDelay,
       avgTaskDelay,
-      avgProgress,
+      progressPct,
       completedTasks,
       totalTasks,
       confidenceScore,
@@ -290,8 +446,16 @@ export default function RecoveryForecastPage() {
       requiredAcceleration,
       phaseHeatmap,
       summary,
+      procurementRisks,
+      openRisks,
+      highRisks,
+      openSnags,
+      criticalSnags,
+      pendingApprovals,
+      overdueApprovals,
+      variancePct,
     }
-  }, [tasks])
+  }, [tasks, project, procurement, approvals, snags, risks])
 
   const kpis: KPI[] = [
     {
@@ -327,11 +491,7 @@ export default function RecoveryForecastPage() {
   ]
 
   if (loading) {
-    return (
-      <div className="p-8 text-white">
-        Loading Recovery Forecast...
-      </div>
-    )
+    return <div className="p-8 text-white">Loading Recovery Forecast...</div>
   }
 
   if (tasks.length === 0) {
@@ -345,28 +505,20 @@ export default function RecoveryForecastPage() {
   return (
     <div className="space-y-5 text-white">
       <div className="card p-5">
-        <h1 className="text-2xl font-bold">
-          Recovery Forecast Engine
-        </h1>
+        <h1 className="text-2xl font-bold">Recovery Forecast Engine</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Predict delays, forecast completion, and recommend recovery actions.
+          Reads schedule, dashboard health, risks, approvals, procurement, and snags.
         </p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-2">
-            Executive Summary
-          </h2>
-          <p className="text-slate-300">
-            {engine.summary}
-          </p>
+          <h2 className="text-lg font-semibold mb-2">Executive Summary</h2>
+          <p className="text-slate-300">{engine.summary}</p>
         </div>
 
         <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-3">
-            Recovery Probability
-          </h2>
+          <h2 className="text-lg font-semibold mb-3">Recovery Probability</h2>
 
           <div className="w-full bg-slate-800 h-4 rounded-full overflow-hidden">
             <div
@@ -380,14 +532,12 @@ export default function RecoveryForecastPage() {
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            Based on task progress, active delay, RAG pressure, and recovery capacity.
+            Based on tasks, dashboard variance, risks, approvals, procurement, and snags.
           </p>
         </div>
 
         <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-4">
-            Delay Heatmap
-          </h2>
+          <h2 className="text-lg font-semibold mb-4">Delay Heatmap</h2>
 
           <div className="space-y-3">
             {Object.entries(engine.phaseHeatmap).length === 0 ? (
@@ -439,48 +589,19 @@ export default function RecoveryForecastPage() {
         })}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="card p-5">
-          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
-            Average Progress
-          </h2>
-          <div className="text-3xl font-bold text-[#c49e48] mt-2">
-            {engine.avgProgress}%
-          </div>
-          <p className="text-sm text-slate-500 mt-1">
-            {engine.completedTasks}/{engine.totalTasks} tasks completed
-          </p>
-        </div>
-
-        <div className="card p-5">
-          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
-            Average Delay
-          </h2>
-          <div className="text-3xl font-bold text-amber-400 mt-2">
-            {engine.avgTaskDelay} Days
-          </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Average delay across delayed activities
-          </p>
-        </div>
-
-        <div className="card p-5">
-          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
-            Forecast Completion Date
-          </h2>
-          <div className="text-2xl font-bold text-[#c49e48] mt-2">
-            {engine.forecastFinish.toDateString()}
-          </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Based on active delay and programme trend
-          </p>
-        </div>
+      <div className="grid md:grid-cols-4 gap-4">
+        <MiniMetric title="Progress" value={`${engine.progressPct}%`} />
+        <MiniMetric title="Variance" value={engine.variancePct === null ? '—' : `${engine.variancePct}%`} />
+        <MiniMetric title="Procurement Risks" value={engine.procurementRisks} />
+        <MiniMetric title="High Risks" value={engine.highRisks} />
+        <MiniMetric title="Pending Approvals" value={engine.pendingApprovals} />
+        <MiniMetric title="Open Snags" value={engine.openSnags} />
+        <MiniMetric title="Critical Snags" value={engine.criticalSnags} />
+        <MiniMetric title="Forecast Finish" value={engine.forecastFinish.toDateString()} />
       </div>
 
       <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-4">
-          Critical Delayed Activities
-        </h2>
+        <h2 className="text-lg font-semibold mb-4">Critical Delayed Activities</h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -508,9 +629,7 @@ export default function RecoveryForecastPage() {
                     <td>{task.name}</td>
                     <td>{task.phase}</td>
                     <td>{task.finish_date}</td>
-                    <td className="text-red-400">
-                      {task.progress_pct}%
-                    </td>
+                    <td className="text-red-400">{task.progress_pct}%</td>
                   </tr>
                 ))
               )}
@@ -520,15 +639,26 @@ export default function RecoveryForecastPage() {
       </div>
 
       <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-4">
-          Recommended Recovery Actions
-        </h2>
+        <h2 className="text-lg font-semibold mb-4">Recommended Recovery Actions</h2>
 
         <div className="space-y-3 text-sm text-slate-300">
           {engine.recommendations.map((item, i) => (
             <Action key={i} text={item} />
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function MiniMetric({ title, value }: { title: string; value: string | number }) {
+  return (
+    <div className="card p-4">
+      <div className="text-xs text-slate-400 uppercase tracking-wider">
+        {title}
+      </div>
+      <div className="text-xl font-bold text-[#c49e48] mt-2">
+        {value}
       </div>
     </div>
   )
