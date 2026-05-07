@@ -65,79 +65,90 @@ export default function App() {
   const role = getRole(user?.email)
 
   useEffect(() => {
-  async function loadUser() {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+    let mounted = true
 
-      if (!session?.user) {
+    async function loadAuthUser() {
+      try {
+        setLoading(true)
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!mounted) return
+
+        if (!session?.user) {
+          setUser(null)
+          return
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (!mounted) return
+
+        setUser({
+          ...session.user,
+          ...(profile || {}),
+          email: profile?.email || session.user.email,
+          full_name: profile?.full_name || 'Admin',
+          role: profile?.role || 'admin',
+        } as any)
+      } catch (error) {
+        console.error('Auth initialization failed:', error)
+
+        if (mounted) {
+          setUser(null)
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadAuthUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        setLoading(true)
+
+        if (!session?.user) {
+          setUser(null)
+          return
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        setUser({
+          ...session.user,
+          ...(profile || {}),
+          email: profile?.email || session.user.email,
+          full_name: profile?.full_name || 'Admin',
+          role: profile?.role || 'admin',
+        } as any)
+      } catch (error) {
+        console.error('Auth state change failed:', error)
         setUser(null)
+      } finally {
         setLoading(false)
-        return
       }
+    })
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle()
-
-      if (error) {
-        console.error('Profile error:', error)
-      }
-
-      setUser({
-        ...session.user,
-        ...(profile || {}),
-        email: profile?.email || session.user.email,
-        full_name: profile?.full_name || 'Admin',
-        role: profile?.role || 'admin',
-      } as any)
-    } catch (err) {
-      console.error('Auth load error:', err)
-      setUser(null)
-    } finally {
-      setLoading(false)
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
     }
-  }
-
-  loadUser()
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    try {
-      if (!session?.user) {
-        setUser(null)
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle()
-
-      setUser({
-        ...session.user,
-        ...(profile || {}),
-        email: profile?.email || session.user.email,
-        full_name: profile?.full_name || 'Admin',
-        role: profile?.role || 'admin',
-      } as any)
-    } catch (err) {
-      console.error('Auth change error:', err)
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  })
-
-  return () => {
-    subscription.unsubscribe()
-  }
-}, [setUser, setLoading])
+  }, [setUser, setLoading])
 
   return (
     <BrowserRouter>
