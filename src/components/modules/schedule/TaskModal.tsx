@@ -233,15 +233,14 @@ export default function TaskModal({ task, onClose }: Props) {
             {task ? `Update Task #${task.task_number}` : 'New Task'}
           </div>
 
-         {task &&
-  (role === 'admin' || role === 'project_owner') && (
-    <button
-      onClick={remove}
-      className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"
-      title="Delete Task"
-    >
-      <Trash2 size={14} />
-    </button>
+         {task && role === 'admin' && (
+  <button
+    onClick={remove}
+    className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"
+    title="Delete Task"
+  >
+    <Trash2 size={14} />
+  </button>
 )}
 
           <button
