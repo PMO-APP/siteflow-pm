@@ -1,3 +1,5 @@
+import ProfilePage from '@/pages/ProfilePage'
+import SettingsPage from '@/pages/SettingsPage'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import PricingPage from '@/pages/PricingPage'
@@ -139,6 +141,8 @@ export default function App() {
           <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+<Route path="settings" element={<SettingsPage />} />
 
           {role === 'admin' && (
             <Route path="audit" element={<AuditPage />} />
