@@ -69,32 +69,14 @@ export default function RecoveryForecastPage() {
   const engine = useMemo(() => {
     const today = new Date()
 
-    const daysBetween = (a: Date, b: Date) =>
-      Math.ceil((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
-
-    const safeDate = (value: string) => {
-      const date = new Date(value)
-      return isNaN(date.getTime()) ? null : date
+    const safeDate = (value?: string) => {
+      if (!value) return null
+      const d = new Date(value)
+      return isNaN(d.getTime()) ? null : d
     }
 
-    const parseDeps = (dep: string | null) =>
-      dep
-        ? dep
-            .split(',')
-            .map(x => Number(x.trim()))
-            .filter(Boolean)
-        : []
-
-    const downstreamMap: Record<number, number[]> = {}
-
-    tasks.forEach(task => {
-      const deps = parseDeps(task.dependencies)
-
-      deps.forEach(d => {
-        if (!downstreamMap[d]) downstreamMap[d] = []
-        downstreamMap[d].push(task.task_number)
-      })
-    })
+    const daysBetween = (a: Date, b: Date) =>
+      Math.ceil((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
 
     const validTasks = tasks.filter(
       task => safeDate(task.start_date) && safeDate(task.finish_date)
@@ -102,37 +84,128 @@ export default function RecoveryForecastPage() {
 
     const delayedTasks = validTasks.filter(task => {
       const finish = safeDate(task.finish_date)
-      if (!finish) return false
-
-      return finish < today && Number(task.progress_pct || 0) < 100
+      return !!finish && finish < today && Number(task.progress_pct || 0) < 100
     })
+
+    const totalTasks = validTasks.length
+
+    const completedTasks = validTasks.filter(
+      t => Number(t.progress_pct || 0) >= 100 || t.status === 'Completed'
+    ).length
+
+    const avgProgress =
+      totalTasks === 0
+        ? 0
+        : Math.round(
+            validTasks.reduce((sum, t) => {
+              if (t.status === 'Completed') return sum + 100
+              return sum + Number(t.progress_pct || 0)
+            }, 0) / totalTasks
+          )
 
     const taskDelayDays = delayedTasks.map(task => {
       const finish = safeDate(task.finish_date)
       return finish ? Math.max(0, daysBetween(today, finish)) : 0
     })
 
-    // Important correction:
-    // Do not add all delayed task days together.
-    // Use the worst active delay because many tasks may run in parallel.
-    const totalDelayDays =
+    const worstDelay =
       taskDelayDays.length === 0 ? 0 : Math.max(...taskDelayDays)
+
+    const avgTaskDelay =
+      taskDelayDays.length === 0
+        ? 0
+        : Math.round(
+            taskDelayDays.reduce((sum, d) => sum + d, 0) /
+              taskDelayDays.length
+          )
+
+    const redTasks = validTasks.filter(t => t.rag === 'RED').length
+    const amberTasks = validTasks.filter(t => t.rag === 'AMBER').length
+
+    const activeTasks = validTasks.filter(
+      t => t.status === 'In Progress' || Number(t.progress_pct || 0) > 0
+    ).length
+
+    let confidenceScore = 100
+
+    confidenceScore -= worstDelay * 1.2
+    confidenceScore -= avgTaskDelay * 0.8
+    confidenceScore -= redTasks * 6
+    confidenceScore -= amberTasks * 2
+
+    if (avgProgress < 25) confidenceScore -= 20
+    else if (avgProgress < 50) confidenceScore -= 10
+    else if (avgProgress >= 75) confidenceScore += 5
+
+    if (delayedTasks.length > 5) confidenceScore -= 15
+    if (activeTasks === 0 && totalTasks > 0) confidenceScore -= 10
+
+    confidenceScore = Math.max(5, Math.min(98, Math.round(confidenceScore)))
+
+    let recoveryScore = confidenceScore
+
+    if (worstDelay > 30) recoveryScore -= 20
+    if (redTasks >= 5) recoveryScore -= 15
+    if (avgProgress >= 70 && worstDelay <= 14) recoveryScore += 8
+
+    recoveryScore = Math.max(5, Math.min(95, Math.round(recoveryScore)))
+
+    const recoverable =
+      recoveryScore >= 75 ? 'YES' : recoveryScore >= 50 ? 'RISK' : 'NO'
+
+    const requiredAcceleration =
+      worstDelay === 0
+        ? '0%'
+        : `${Math.min(50, Math.round(worstDelay * 1.8))}%`
+
+    const latestTask =
+      validTasks.length > 0
+        ? validTasks.reduce((latest, current) => {
+            const currentDate = safeDate(current.finish_date)
+            const latestDate = safeDate(latest.finish_date)
+
+            if (currentDate && latestDate && currentDate > latestDate) {
+              return current
+            }
+
+            return latest
+          })
+        : null
+
+    const forecastFinish = latestTask
+      ? new Date(latestTask.finish_date)
+      : new Date()
+
+    forecastFinish.setDate(forecastFinish.getDate() + worstDelay)
+
+    const phaseHeatmap = validTasks.reduce((acc: any, task) => {
+      const phase = task.phase || 'Unassigned Phase'
+      const finish = safeDate(task.finish_date)
+
+      if (!acc[phase]) acc[phase] = 0
+
+      const delayed =
+        !!finish && finish < today && Number(task.progress_pct || 0) < 100
+
+      if (delayed) acc[phase] += 1
+
+      return acc
+    }, {})
 
     const criticalTasks = validTasks
       .map(task => {
-        const finish = safeDate(task.finish_date)!
-        const start = safeDate(task.start_date)!
+        const finish = safeDate(task.finish_date)
+        const start = safeDate(task.start_date)
 
         const lateDays =
-          finish < today && Number(task.progress_pct || 0) < 100
+          finish && finish < today && Number(task.progress_pct || 0) < 100
             ? Math.max(0, daysBetween(today, finish))
             : 0
 
-        const daysToFinish = Math.max(0, daysBetween(finish, today))
-
         const totalDur = Math.max(1, Number(task.duration_days || 1))
 
-        const elapsed = Math.max(0, daysBetween(today, start))
+        const elapsed =
+          start ? Math.max(0, daysBetween(today, start)) : 0
 
         const expectedProgress = Math.min(
           100,
@@ -144,15 +217,11 @@ export default function RecoveryForecastPage() {
           expectedProgress - Number(task.progress_pct || 0)
         )
 
-        const downstream = downstreamMap[task.task_number]?.length || 0
-
         let score = 0
 
         score += lateDays * 4
         score += progressLag * 0.8
-        score += downstream * 12
         score += task.duration_days > 10 ? 10 : 0
-        score += daysToFinish <= 30 ? 10 : 0
         score += task.rag === 'RED' ? 20 : task.rag === 'AMBER' ? 10 : 0
 
         return {
@@ -160,131 +229,67 @@ export default function RecoveryForecastPage() {
           score: Math.round(score),
           lateDays,
           progressLag,
-          downstream,
         }
       })
       .filter(t => t.score >= 25)
       .sort((a, b) => b.score - a.score)
       .slice(0, 8)
 
-    const projectFinish =
-      validTasks.length > 0
-        ? new Date(
-            validTasks.reduce((latest, task) => {
-              const taskFinish = safeDate(task.finish_date)!
-              const latestFinish = safeDate(latest.finish_date)!
+    let summary = ''
 
-              return taskFinish > latestFinish ? task : latest
-            }).finish_date
-          )
-        : today
+    if (confidenceScore >= 85) {
+      summary =
+        'Project delivery performance is healthy with strong recovery capability and manageable execution risks.'
+    } else if (confidenceScore >= 65) {
+      summary =
+        'Project is experiencing moderate delivery pressure. Recovery actions are required to maintain the target completion date.'
+    } else {
+      summary =
+        'Project delivery is under significant stress. Delays and execution risks may threaten the completion timeline.'
+    }
 
-    const forecastFinish = new Date(projectFinish)
-    forecastFinish.setDate(projectFinish.getDate() + totalDelayDays)
+    const recommendations: string[] = []
 
-    const recoverable =
-      totalDelayDays <= 14 ? 'YES' : totalDelayDays <= 30 ? 'RISK' : 'NO'
+    if (redTasks > 0) {
+      recommendations.push('Escalate all RED activities to executive monitoring.')
+    }
 
-    const requiredAcceleration =
-      totalDelayDays === 0
-        ? '0%'
-        : `${Math.min(50, Math.round((totalDelayDays / 30) * 100))}%`
+    if (worstDelay > 14) {
+      recommendations.push('Introduce a recovery programme with parallel work fronts.')
+    }
 
-    const completionConfidence =
-      totalDelayDays <= 7
-        ? '92%'
-        : totalDelayDays <= 14
-        ? '78%'
-        : totalDelayDays <= 30
-        ? '56%'
-        : '34%'
+    if (avgProgress < 50) {
+      recommendations.push('Increase workforce productivity and tighten site supervision.')
+    }
 
-    const sourceTasks = delayedTasks.length > 0 ? delayedTasks : criticalTasks
+    if (delayedTasks.length > 3) {
+      recommendations.push('Conduct weekly delay review meetings with contractors.')
+    }
 
-    const recommendations = sourceTasks.slice(0, 6).map(task => {
-      const taskName = task.name.toLowerCase()
+    if (amberTasks > 3) {
+      recommendations.push('Convert AMBER activities into short-term action plans before they become critical.')
+    }
 
-      if (
-        taskName.includes('block') ||
-        taskName.includes('tiling') ||
-        taskName.includes('plaster')
-      ) {
-        return `Add additional labour crew to ${task.name}`
-      }
-
-      if (
-        taskName.includes('door') ||
-        taskName.includes('window') ||
-        taskName.includes('sanitary')
-      ) {
-        return `Fast-track materials delivery for ${task.name}`
-      }
-
-      if (
-        taskName.includes('m&e') ||
-        taskName.includes('electrical') ||
-        taskName.includes('plumbing')
-      ) {
-        return `Run extended hours and parallel inspections for ${task.name}`
-      }
-
-      if (task.dependencies) {
-        return `Prioritize ${task.name} as linked successor activities may be impacted`
-      }
-
-      if (task.duration_days > 10) {
-        return `Split ${task.name} into work zones for parallel execution`
-      }
-
-      return `Daily review and 48-hour action plan for ${task.name}`
-    })
-
-    const phaseHeatmap = validTasks.reduce((acc: any, task: Task) => {
-      const finish = safeDate(task.finish_date)
-      const delayed =
-        !!finish && finish < today && Number(task.progress_pct || 0) < 100
-
-      if (!acc[task.phase || 'Unassigned Phase']) {
-        acc[task.phase || 'Unassigned Phase'] = 0
-      }
-
-      if (delayed) {
-        acc[task.phase || 'Unassigned Phase'] += 1
-      }
-
-      return acc
-    }, {})
+    if (recommendations.length === 0) {
+      recommendations.push('Project currently progressing within acceptable thresholds.')
+    }
 
     return {
       delayedTasks,
       criticalTasks,
       recommendations,
-      totalDelayDays,
+      totalDelayDays: worstDelay,
+      avgTaskDelay,
+      avgProgress,
+      completedTasks,
+      totalTasks,
+      confidenceScore,
+      recoveryScore,
       forecastFinish,
       recoverable,
       requiredAcceleration,
-      completionConfidence,
       phaseHeatmap,
-
-      summary:
-        totalDelayDays === 0
-          ? 'Project currently on track with no active delays.'
-          : totalDelayDays <= 7
-          ? 'Minor delay detected. Recoverable with immediate action.'
-          : totalDelayDays <= 14
-          ? 'Moderate delay affecting programme. Recovery measures required.'
-          : 'Major delay threatening completion date. Executive intervention required.',
-
-      recoveryScore:
-        totalDelayDays === 0
-          ? 95
-          : totalDelayDays <= 7
-          ? 80
-          : totalDelayDays <= 14
-          ? 65
-          : totalDelayDays <= 30
-          ? 45
-          : 20,
+      summary,
     }
   }, [tasks])
 
@@ -315,7 +320,7 @@ export default function RecoveryForecastPage() {
     },
     {
       label: 'Confidence',
-      value: engine.completionConfidence,
+      value: `${engine.confidenceScore}%`,
       icon: TrendingUp,
       color: 'text-violet-400',
     },
@@ -373,6 +378,10 @@ export default function RecoveryForecastPage() {
           <p className="mt-2 text-sm text-slate-400">
             {engine.recoveryScore}% likelihood of meeting completion date
           </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Based on task progress, active delay, RAG pressure, and recovery capacity.
+          </p>
         </div>
 
         <div className="card p-5">
@@ -381,21 +390,27 @@ export default function RecoveryForecastPage() {
           </h2>
 
           <div className="space-y-3">
-            {Object.entries(engine.phaseHeatmap).map(([phase, count]: any) => (
-              <div key={phase}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>{phase}</span>
-                  <span>{count}</span>
-                </div>
-
-                <div className="w-full h-3 bg-slate-800 rounded">
-                  <div
-                    className="h-3 bg-red-500 rounded"
-                    style={{ width: `${Math.min(100, count * 20)}%` }}
-                  />
-                </div>
+            {Object.entries(engine.phaseHeatmap).length === 0 ? (
+              <div className="text-sm text-slate-500">
+                No phase delay data available.
               </div>
-            ))}
+            ) : (
+              Object.entries(engine.phaseHeatmap).map(([phase, count]: any) => (
+                <div key={phase}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>{phase}</span>
+                    <span>{count}</span>
+                  </div>
+
+                  <div className="w-full h-3 bg-slate-800 rounded">
+                    <div
+                      className="h-3 bg-red-500 rounded"
+                      style={{ width: `${Math.min(100, count * 20)}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -411,6 +426,7 @@ export default function RecoveryForecastPage() {
                   <p className="text-xs text-slate-400 uppercase tracking-wider">
                     {item.label}
                   </p>
+
                   <h2 className={`text-2xl font-bold mt-2 ${item.color}`}>
                     {item.value}
                   </h2>
@@ -423,18 +439,42 @@ export default function RecoveryForecastPage() {
         })}
       </div>
 
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-2">
-          Forecast Completion Date
-        </h2>
-
-        <div className="text-3xl font-bold text-[#c49e48]">
-          {engine.forecastFinish.toDateString()}
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="card p-5">
+          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
+            Average Progress
+          </h2>
+          <div className="text-3xl font-bold text-[#c49e48] mt-2">
+            {engine.avgProgress}%
+          </div>
+          <p className="text-sm text-slate-500 mt-1">
+            {engine.completedTasks}/{engine.totalTasks} tasks completed
+          </p>
         </div>
 
-        <p className="text-sm text-slate-400 mt-2">
-          Based on the worst active delay and current productivity trend.
-        </p>
+        <div className="card p-5">
+          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
+            Average Delay
+          </h2>
+          <div className="text-3xl font-bold text-amber-400 mt-2">
+            {engine.avgTaskDelay} Days
+          </div>
+          <p className="text-sm text-slate-500 mt-1">
+            Average delay across delayed activities
+          </p>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="text-sm text-slate-400 uppercase tracking-wider">
+            Forecast Completion Date
+          </h2>
+          <div className="text-2xl font-bold text-[#c49e48] mt-2">
+            {engine.forecastFinish.toDateString()}
+          </div>
+          <p className="text-sm text-slate-500 mt-1">
+            Based on active delay and programme trend
+          </p>
+        </div>
       </div>
 
       <div className="card p-5">
@@ -485,15 +525,9 @@ export default function RecoveryForecastPage() {
         </h2>
 
         <div className="space-y-3 text-sm text-slate-300">
-          {engine.delayedTasks.length === 0 ? (
-            <div className="text-emerald-400 text-sm">
-              No recovery action required. Project on track.
-            </div>
-          ) : (
-            engine.recommendations.map((item, i) => (
-              <Action key={i} text={item} />
-            ))
-          )}
+          {engine.recommendations.map((item, i) => (
+            <Action key={i} text={item} />
+          ))}
         </div>
       </div>
     </div>
