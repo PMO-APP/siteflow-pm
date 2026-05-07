@@ -9,8 +9,6 @@ import { useAuthStore } from '@/store/auth'
 import type { Task } from '@/types'
 import { fdate } from '@/lib/utils'
 
-
-
 interface Props {
   task: Task | null
   onClose: () => void
@@ -19,30 +17,6 @@ interface Props {
 export default function TaskModal({ task, onClose }: Props) {
   const { user } = useAuthStore()
   const { projectId } = useProjectStore()
-  const DEFAULT_PHASES = [
-  'Approval Schedule',
-  'Program Schedule',
-  'Site Preparation',
-  'Substructure',
-  'Foundation',
-  'Superstructure',
-  'Blockwork',
-  'Roofing',
-  'Internal "Wet works" (Contractor)',
-  'MEP Works',
-  'External Works Phase',
-  'Internal works & Interior Design',
-  'Finishes',
-  'Snagging',
-  'Handover',
-]
-
-const PHASES = Array.from(
-  new Set([
-    ...DEFAULT_PHASES,
-    task?.phase || '',
-  ].filter(Boolean))
-)
 
   const role = getRole(user?.email)
   const create = useCreateTask()
@@ -50,6 +24,33 @@ const PHASES = Array.from(
   const del = useDeleteTask()
 
   const [error, setError] = useState('')
+
+  const DEFAULT_PHASES = [
+    'Approval Schedule',
+    'Program Schedule',
+    'Site Preparation',
+    'Substructure',
+    'Foundation',
+    'Superstructure',
+    'Blockwork',
+    'Roofing',
+    'Internal "Wet works" (Contractor)',
+    'MEP Works',
+    'External Works Phase',
+    'Internal works & Interior Design',
+    'Finishes',
+    'Snagging',
+    'Handover',
+  ]
+
+  const PHASES = Array.from(
+    new Set([
+      ...DEFAULT_PHASES,
+      task?.phase || '',
+    ].filter(Boolean))
+  )
+
+  const isEditMode = !!task
 
   const [form, setForm] = useState({
     task_number: task?.task_number ?? 0,
@@ -100,7 +101,7 @@ const PHASES = Array.from(
     return value && value.trim() !== '' ? value : null
   }
 
-  const cleanPayload = () => {
+  const cleanCreatePayload = () => {
     return {
       task_number: Number(form.task_number || 0),
       name: form.name.trim(),
@@ -118,6 +119,14 @@ const PHASES = Array.from(
     }
   }
 
+  const cleanUpdatePayload = () => {
+    return {
+      status: form.status,
+      progress_pct: Number(form.progress_pct || 0),
+      notes: form.notes || null,
+    }
+  }
+
   const save = async () => {
     setError('')
 
@@ -126,15 +135,15 @@ const PHASES = Array.from(
       return
     }
 
-    if (!form.name.trim()) {
+    if (!isEditMode && !form.name.trim()) {
       setError('Task name is required.')
       return
     }
 
     try {
-      const payload = cleanPayload()
-
       if (task) {
+        const payload = cleanUpdatePayload()
+
         await update.mutateAsync({
           id: task.id,
           ...payload,
@@ -142,96 +151,8 @@ const PHASES = Array.from(
 
         const changes: string[] = []
 
-        if (task.finish_date !== payload.finish_date) {
-          changes.push(
-            `Finish Date ${task.finish_date || '-'} → ${payload.finish_date || '-'}`
-          )
-
-          if (task.finish_date && payload.finish_date) {
-            const oldDate = new Date(task.finish_date)
-            const newDate = new Date(payload.finish_date)
-
-            const diffDays = Math.round(
-              (newDate.getTime() - oldDate.getTime()) /
-                (1000 * 60 * 60 * 24)
-            )
-
-            if (diffDays > 0 && diffDays < 7) {
-              changes.push(`Delay Warning: +${diffDays} days`)
-
-              await supabase.from('notifications').insert({
-                user_id: user?.id,
-                type: 'warning',
-                title: 'Delay Warning',
-                message: `${payload.name} delayed by ${diffDays} days`,
-                project_id: projectId,
-              })
-            }
-
-            if (diffDays >= 7) {
-              changes.push(`Critical Delay: +${diffDays} days`)
-
-              await supabase.from('notifications').insert({
-                user_id: user?.id,
-                type: 'alert',
-                title: 'Critical Delay',
-                message: `${payload.name} delayed by ${diffDays} days`,
-                project_id: projectId,
-              })
-
-              await supabase.from('risks').upsert(
-                {
-                  title: `${payload.name} causing critical delay`,
-                  category: 'Schedule',
-                  owner: payload.responsible || 'PM',
-                  severity: 'High',
-                  status: 'Open',
-                  mitigation: 'Immediate recovery plan required',
-                  source: 'Auto from Schedule',
-                  project_id: projectId,
-                },
-                {
-                  onConflict: 'title,source',
-                }
-              )
-            }
-
-            if (diffDays < 0) {
-              changes.push(`Recovered ${Math.abs(diffDays)} days`)
-
-              await supabase.from('notifications').insert({
-                user_id: user?.id,
-                type: 'success',
-                title: 'Recovery Achieved',
-                message: `${payload.name} recovered ${Math.abs(diffDays)} days`,
-                project_id: projectId,
-              })
-
-              await supabase
-                .from('risks')
-                .update({
-                  severity: Math.abs(diffDays) >= 7 ? 'Low' : 'Medium',
-                  status: Math.abs(diffDays) >= 7 ? 'Closed' : 'Monitoring',
-                  mitigation:
-                    Math.abs(diffDays) >= 7
-                      ? 'Recovered through programme acceleration'
-                      : 'Delay partially recovered',
-                })
-                .eq('title', `${payload.name} causing critical delay`)
-                .eq('source', 'Auto from Schedule')
-                .eq('project_id', projectId)
-            }
-          }
-        }
-
-        if (task.phase !== payload.phase) {
-          changes.push(`Phase ${task.phase || '-'} → ${payload.phase || '-'}`)
-        }
-
-        if (task.start_date !== payload.start_date) {
-          changes.push(
-            `Start Date ${task.start_date || '-'} → ${payload.start_date || '-'}`
-          )
+        if (task.status !== payload.status) {
+          changes.push(`Status ${task.status} → ${payload.status}`)
         }
 
         if (Number(task.progress_pct || 0) !== payload.progress_pct) {
@@ -240,20 +161,8 @@ const PHASES = Array.from(
           )
         }
 
-        if (task.status !== payload.status) {
-          changes.push(`Status ${task.status} → ${payload.status}`)
-        }
-
-        if ((task.dependencies || '') !== (payload.dependencies || '')) {
-          changes.push(
-            `Deps ${task.dependencies || '-'} → ${payload.dependencies || '-'}`
-          )
-        }
-
-        if ((task.responsible || '') !== (payload.responsible || '')) {
-          changes.push(
-            `Owner ${task.responsible || '-'} → ${payload.responsible || '-'}`
-          )
+        if ((task.notes || '') !== (payload.notes || '')) {
+          changes.push('Notes updated')
         }
 
         await logAudit(
@@ -261,9 +170,11 @@ const PHASES = Array.from(
           'UPDATE',
           'Schedule',
           task.id,
-          changes.length > 0 ? changes.join(' | ') : `${payload.name} updated`
+          changes.length > 0 ? changes.join(' | ') : `${task.name} updated`
         )
       } else {
+        const payload = cleanCreatePayload()
+
         await create.mutateAsync({
           ...payload,
           rag: '',
@@ -319,7 +230,7 @@ const PHASES = Array.from(
 
         <div className="modal-head">
           <div className="modal-title">
-            {task ? `Edit Task #${task.task_number}` : 'New Task'}
+            {task ? `Update Task #${task.task_number}` : 'New Task'}
           </div>
 
           {task && role === 'admin' && (
@@ -349,25 +260,25 @@ const PHASES = Array.from(
           <div className="grid grid-cols-3 gap-2 px-5 py-3 bg-[#111820] border-b border-white/[0.06]">
             {[
               {
-                k: 'Duration',
-                v: task.duration_days ? `${task.duration_days}d` : '—',
+                k: 'Phase',
+                v: task.phase || '—',
               },
               {
-                k: 'Created',
-                v: fdate(task.created_at),
+                k: 'Planned Start',
+                v: fdate(task.start_date),
               },
               {
-                k: 'Updated',
-                v: fdate(task.updated_at),
+                k: 'Planned Finish',
+                v: fdate(task.finish_date),
               },
-            ].map(i => (
-              <div key={i.k} className="bg-[#1c2a36] rounded p-2">
+            ].map(item => (
+              <div key={item.k} className="bg-[#1c2a36] rounded p-2">
                 <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase tracking-widest mb-0.5">
-                  {i.k}
+                  {item.k}
                 </div>
 
                 <div className="text-[12px] text-[#ede8de]">
-                  {i.v}
+                  {item.v}
                 </div>
               </div>
             ))}
@@ -375,105 +286,161 @@ const PHASES = Array.from(
         )}
 
         <div className="p-5 space-y-4">
-          {!task && (
+          {!isEditMode && (
+            <>
+              <div>
+                <label className="form-label">Task Number</label>
+                <input
+                  className="form-control"
+                  type="number"
+                  value={form.task_number}
+                  onChange={e =>
+                    updateField('task_number', Number(e.target.value))
+                  }
+                  placeholder="e.g. 1"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Task Name *</label>
+                <input
+                  className="form-control"
+                  value={form.name}
+                  onChange={e => updateField('name', e.target.value)}
+                  placeholder="Task name…"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Phase</label>
+                  <select
+                    className="form-control"
+                    value={form.phase}
+                    onChange={e => updateField('phase', e.target.value)}
+                  >
+                    {PHASES.map(phase => (
+                      <option key={phase}>{phase}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Responsible Person</label>
+                  <input
+                    className="form-control"
+                    value={form.responsible}
+                    onChange={e => updateField('responsible', e.target.value)}
+                    placeholder="Name or company…"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Start Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.start_date}
+                    onChange={e => updateField('start_date', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Finish Date</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.finish_date}
+                    onChange={e => updateField('finish_date', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Procurement Deadline</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.procurement_deadline}
+                    onChange={e =>
+                      updateField('procurement_deadline', e.target.value)
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Approval Deadline</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.approval_deadline}
+                    onChange={e =>
+                      updateField('approval_deadline', e.target.value)
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Dependencies (#)</label>
+                <input
+                  className="form-control"
+                  value={form.dependencies}
+                  onChange={e => updateField('dependencies', e.target.value)}
+                  placeholder="e.g. 1, 3"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="milestone"
+                  checked={form.is_milestone}
+                  onChange={e =>
+                    updateField('is_milestone', e.target.checked)
+                  }
+                  className="accent-[#c49e48]"
+                />
+
+                <label
+                  htmlFor="milestone"
+                  className="text-[12px] text-[#bfb9ae] cursor-pointer"
+                >
+                  Mark as Milestone ⬦
+                </label>
+              </div>
+            </>
+          )}
+
+          {isEditMode && (
             <div>
-              <label className="form-label">Task Number</label>
-              <input
-                className="form-control"
-                type="number"
-                value={form.task_number}
-                onChange={e => updateField('task_number', Number(e.target.value))}
-                placeholder="e.g. 1"
-              />
+              <label className="form-label">Task</label>
+              <div className="form-control bg-[#111820] border-white/[0.04] text-[#bfb9ae]">
+                {task?.name}
+              </div>
             </div>
           )}
 
           <div>
-            <label className="form-label">Task Name *</label>
-            <input
+            <label className="form-label">Status</label>
+            <select
               className="form-control"
-              value={form.name}
-              onChange={e => updateField('name', e.target.value)}
-              placeholder="Task name…"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">Phase</label>
-              <select
-                className="form-control"
-                value={form.phase}
-                onChange={e => updateField('phase', e.target.value)}
-              >
-                {PHASES.map(phase => (
-                  <option key={phase}>{phase}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">Status</label>
-              <select
-                className="form-control"
-                value={form.status}
-                onChange={e => updateField('status', e.target.value)}
-              >
-                {[
-                  'Not Started',
-                  'In Progress',
-                  'Completed',
-                  'On Hold',
-                  'Blocked',
-                ].map(status => (
-                  <option key={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">Start Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.start_date}
-                onChange={e => updateField('start_date', e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Finish Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.finish_date}
-                onChange={e => updateField('finish_date', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">Dependencies (#)</label>
-              <input
-                className="form-control"
-                value={form.dependencies}
-                onChange={e => updateField('dependencies', e.target.value)}
-                placeholder="e.g. 1, 3"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Responsible Person</label>
-              <input
-                className="form-control"
-                value={form.responsible}
-                onChange={e => updateField('responsible', e.target.value)}
-                placeholder="Name or company…"
-              />
-            </div>
+              value={form.status}
+              onChange={e => updateField('status', e.target.value)}
+            >
+              {[
+                'Not Started',
+                'In Progress',
+                'Completed',
+                'On Hold',
+                'Blocked',
+              ].map(status => (
+                <option key={status}>{status}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -486,58 +453,25 @@ const PHASES = Array.from(
               min={0}
               max={100}
               value={form.progress_pct}
-              onChange={e => updateField('progress_pct', Number(e.target.value))}
+              onChange={e =>
+                updateField('progress_pct', Number(e.target.value))
+              }
               className="w-full accent-[#c49e48] bg-[#1c2a36] h-1.5 rounded-full"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">Procurement Deadline</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.procurement_deadline}
-                onChange={e => updateField('procurement_deadline', e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Approval Deadline</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.approval_deadline}
-                onChange={e => updateField('approval_deadline', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="milestone"
-              checked={form.is_milestone}
-              onChange={e => updateField('is_milestone', e.target.checked)}
-              className="accent-[#c49e48]"
-            />
-
-            <label
-              htmlFor="milestone"
-              className="text-[12px] text-[#bfb9ae] cursor-pointer"
-            >
-              Mark as Milestone ⬦
-            </label>
-          </div>
-
           <div>
-            <label className="form-label">Notes</label>
+            <label className="form-label">Notes / Update</label>
             <textarea
               className="form-control"
-              rows={3}
+              rows={4}
               value={form.notes}
               onChange={e => updateField('notes', e.target.value)}
-              placeholder="Notes…"
+              placeholder={
+                isEditMode
+                  ? 'Add progress update, site observation, delay reason, or action taken…'
+                  : 'Notes…'
+              }
             />
           </div>
         </div>
@@ -558,7 +492,7 @@ const PHASES = Array.from(
             {create.isPending || update.isPending
               ? 'Saving…'
               : task
-              ? 'Save Changes'
+              ? 'Save Update'
               : 'Create Task'}
           </button>
         </div>
