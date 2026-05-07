@@ -9,7 +9,17 @@ import { useAuthStore } from '@/store/auth'
 import type { Task } from '@/types'
 import { fdate } from '@/lib/utils'
 
-const PHASES = [
+
+
+interface Props {
+  task: Task | null
+  onClose: () => void
+}
+
+export default function TaskModal({ task, onClose }: Props) {
+  const { user } = useAuthStore()
+  const { projectId } = useProjectStore()
+  const DEFAULT_PHASES = [
   'Approval Schedule',
   'Program Schedule',
   'Site Preparation',
@@ -27,14 +37,12 @@ const PHASES = [
   'Handover',
 ]
 
-interface Props {
-  task: Task | null
-  onClose: () => void
-}
-
-export default function TaskModal({ task, onClose }: Props) {
-  const { user } = useAuthStore()
-  const { projectId } = useProjectStore()
+const PHASES = Array.from(
+  new Set([
+    ...DEFAULT_PHASES,
+    task?.phase || '',
+  ].filter(Boolean))
+)
 
   const role = getRole(user?.email)
   const create = useCreateTask()
