@@ -9,13 +9,6 @@ import { useAuthStore } from '@/store/auth'
 import type { Task } from '@/types'
 import { fdate } from '@/lib/utils'
 
-const PHASES = [
-  'Approval Schedule',
-  'Program Schedule',
-  'Internal "Wet works" (Contractor)',
-  'External Works Phase',
-  'Internal works & Interior Design',
-]
 
 interface Props {
   task: Task | null
@@ -380,19 +373,8 @@ export default function TaskModal({ task, onClose }: Props) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">Phase</label>
-              <select
-                className="form-control"
-                value={form.phase}
-                onChange={e => set('phase', e.target.value)}
-              >
-                {PHASES.map(p => (
-                  <option key={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 gap-3">
+           
 
             <div>
               <label className="form-label">Status</label>
