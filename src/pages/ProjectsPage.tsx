@@ -243,8 +243,8 @@ export default function ProjectsPage() {
                 )
 
                 const orgProjects = projects.filter(
-                  p => p.organization_id === org.id || !p.organization_id
-                )
+  p => p.organization_id === org.id
+)
 
                 return (
                   <div
