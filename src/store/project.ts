@@ -17,7 +17,6 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>(set => ({
- export const useProjectStore = create<ProjectState>(set => ({
   projectId: localStorage.getItem('projectId')
     ? Number(localStorage.getItem('projectId'))
     : null,
@@ -32,6 +31,7 @@ export const useProjectStore = create<ProjectState>(set => ({
   portfolioId: localStorage.getItem('portfolioId')
     ? Number(localStorage.getItem('portfolioId'))
     : null,
+
   setProject: (
     id,
     name,
