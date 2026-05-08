@@ -64,7 +64,7 @@ export default function SignInPage() {
       localStorage.removeItem('organizationId')
       localStorage.removeItem('portfolioId')
 
-      window.location.assign('/app')
+      window.location.href = '/projects'
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
 
