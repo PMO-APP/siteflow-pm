@@ -91,7 +91,10 @@ export default function App() {
           ...session.user,
           ...(profile || {}),
           email: profile?.email || session.user.email,
-          full_name: profile?.full_name || 'Admin',
+          full_name:
+            profile?.full_name ||
+            session.user.user_metadata?.full_name ||
+            'Admin',
           role: profile?.role || 'admin',
         } as any)
       } catch (error) {
@@ -111,34 +114,24 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        setLoading(true)
-
-        if (!session?.user) {
-          setUser(null)
-          return
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        setUser({
-          ...session.user,
-          ...(profile || {}),
-          email: profile?.email || session.user.email,
-          full_name: profile?.full_name || 'Admin',
-          role: profile?.role || 'admin',
-        } as any)
-      } catch (error) {
-        console.error('Auth state change failed:', error)
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
         setUser(null)
-      } finally {
         setLoading(false)
+        return
       }
+
+      setUser({
+        ...session.user,
+        email: session.user.email,
+        full_name:
+          session.user.user_metadata?.full_name ||
+          session.user.email ||
+          'Admin',
+        role: 'admin',
+      } as any)
+
+      setLoading(false)
     })
 
     return () => {
@@ -196,9 +189,7 @@ export default function App() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
 
-          {role === 'admin' && (
-            <Route path="audit" element={<AuditPage />} />
-          )}
+          {role === 'admin' && <Route path="audit" element={<AuditPage />} />}
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
