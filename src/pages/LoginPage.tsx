@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+
+const allowedEmails = [
+  'ebikienmo.bi@gmail.com',
+  'ebi4real96@gmail.com',
+  'e.bio-ibogomo@mixtafrica.com',
+]
 
 export default function SignInPage() {
   const navigate = useNavigate()
@@ -31,14 +37,21 @@ export default function SignInPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      const cleanEmail = email.toLowerCase().trim()
+
+      if (!allowedEmails.includes(cleanEmail)) {
+        throw new Error('Access restricted.')
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
         password,
       })
 
       if (error) throw error
+      if (!data.user) throw new Error('Unable to sign in.')
 
-      localStorage.setItem('savedEmail', email)
+      localStorage.setItem('savedEmail', cleanEmail)
 
       if (rememberMe) {
         localStorage.setItem('savedPassword', password)
@@ -46,23 +59,25 @@ export default function SignInPage() {
         localStorage.removeItem('savedPassword')
       }
 
-     localStorage.removeItem('projectId')
-localStorage.removeItem('projectName')
-localStorage.removeItem('organizationId')
-localStorage.removeItem('portfolioId')
+      localStorage.removeItem('projectId')
+      localStorage.removeItem('projectName')
+      localStorage.removeItem('organizationId')
+      localStorage.removeItem('portfolioId')
 
-window.location.href = '/projects'
+      window.location.assign('/projects')
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
 
-      if (msg.includes('invalid')) {
+      if (msg.includes('access restricted')) {
+        setError('Access restricted. This platform is for authorized users only.')
+      } else if (msg.includes('invalid')) {
         setError('Incorrect email or password.')
       } else if (msg.includes('confirm')) {
         setError('Please verify your email first.')
       } else {
         setError(err.message || 'Unable to sign in.')
       }
-    } finally {
+
       setLoading(false)
     }
   }
@@ -83,7 +98,7 @@ window.location.href = '/projects'
 
         <div className="relative z-10 max-w-xl">
           <div className="inline-flex mb-5 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-            Welcome back
+            Authorized Access
           </div>
 
           <h1 className="text-5xl font-black leading-tight">
@@ -117,12 +132,19 @@ window.location.href = '/projects'
             <div className="p-7">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-[#ede8de]">
-                  Sign in
+                  Secure sign in
                 </h2>
 
                 <p className="text-sm text-slate-500 mt-1">
-                  Continue to your PMOCorex project hub.
+                  Authorized PMOCorex users only.
                 </p>
+              </div>
+
+              <div className="mb-4 p-3 rounded-md bg-[#c49e48]/10 border border-[#c49e48]/20 text-[#c49e48] text-sm flex gap-2">
+                <ShieldCheck size={16} className="mt-0.5 flex-shrink-0" />
+                <span>
+                  Access is restricted to approved internal users.
+                </span>
               </div>
 
               {error && (
@@ -189,13 +211,7 @@ window.location.href = '/projects'
               </form>
 
               <div className="mt-6 text-center text-xs text-slate-500">
-                New to PMOCorex?{' '}
-                <button
-                  onClick={() => navigate('/signup')}
-                  className="text-[#c49e48] hover:underline"
-                >
-                  Create an account
-                </button>
+                No public registration. Access is managed by the administrator.
               </div>
             </div>
           </div>
