@@ -1,3 +1,4 @@
+import ComingSoonPage from '@/pages/ComingSoonPage'
 import ProfilePage from '@/pages/ProfilePage'
 import SettingsPage from '@/pages/SettingsPage'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
