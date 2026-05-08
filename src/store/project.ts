@@ -17,18 +17,21 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>(set => ({
-  projectId:
-    Number(localStorage.getItem('projectId')) || null,
+ export const useProjectStore = create<ProjectState>(set => ({
+  projectId: localStorage.getItem('projectId')
+    ? Number(localStorage.getItem('projectId'))
+    : null,
 
   projectName:
     localStorage.getItem('projectName') || '',
 
-  organizationId:
-    Number(localStorage.getItem('organizationId')) || null,
+  organizationId: localStorage.getItem('organizationId')
+    ? Number(localStorage.getItem('organizationId'))
+    : null,
 
-  portfolioId:
-    Number(localStorage.getItem('portfolioId')) || null,
-
+  portfolioId: localStorage.getItem('portfolioId')
+    ? Number(localStorage.getItem('portfolioId'))
+    : null,
   setProject: (
     id,
     name,
