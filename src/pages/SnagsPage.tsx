@@ -44,6 +44,7 @@ function SnagModal({
 }) {
   const upsert = useUpsertSnag()
 const { user } = useAuthStore()
+  const canEdit = !item || item.created_by === user?.id
 const { projectId } = useProjectStore()
 
   const [form, setForm] = useState({
@@ -254,17 +255,19 @@ const { projectId } = useProjectStore()
             Cancel
           </button>
 
-          <button
-            className="btn-gold btn-sm btn"
-            onClick={save}
-            disabled={upsert.isPending}
-          >
-            {upsert.isPending
-              ? 'Saving…'
-              : item
-              ? 'Save Changes'
-              : 'Log Snag'}
-          </button>
+          {canEdit && (
+  <button
+    className="btn-gold btn-sm btn"
+    onClick={save}
+    disabled={upsert.isPending}
+  >
+    {upsert.isPending
+      ? 'Saving…'
+      : item
+      ? 'Save Changes'
+      : 'Log Snag'}
+  </button>
+)}
         </div>
       </div>
     </div>
@@ -648,7 +651,7 @@ const { user } = useAuthStore()
                             className="tbl-action"
                             onClick={() => setModal(snag)}
                           >
-                            Edit
+                            view
                           </button>
                         ) : (
                           <span className="text-[#6e7d8c] text-[11px]">
