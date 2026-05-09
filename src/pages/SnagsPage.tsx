@@ -290,7 +290,7 @@ const { user } = useAuthStore()
   const canCreate = !!user
 
   const canEditSnag = (snag: Snag) => {
-  return snag.created_by === user?.id
+  return !!user?.id && snag.created_by === user.id
 }
 
   const filtered = snags.filter(snag => {
