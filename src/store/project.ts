@@ -11,7 +11,7 @@ interface ProjectState {
     id: number,
     name: string,
     organizationId?: number | null,
-    portfolioId?: number | null
+    portfolioId?: number | null,
     projectOwnerEmail?: string | null
   ) => void
 
@@ -34,25 +34,46 @@ export const useProjectStore = create<ProjectState>(set => ({
     ? Number(localStorage.getItem('portfolioId'))
     : null,
 
+  projectOwnerEmail:
+    localStorage.getItem('projectOwnerEmail') || null,
+
   setProject: (
     id,
     name,
     organizationId = null,
-    portfolioId = null
+    portfolioId = null,
+    projectOwnerEmail = null
   ) => {
     localStorage.setItem('projectId', String(id))
     localStorage.setItem('projectName', name)
 
     if (organizationId) {
-      localStorage.setItem('organizationId', String(organizationId))
+      localStorage.setItem(
+        'organizationId',
+        String(organizationId)
+      )
     } else {
       localStorage.removeItem('organizationId')
     }
 
     if (portfolioId) {
-      localStorage.setItem('portfolioId', String(portfolioId))
+      localStorage.setItem(
+        'portfolioId',
+        String(portfolioId)
+      )
     } else {
       localStorage.removeItem('portfolioId')
+    }
+
+    if (projectOwnerEmail) {
+      localStorage.setItem(
+        'projectOwnerEmail',
+        projectOwnerEmail
+      )
+    } else {
+      localStorage.removeItem(
+        'projectOwnerEmail'
+      )
     }
 
     set({
@@ -60,6 +81,7 @@ export const useProjectStore = create<ProjectState>(set => ({
       projectName: name,
       organizationId,
       portfolioId,
+      projectOwnerEmail,
     })
   },
 
@@ -68,12 +90,14 @@ export const useProjectStore = create<ProjectState>(set => ({
     localStorage.removeItem('projectName')
     localStorage.removeItem('organizationId')
     localStorage.removeItem('portfolioId')
+    localStorage.removeItem('projectOwnerEmail')
 
     set({
       projectId: null,
       projectName: '',
       organizationId: null,
       portfolioId: null,
+      projectOwnerEmail: null,
     })
   },
 }))
