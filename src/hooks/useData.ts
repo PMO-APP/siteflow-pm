@@ -206,11 +206,15 @@ export const useSnags = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('snags')
-        .select('*, profiles(full_name, role)')
+        .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('SNAGS FETCH ERROR:', error)
+        throw error
+      }
+
       return data as Snag[]
     },
   })
