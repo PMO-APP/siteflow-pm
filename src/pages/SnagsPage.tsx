@@ -1,7 +1,6 @@
 import { useProjectStore } from '@/store/project'
 import { logAudit } from '@/lib/audit'
 import { useAuthStore } from '@/store/auth'
-import { getRole } from '@/lib/access'
 import { useState } from 'react'
 import { Plus, X, Search } from 'lucide-react'
 import { useSnags, useUpsertSnag } from '@/hooks/useData'
@@ -279,8 +278,7 @@ export default function SnagsPage() {
 console.log('CURRENT PROJECT ID:', projectId)
 console.log('SNAGS:', snags)
 
-  const { user } = useAuthStore()
-  const role = getRole(user?.email)
+const { user } = useAuthStore()
 
   const [modal, setModal] = useState<Snag | null | 'new'>(null)
   const [search, setSearch] = useState('')
@@ -292,8 +290,8 @@ console.log('SNAGS:', snags)
   const canCreate = !!user
 
   const canEditSnag = (snag: Snag) => {
-    return role === 'admin' || snag.created_by === user?.id
-  }
+  return snag.created_by === user?.id
+}
 
   const filtered = snags.filter(snag => {
     if (
