@@ -448,7 +448,6 @@ const canEditProcurement = (item: ProcurementItem) => {
     (!!user?.id && item.created_by === user.id)
   )
 }
-}
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
