@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { logAudit } from '@/lib/audit'
 import { getRole } from '@/lib/access'
 import { canEditPage } from '@/lib/permissions'
@@ -138,10 +139,16 @@ function DocModal({ item, onClose }: { item: Document | null; onClose: () => voi
 
 export default function DocumentsPage() {
   const { user } = useAuthStore()
+const { projectOwnerEmail } = useProjectStore()
+
 const role = getRole(user?.email)
 
-const canEdit =
-  canEditPage(role, 'documents')
+const canEdit = canEditPage(
+  role,
+  'documents',
+  user?.email,
+  projectOwnerEmail
+)
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
   const [search, setSearch] = useState('')
