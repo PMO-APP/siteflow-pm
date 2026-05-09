@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { logAudit } from '@/lib/audit'
 import { getRole } from '@/lib/access'
 import { canEditPage } from '@/lib/permissions'
@@ -16,10 +17,16 @@ export default function FinancialPage() {
   const { data: items = [], isLoading } = useFinancial()
   const upsert = useUpsertFinancial()
   const { user } = useAuthStore()
-  const role = getRole(user?.email)
+const { projectOwnerEmail } = useProjectStore()
 
-const canEdit =
-  canEditPage(role, 'financial')
+const role = getRole(user?.email)
+
+const canEdit = canEditPage(
+  role,
+  'financial',
+  user?.email,
+  projectOwnerEmail
+)
   const [modal, setModal] = useState<FinancialItem | null | 'new'>(null)
 
   const [form, setForm] = useState({
