@@ -142,6 +142,7 @@ export type SnagStatus = 'Open' | 'In Progress' | 'Pending Verification' | 'Clos
 
 export interface Snag {
   id: string
+  project_id?: number
   snag_number?: number
   title: string
   description?: string
