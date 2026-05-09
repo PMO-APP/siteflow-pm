@@ -1,7 +1,5 @@
 import { useProjectStore } from '@/store/project'
-import { canEditPage } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth'
-import { getRole } from '@/lib/access'
 import { useState } from 'react'
 import { Plus, X, Search } from 'lucide-react'
 import { useProcurement, useUpsertProcurement } from '@/hooks/useData'
@@ -42,7 +40,9 @@ function ProcModal({
   onClose: () => void
 }) {
   const upsert = useUpsertProcurement()
-  const isEditMode = !!item
+const { user } = useAuthStore()
+const isEditMode = !!item
+const canEdit = !item || item.created_by === user?.id
 
   const [form, setForm] = useState({
     name: item?.name || '',
@@ -104,6 +104,7 @@ function ProcModal({
     } else {
       await upsert.mutateAsync({
         name: form.name.trim(),
+        created_by: user?.id,
         specification: form.specification || null,
         category: form.category,
         quantity: Number(form.quantity || 0),
@@ -408,17 +409,19 @@ function ProcModal({
             Cancel
           </button>
 
-          <button
-            className="btn-gold btn-sm btn"
-            onClick={save}
-            disabled={upsert.isPending}
-          >
-            {upsert.isPending
-              ? 'Saving…'
-              : isEditMode
-              ? 'Save Update'
-              : 'Create Item'}
-          </button>
+          {canEdit && (
+  <button
+    className="btn-gold btn-sm btn"
+    onClick={save}
+    disabled={upsert.isPending}
+  >
+    {upsert.isPending
+      ? 'Saving…'
+      : isEditMode
+      ? 'Save Update'
+      : 'Create Item'}
+  </button>
+)}
         </div>
       </div>
     </div>
@@ -430,14 +433,11 @@ export default function ProcurementPage() {
  const { user } = useAuthStore()
 const { projectOwnerEmail } = useProjectStore()
 
-const role = getRole(user?.email)
+const canCreate = !!user
 
-const canEdit = canEditPage(
-  role,
-  'procurement',
-  user?.email,
-  projectOwnerEmail
-)
+const canEditProcurement = (item: ProcurementItem) => {
+  return !!user?.id && item.created_by === user.id
+}
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
@@ -585,7 +585,7 @@ const canEdit = canEditPage(
           <option value="OK">🟢 On Track</option>
         </select>
 
-        {canEdit && (
+        {canCreate && (
   <button
     className="btn-gold btn-sm btn ml-auto"
     onClick={() => setModal('new')}
@@ -726,16 +726,21 @@ const canEdit = canEditPage(
                       </td>
 
                      <td>
-  {canEdit ? (
-    <button
-      className="tbl-action"
-      onClick={() => setModal(item)}
-    >
-      Edit
-    </button>
-  ) : (
-    <span className="text-[10px] text-[#6e7d8c]">View only</span>
-  )}
+  {canEditProcurement(item) ? (
+  <button
+    className="tbl-action"
+    onClick={() => setModal(item)}
+  >
+    Edit
+  </button>
+) : (
+  <button
+    className="tbl-action"
+    onClick={() => setModal(item)}
+  >
+    View
+  </button>
+)}
 </td>
                     </tr>
                   )
