@@ -35,14 +35,33 @@ export const COSTING_TEAM = [
   't.ibidokun@mixtafrica.com'
 ]
 
-export function getRole(email?: string) {
+export type UserRole =
+  | 'admin'
+  | 'project_owner'
+  | 'project'
+  | 'design'
+  | 'costing'
+  | 'guest'
+
+export function getRole(email?: string): UserRole {
   if (!email) return 'guest'
 
   email = email.toLowerCase()
 
   if (ADMIN.includes(email)) return 'admin'
+
+  // TEMPORARY
+  if (
+    email === 'e.bio-ibogomo@mixtafrica.com' ||
+    email === 'ebikienmo.bi@gmail.com'
+  ) {
+    return 'project_owner'
+  }
+
   if (PROJECT_TEAM.includes(email)) return 'project'
+
   if (DESIGN_TEAM.includes(email)) return 'design'
+
   if (COSTING_TEAM.includes(email)) return 'costing'
 
   return 'guest'
