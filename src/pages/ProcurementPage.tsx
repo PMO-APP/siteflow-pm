@@ -1,6 +1,7 @@
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
 import { useState } from 'react'
+import { getRole } from '@/lib/access'
 import { Plus, X, Search } from 'lucide-react'
 import { useProcurement, useUpsertProcurement } from '@/hooks/useData'
 import { fdate, urgencyColor } from '@/lib/utils'
@@ -41,8 +42,12 @@ function ProcModal({
 }) {
   const upsert = useUpsertProcurement()
 const { user } = useAuthStore()
+  const role = getRole(user?.email)
 const isEditMode = !!item
-const canEdit = !item || item.created_by === user?.id
+const canEdit =
+  role === 'admin' ||
+  !item ||
+  item.created_by === user?.id
 
   const [form, setForm] = useState({
     name: item?.name || '',
@@ -435,8 +440,14 @@ const { projectOwnerEmail } = useProjectStore()
 
 const canCreate = !!user
 
+const role = getRole(user?.email)
+
 const canEditProcurement = (item: ProcurementItem) => {
-  return !!user?.id && item.created_by === user.id
+  return (
+    role === 'admin' ||
+    (!!user?.id && item.created_by === user.id)
+  )
+}
 }
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
   const [search, setSearch] = useState('')
