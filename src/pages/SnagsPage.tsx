@@ -647,17 +647,20 @@ const { user } = useAuthStore()
 
                       <td>
                         {canEditSnag(snag) ? (
-                          <button
-                            className="tbl-action"
-                            onClick={() => setModal(snag)}
-                          >
-                            view
-                          </button>
-                        ) : (
-                          <span className="text-[#6e7d8c] text-[11px]">
-                            View
-                          </span>
-                        )}
+  <button
+    className="tbl-action"
+    onClick={() => setModal(snag)}
+  >
+    Edit
+  </button>
+) : (
+  <button
+    className="tbl-action"
+    onClick={() => setModal(snag)}
+  >
+    View
+  </button>
+)}
                       </td>
                     </tr>
                   ))
