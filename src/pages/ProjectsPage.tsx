@@ -59,15 +59,16 @@ export default function ProjectsPage() {
   }
 
   function openProject(p: any) {
-    setProject(
-      p.id,
-      p.project_name,
-      p.organization_id || null,
-      p.portfolio_id || null
-    )
+  setProject(
+    Number(p.id),
+    p.project_name,
+    p.organization_id ?? null,
+    p.portfolio_id ?? null,
+    p.project_owner_email ?? null
+  )
 
-    navigate('/app')
-  }
+  navigate('/app')
+}
 
   async function createOrganization() {
     if (!newOrgName.trim()) return
