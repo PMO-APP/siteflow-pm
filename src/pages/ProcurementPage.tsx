@@ -1,3 +1,5 @@
+import { useProjectStore } from '@/store/project'
+import { canEditPage } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth'
 import { getRole } from '@/lib/access'
 import { useState } from 'react'
@@ -425,12 +427,17 @@ function ProcModal({
 
 export default function ProcurementPage() {
   const { data: items = [], isLoading } = useProcurement()
-  const { user } = useAuthStore()
+ const { user } = useAuthStore()
+const { projectOwnerEmail } = useProjectStore()
+
 const role = getRole(user?.email)
 
-const canEdit =
-  role === 'admin' ||
-  role === 'project_owner'
+const canEdit = canEditPage(
+  role,
+  'procurement',
+  user?.email,
+  projectOwnerEmail
+)
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
