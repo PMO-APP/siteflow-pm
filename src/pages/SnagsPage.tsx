@@ -274,6 +274,10 @@ const { projectId } = useProjectStore()
 
 export default function SnagsPage() {
   const { data: snags = [], isLoading } = useSnags()
+  const { projectId } = useProjectStore()
+
+console.log('CURRENT PROJECT ID:', projectId)
+console.log('SNAGS:', snags)
 
   const { user } = useAuthStore()
   const role = getRole(user?.email)
