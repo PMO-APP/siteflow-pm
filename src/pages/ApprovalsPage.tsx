@@ -1,3 +1,5 @@
+import { useProjectStore } from '@/store/project'
+import { canEditPage, canDelete } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth'
 import { getRole } from '@/lib/access'
 import { useState } from 'react'
@@ -332,11 +334,16 @@ function ApprovalModal({
 export default function ApprovalsPage() {
   const { data: approvals = [], isLoading } = useApprovals()
   const { user } = useAuthStore()
+const { projectOwnerEmail } = useProjectStore()
+
 const role = getRole(user?.email)
 
-const canEdit =
-  role === 'admin' ||
-  role === 'project_owner'
+const canEdit = canEditPage(
+  role,
+  'approvals',
+  user?.email,
+  projectOwnerEmail
+)
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
   const [typeFilter, setTypeFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
