@@ -158,6 +158,7 @@ export interface Snag {
   verified_by?: string
   task_id?: string
   notes?: string
+  created_by?: string
   created_at: string
   updated_at: string
   profiles?: Profile
