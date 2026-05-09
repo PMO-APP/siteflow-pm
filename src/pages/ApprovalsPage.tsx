@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/store/auth'
+import { getRole } from '@/lib/access'
 import { useState } from 'react'
 import { Plus, X, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useApprovals, useUpsertApproval } from '@/hooks/useData'
@@ -329,6 +331,12 @@ function ApprovalModal({
 
 export default function ApprovalsPage() {
   const { data: approvals = [], isLoading } = useApprovals()
+  const { user } = useAuthStore()
+const role = getRole(user?.email)
+
+const canEdit =
+  role === 'admin' ||
+  role === 'project_owner'
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
   const [typeFilter, setTypeFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
@@ -434,13 +442,15 @@ export default function ApprovalsPage() {
           ))}
         </select>
 
-        <button
-          className="btn-gold btn-sm btn ml-auto"
-          onClick={() => setModal('new')}
-        >
-          <Plus size={13} />
-          New Approval
-        </button>
+        {canEdit && (
+  <button
+    className="btn-gold btn-sm btn ml-auto"
+    onClick={() => setModal('new')}
+  >
+    <Plus size={13} />
+    New Approval
+  </button>
+)}
       </div>
 
       <div className="card">
@@ -535,13 +545,17 @@ export default function ApprovalsPage() {
                       </td>
 
                       <td>
-                        <button
-                          className="tbl-action"
-                          onClick={() => setModal(approval)}
-                        >
-                          Edit
-                        </button>
-                      </td>
+  {canEdit ? (
+    <button
+      className="tbl-action"
+      onClick={() => setModal(approval)}
+    >
+      Edit
+    </button>
+  ) : (
+    <span className="text-[10px] text-[#6e7d8c]">View only</span>
+  )}
+</td>
                     </tr>
                   )
                 })
