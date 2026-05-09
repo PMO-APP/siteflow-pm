@@ -5,12 +5,14 @@ interface ProjectState {
   projectName: string
   organizationId: number | null
   portfolioId: number | null
+  projectOwnerEmail: string | null
 
   setProject: (
     id: number,
     name: string,
     organizationId?: number | null,
     portfolioId?: number | null
+    projectOwnerEmail?: string | null
   ) => void
 
   clearProject: () => void
