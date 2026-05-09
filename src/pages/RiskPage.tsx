@@ -1,3 +1,6 @@
+import { useProjectStore } from '@/store/project'
+import { getRole } from '@/lib/access'
+import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Shield } from 'lucide-react'
 import { useRisks, useUpsertRisk } from '@/hooks/useData'
@@ -142,6 +145,18 @@ function RiskMatrix({ risks }: { risks: Risk[] }) {
 
 export default function RiskPage() {
   const { data: risks = [], isLoading } = useRisks()
+
+  const { user } = useAuthStore()
+  const { projectOwnerEmail } = useProjectStore()
+
+  const role = getRole(user?.email)
+
+  const canEdit = canEditPage(
+    role,
+    'risk',
+    user?.email,
+    projectOwnerEmail
+  )
   const [modal, setModal] = useState<Risk | null | 'new'>(null)
   const [catFilter, setCatFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
@@ -188,9 +203,14 @@ export default function RiskPage() {
           <option value="">All Status</option>
           {STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <button className="btn-gold btn-sm btn ml-auto" onClick={() => setModal('new')}>
-          <Plus size={13} /> Add Risk
-        </button>
+        {canEdit && (
+  <button
+    className="btn-gold btn-sm btn ml-auto"
+    onClick={() => setModal('new')}
+  >
+    <Plus size={13} /> Add Risk
+  </button>
+)}
       </div>
 
       {view === 'matrix' && <RiskMatrix risks={risks} />}
@@ -221,7 +241,20 @@ export default function RiskPage() {
                       <td><span className={`badge ${lvl.color}`}>{lvl.label}</span></td>
                       <td><span className={`badge ${statBadge(r.status)}`}>{r.status}</span></td>
                       <td className="hide-mobile">{fdate(r.review_date)}</td>
-                      <td><button className="tbl-action" onClick={() => setModal(r)}>Edit</button></td>
+                      <td>
+  {canEdit ? (
+    <button
+      className="tbl-action"
+      onClick={() => setModal(r)}
+    >
+      Edit
+    </button>
+  ) : (
+    <span className="text-[10px] text-[#6e7d8c]">
+      View only
+    </span>
+  )}
+</td>
                     </tr>
                   )
                 })}
