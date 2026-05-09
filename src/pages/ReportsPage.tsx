@@ -1,11 +1,26 @@
+import { useAuthStore } from '@/store/auth'
+import { useProjectStore } from '@/store/project'
+import { getRole } from '@/lib/access'
+import { canEditPage } from '@/lib/permissions'
 import { useState } from 'react'
-import { FileText, Download, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { useTasks } from '@/hooks/useTasks'
 import { useProcurement, useApprovals, useSnags, useRisks, useFinancial, useSiteReports } from '@/hooks/useData'
 import { fdate, formatCurrency, PROJECT_END } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 
 export default function ReportsPage() {
+  const { user } = useAuthStore()
+const { projectOwnerEmail } = useProjectStore()
+
+const role = getRole(user?.email)
+
+const canExport = canEditPage(
+  role,
+  'reports',
+  user?.email,
+  projectOwnerEmail
+)
   const { data: tasks = [] } = useTasks()
   const { data: procs = [] } = useProcurement()
   const { data: approvals = [] } = useApprovals()
@@ -61,7 +76,11 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
-        <button className="btn-ghost btn-sm btn" onClick={handlePrint}><Printer size={13} /> Print / PDF</button>
+        {canExport && (
+  <button className="btn-ghost btn-sm btn" onClick={handlePrint}>
+    <Printer size={13} /> Print / PDF
+  </button>
+)}
       </div>
 
       {/* Report */}
