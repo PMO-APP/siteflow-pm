@@ -1,3 +1,4 @@
+import { useProjectStore } from '@/store/project'
 import { logAudit } from '@/lib/audit'
 import { useAuthStore } from '@/store/auth'
 import { getRole } from '@/lib/access'
@@ -43,7 +44,8 @@ function SnagModal({
   onClose: () => void
 }) {
   const upsert = useUpsertSnag()
-  const { user } = useAuthStore()
+const { user } = useAuthStore()
+const { projectId } = useProjectStore()
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -71,15 +73,16 @@ function SnagModal({
     if (!form.title.trim()) return
 
     const payload = {
-      ...form,
-      closed_date:
-        form.status === 'Closed' && !form.closed_date
-          ? new Date().toISOString().slice(0, 10)
-          : form.closed_date || null,
-      target_close_date: form.target_close_date || null,
-      raised_date: form.raised_date || null,
-      created_by: item?.created_by || user?.id,
-    }
+  ...form,
+  project_id: item?.project_id || projectId,
+  closed_date:
+    form.status === 'Closed' && !form.closed_date
+      ? new Date().toISOString().slice(0, 10)
+      : form.closed_date || null,
+  target_close_date: form.target_close_date || null,
+  raised_date: form.raised_date || null,
+  created_by: item?.created_by || user?.id,
+}
 
     await upsert.mutateAsync({
       id: item?.id,
