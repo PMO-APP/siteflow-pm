@@ -361,13 +361,25 @@ const handleScheduleUpload = async (
   />
 </label>
 
-<button
-  className="btn-gold btn-sm btn"
-  onClick={() => setModalTask('new')}
->
-  <Plus size={13} />
-  Add Task
-</button>
+<div className="flex gap-2 ml-auto">
+  <label className="btn btn-sm btn-ghost cursor-pointer">
+    Upload PDF
+    <input
+      type="file"
+      accept=".pdf"
+      className="hidden"
+      onChange={handlePdfUpload}
+    />
+  </label>
+
+  <button
+    className="btn-gold btn-sm btn"
+    onClick={() => setModalTask('new')}
+  >
+    <Plus size={13} />
+    Add Task
+  </button>
+</div>
       </div>
 
       {view === 'gantt' && (
@@ -448,7 +460,26 @@ const handleScheduleUpload = async (
                                 today
                               )
                             : null
+const handlePdfUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = event.target.files?.[0]
 
+  if (!file || !projectId) return
+
+  const fileName = `${projectId}/${Date.now()}-${file.name}`
+
+  const { error } = await supabase.storage
+    .from('project-files')
+    .upload(fileName, file)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  alert('PDF uploaded successfully.')
+}
                           return (
                             <tr key={task.id}>
                               <td className="font-mono text-[#6e7d8c] text-[10px]">
