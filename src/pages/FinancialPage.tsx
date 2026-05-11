@@ -107,6 +107,10 @@ const costOverrunPct =
 
 const finalAccountForecast =
   projectedFinalContractSum - paidAmt
+  const paymentProgressPct =
+  projectedFinalContractSum > 0
+    ? (paidAmt / projectedFinalContractSum) * 100
+    : 0
 
   const chartData = [
     { name: 'Contract', value: contractSum, color: '#c49e48' },
@@ -166,9 +170,22 @@ const finalAccountForecast =
   },
   {
     label: 'Final Account Forecast',
+  
     value: finalAccountForecast,
     color: 'text-purple-400',
   },
+      {
+  label: 'Paid %',
+  value: `${paymentProgressPct.toFixed(1)}%`,
+  color:
+    paymentProgressPct >= 100
+      ? 'text-emerald-400'
+      : paymentProgressPct >= 70
+      ? 'text-blue-400'
+      : paymentProgressPct >= 40
+      ? 'text-amber-400'
+      : 'text-red-400',
+},
   {
     label: 'Retention Held',
     value: retentionAmt,
