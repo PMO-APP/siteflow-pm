@@ -1,3 +1,6 @@
+import * as XLSX from 'xlsx'
+import { Upload } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { Fragment, useState } from 'react'
 import {
@@ -143,7 +146,54 @@ export default function SchedulePage() {
       (task: Task) => getRag(task) === 'AMBER'
     ).length,
   }
+const handleScheduleUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = event.target.files?.[0]
+  if (!file || !projectId) return
 
+  const reader = new FileReader()
+
+  reader.onload = async e => {
+    const data = new Uint8Array(e.target?.result as ArrayBuffer)
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+
+    const tasksToInsert = rows.map((row, index) => ({
+      project_id: projectId,
+      task_number: row['Task Number'] || index + 1,
+      name: row['Task Name'] || row['Name'] || 'Untitled Task',
+      phase: row['Phase'] || 'General',
+      start_date: row['Start Date'] || null,
+      finish_date: row['Finish Date'] || null,
+      duration_days: row['Duration'] || null,
+      dependencies: row['Dependencies'] || null,
+      responsible: row['Responsible'] || null,
+      status: row['Status'] || 'Not Started',
+      rag: row['RAG'] || '',
+      progress_pct: Number(row['Progress'] || 0),
+      procurement_deadline: row['Procurement Deadline'] || null,
+      approval_deadline: row['Approval Deadline'] || null,
+      notes: row['Notes'] || null,
+      is_milestone: row['Milestone'] === true || row['Milestone'] === 'Yes',
+    }))
+
+    const { error } = await supabase
+      .from('tasks')
+      .insert(tasksToInsert)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    alert('Schedule uploaded successfully.')
+    window.location.reload()
+  }
+
+  reader.readAsArrayBuffer(file)
+}
   return (
     <div className="space-y-4">
       <div>
@@ -252,13 +302,24 @@ export default function SchedulePage() {
           ))}
         </select>
 
-        <button
-          className="btn-gold btn-sm btn ml-auto"
-          onClick={() => setModalTask('new')}
-        >
-          <Plus size={13} />
-          Add Task
-        </button>
+        <label className="btn-ghost btn-sm btn ml-auto cursor-pointer">
+  <Upload size={13} />
+  Upload Schedule
+  <input
+    type="file"
+    hidden
+    accept=".xlsx,.xls,.csv"
+    onChange={handleScheduleUpload}
+  />
+</label>
+
+<button
+  className="btn-gold btn-sm btn"
+  onClick={() => setModalTask('new')}
+>
+  <Plus size={13} />
+  Add Task
+</button>
       </div>
 
       {view === 'gantt' && (
