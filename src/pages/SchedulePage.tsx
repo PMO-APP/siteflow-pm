@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +23,7 @@ type View = 'list' | 'gantt' | 'milestones'
 
 export default function SchedulePage() {
   const { projectId, projectName } = useProjectStore()
+  const queryClient = useQueryClient()
 
   const {
     data: allTasks = [],
@@ -146,11 +148,33 @@ export default function SchedulePage() {
       (task: Task) => getRag(task) === 'AMBER'
     ).length,
   }
+const excelDateToISO = (value: any) => {
+  if (!value) return null
+
+  if (typeof value === 'number') {
+    const date = XLSX.SSF.parse_date_code(value)
+    if (!date) return null
+
+    return `${date.y}-${String(date.m).padStart(2, '0')}-${String(
+      date.d
+    ).padStart(2, '0')}`
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  return parsed.toISOString().slice(0, 10)
+}
+
 const handleScheduleUpload = async (
   event: React.ChangeEvent<HTMLInputElement>
 ) => {
   const file = event.target.files?.[0]
-  if (!file || !projectId) return
+
+  if (!file || !projectId) {
+    alert('No project selected.')
+    return
+  }
 
   const reader = new FileReader()
 
@@ -158,26 +182,44 @@ const handleScheduleUpload = async (
     const data = new Uint8Array(e.target?.result as ArrayBuffer)
     const workbook = XLSX.read(data, { type: 'array' })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
 
-    const tasksToInsert = rows.map((row, index) => ({
-      project_id: projectId,
-      task_number: row['Task Number'] || index + 1,
-      name: row['Task Name'] || row['Name'] || 'Untitled Task',
-      phase: row['Phase'] || 'General',
-      start_date: row['Start Date'] || null,
-      finish_date: row['Finish Date'] || null,
-      duration_days: row['Duration'] || null,
-      dependencies: row['Dependencies'] || null,
-      responsible: row['Responsible'] || null,
-      status: row['Status'] || 'Not Started',
-      rag: row['RAG'] || '',
-      progress_pct: Number(row['Progress'] || 0),
-      procurement_deadline: row['Procurement Deadline'] || null,
-      approval_deadline: row['Approval Deadline'] || null,
-      notes: row['Notes'] || null,
-      is_milestone: row['Milestone'] === true || row['Milestone'] === 'Yes',
-    }))
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet, {
+      defval: '',
+    })
+
+    if (!rows.length) {
+      alert('No rows found in the Excel file.')
+      return
+    }
+
+    const tasksToInsert = rows
+      .filter(row => row['Task Name'] || row['Name'])
+      .map((row, index) => ({
+        project_id: projectId,
+        task_number: Number(row['Task Number'] || index + 1),
+        name: row['Task Name'] || row['Name'],
+        phase: row['Phase'] || 'General',
+        start_date: excelDateToISO(row['Start Date']),
+        finish_date: excelDateToISO(row['Finish Date']),
+        duration_days: row['Duration'] ? Number(row['Duration']) : null,
+        dependencies: row['Dependencies'] || null,
+        responsible: row['Responsible'] || null,
+        status: row['Status'] || 'Not Started',
+        rag: row['RAG'] || '',
+        progress_pct: Number(row['Progress'] || 0),
+        procurement_deadline: excelDateToISO(row['Procurement Deadline']),
+        approval_deadline: excelDateToISO(row['Approval Deadline']),
+        notes: row['Notes'] || null,
+        is_milestone:
+          row['Milestone'] === true ||
+          row['Milestone'] === 'Yes' ||
+          row['Milestone'] === 'YES',
+      }))
+
+    if (!tasksToInsert.length) {
+      alert('No valid tasks found. Make sure your Excel has a Task Name column.')
+      return
+    }
 
     const { error } = await supabase
       .from('tasks')
@@ -188,12 +230,18 @@ const handleScheduleUpload = async (
       return
     }
 
-    alert('Schedule uploaded successfully.')
-    window.location.reload()
+    await queryClient.invalidateQueries({
+      queryKey: ['tasks', projectId],
+    })
+
+    alert(`${tasksToInsert.length} tasks uploaded successfully.`)
+
+    event.target.value = ''
   }
 
   reader.readAsArrayBuffer(file)
 }
+  
   return (
     <div className="space-y-4">
       <div>
