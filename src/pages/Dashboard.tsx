@@ -170,20 +170,56 @@ export default function Dashboard() {
   ).length
 
   const contractSum = financial
-    .filter((f: any) => f.type === 'Contract Sum')
-    .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
+  .filter((f: any) => f.type === 'Contract Sum')
+  .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
 
-  const variationsTotal = financial
-    .filter((f: any) => f.type === 'Variation' && f.status === 'Approved')
-    .reduce(
-      (s: number, f: any) =>
-        s + (f.direction === 'Addition' ? Number(f.amount || 0) : -Number(f.amount || 0)),
-      0
-    )
+const variationsTotal = financial
+  .filter((f: any) => f.type === 'Variation' && f.status === 'Approved')
+  .reduce(
+    (s: number, f: any) =>
+      s +
+      (f.direction === 'Addition'
+        ? Number(f.amount || 0)
+        : -Number(f.amount || 0)),
+    0
+  )
 
-  const certifiedTotal = financial
-    .filter((f: any) => f.type === 'Payment' && f.status === 'Certified')
-    .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
+const pendingVariationExposure = financial
+  .filter((f: any) => f.type === 'Variation' && f.status === 'Pending')
+  .reduce(
+    (s: number, f: any) =>
+      s +
+      (f.direction === 'Addition'
+        ? Number(f.amount || 0)
+        : -Number(f.amount || 0)),
+    0
+  )
+
+const revisedContract = contractSum + variationsTotal
+
+const projectedFinalContractSum =
+  revisedContract + pendingVariationExposure
+
+const certifiedTotal = financial
+  .filter((f: any) => f.type === 'Payment' && f.status === 'Certified')
+  .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
+
+const paidTotal = financial
+  .filter((f: any) => f.type === 'Payment' && f.status === 'Paid')
+  .reduce((s: number, f: any) => s + Number(f.amount || 0), 0)
+
+const costOverrunPct =
+  contractSum > 0
+    ? ((projectedFinalContractSum - contractSum) / contractSum) * 100
+    : 0
+
+const paidPct =
+  projectedFinalContractSum > 0
+    ? (paidTotal / projectedFinalContractSum) * 100
+    : 0
+
+const finalAccountForecast =
+  projectedFinalContractSum - paidTotal
 
   const phaseList: string[] = Array.from(
     new Set(
@@ -680,30 +716,56 @@ export default function Dashboard() {
 
           <div className="p-4 space-y-3">
             {[
-              {
-                label: 'Contract Sum',
-                value: contractSum,
-                color: 'text-[#c49e48]',
-              },
-              {
-                label: 'Approved Variations',
-                value: variationsTotal,
-                color:
-                  variationsTotal >= 0
-                    ? 'text-emerald-400'
-                    : 'text-red-400',
-              },
-              {
-                label: 'Revised Contract',
-                value: contractSum + variationsTotal,
-                color: 'text-[#ede8de]',
-              },
-              {
-                label: 'Certified to Date',
-                value: certifiedTotal,
-                color: 'text-blue-400',
-              },
-            ].map((f: any) => (
+  {
+    label: 'Contract Sum',
+    value: contractSum,
+    color: 'text-[#c49e48]',
+    type: 'money',
+  },
+  {
+    label: 'Revised Contract',
+    value: revisedContract,
+    color: 'text-blue-400',
+    type: 'money',
+  },
+  {
+    label: 'Projected Final Sum',
+    value: projectedFinalContractSum,
+    color:
+      projectedFinalContractSum > contractSum
+        ? 'text-amber-400'
+        : 'text-emerald-400',
+    type: 'money',
+  },
+  {
+    label: 'Cost Overrun',
+    value: `${costOverrunPct.toFixed(1)}%`,
+    color:
+      costOverrunPct > 10
+        ? 'text-red-400'
+        : costOverrunPct > 0
+        ? 'text-amber-400'
+        : 'text-emerald-400',
+    type: 'percent',
+  },
+  {
+    label: 'Paid',
+    value: `${paidPct.toFixed(1)}%`,
+    color:
+      paidPct >= 70
+        ? 'text-emerald-400'
+        : paidPct >= 40
+        ? 'text-amber-400'
+        : 'text-red-400',
+    type: 'percent',
+  },
+  {
+    label: 'Final Account Forecast',
+    value: finalAccountForecast,
+    color: 'text-purple-400',
+    type: 'money',
+  },
+].map((f: any) => (
               <div
                 key={f.label}
                 className="flex justify-between items-center py-1.5 border-b border-white/[0.04] last:border-0"
@@ -711,7 +773,11 @@ export default function Dashboard() {
                 <div className="text-[11px] text-[#6e7d8c]">{f.label}</div>
 
                 <div className={`text-[12px] font-mono font-medium ${f.color}`}>
-                  {f.value === 0 ? 'TBC' : formatCurrency(f.value)}
+                  {f.type === 'percent'
+  ? f.value
+  : f.value === 0
+  ? 'TBC'
+  : formatCurrency(f.value)}
                 </div>
               </div>
             ))}
