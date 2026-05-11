@@ -91,6 +91,23 @@ const canEdit = canEditPage(
   const retentionAmt = items.filter(i => i.type === 'Retention').reduce((s, i) => s + i.amount, 0)
   const revised = contractSum + variationsNet
 
+const pendingVariationExposure = items
+  .filter(i => i.type === 'Variation' && i.status === 'Pending')
+  .reduce((sum, item) => {
+    return sum + (item.direction === 'Addition' ? item.amount : -item.amount)
+  }, 0)
+
+const projectedFinalContractSum =
+  revised + pendingVariationExposure
+
+const costOverrunPct =
+  contractSum > 0
+    ? ((projectedFinalContractSum - contractSum) / contractSum) * 100
+    : 0
+
+const finalAccountForecast =
+  projectedFinalContractSum - paidAmt
+
   const chartData = [
     { name: 'Contract', value: contractSum, color: '#c49e48' },
     { name: 'Variations', value: variationsNet, color: variationsNet >= 0 ? '#3fad78' : '#e05252' },
@@ -119,15 +136,51 @@ const canEdit = canEditPage(
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Contract Sum', value: contractSum, color: 'text-[#c49e48]' },
-          { label: 'Approved Vars', value: variationsNet, color: variationsNet >= 0 ? 'text-emerald-400' : 'text-red-400' },
-          { label: 'Revised Contract', value: revised, color: 'text-blue-400' },
-          { label: 'Pending Vars', value: pendingVars, color: 'text-amber-400' },
-          { label: 'Certified', value: certifiedAmt, color: 'text-purple-400' },
-          { label: 'Retention Held', value: retentionAmt, color: 'text-[#6e7d8c]' },
-        ].map(s => (
+  {
+    label: 'Contract Sum',
+    value: contractSum,
+    color: 'text-[#c49e48]',
+  },
+  {
+    label: 'Revised Contract',
+    value: revised,
+    color: 'text-blue-400',
+  },
+  {
+    label: 'Projected Final Sum',
+    value: projectedFinalContractSum,
+    color:
+      projectedFinalContractSum > contractSum
+        ? 'text-amber-400'
+        : 'text-emerald-400',
+  },
+  {
+    label: 'Cost Overrun %',
+    value: `${costOverrunPct.toFixed(1)}%`,
+    color:
+      costOverrunPct > 10
+        ? 'text-red-400'
+        : costOverrunPct > 0
+        ? 'text-amber-400'
+        : 'text-emerald-400',
+  },
+  {
+    label: 'Final Account Forecast',
+    value: finalAccountForecast,
+    color: 'text-purple-400',
+  },
+  {
+    label: 'Retention Held',
+    value: retentionAmt,
+    color: 'text-[#6e7d8c]',
+  },
+].map(s => (
           <div key={s.label} className="card p-3">
-            <div className={`font-display text-xl font-bold ${s.color}`}>{s.value === 0 ? 'TBC' : formatCurrency(s.value)}</div>
+            <div className={`font-display text-xl font-bold ${s.color}`}>{typeof s.value === 'string'
+  ? s.value
+  : s.value === 0
+  ? 'TBC'
+  : formatCurrency(s.value)}</div>
             <div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">{s.label}</div>
           </div>
         ))}
