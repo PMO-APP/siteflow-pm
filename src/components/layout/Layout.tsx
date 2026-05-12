@@ -23,6 +23,7 @@ import {
   Menu,
   BarChart3,
   ShieldCheck,
+  ClipboardCheck,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
