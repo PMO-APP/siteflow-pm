@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import type {
   ProcurementItem, Approval, SiteReport, Snag,
   Document, FinancialItem, Risk, Comment, Meeting,
+  QualityGate,
   ContractorScore, Notification
 } from '@/types'
 
@@ -89,7 +90,68 @@ export const useDeleteProcurement = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['procurement', projectId] }),
   })
 }
+// ─── QUALITY GATES ─────────────────────────────────────
+export const useQualityGates = () => {
+  const { projectId } = useProjectStore()
 
+  return useQuery({
+    queryKey: ['quality_gates', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quality_gates')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data as QualityGate[]
+    },
+  })
+}
+
+export const useUpsertQualityGate = () => {
+  const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
+  return useMutation({
+    mutationFn: async (gate: Partial<QualityGate> & { id?: string }) => {
+      if (!projectId) throw new Error('No project selected')
+
+      const { id, ...rest } = gate
+
+      const query = id
+        ? supabase
+            .from('quality_gates')
+            .update({
+              ...rest,
+              project_id: projectId,
+            })
+            .eq('id', id)
+            .eq('project_id', projectId)
+        : supabase
+            .from('quality_gates')
+            .insert({
+              ...rest,
+              project_id: projectId,
+            })
+
+      const { data, error } = await query.select().single()
+
+      if (error) {
+        alert(error.message)
+        throw error
+      }
+
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ['quality_gates', projectId],
+      })
+    },
+  })
+}
 // ─── APPROVALS ─────────────────────────────────────────
 export const useApprovals = () => {
   const { projectId } = useProjectStore()
