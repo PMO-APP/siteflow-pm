@@ -176,7 +176,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
-          <Route path="/quality" element={<QualityPage />} />
+          <Route path="quality" element={<QualityPage />} />
           <Route path="procurement" element={<ProcurementPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
           <Route path="site" element={<SitePage />} />
