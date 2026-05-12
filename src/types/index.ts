@@ -307,3 +307,19 @@ export interface DashboardStats {
   certifiedTotal: number
   retentionTotal: number
 }
+export interface QualityGate {
+  id: string
+  project_id: number
+  task_id?: string
+  gate_name: string
+  gate_type?: string
+  status: 'Pending' | 'Approved' | 'Rejected'
+  contractor?: string
+  consultant?: string
+  internal_reviewer?: string
+  inspection_date?: string
+  approved_at?: string
+  comments?: string
+  photos?: string[]
+  created_at: string
+}
