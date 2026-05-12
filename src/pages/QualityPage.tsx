@@ -133,6 +133,8 @@ export default function QualityPage() {
             <option>MEP Consultant</option>
             <option>Infrastructure Team</option>
             <option>PMO</option>
+            <option>Design Team</option>
+            <option>MEP Team</option>
             <option>Housebuild Team</option>
           </select>
         </div>
