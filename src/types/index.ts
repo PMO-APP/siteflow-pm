@@ -311,6 +311,8 @@ export interface QualityGate {
   id: string
   project_id: number
   task_id?: string
+  blocks_task_id?: string
+  required_before_task?: string
   gate_name: string
   gate_type?: string
   status: 'Pending' | 'Approved' | 'Rejected'
