@@ -40,6 +40,7 @@ const NAV = [
   { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
   { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
+  { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates' },
   { to: '/app/site', icon: HardHat, label: 'Site Progress' },
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
@@ -146,6 +147,7 @@ export default function Layout() {
         '/app/documents',
         '/app/snags',
         '/app/risk',
+        '/app/quality',
       ].includes(item.to)
     }
 
