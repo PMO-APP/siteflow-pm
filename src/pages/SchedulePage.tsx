@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { Fragment, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
+import { useQualityGates } from '@/hooks/useData'
 import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { Task } from '@/types'
@@ -18,6 +19,7 @@ export default function SchedulePage() {
   const { projectId, projectName } = useProjectStore()
   const queryClient = useQueryClient()
   const { data: allTasks = [], isLoading } = useTasks()
+  const { data: qualityGates = [] } = useQualityGates()
 
   const tasks: Task[] = allTasks.filter(
     (task: Task) => task.project_id === projectId
@@ -230,7 +232,13 @@ export default function SchedulePage() {
     red: tasks.filter(task => getRag(task) === 'RED').length,
     amber: tasks.filter(task => getRag(task) === 'AMBER').length,
   }
-
+const isTaskLocked = (task: Task) => {
+  return qualityGates.some(
+    gate =>
+      gate.blocks_task_id === task.id &&
+      gate.status !== 'Approved'
+  )
+}
   return (
     <div className="space-y-4">
       <div>
@@ -546,12 +554,18 @@ export default function SchedulePage() {
                             </td>
 
                             <td>
-                              <button
-                                className="tbl-action"
-                                onClick={() => setModalTask(task)}
-                              >
-                                Edit
-                              </button>
+                             {isTaskLocked(task) ? (
+  <span className="badge badge-red">
+    LOCKED
+  </span>
+) : (
+  <button
+    className="tbl-action"
+    onClick={() => setModalTask(task)}
+  >
+    Edit
+  </button>
+)}
                             </td>
                           </tr>
                         )
