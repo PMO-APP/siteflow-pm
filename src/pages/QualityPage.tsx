@@ -3,10 +3,12 @@ import type { Task } from '@/types'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
+import { useAuthStore } from '@/store/auth'
 import { ClipboardCheck, Plus } from 'lucide-react'
 
 export default function QualityPage() {
   const { projectId } = useProjectStore()
+  const { user } = useAuthStore()
   const { data: allTasks = [] } = useTasks()
 
   const tasks: Task[] = (allTasks as Task[]).filter(
@@ -62,8 +64,8 @@ export default function QualityPage() {
   }
 
   async function createGate() {
-    if (!gateName || !responsibleTeam || !projectId || !inspectorName || !blocksTaskId) {
-      alert('Please complete gate name, responsible team, inspector name, and blocked task.')
+    if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
+      alert('Please complete gate name, responsible team, and blocked task.')
       return
     }
 
@@ -79,12 +81,13 @@ export default function QualityPage() {
           project_id: projectId,
           gate_name: gateName,
           gate_type: responsibleTeam,
-          inspector_name: inspectorName,
-          inspection_comments: inspectionComments,
+          inspector_name: inspectorName || null,
+          inspection_comments: inspectionComments || null,
           evidence_photos: uploadedPhotoUrl ? [uploadedPhotoUrl] : [],
           blocks_task_id: blocksTaskId,
           required_before_task: requiredBeforeTask,
           status: 'Pending',
+          inspection_status: 'Not Requested',
         },
       ])
 
@@ -108,17 +111,13 @@ export default function QualityPage() {
     }
   }
 
-  async function approveGate(gate: any) {
-    if (!gate.evidence_photos || gate.evidence_photos.length === 0) {
-      alert('Upload evidence before approval.')
-      return
-    }
-
+  async function requestInspection(gate: any) {
     const { error } = await supabase
       .from('quality_gates')
       .update({
-        status: 'Approved',
-        approved_at: new Date().toISOString(),
+        inspection_status: 'Inspection Requested',
+        requested_by: user?.email || user?.full_name || 'Unknown user',
+        requested_at: new Date().toISOString(),
       })
       .eq('id', gate.id)
 
@@ -130,11 +129,13 @@ export default function QualityPage() {
     await loadQualityGates()
   }
 
-  async function rejectGate(id: string) {
+  async function startReview(gate: any) {
     const { error } = await supabase
       .from('quality_gates')
-      .update({ status: 'Rejected' })
-      .eq('id', id)
+      .update({
+        inspection_status: 'Under Review',
+      })
+      .eq('id', gate.id)
 
     if (error) {
       alert(error.message)
@@ -142,6 +143,66 @@ export default function QualityPage() {
     }
 
     await loadQualityGates()
+  }
+
+  async function approveGate(gate: any) {
+    if (!gate.evidence_photos || gate.evidence_photos.length === 0) {
+      alert('Upload evidence before approval.')
+      return
+    }
+
+    const { error } = await supabase
+      .from('quality_gates')
+      .update({
+        status: 'Approved',
+        inspection_status: 'Approved',
+        approved_at: new Date().toISOString(),
+        reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', gate.id)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    await loadQualityGates()
+  }
+
+  async function rejectGate(gate: any) {
+    const reason = prompt('Why is this inspection rejected?')
+
+    if (!reason) {
+      alert('Rejection reason is required.')
+      return
+    }
+
+    const { error } = await supabase
+      .from('quality_gates')
+      .update({
+        status: 'Rejected',
+        inspection_status: 'Rejected',
+        rejection_reason: reason,
+        reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', gate.id)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    await loadQualityGates()
+  }
+
+  const statusClass = (status: string) => {
+    if (status === 'Approved') return 'badge-green'
+    if (status === 'Rejected') return 'badge-red'
+    if (status === 'Under Review') return 'badge-blue'
+    if (status === 'Inspection Requested') return 'badge-amber'
+    return 'badge-muted'
   }
 
   return (
@@ -153,7 +214,7 @@ export default function QualityPage() {
         </div>
 
         <p className="text-sm text-[#6e7d8c] mt-1">
-          Construction stage approvals and hold-point control
+          Site inspection requests, reviews, evidence, and hold-point approvals
         </p>
       </div>
 
@@ -161,7 +222,7 @@ export default function QualityPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             className="form-control"
-            placeholder="Gate Name, e.g. Slab Casting Sign-Off"
+            placeholder="Gate Name, e.g. Terrace Drainage Inspection"
             value={gateName}
             onChange={e => setGateName(e.target.value)}
           />
@@ -263,6 +324,20 @@ export default function QualityPage() {
                   Inspector: {gate.inspector_name || '—'}
                 </div>
 
+                <div className="text-sm text-[#6e7d8c]">
+                  Requested by: {gate.requested_by || 'Not requested'}
+                </div>
+
+                <div className="text-sm text-[#6e7d8c]">
+                  Reviewed by: {gate.reviewed_by || 'Not reviewed'}
+                </div>
+
+                {gate.rejection_reason && (
+                  <div className="text-sm text-red-400 mt-1">
+                    Rejection reason: {gate.rejection_reason}
+                  </div>
+                )}
+
                 <div className="text-sm text-[#6e7d8c] mt-1">
                   {gate.inspection_comments || 'No comments'}
                 </div>
@@ -280,7 +355,11 @@ export default function QualityPage() {
                   </div>
                 )}
 
-                <div className="mt-2">
+                <div className="flex gap-2 mt-3">
+                  <span className={`badge ${statusClass(gate.inspection_status)}`}>
+                    {gate.inspection_status || 'Not Requested'}
+                  </span>
+
                   <span
                     className={`badge ${
                       gate.status === 'Approved'
@@ -295,7 +374,21 @@ export default function QualityPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 justify-end">
+                <button
+                  onClick={() => requestInspection(gate)}
+                  className="btn btn-sm btn-ghost"
+                >
+                  Request Inspection
+                </button>
+
+                <button
+                  onClick={() => startReview(gate)}
+                  className="btn btn-sm btn-ghost"
+                >
+                  Start Review
+                </button>
+
                 <button
                   onClick={() => approveGate(gate)}
                   className="btn btn-sm btn-success"
@@ -304,7 +397,7 @@ export default function QualityPage() {
                 </button>
 
                 <button
-                  onClick={() => rejectGate(gate.id)}
+                  onClick={() => rejectGate(gate)}
                   className="btn btn-sm btn-danger"
                 >
                   Reject
