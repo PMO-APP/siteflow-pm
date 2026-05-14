@@ -29,6 +29,9 @@ export default function QualityPage() {
   const [rejectingGate, setRejectingGate] = useState<any | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
 
+  const [resubmittingGate, setResubmittingGate] = useState<any | null>(null)
+  const [resubmissionComment, setResubmissionComment] = useState('')
+
   const [toast, setToast] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
 
@@ -106,6 +109,7 @@ export default function QualityPage() {
           required_before_task: requiredBeforeTask,
           status: 'Pending',
           inspection_status: 'Not Requested',
+          was_rejected: false,
         },
       ])
 
@@ -129,24 +133,36 @@ export default function QualityPage() {
     }
   }
 
-  async function requestInspection(gate: any) {
+  async function requestInspection(gate: any, comment?: string) {
     if (gate.inspection_status === 'Inspection Requested') {
       showError('Inspection already requested.')
       return
     }
 
-    if (gate.status === 'Approved') {
+    if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
     }
 
+    const updatePayload: any = {
+      inspection_status: 'Inspection Requested',
+      requested_by: user?.email || user?.full_name || 'Unknown user',
+      requested_at: new Date().toISOString(),
+    }
+
+    if (gate.status === 'Rejected') {
+      if (!comment?.trim()) {
+        showError('Please explain how the rejection has been resolved.')
+        return
+      }
+
+      updatePayload.status = 'Pending'
+      updatePayload.resubmission_comment = comment
+    }
+
     const { error } = await supabase
       .from('quality_gates')
-      .update({
-        inspection_status: 'Inspection Requested',
-        requested_by: user?.email || user?.full_name || 'Unknown user',
-        requested_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', gate.id)
 
     if (error) {
@@ -154,12 +170,20 @@ export default function QualityPage() {
       return
     }
 
+    setResubmittingGate(null)
+    setResubmissionComment('')
+
     await loadQualityGates()
-    showSuccess('Inspection requested successfully.')
+
+    showSuccess(
+      gate.status === 'Rejected'
+        ? 'Inspection re-submitted successfully.'
+        : 'Inspection requested successfully.'
+    )
   }
 
   async function startReview(gate: any) {
-    if (gate.status === 'Approved') {
+    if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
     }
@@ -181,7 +205,7 @@ export default function QualityPage() {
   }
 
   async function approveGate(gate: any) {
-    if (gate.status === 'Approved') {
+    if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
     }
@@ -191,12 +215,15 @@ export default function QualityPage() {
       return
     }
 
+    const isReapproval = gate.was_rejected === true
+
     const { error } = await supabase
       .from('quality_gates')
       .update({
-        status: 'Approved',
-        inspection_status: 'Approved',
+        status: isReapproval ? 'Reapproved' : 'Approved',
+        inspection_status: isReapproval ? 'Reapproved' : 'Approved',
         approved_at: new Date().toISOString(),
+        reapproved_at: isReapproval ? new Date().toISOString() : null,
         reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
         reviewed_at: new Date().toISOString(),
       })
@@ -208,11 +235,16 @@ export default function QualityPage() {
     }
 
     await loadQualityGates()
-    showSuccess('Inspection approved successfully.')
+
+    showSuccess(
+      isReapproval
+        ? 'Inspection reapproved successfully.'
+        : 'Inspection approved successfully.'
+    )
   }
 
   async function rejectGate(gate: any, reason: string) {
-    if (gate.status === 'Approved') {
+    if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
     }
@@ -228,6 +260,7 @@ export default function QualityPage() {
         status: 'Rejected',
         inspection_status: 'Rejected',
         rejection_reason: reason,
+        was_rejected: true,
         reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
         reviewed_at: new Date().toISOString(),
       })
@@ -240,12 +273,14 @@ export default function QualityPage() {
 
     setRejectingGate(null)
     setRejectionReason('')
+
     await loadQualityGates()
     showSuccess('Inspection rejected.')
   }
 
   const statusClass = (status: string) => {
     if (status === 'Approved') return 'badge-green'
+    if (status === 'Reapproved') return 'badge-green'
     if (status === 'Rejected') return 'badge-red'
     if (status === 'Under Review') return 'badge-blue'
     if (status === 'Inspection Requested') return 'badge-amber'
@@ -271,10 +306,12 @@ export default function QualityPage() {
   const canApproveOrReject = (gate: any) =>
     isConsultantOrPMO &&
     gate.inspection_status === 'Under Review' &&
-    gate.status !== 'Approved'
+    gate.status !== 'Approved' &&
+    gate.status !== 'Reapproved'
 
   const canUploadEvidence = (gate: any) =>
-    gate.inspection_status !== 'Approved'
+    gate.inspection_status !== 'Approved' &&
+    gate.inspection_status !== 'Reapproved'
 
   return (
     <div className="space-y-6">
@@ -441,6 +478,12 @@ export default function QualityPage() {
                   </div>
                 )}
 
+                {gate.resubmission_comment && (
+                  <div className="text-sm text-emerald-400 mt-1">
+                    Close-out comment: {gate.resubmission_comment}
+                  </div>
+                )}
+
                 <div className="text-sm text-[#6e7d8c] mt-1">
                   {gate.inspection_comments || 'No comments'}
                 </div>
@@ -459,21 +502,27 @@ export default function QualityPage() {
                 )}
 
                 <div className="flex gap-2 mt-3">
+                  {gate.was_rejected && (
+                    <span className="badge badge-red">Rejected</span>
+                  )}
+
                   <span className={`badge ${statusClass(gate.inspection_status)}`}>
                     {gate.inspection_status || 'Not Requested'}
                   </span>
 
-                  <span
-                    className={`badge ${
-                      gate.status === 'Approved'
-                        ? 'badge-green'
-                        : gate.status === 'Rejected'
-                        ? 'badge-red'
-                        : 'badge-amber'
-                    }`}
-                  >
-                    {gate.status}
-                  </span>
+                  {!gate.was_rejected && (
+                    <span
+                      className={`badge ${
+                        gate.status === 'Approved'
+                          ? 'badge-green'
+                          : gate.status === 'Rejected'
+                          ? 'badge-red'
+                          : 'badge-amber'
+                      }`}
+                    >
+                      {gate.status}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -524,10 +573,17 @@ export default function QualityPage() {
 
                 {canRequestInspection(gate) && (
                   <button
-                    onClick={() => requestInspection(gate)}
+                    onClick={() => {
+                      if (gate.status === 'Rejected') {
+                        setResubmittingGate(gate)
+                        setResubmissionComment('')
+                      } else {
+                        requestInspection(gate)
+                      }
+                    }}
                     className="btn btn-sm btn-ghost"
                   >
-                    {gate.inspection_status === 'Rejected'
+                    {gate.status === 'Rejected'
                       ? 'Re-submit Inspection'
                       : 'Request Inspection'}
                   </button>
@@ -548,7 +604,7 @@ export default function QualityPage() {
                       onClick={() => approveGate(gate)}
                       className="btn btn-sm btn-success"
                     >
-                      Approve
+                      {gate.was_rejected ? 'Reapprove' : 'Approve'}
                     </button>
 
                     <button
@@ -563,9 +619,12 @@ export default function QualityPage() {
                   </>
                 )}
 
-                {gate.inspection_status === 'Approved' && (
+                {(gate.inspection_status === 'Approved' ||
+                  gate.inspection_status === 'Reapproved') && (
                   <span className="badge badge-green">
-                    Final Approved
+                    {gate.inspection_status === 'Reapproved'
+                      ? 'Final Reapproved'
+                      : 'Final Approved'}
                   </span>
                 )}
               </div>
@@ -613,6 +672,54 @@ export default function QualityPage() {
                 onClick={() => rejectGate(rejectingGate, rejectionReason)}
               >
                 Reject Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resubmittingGate && (
+        <div className="modal-overlay">
+          <div className="modal max-w-md">
+            <div className="gold-bar" />
+
+            <div className="modal-head">
+              <div className="modal-title">Re-submit Inspection</div>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <div className="text-sm text-[#bfb9ae]">
+                Explain how the rejection issue has been resolved before
+                re-submitting.
+              </div>
+
+              <textarea
+                className="form-control"
+                rows={4}
+                value={resubmissionComment}
+                onChange={e => setResubmissionComment(e.target.value)}
+                placeholder="Enter close-out comment..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06]">
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => {
+                  setResubmittingGate(null)
+                  setResubmissionComment('')
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="btn btn-sm btn-success"
+                onClick={() =>
+                  requestInspection(resubmittingGate, resubmissionComment)
+                }
+              >
+                Re-submit
               </button>
             </div>
           </div>
