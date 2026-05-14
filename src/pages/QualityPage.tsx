@@ -29,9 +29,24 @@ export default function QualityPage() {
   const [rejectingGate, setRejectingGate] = useState<any | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
 
+  const [toast, setToast] = useState('')
+  const [toastType, setToastType] = useState<'success' | 'error'>('success')
+
   useEffect(() => {
     loadQualityGates()
   }, [projectId])
+
+  function showSuccess(message: string) {
+    setToast(message)
+    setToastType('success')
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  function showError(message: string) {
+    setToast(message)
+    setToastType('error')
+    setTimeout(() => setToast(''), 4000)
+  }
 
   async function loadQualityGates() {
     if (!projectId) return
@@ -68,7 +83,7 @@ export default function QualityPage() {
 
   async function createGate() {
     if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
-      alert('Please complete gate name, responsible team, and blocked task.')
+      showError('Please complete all required fields.')
       return
     }
 
@@ -95,7 +110,7 @@ export default function QualityPage() {
       ])
 
       if (error) {
-        alert(error.message)
+        showError(error.message)
         return
       }
 
@@ -108,20 +123,20 @@ export default function QualityPage() {
       setRequiredBeforeTask('')
 
       await loadQualityGates()
-      alert('Quality gate created successfully.')
+      showSuccess('Quality gate created successfully.')
     } catch (err: any) {
-      alert(err.message)
+      showError(err.message)
     }
   }
 
   async function requestInspection(gate: any) {
     if (gate.inspection_status === 'Inspection Requested') {
-      alert('Inspection already requested.')
+      showError('Inspection already requested.')
       return
     }
 
     if (gate.status === 'Approved') {
-      alert('This gate is already approved and locked.')
+      showError('This gate is already approved and locked.')
       return
     }
 
@@ -135,16 +150,17 @@ export default function QualityPage() {
       .eq('id', gate.id)
 
     if (error) {
-      alert(error.message)
+      showError(error.message)
       return
     }
 
     await loadQualityGates()
+    showSuccess('Inspection requested successfully.')
   }
 
   async function startReview(gate: any) {
     if (gate.status === 'Approved') {
-      alert('This gate is already approved and locked.')
+      showError('This gate is already approved and locked.')
       return
     }
 
@@ -156,21 +172,22 @@ export default function QualityPage() {
       .eq('id', gate.id)
 
     if (error) {
-      alert(error.message)
+      showError(error.message)
       return
     }
 
     await loadQualityGates()
+    showSuccess('Inspection review started.')
   }
 
   async function approveGate(gate: any) {
     if (gate.status === 'Approved') {
-      alert('This gate is already approved and locked.')
+      showError('This gate is already approved and locked.')
       return
     }
 
     if (!gate.evidence_photos || gate.evidence_photos.length === 0) {
-      alert('Upload evidence before approval.')
+      showError('Upload evidence before approval.')
       return
     }
 
@@ -186,20 +203,24 @@ export default function QualityPage() {
       .eq('id', gate.id)
 
     if (error) {
-      alert(error.message)
+      showError(error.message)
       return
     }
 
     await loadQualityGates()
+    showSuccess('Inspection approved successfully.')
   }
 
   async function rejectGate(gate: any, reason: string) {
     if (gate.status === 'Approved') {
-      alert('This gate is already approved and locked.')
+      showError('This gate is already approved and locked.')
       return
     }
 
-    if (!reason.trim()) return
+    if (!reason.trim()) {
+      showError('Rejection reason is required.')
+      return
+    }
 
     const { error } = await supabase
       .from('quality_gates')
@@ -213,13 +234,14 @@ export default function QualityPage() {
       .eq('id', gate.id)
 
     if (error) {
-      alert(error.message)
+      showError(error.message)
       return
     }
 
     setRejectingGate(null)
     setRejectionReason('')
     await loadQualityGates()
+    showSuccess('Inspection rejected.')
   }
 
   const statusClass = (status: string) => {
@@ -256,6 +278,36 @@ export default function QualityPage() {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className="fixed top-5 right-5 z-50 animate-fade-in">
+          <div
+            className={`min-w-[320px] rounded-2xl border px-5 py-4 shadow-2xl backdrop-blur-xl ${
+              toastType === 'success'
+                ? 'border-emerald-500/20 bg-[#08120d]'
+                : 'border-red-500/20 bg-[#140909]'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                  toastType === 'success' ? 'bg-emerald-400' : 'bg-red-400'
+                }`}
+              />
+
+              <div>
+                <div className="text-sm font-semibold text-[#ede8de]">
+                  PMOCorex
+                </div>
+
+                <div className="mt-1 text-sm text-[#b8c0cc]">
+                  {toast}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center gap-2">
           <ClipboardCheck className="text-[#c49e48]" size={22} />
@@ -454,14 +506,14 @@ export default function QualityPage() {
                             .eq('id', gate.id)
 
                           if (error) {
-                            alert(error.message)
+                            showError(error.message)
                             return
                           }
 
                           await loadQualityGates()
-                          alert('Evidence uploaded successfully.')
+                          showSuccess('Evidence uploaded successfully.')
                         } catch (err: any) {
-                          alert(err.message)
+                          showError(err.message)
                         }
 
                         e.target.value = ''
