@@ -62,44 +62,6 @@ export default function QualityPage() {
 
     return data.publicUrl
   }
-  async function addEvidenceToGate(
-  gateId: string,
-  existingPhotos: string[]
-) {
-  if (!selectedPhoto) {
-    alert('Select a photo first.')
-    return
-  }
-
-  try {
-    const uploadedPhotoUrl = await uploadEvidencePhoto(selectedPhoto)
-
-    const updatedPhotos = [
-      ...(existingPhotos || []),
-      uploadedPhotoUrl,
-    ]
-
-    const { error } = await supabase
-      .from('quality_gates')
-      .update({
-        evidence_photos: updatedPhotos,
-      })
-      .eq('id', gateId)
-
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    setSelectedPhoto(null)
-
-    await loadQualityGates()
-
-    alert('Evidence uploaded successfully.')
-  } catch (err: any) {
-    alert(err.message)
-  }
-}
 
   async function createGate() {
     if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
@@ -150,6 +112,16 @@ export default function QualityPage() {
   }
 
   async function requestInspection(gate: any) {
+    if (gate.inspection_status === 'Inspection Requested') {
+      alert('Inspection already requested.')
+      return
+    }
+
+    if (gate.status === 'Approved') {
+      alert('This gate is already approved and locked.')
+      return
+    }
+
     const { error } = await supabase
       .from('quality_gates')
       .update({
@@ -168,6 +140,11 @@ export default function QualityPage() {
   }
 
   async function startReview(gate: any) {
+    if (gate.status === 'Approved') {
+      alert('This gate is already approved and locked.')
+      return
+    }
+
     const { error } = await supabase
       .from('quality_gates')
       .update({
@@ -184,6 +161,11 @@ export default function QualityPage() {
   }
 
   async function approveGate(gate: any) {
+    if (gate.status === 'Approved') {
+      alert('This gate is already approved and locked.')
+      return
+    }
+
     if (!gate.evidence_photos || gate.evidence_photos.length === 0) {
       alert('Upload evidence before approval.')
       return
@@ -209,6 +191,11 @@ export default function QualityPage() {
   }
 
   async function rejectGate(gate: any) {
+    if (gate.status === 'Approved') {
+      alert('This gate is already approved and locked.')
+      return
+    }
+
     const reason = prompt('Why is this inspection rejected?')
 
     if (!reason) {
@@ -243,12 +230,38 @@ export default function QualityPage() {
     return 'badge-muted'
   }
 
+  const userRole = user?.role || ''
+
+  const isConsultantOrPMO =
+    userRole === 'admin' ||
+    userRole === 'consultant' ||
+    userRole === 'design' ||
+    userRole === 'project'
+
+  const canRequestInspection = (gate: any) =>
+    gate.inspection_status === 'Not Requested' ||
+    gate.inspection_status === 'Rejected'
+
+  const canStartReview = (gate: any) =>
+    isConsultantOrPMO &&
+    gate.inspection_status === 'Inspection Requested'
+
+  const canApproveOrReject = (gate: any) =>
+    isConsultantOrPMO &&
+    gate.inspection_status === 'Under Review' &&
+    gate.status !== 'Approved'
+
+  const canUploadEvidence = (gate: any) =>
+    gate.inspection_status !== 'Approved'
+
   return (
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
           <ClipboardCheck className="text-[#c49e48]" size={22} />
-          <h1 className="text-2xl font-bold text-[#ede8de]">Quality Gates</h1>
+          <h1 className="text-2xl font-bold text-[#ede8de]">
+            Quality Gates
+          </h1>
         </div>
 
         <p className="text-sm text-[#6e7d8c] mt-1">
@@ -412,77 +425,95 @@ export default function QualityPage() {
                 </div>
               </div>
 
-             <div className="flex flex-wrap gap-2 justify-end">
-  <label className="btn btn-sm btn-ghost cursor-pointer">
-    Upload Evidence
-    <input
-      type="file"
-      hidden
-      accept="image/*"
-      onChange={async e => {
-        const file = e.target.files?.[0]
+              <div className="flex flex-wrap gap-2 justify-end">
+                {canUploadEvidence(gate) && (
+                  <label className="btn btn-sm btn-ghost cursor-pointer">
+                    Upload Evidence
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
 
-        if (!file) return
+                        try {
+                          const uploadedPhotoUrl =
+                            await uploadEvidencePhoto(file)
 
-        try {
-          const uploadedPhotoUrl = await uploadEvidencePhoto(file)
+                          const updatedPhotos = [
+                            ...(gate.evidence_photos || []),
+                            uploadedPhotoUrl,
+                          ]
 
-          const updatedPhotos = [
-            ...(gate.evidence_photos || []),
-            uploadedPhotoUrl,
-          ]
+                          const { error } = await supabase
+                            .from('quality_gates')
+                            .update({
+                              evidence_photos: updatedPhotos,
+                            })
+                            .eq('id', gate.id)
 
-          const { error } = await supabase
-            .from('quality_gates')
-            .update({
-              evidence_photos: updatedPhotos,
-            })
-            .eq('id', gate.id)
+                          if (error) {
+                            alert(error.message)
+                            return
+                          }
 
-          if (error) {
-            alert(error.message)
-            return
-          }
+                          await loadQualityGates()
+                          alert('Evidence uploaded successfully.')
+                        } catch (err: any) {
+                          alert(err.message)
+                        }
 
-          await loadQualityGates()
-          alert('Evidence uploaded successfully.')
-        } catch (err: any) {
-          alert(err.message)
-        }
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                )}
 
-        e.target.value = ''
-      }}
-    />
-  </label>
+                {canRequestInspection(gate) && (
+                  <button
+                    onClick={() => requestInspection(gate)}
+                    className="btn btn-sm btn-ghost"
+                  >
+                    {gate.inspection_status === 'Rejected'
+                      ? 'Re-submit Inspection'
+                      : 'Request Inspection'}
+                  </button>
+                )}
 
-  <button
-    onClick={() => requestInspection(gate)}
-    className="btn btn-sm btn-ghost"
-  >
-    Request Inspection
-  </button>
+                {canStartReview(gate) && (
+                  <button
+                    onClick={() => startReview(gate)}
+                    className="btn btn-sm btn-ghost"
+                  >
+                    Start Review
+                  </button>
+                )}
 
-  <button
-    onClick={() => startReview(gate)}
-    className="btn btn-sm btn-ghost"
-  >
-    Start Review
-  </button>
+                {canApproveOrReject(gate) && (
+                  <>
+                    <button
+                      onClick={() => approveGate(gate)}
+                      className="btn btn-sm btn-success"
+                    >
+                      Approve
+                    </button>
 
-  <button
-    onClick={() => approveGate(gate)}
-    className="btn btn-sm btn-success"
-  >
-    Approve
-  </button>
+                    <button
+                      onClick={() => rejectGate(gate)}
+                      className="btn btn-sm btn-danger"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
 
-  <button
-    onClick={() => rejectGate(gate)}
-    className="btn btn-sm btn-danger"
-  >
-    Reject
-  </button>
-</div>
+                {gate.inspection_status === 'Approved' && (
+                  <span className="badge badge-green">
+                    Final Approved
+                  </span>
+                )}
+              </div>
             </div>
           ))
         )}
