@@ -26,6 +26,9 @@ export default function QualityPage() {
   const [blocksTaskId, setBlocksTaskId] = useState('')
   const [requiredBeforeTask, setRequiredBeforeTask] = useState('')
 
+  const [rejectingGate, setRejectingGate] = useState<any | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+
   useEffect(() => {
     loadQualityGates()
   }, [projectId])
@@ -190,18 +193,13 @@ export default function QualityPage() {
     await loadQualityGates()
   }
 
-  async function rejectGate(gate: any) {
+  async function rejectGate(gate: any, reason: string) {
     if (gate.status === 'Approved') {
       alert('This gate is already approved and locked.')
       return
     }
 
-    const reason = prompt('Why is this inspection rejected?')
-
-    if (!reason) {
-      alert('Rejection reason is required.')
-      return
-    }
+    if (!reason.trim()) return
 
     const { error } = await supabase
       .from('quality_gates')
@@ -219,6 +217,8 @@ export default function QualityPage() {
       return
     }
 
+    setRejectingGate(null)
+    setRejectionReason('')
     await loadQualityGates()
   }
 
@@ -500,7 +500,10 @@ export default function QualityPage() {
                     </button>
 
                     <button
-                      onClick={() => rejectGate(gate)}
+                      onClick={() => {
+                        setRejectingGate(gate)
+                        setRejectionReason('')
+                      }}
                       className="btn btn-sm btn-danger"
                     >
                       Reject
@@ -518,6 +521,51 @@ export default function QualityPage() {
           ))
         )}
       </div>
+
+      {rejectingGate && (
+        <div className="modal-overlay">
+          <div className="modal max-w-md">
+            <div className="gold-bar" />
+
+            <div className="modal-head">
+              <div className="modal-title">Reject Inspection</div>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <div className="text-sm text-[#bfb9ae]">
+                Please state why this inspection is being rejected.
+              </div>
+
+              <textarea
+                className="form-control"
+                rows={4}
+                value={rejectionReason}
+                onChange={e => setRejectionReason(e.target.value)}
+                placeholder="Enter rejection reason..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06]">
+              <button
+                className="btn btn-sm btn-ghost"
+                onClick={() => {
+                  setRejectingGate(null)
+                  setRejectionReason('')
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => rejectGate(rejectingGate, rejectionReason)}
+              >
+                Reject Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
