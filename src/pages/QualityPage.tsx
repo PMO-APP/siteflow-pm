@@ -62,6 +62,44 @@ export default function QualityPage() {
 
     return data.publicUrl
   }
+  async function addEvidenceToGate(
+  gateId: string,
+  existingPhotos: string[]
+) {
+  if (!selectedPhoto) {
+    alert('Select a photo first.')
+    return
+  }
+
+  try {
+    const uploadedPhotoUrl = await uploadEvidencePhoto(selectedPhoto)
+
+    const updatedPhotos = [
+      ...(existingPhotos || []),
+      uploadedPhotoUrl,
+    ]
+
+    const { error } = await supabase
+      .from('quality_gates')
+      .update({
+        evidence_photos: updatedPhotos,
+      })
+      .eq('id', gateId)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setSelectedPhoto(null)
+
+    await loadQualityGates()
+
+    alert('Evidence uploaded successfully.')
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
 
   async function createGate() {
     if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
@@ -374,35 +412,77 @@ export default function QualityPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 justify-end">
-                <button
-                  onClick={() => requestInspection(gate)}
-                  className="btn btn-sm btn-ghost"
-                >
-                  Request Inspection
-                </button>
+             <div className="flex flex-wrap gap-2 justify-end">
+  <label className="btn btn-sm btn-ghost cursor-pointer">
+    Upload Evidence
+    <input
+      type="file"
+      hidden
+      accept="image/*"
+      onChange={async e => {
+        const file = e.target.files?.[0]
 
-                <button
-                  onClick={() => startReview(gate)}
-                  className="btn btn-sm btn-ghost"
-                >
-                  Start Review
-                </button>
+        if (!file) return
 
-                <button
-                  onClick={() => approveGate(gate)}
-                  className="btn btn-sm btn-success"
-                >
-                  Approve
-                </button>
+        try {
+          const uploadedPhotoUrl = await uploadEvidencePhoto(file)
 
-                <button
-                  onClick={() => rejectGate(gate)}
-                  className="btn btn-sm btn-danger"
-                >
-                  Reject
-                </button>
-              </div>
+          const updatedPhotos = [
+            ...(gate.evidence_photos || []),
+            uploadedPhotoUrl,
+          ]
+
+          const { error } = await supabase
+            .from('quality_gates')
+            .update({
+              evidence_photos: updatedPhotos,
+            })
+            .eq('id', gate.id)
+
+          if (error) {
+            alert(error.message)
+            return
+          }
+
+          await loadQualityGates()
+          alert('Evidence uploaded successfully.')
+        } catch (err: any) {
+          alert(err.message)
+        }
+
+        e.target.value = ''
+      }}
+    />
+  </label>
+
+  <button
+    onClick={() => requestInspection(gate)}
+    className="btn btn-sm btn-ghost"
+  >
+    Request Inspection
+  </button>
+
+  <button
+    onClick={() => startReview(gate)}
+    className="btn btn-sm btn-ghost"
+  >
+    Start Review
+  </button>
+
+  <button
+    onClick={() => approveGate(gate)}
+    className="btn btn-sm btn-success"
+  >
+    Approve
+  </button>
+
+  <button
+    onClick={() => rejectGate(gate)}
+    className="btn btn-sm btn-danger"
+  >
+    Reject
+  </button>
+</div>
             </div>
           ))
         )}
