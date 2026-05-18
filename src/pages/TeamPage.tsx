@@ -6,7 +6,7 @@ import { fdate } from '@/lib/utils'
 import type { Meeting, ContractorScore } from '@/types'
 
 const CONTRACTORS = [
-  'Main Contractor', 'Pinconsult Ltd (Structural)', 'OMIJLED Engineering (MEP)',
+  'Main Contractor', 'Pinconsult Ltd (Structural)', 'OMULED Engineering (MEP)',
   'Hammam Specialist', 'Koi Pond Specialist', 'ELV Contractor',
   'Interior Designer', 'Landscaping Contractor', 'Driveway Contractor'
 ]
@@ -15,7 +15,7 @@ const PROJECT_TEAM = [
   { name: 'Mixta Africa', role: 'Client / Developer', contact: 'Lagos' },
   { name: 'Moss & Coin Ltd', role: 'Architect', contact: '' },
   { name: 'Pinconsult Ltd', role: 'Structural Engineer', contact: '' },
-  { name: 'OMIJLED Engineering Services Ltd', role: 'M&E Engineer', contact: '' },
+  { name: 'OMULED Engineering Services Ltd', role: 'M&E Engineer', contact: '' },
 ]
 
 function MeetingModal({ item, onClose }: { item: Meeting | null; onClose: () => void }) {
