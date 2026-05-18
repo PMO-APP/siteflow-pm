@@ -17,6 +17,7 @@ export default function QualityPage() {
 
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [projectRole, setProjectRole] = useState('guest')
 
   const [gateName, setGateName] = useState('')
   const [responsibleTeam, setResponsibleTeam] = useState('')
@@ -39,6 +40,10 @@ export default function QualityPage() {
     loadQualityGates()
   }, [projectId])
 
+  useEffect(() => {
+    loadProjectRole()
+  }, [projectId, user?.email])
+
   function showSuccess(message: string) {
     setToast(message)
     setToastType('success')
@@ -49,6 +54,28 @@ export default function QualityPage() {
     setToast(message)
     setToastType('error')
     setTimeout(() => setToast(''), 4000)
+  }
+
+  async function loadProjectRole() {
+    if (!projectId || !user?.email) {
+      setProjectRole('guest')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('project_team_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('email', user.email)
+      .maybeSingle()
+
+    if (error) {
+      console.error(error.message)
+      setProjectRole('guest')
+      return
+    }
+
+    setProjectRole((data?.role || 'guest').toLowerCase())
   }
 
   async function loadQualityGates() {
@@ -84,7 +111,44 @@ export default function QualityPage() {
     return data.publicUrl
   }
 
+  const userRole = projectRole
+
+  const canCreateGate =
+    ['admin', 'pmo', 'project', 'consultant', 'design'].includes(userRole)
+
+  const isConsultantOrPMO =
+    ['admin', 'pmo', 'project', 'consultant', 'design'].includes(userRole)
+
+  const canRequestOrResubmit =
+    ['admin', 'pmo', 'project', 'contractor', 'housebuild', 'mep', 'infrastructure'].includes(userRole)
+
+  const canRequestInspection = (gate: any) =>
+    canRequestOrResubmit &&
+    (
+      gate.inspection_status === 'Not Requested' ||
+      gate.inspection_status === 'Rejected'
+    )
+
+  const canStartReview = (gate: any) =>
+    isConsultantOrPMO &&
+    gate.inspection_status === 'Inspection Requested'
+
+  const canApproveOrReject = (gate: any) =>
+    isConsultantOrPMO &&
+    gate.inspection_status === 'Under Review' &&
+    gate.status !== 'Approved' &&
+    gate.status !== 'Reapproved'
+
+  const canUploadEvidence = (gate: any) =>
+    gate.inspection_status !== 'Approved' &&
+    gate.inspection_status !== 'Reapproved'
+
   async function createGate() {
+    if (!canCreateGate) {
+      showError('You do not have permission to create quality gates.')
+      return
+    }
+
     if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
       showError('Please complete all required fields.')
       return
@@ -134,6 +198,11 @@ export default function QualityPage() {
   }
 
   async function requestInspection(gate: any, comment?: string) {
+    if (!canRequestOrResubmit) {
+      showError('You do not have permission to request inspections.')
+      return
+    }
+
     if (gate.inspection_status === 'Inspection Requested') {
       showError('Inspection already requested.')
       return
@@ -183,6 +252,11 @@ export default function QualityPage() {
   }
 
   async function startReview(gate: any) {
+    if (!isConsultantOrPMO) {
+      showError('You do not have permission to review inspections.')
+      return
+    }
+
     if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
@@ -205,6 +279,11 @@ export default function QualityPage() {
   }
 
   async function approveGate(gate: any) {
+    if (!isConsultantOrPMO) {
+      showError('You do not have permission to approve inspections.')
+      return
+    }
+
     if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
@@ -244,6 +323,11 @@ export default function QualityPage() {
   }
 
   async function rejectGate(gate: any, reason: string) {
+    if (!isConsultantOrPMO) {
+      showError('You do not have permission to reject inspections.')
+      return
+    }
+
     if (gate.status === 'Approved' || gate.status === 'Reapproved') {
       showError('This gate is already approved and locked.')
       return
@@ -286,32 +370,6 @@ export default function QualityPage() {
     if (status === 'Inspection Requested') return 'badge-amber'
     return 'badge-muted'
   }
-
-  const userRole = user?.role || ''
-
-  const isConsultantOrPMO =
-    userRole === 'admin' ||
-    userRole === 'consultant' ||
-    userRole === 'design' ||
-    userRole === 'project'
-
-  const canRequestInspection = (gate: any) =>
-    gate.inspection_status === 'Not Requested' ||
-    gate.inspection_status === 'Rejected'
-
-  const canStartReview = (gate: any) =>
-    isConsultantOrPMO &&
-    gate.inspection_status === 'Inspection Requested'
-
-  const canApproveOrReject = (gate: any) =>
-    isConsultantOrPMO &&
-    gate.inspection_status === 'Under Review' &&
-    gate.status !== 'Approved' &&
-    gate.status !== 'Reapproved'
-
-  const canUploadEvidence = (gate: any) =>
-    gate.inspection_status !== 'Approved' &&
-    gate.inspection_status !== 'Reapproved'
 
   return (
     <div className="space-y-6">
@@ -356,83 +414,89 @@ export default function QualityPage() {
         <p className="text-sm text-[#6e7d8c] mt-1">
           Site inspection requests, reviews, evidence, and hold-point approvals
         </p>
-      </div>
 
-      <div className="card p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            className="form-control"
-            placeholder="Gate Name, e.g. Terrace Drainage Inspection"
-            value={gateName}
-            onChange={e => setGateName(e.target.value)}
-          />
-
-          <select
-            className="form-control"
-            value={responsibleTeam}
-            onChange={e => setResponsibleTeam(e.target.value)}
-          >
-            <option value="">Select Responsible Team</option>
-            <option>Architectural Consultant</option>
-            <option>Structural Consultant</option>
-            <option>MEP Consultant</option>
-            <option>Infrastructure Team</option>
-            <option>PMO</option>
-            <option>Design Team</option>
-            <option>MEP Team</option>
-            <option>Housebuild Team</option>
-          </select>
-
-          <select
-            className="form-control"
-            value={blocksTaskId}
-            onChange={e => {
-              const selectedTask = tasks.find(task => task.id === e.target.value)
-              setBlocksTaskId(e.target.value)
-              setRequiredBeforeTask(selectedTask?.name || '')
-            }}
-          >
-            <option value="">Select task this gate blocks</option>
-            {tasks.map(task => (
-              <option key={task.id} value={task.id}>
-                #{task.task_number} — {task.name}
-              </option>
-            ))}
-          </select>
-
-          <input
-            className="form-control"
-            placeholder="Inspector Name"
-            value={inspectorName}
-            onChange={e => setInspectorName(e.target.value)}
-          />
-
-          <textarea
-            className="form-control"
-            placeholder="Inspection Comments"
-            value={inspectionComments}
-            onChange={e => setInspectionComments(e.target.value)}
-          />
-
-          <label className="btn-ghost btn cursor-pointer">
-            {selectedPhoto ? selectedPhoto.name : 'Upload Evidence Photo'}
-            <input
-              type="file"
-              hidden
-              accept="image/*"
-              onChange={e => setSelectedPhoto(e.target.files?.[0] || null)}
-            />
-          </label>
+        <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-wider text-[#c49e48]">
+          Project Role: {projectRole}
         </div>
-
-        <button
-          onClick={createGate}
-          className="btn-gold btn flex items-center gap-2"
-        >
-          <Plus size={14} />
-          Create Quality Gate
-        </button>
       </div>
+
+      {canCreateGate && (
+        <div className="card p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              className="form-control"
+              placeholder="Gate Name, e.g. Terrace Drainage Inspection"
+              value={gateName}
+              onChange={e => setGateName(e.target.value)}
+            />
+
+            <select
+              className="form-control"
+              value={responsibleTeam}
+              onChange={e => setResponsibleTeam(e.target.value)}
+            >
+              <option value="">Select Responsible Team</option>
+              <option>Architectural Consultant</option>
+              <option>Structural Consultant</option>
+              <option>MEP Consultant</option>
+              <option>Infrastructure Team</option>
+              <option>PMO</option>
+              <option>Design Team</option>
+              <option>MEP Team</option>
+              <option>Housebuild Team</option>
+            </select>
+
+            <select
+              className="form-control"
+              value={blocksTaskId}
+              onChange={e => {
+                const selectedTask = tasks.find(task => task.id === e.target.value)
+                setBlocksTaskId(e.target.value)
+                setRequiredBeforeTask(selectedTask?.name || '')
+              }}
+            >
+              <option value="">Select task this gate blocks</option>
+              {tasks.map(task => (
+                <option key={task.id} value={task.id}>
+                  #{task.task_number} — {task.name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="form-control"
+              placeholder="Inspector Name"
+              value={inspectorName}
+              onChange={e => setInspectorName(e.target.value)}
+            />
+
+            <textarea
+              className="form-control"
+              placeholder="Inspection Comments"
+              value={inspectionComments}
+              onChange={e => setInspectionComments(e.target.value)}
+            />
+
+            <label className="btn-ghost btn cursor-pointer">
+              {selectedPhoto ? selectedPhoto.name : 'Upload Evidence Photo'}
+              <input
+                type="file"
+                hidden
+                accept="image/*"
+                onChange={e => setSelectedPhoto(e.target.files?.[0] || null)}
+              />
+            </label>
+          </div>
+
+          <button
+            onClick={createGate}
+            className="btn-gold btn flex items-center gap-2"
+          >
+            <Plus size={14} />
+            Create Quality Gate
+          </button>
+        </div>
+      )}
 
       <div className="space-y-3">
         {loading ? (
