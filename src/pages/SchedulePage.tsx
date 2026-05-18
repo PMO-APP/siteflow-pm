@@ -236,7 +236,16 @@ const isTaskLocked = (task: Task) => {
   return qualityGates.some(
     gate =>
       gate.blocks_task_id === task.id &&
-      gate.status !== 'Approved'
+      gate.status !== 'Approved' &&
+      gate.status !== 'Reapproved'
+  )
+}
+  const getBlockingGate = (task: Task) => {
+  return qualityGates.find(
+    gate =>
+      gate.blocks_task_id === task.id &&
+      gate.status !== 'Approved' &&
+      gate.status !== 'Reapproved'
   )
 }
   return (
@@ -554,19 +563,25 @@ const isTaskLocked = (task: Task) => {
                             </td>
 
                             <td>
-                             {isTaskLocked(task) ? (
-  <span className="badge badge-red">
-    LOCKED
-  </span>
-) : (
-  <button
-    className="tbl-action"
-    onClick={() => setModalTask(task)}
-  >
-    Edit
-  </button>
-)}
-                            </td>
+  {isTaskLocked(task) ? (
+    <div className="flex flex-col gap-1">
+      <span className="badge badge-red">
+        LOCKED
+      </span>
+
+      <span className="text-[9px] text-[#6e7d8c] max-w-[120px]">
+        Pending: {getBlockingGate(task)?.gate_name || 'Quality Gate'}
+      </span>
+    </div>
+  ) : (
+    <button
+      className="tbl-action"
+      onClick={() => setModalTask(task)}
+    >
+      Edit
+    </button>
+  )}
+</td>
                           </tr>
                         )
                       })}
