@@ -50,11 +50,11 @@ export default function QualityPage() {
       console.log('Current Project ID:', projectId)
 
       const { data, error } = await supabase
-        .from('project_team_members')
-        .select('role')
-        .eq('project_id', Number(projectId))
-        .ilike('email', email)
-        .single()
+  .from('project_team_members')
+  .select('role')
+  .eq('project_id', projectId)
+  .ilike('email', email)
+  .single()
 
       console.log('Role Query Result:', data)
       console.log('Role Query Error:', error)
