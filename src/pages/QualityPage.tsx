@@ -49,12 +49,12 @@ export default function QualityPage() {
       console.log('Current User Email:', email)
       console.log('Current Project ID:', projectId)
 
-      const { data, error } = await supabase
+     const { data, error } = await supabase
   .from('project_team_members')
   .select('role')
   .eq('project_id', projectId)
   .ilike('email', email)
-  .single()
+  .maybeSingle()
 
       console.log('Role Query Result:', data)
       console.log('Role Query Error:', error)
