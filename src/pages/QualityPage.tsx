@@ -53,7 +53,7 @@ export default function QualityPage() {
   .from('project_team_members')
   .select('role')
   .eq('project_id', projectId)
-  .ilike('email', email)
+  .ilike('email', email.trim().toLowerCase())
   .maybeSingle()
 
       console.log('Role Query Result:', data)
