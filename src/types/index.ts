@@ -315,12 +315,29 @@ export interface QualityGate {
   required_before_task?: string
   gate_name: string
   gate_type?: string
-  status: 'Pending' | 'Approved' | 'Rejected'
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Reapproved'
+  inspection_status?:
+    | 'Not Requested'
+    | 'Inspection Requested'
+    | 'Reinspection Requested'
+    | 'Under Review'
+    | 'Approved'
+    | 'Rejected'
+    | 'Reapproved'
   contractor?: string
   consultant?: string
   internal_reviewer?: string
+  inspector_name?: string
+  inspection_comments?: string
   inspection_date?: string
   approved_at?: string
+  reapproved_at?: string
+  reviewed_by?: string
+  reviewed_at?: string
+  rejection_reason?: string
+  resubmission_comment?: string
+  was_rejected?: boolean
+  evidence_photos?: string[]
   comments?: string
   photos?: string[]
   created_at: string
