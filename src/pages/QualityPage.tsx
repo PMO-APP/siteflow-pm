@@ -283,22 +283,50 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
       gate.rejection_reason &&
       gate.rejection_reason !== ''
 
-    const { error } = await supabase
-      .from('quality_gates')
-      .update({
-        status: isReapproved
-          ? 'Reapproved'
-          : 'Approved',
-        inspection_status: isReapproved
-          ? 'Reapproved'
-          : 'Approved',
-        approved_at: new Date().toISOString(),
-        reviewed_by:
-          user?.email ||
-          user?.full_name ||
-          'Unknown reviewer',
-        reviewed_at: new Date().toISOString(),
-      })
+    const reviewerCompany = prompt(
+  'Enter consultant/company name'
+)
+
+if (!reviewerCompany) {
+  setCustomAlert('Company name is required.')
+  return
+}
+
+const reviewerSignature = prompt(
+  'Enter reviewer digital signature/name'
+)
+
+if (!reviewerSignature) {
+  setCustomAlert('Digital signature is required.')
+  return
+}
+
+const { error } = await supabase
+  .from('quality_gates')
+  .update({
+    status: isReapproved
+      ? 'Reapproved'
+      : 'Approved',
+
+    inspection_status: isReapproved
+      ? 'Reapproved'
+      : 'Approved',
+
+    approved_at: new Date().toISOString(),
+
+    reviewed_by:
+      user?.email ||
+      user?.full_name ||
+      'Unknown reviewer',
+
+    reviewed_at: new Date().toISOString(),
+
+    reviewer_company: reviewerCompany,
+
+    reviewer_signature: reviewerSignature,
+
+    digitally_signed: true,
+  })
       .eq('id', gate.id)
 
     if (error) {
@@ -904,14 +932,72 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
                   </>
                 )}
 
-                {(gate.inspection_status ===
-                  'Approved' ||
-                  gate.inspection_status ===
-                    'Reapproved') && (
-                  <span className="badge badge-green">
-                    FINAL APPROVED
-                  </span>
-                )}
+             {(gate.inspection_status === 'Approved' ||
+  gate.inspection_status === 'Reapproved') && (
+  <div className="w-full mt-3">
+    <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-xl p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-emerald-400 font-semibold text-sm">
+            FINAL APPROVAL CERTIFICATE
+          </div>
+
+          <div className="text-[11px] text-[#9ca3af] mt-1">
+            Passport ID: {gate.passport_id}
+          </div>
+        </div>
+
+        <div className="badge badge-green">
+          {gate.status}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+            Reviewed By
+          </div>
+
+          <div className="text-sm text-[#ede8de]">
+            {gate.reviewed_by || '—'}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+            Company
+          </div>
+
+          <div className="text-sm text-[#ede8de]">
+            {gate.reviewer_company || '—'}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+            Digital Signature
+          </div>
+
+          <div className="text-sm text-[#c49e48] font-semibold">
+            {gate.reviewer_signature || '—'}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+            Approval Timestamp
+          </div>
+
+          <div className="text-sm text-[#ede8de]">
+            {new Date(
+              gate.approved_at
+            ).toLocaleString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
               </div>
             </div>
           ))
