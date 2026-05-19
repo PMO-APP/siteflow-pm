@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth'
 import { ClipboardCheck, Plus } from 'lucide-react'
 
 export default function QualityPage() {
-  const { projectId } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
   const { user } = useAuthStore()
   const { data: allTasks = [] } = useTasks()
 
@@ -121,9 +121,64 @@ export default function QualityPage() {
 
     let uploadedPhotoUrl: string | null = null
     
-    const passportPrefix = `QG-${String(projectId).padStart(3, '0')}`
+    const projectCode =
+  projectName
+    ?.split(' ')
+    .filter(Boolean)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 3) || 'PRJ'
+
+const disciplineMap: Record<string, string> = {
+  'Structural Consultant': 'STR',
+  'Architectural Consultant': 'ARC',
+  'MEP Consultant': 'MEP',
+  'Infrastructure Team': 'INF',
+  PMO: 'PMO',
+  'Design Team': 'ARC',
+  'MEP Team': 'MEP',
+  'Housebuild Team': 'BLD',
+}
+
+const issueMap: Record<string, string> = {
+  slab: 'STR',
+  column: 'STR',
+  beam: 'STR',
+  reinforcement: 'STR',
+  concrete: 'STR',
+  blockwork: 'ARC',
+  block: 'ARC',
+  plaster: 'ARC',
+  tile: 'ARC',
+  waterproofing: 'ARC',
+  roof: 'ARC',
+  paint: 'ARC',
+  electrical: 'MEP',
+  plumbing: 'MEP',
+  pipe: 'MEP',
+  drainage: 'MEP',
+  stormwater: 'INF',
+  road: 'INF',
+  manhole: 'INF',
+  landscape: 'INF',
+}
+
+const lowerGateName = gateName.toLowerCase()
+
+const matchedIssue = Object.keys(issueMap).find(key =>
+  lowerGateName.includes(key)
+)
+
+const disciplineCode = matchedIssue
+  ? issueMap[matchedIssue]
+  : disciplineMap[responsibleTeam] || 'GEN'
+
 const passportNumber = qualityGates.length + 1
-const passportId = `${passportPrefix}-${String(passportNumber).padStart(4, '0')}`
+
+const passportId = `QG-${projectCode}-${disciplineCode}-${String(
+  passportNumber
+).padStart(4, '0')}`
 
     try {
       if (selectedPhoto) {
