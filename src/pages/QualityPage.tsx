@@ -711,6 +711,82 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
                     {gate.status}
                   </span>
                 </div>
+                {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
+  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+    <div className="text-[11px] uppercase tracking-widest text-emerald-400 font-semibold">
+      Final Approval Record
+    </div>
+
+    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Passport ID
+        </div>
+        <div className="text-[#ede8de] font-mono">
+          {gate.passport_id || 'Not generated'}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Final Status
+        </div>
+        <div className="text-emerald-400 font-semibold">
+          {gate.status}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Reviewed By
+        </div>
+        <div className="text-[#ede8de]">
+          {gate.reviewed_by || 'Not recorded'}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Approval Date
+        </div>
+        <div className="text-[#ede8de]">
+          {gate.reviewed_at
+            ? new Date(gate.reviewed_at).toLocaleString('en-GB')
+            : 'Not recorded'}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Linked Task
+        </div>
+        <div className="text-[#ede8de]">
+          {gate.required_before_task || 'No linked task'}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[#6e7d8c] text-[11px] uppercase">
+          Evidence Count
+        </div>
+        <div className="text-[#ede8de]">
+          {gate.evidence_photos?.length || 0} photo(s)
+        </div>
+      </div>
+    </div>
+
+    {gate.rejection_reason && (
+      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+        <div className="text-[11px] uppercase text-red-400 font-semibold">
+          Previous Rejection
+        </div>
+        <div className="text-sm text-[#bfb9ae] mt-1">
+          {gate.rejection_reason}
+        </div>
+      </div>
+    )}
+  </div>
+)}
               </div>
 
               <div className="flex flex-wrap gap-2 justify-end">
