@@ -17,7 +17,6 @@ export default function QualityPage() {
 
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
   const [projectRole, setProjectRole] = useState('guest')
 
   const [gateName, setGateName] = useState('')
@@ -33,6 +32,11 @@ export default function QualityPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [selectedGate, setSelectedGate] = useState<any>(null)
 
+  const [showApproveModal, setShowApproveModal] = useState(false)
+  const [reviewerCompany, setReviewerCompany] = useState('')
+  const [reviewerSignature, setReviewerSignature] = useState('')
+  const [approvalGate, setApprovalGate] = useState<any>(null)
+
   useEffect(() => {
     loadQualityGates()
   }, [projectId])
@@ -46,18 +50,12 @@ export default function QualityPage() {
 
       const email = user.email.trim().toLowerCase()
 
-      console.log('Current User Email:', email)
-      console.log('Current Project ID:', projectId)
-
-     const { data, error } = await supabase
-  .from('project_team_members')
-  .select('role')
-  .eq('project_id', projectId)
-  .ilike('email', email.trim().toLowerCase())
-  .maybeSingle()
-
-      console.log('Role Query Result:', data)
-      console.log('Role Query Error:', error)
+      const { data, error } = await supabase
+        .from('project_team_members')
+        .select('role')
+        .eq('project_id', projectId)
+        .ilike('email', email)
+        .maybeSingle()
 
       if (error || !data) {
         setProjectRole('guest')
@@ -81,11 +79,8 @@ export default function QualityPage() {
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error(error.message)
-    } else {
-      setQualityGates(data || [])
-    }
+    if (error) console.error(error.message)
+    else setQualityGates(data || [])
 
     setLoading(false)
   }
@@ -106,104 +101,94 @@ export default function QualityPage() {
     return data.publicUrl
   }
 
+  function generatePassportId() {
+    const projectCode =
+      projectName
+        ?.split(' ')
+        .filter(Boolean)
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 3) || 'PRJ'
+
+    const disciplineMap: Record<string, string> = {
+      'Structural Consultant': 'STR',
+      'Architectural Consultant': 'ARC',
+      'MEP Consultant': 'MEP',
+      'Infrastructure Team': 'INF',
+      PMO: 'PMO',
+      'Design Team': 'ARC',
+      'MEP Team': 'MEP',
+      'Housebuild Team': 'BLD',
+    }
+
+    const issueMap: Record<string, string> = {
+      slab: 'STR',
+      column: 'STR',
+      beam: 'STR',
+      reinforcement: 'STR',
+      concrete: 'STR',
+      blockwork: 'ARC',
+      block: 'ARC',
+      plaster: 'ARC',
+      tile: 'ARC',
+      waterproofing: 'ARC',
+      roof: 'ARC',
+      paint: 'ARC',
+      electrical: 'MEP',
+      plumbing: 'MEP',
+      pipe: 'MEP',
+      drainage: 'MEP',
+      stormwater: 'INF',
+      road: 'INF',
+      manhole: 'INF',
+      landscape: 'INF',
+    }
+
+    const lowerGateName = gateName.toLowerCase()
+
+    const matchedIssue = Object.keys(issueMap).find(key =>
+      lowerGateName.includes(key)
+    )
+
+    const disciplineCode = matchedIssue
+      ? issueMap[matchedIssue]
+      : disciplineMap[responsibleTeam] || 'GEN'
+
+    const passportNumber = qualityGates.length + 1
+
+    return `QG-${projectCode}-${disciplineCode}-${String(passportNumber).padStart(4, '0')}`
+  }
+
   async function createGate() {
-    if (
-      !gateName ||
-      !responsibleTeam ||
-      !projectId ||
-      !blocksTaskId
-    ) {
-      setCustomAlert(
-        'Please complete gate name, responsible team, and blocked task.'
-      )
+    if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
+      setCustomAlert('Please complete gate name, responsible team, and blocked task.')
       return
     }
 
     let uploadedPhotoUrl: string | null = null
-    
-    const projectCode =
-  projectName
-    ?.split(' ')
-    .filter(Boolean)
-    .map(word => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 3) || 'PRJ'
-
-const disciplineMap: Record<string, string> = {
-  'Structural Consultant': 'STR',
-  'Architectural Consultant': 'ARC',
-  'MEP Consultant': 'MEP',
-  'Infrastructure Team': 'INF',
-  PMO: 'PMO',
-  'Design Team': 'ARC',
-  'MEP Team': 'MEP',
-  'Housebuild Team': 'BLD',
-}
-
-const issueMap: Record<string, string> = {
-  slab: 'STR',
-  column: 'STR',
-  beam: 'STR',
-  reinforcement: 'STR',
-  concrete: 'STR',
-  blockwork: 'ARC',
-  block: 'ARC',
-  plaster: 'ARC',
-  tile: 'ARC',
-  waterproofing: 'ARC',
-  roof: 'ARC',
-  paint: 'ARC',
-  electrical: 'MEP',
-  plumbing: 'MEP',
-  pipe: 'MEP',
-  drainage: 'MEP',
-  stormwater: 'INF',
-  road: 'INF',
-  manhole: 'INF',
-  landscape: 'INF',
-}
-
-const lowerGateName = gateName.toLowerCase()
-
-const matchedIssue = Object.keys(issueMap).find(key =>
-  lowerGateName.includes(key)
-)
-
-const disciplineCode = matchedIssue
-  ? issueMap[matchedIssue]
-  : disciplineMap[responsibleTeam] || 'GEN'
-
-const passportNumber = qualityGates.length + 1
-
-const passportId = `QG-${projectCode}-${disciplineCode}-${String(
-  passportNumber
-).padStart(4, '0')}`
+    const passportId = generatePassportId()
 
     try {
       if (selectedPhoto) {
         uploadedPhotoUrl = await uploadEvidencePhoto(selectedPhoto)
       }
 
-      const { error } = await supabase
-        .from('quality_gates')
-        .insert([
-          {
-            project_id: projectId,
-            passport_id: passportId,
-            gate_name: gateName,
-            gate_type: responsibleTeam,
-            inspector_name: inspectorName || null,
-            inspection_comments: inspectionComments || null,
-            evidence_photos: uploadedPhotoUrl
-              ? [uploadedPhotoUrl]
-              : [],
-            blocks_task_id: blocksTaskId,
-            required_before_task: requiredBeforeTask,
-            status: 'Pending',
-            inspection_status: 'Not Requested',
-          },
-        ])
+      const { error } = await supabase.from('quality_gates').insert([
+        {
+          project_id: projectId,
+          passport_id: passportId,
+          gate_name: gateName,
+          gate_type: responsibleTeam,
+          inspector_name: inspectorName || null,
+          inspection_comments: inspectionComments || null,
+          evidence_photos: uploadedPhotoUrl ? [uploadedPhotoUrl] : [],
+          blocks_task_id: blocksTaskId,
+          required_before_task: requiredBeforeTask,
+          status: 'Pending',
+          inspection_status: 'Not Requested',
+        },
+      ])
 
       if (error) {
         setCustomAlert(error.message)
@@ -219,7 +204,6 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
       setRequiredBeforeTask('')
 
       await loadQualityGates()
-
       setCustomAlert('Quality gate created successfully.')
     } catch (err: any) {
       setCustomAlert(err.message)
@@ -227,8 +211,7 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
   }
 
   async function requestInspection(gate: any) {
-    const isResubmission =
-      gate.inspection_status === 'Rejected'
+    const isResubmission = gate.inspection_status === 'Rejected'
 
     const { error } = await supabase
       .from('quality_gates')
@@ -236,10 +219,7 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
         inspection_status: isResubmission
           ? 'Reinspection Requested'
           : 'Inspection Requested',
-        requested_by:
-          user?.email ||
-          user?.full_name ||
-          'Unknown user',
+        requested_by: user?.email || user?.full_name || 'Unknown user',
         requested_at: new Date().toISOString(),
       })
       .eq('id', gate.id)
@@ -269,70 +249,49 @@ const passportId = `QG-${projectCode}-${disciplineCode}-${String(
   }
 
   async function approveGate(gate: any) {
-    if (
-      !gate.evidence_photos ||
-      gate.evidence_photos.length === 0
-    ) {
-      setCustomAlert(
-        'Upload evidence before approval.'
-      )
+    if (!gate) return
+
+    if (!gate.evidence_photos || gate.evidence_photos.length === 0) {
+      setCustomAlert('Upload evidence before approval.')
+      return
+    }
+
+    if (!reviewerCompany.trim()) {
+      setCustomAlert('Consultant company is required.')
+      return
+    }
+
+    if (!reviewerSignature.trim()) {
+      setCustomAlert('Digital signature is required.')
       return
     }
 
     const isReapproved =
-      gate.rejection_reason &&
-      gate.rejection_reason !== ''
+      gate.rejection_reason && gate.rejection_reason !== ''
 
-    const reviewerCompany = prompt(
-  'Enter consultant/company name'
-)
-
-if (!reviewerCompany) {
-  setCustomAlert('Company name is required.')
-  return
-}
-
-const reviewerSignature = prompt(
-  'Enter reviewer digital signature/name'
-)
-
-if (!reviewerSignature) {
-  setCustomAlert('Digital signature is required.')
-  return
-}
-
-const { error } = await supabase
-  .from('quality_gates')
-  .update({
-    status: isReapproved
-      ? 'Reapproved'
-      : 'Approved',
-
-    inspection_status: isReapproved
-      ? 'Reapproved'
-      : 'Approved',
-
-    approved_at: new Date().toISOString(),
-
-    reviewed_by:
-      user?.email ||
-      user?.full_name ||
-      'Unknown reviewer',
-
-    reviewed_at: new Date().toISOString(),
-
-    reviewer_company: reviewerCompany,
-
-    reviewer_signature: reviewerSignature,
-
-    digitally_signed: true,
-  })
+    const { error } = await supabase
+      .from('quality_gates')
+      .update({
+        status: isReapproved ? 'Reapproved' : 'Approved',
+        inspection_status: isReapproved ? 'Reapproved' : 'Approved',
+        approved_at: new Date().toISOString(),
+        reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
+        reviewed_at: new Date().toISOString(),
+        reviewer_company: reviewerCompany,
+        reviewer_signature: reviewerSignature,
+        digitally_signed: true,
+      })
       .eq('id', gate.id)
 
     if (error) {
       setCustomAlert(error.message)
       return
     }
+
+    setShowApproveModal(false)
+    setReviewerCompany('')
+    setReviewerSignature('')
+    setApprovalGate(null)
 
     await loadQualityGates()
 
@@ -347,9 +306,7 @@ const { error } = await supabase
     if (!selectedGate) return
 
     if (!rejectReason.trim()) {
-      setCustomAlert(
-        'Rejection reason is required.'
-      )
+      setCustomAlert('Rejection reason is required.')
       return
     }
 
@@ -359,10 +316,7 @@ const { error } = await supabase
         status: 'Rejected',
         inspection_status: 'Rejected',
         rejection_reason: rejectReason,
-        reviewed_by:
-          user?.email ||
-          user?.full_name ||
-          'Unknown reviewer',
+        reviewed_by: user?.email || user?.full_name || 'Unknown reviewer',
         reviewed_at: new Date().toISOString(),
       })
       .eq('id', selectedGate.id)
@@ -377,35 +331,22 @@ const { error } = await supabase
     setSelectedGate(null)
 
     await loadQualityGates()
-
     setCustomAlert('Quality gate rejected.')
   }
 
   const statusClass = (status: string) => {
-    if (
-      status === 'Approved' ||
-      status === 'Reapproved'
-    )
-      return 'badge-green'
-
-    if (status === 'Rejected')
-      return 'badge-red'
-
-    if (status === 'Under Review')
-      return 'badge-blue'
-
+    if (status === 'Approved' || status === 'Reapproved') return 'badge-green'
+    if (status === 'Rejected') return 'badge-red'
+    if (status === 'Under Review') return 'badge-blue'
     if (
       status === 'Inspection Requested' ||
       status === 'Reinspection Requested'
-    )
-      return 'badge-amber'
+    ) return 'badge-amber'
 
     return 'badge-muted'
   }
 
-  const canCreateGate =
-    projectRole === 'admin' ||
-    projectRole === 'pmo'
+  const canCreateGate = projectRole === 'admin' || projectRole === 'pmo'
 
   const canReview =
     projectRole === 'admin' ||
@@ -419,15 +360,12 @@ const { error } = await supabase
   const canStartReview = (gate: any) =>
     canReview &&
     (
-      gate.inspection_status ===
-        'Inspection Requested' ||
-      gate.inspection_status ===
-        'Reinspection Requested'
+      gate.inspection_status === 'Inspection Requested' ||
+      gate.inspection_status === 'Reinspection Requested'
     )
 
   const canApproveOrReject = (gate: any) =>
-    canReview &&
-    gate.inspection_status === 'Under Review'
+    canReview && gate.inspection_status === 'Under Review'
 
   const canUploadEvidence = (gate: any) =>
     gate.inspection_status !== 'Approved' &&
@@ -469,9 +407,7 @@ const { error } = await supabase
               className="form-control w-full"
               placeholder="Why is this inspection rejected?"
               value={rejectReason}
-              onChange={e =>
-                setRejectReason(e.target.value)
-              }
+              onChange={e => setRejectReason(e.target.value)}
             />
 
             <div className="flex justify-end gap-2 mt-6">
@@ -496,12 +432,61 @@ const { error } = await supabase
         </div>
       )}
 
+      {showApproveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
+            <div className="text-lg font-semibold text-[#ede8de] mb-4">
+              Final Approval Signoff
+            </div>
+
+            <div className="space-y-4">
+              <input
+                className="form-control w-full"
+                placeholder="Consultant / Company Name"
+                value={reviewerCompany}
+                onChange={e => setReviewerCompany(e.target.value)}
+              />
+
+              <input
+                className="form-control w-full"
+                placeholder="Digital Signature / Reviewer Name"
+                value={reviewerSignature}
+                onChange={e => setReviewerSignature(e.target.value)}
+              />
+
+              <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/5 p-3 text-xs text-[#bfb9ae]">
+                By approving, you confirm this inspection has been reviewed and
+                meets the required quality standards.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setShowApproveModal(false)
+                  setReviewerCompany('')
+                  setReviewerSignature('')
+                  setApprovalGate(null)
+                }}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={() => approveGate(approvalGate)}
+                className="btn btn-success"
+              >
+                Approve & Sign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center gap-2">
-          <ClipboardCheck
-            className="text-[#c49e48]"
-            size={22}
-          />
+          <ClipboardCheck className="text-[#c49e48]" size={22} />
 
           <h1 className="text-2xl font-bold text-[#ede8de]">
             Quality Gates
@@ -509,8 +494,7 @@ const { error } = await supabase
         </div>
 
         <p className="text-sm text-[#6e7d8c] mt-1">
-          Site inspection requests, reviews,
-          evidence, and hold-point approvals
+          Site inspection requests, reviews, evidence, and hold-point approvals
         </p>
 
         <div className="mt-3">
@@ -527,42 +511,22 @@ const { error } = await supabase
               className="form-control"
               placeholder="Gate Name"
               value={gateName}
-              onChange={e =>
-                setGateName(e.target.value)
-              }
+              onChange={e => setGateName(e.target.value)}
             />
 
             <select
               className="form-control"
               value={responsibleTeam}
-              onChange={e =>
-                setResponsibleTeam(e.target.value)
-              }
+              onChange={e => setResponsibleTeam(e.target.value)}
             >
-              <option value="">
-                Select Responsible Team
-              </option>
-
-              <option>
-                Architectural Consultant
-              </option>
-
-              <option>
-                Structural Consultant
-              </option>
-
+              <option value="">Select Responsible Team</option>
+              <option>Architectural Consultant</option>
+              <option>Structural Consultant</option>
               <option>MEP Consultant</option>
-
-              <option>
-                Infrastructure Team
-              </option>
-
+              <option>Infrastructure Team</option>
               <option>PMO</option>
-
               <option>Design Team</option>
-
               <option>MEP Team</option>
-
               <option>Housebuild Team</option>
             </select>
 
@@ -575,21 +539,13 @@ const { error } = await supabase
                 )
 
                 setBlocksTaskId(e.target.value)
-
-                setRequiredBeforeTask(
-                  selectedTask?.name || ''
-                )
+                setRequiredBeforeTask(selectedTask?.name || '')
               }}
             >
-              <option value="">
-                Select task this gate blocks
-              </option>
+              <option value="">Select task this gate blocks</option>
 
               {tasks.map(task => (
-                <option
-                  key={task.id}
-                  value={task.id}
-                >
+                <option key={task.id} value={task.id}>
                   #{task.task_number} — {task.name}
                 </option>
               ))}
@@ -599,36 +555,24 @@ const { error } = await supabase
               className="form-control"
               placeholder="Inspector Name"
               value={inspectorName}
-              onChange={e =>
-                setInspectorName(e.target.value)
-              }
+              onChange={e => setInspectorName(e.target.value)}
             />
 
             <textarea
               className="form-control"
               placeholder="Inspection Comments"
               value={inspectionComments}
-              onChange={e =>
-                setInspectionComments(
-                  e.target.value
-                )
-              }
+              onChange={e => setInspectionComments(e.target.value)}
             />
 
             <label className="btn-ghost btn cursor-pointer">
-              {selectedPhoto
-                ? selectedPhoto.name
-                : 'Upload Evidence Photo'}
+              {selectedPhoto ? selectedPhoto.name : 'Upload Evidence Photo'}
 
               <input
                 type="file"
                 hidden
                 accept="image/*"
-                onChange={e =>
-                  setSelectedPhoto(
-                    e.target.files?.[0] || null
-                  )
-                }
+                onChange={e => setSelectedPhoto(e.target.files?.[0] || null)}
               />
             </label>
           </div>
@@ -645,9 +589,7 @@ const { error } = await supabase
 
       <div className="space-y-3">
         {loading ? (
-          <div className="text-[#6e7d8c]">
-            Loading quality gates...
-          </div>
+          <div className="text-[#6e7d8c]">Loading quality gates...</div>
         ) : qualityGates.length === 0 ? (
           <div className="card p-6 text-center text-[#6e7d8c]">
             No quality gates created yet.
@@ -662,159 +604,158 @@ const { error } = await supabase
                 <div className="text-lg font-semibold text-[#ede8de]">
                   {gate.gate_name}
                 </div>
+
                 <div className="text-[11px] text-[#c49e48] font-mono mt-1">
-  Passport ID: {gate.passport_id || 'Not generated'}
-</div>
-
-                <div className="text-sm text-[#6e7d8c]">
-                  Responsible:{' '}
-                  {gate.gate_type || '—'}
+                  Passport ID: {gate.passport_id || 'Not generated'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Blocks:{' '}
-                  {gate.required_before_task ||
-                    'No task linked'}
+                  Responsible: {gate.gate_type || '—'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Inspector:{' '}
-                  {gate.inspector_name || '—'}
+                  Blocks: {gate.required_before_task || 'No task linked'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Requested by:{' '}
-                  {gate.requested_by ||
-                    'Not requested'}
+                  Inspector: {gate.inspector_name || '—'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Reviewed by:{' '}
-                  {gate.reviewed_by ||
-                    'Not reviewed'}
+                  Requested by: {gate.requested_by || 'Not requested'}
+                </div>
+
+                <div className="text-sm text-[#6e7d8c]">
+                  Reviewed by: {gate.reviewed_by || 'Not reviewed'}
                 </div>
 
                 {gate.rejection_reason && (
                   <div className="text-sm text-red-400 mt-2">
-                    Rejection Reason:{' '}
-                    {gate.rejection_reason}
+                    Rejection Reason: {gate.rejection_reason}
                   </div>
                 )}
 
                 <div className="text-sm text-[#6e7d8c] mt-1">
-                  {gate.inspection_comments ||
-                    'No comments'}
+                  {gate.inspection_comments || 'No comments'}
                 </div>
 
-                {gate.evidence_photos?.length >
-                  0 && (
+                {gate.evidence_photos?.length > 0 && (
                   <div className="flex gap-2 mt-3 flex-wrap">
-                    {gate.evidence_photos.map(
-                      (photo: string) => (
-                        <img
-                          key={photo}
-                          src={photo}
-                          alt="Evidence"
-                          className="w-28 h-28 object-cover rounded-lg border border-white/10"
-                        />
-                      )
-                    )}
+                    {gate.evidence_photos.map((photo: string) => (
+                      <img
+                        key={photo}
+                        src={photo}
+                        alt="Evidence"
+                        className="w-28 h-28 object-cover rounded-lg border border-white/10"
+                      />
+                    ))}
                   </div>
                 )}
 
                 <div className="flex gap-2 mt-3 flex-wrap">
-                  <span
-                    className={`badge ${statusClass(
-                      gate.inspection_status
-                    )}`}
-                  >
+                  <span className={`badge ${statusClass(gate.inspection_status)}`}>
                     {gate.inspection_status}
                   </span>
 
-                  <span
-                    className={`badge ${statusClass(
-                      gate.status
-                    )}`}
-                  >
+                  <span className={`badge ${statusClass(gate.status)}`}>
                     {gate.status}
                   </span>
                 </div>
+
                 {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
-  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-    <div className="text-[11px] uppercase tracking-widest text-emerald-400 font-semibold">
-      Final Approval Record
-    </div>
+                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="text-[11px] uppercase tracking-widest text-emerald-400 font-semibold">
+                      Final Approval Record
+                    </div>
 
-    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Passport ID
-        </div>
-        <div className="text-[#ede8de] font-mono">
-          {gate.passport_id || 'Not generated'}
-        </div>
-      </div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Passport ID
+                        </div>
+                        <div className="text-[#ede8de] font-mono">
+                          {gate.passport_id || 'Not generated'}
+                        </div>
+                      </div>
 
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Final Status
-        </div>
-        <div className="text-emerald-400 font-semibold">
-          {gate.status}
-        </div>
-      </div>
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Final Status
+                        </div>
+                        <div className="text-emerald-400 font-semibold">
+                          {gate.status}
+                        </div>
+                      </div>
 
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Reviewed By
-        </div>
-        <div className="text-[#ede8de]">
-          {gate.reviewed_by || 'Not recorded'}
-        </div>
-      </div>
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Reviewed By
+                        </div>
+                        <div className="text-[#ede8de]">
+                          {gate.reviewed_by || 'Not recorded'}
+                        </div>
+                      </div>
 
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Approval Date
-        </div>
-        <div className="text-[#ede8de]">
-          {gate.reviewed_at
-            ? new Date(gate.reviewed_at).toLocaleString('en-GB')
-            : 'Not recorded'}
-        </div>
-      </div>
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Company
+                        </div>
+                        <div className="text-[#ede8de]">
+                          {gate.reviewer_company || 'Not recorded'}
+                        </div>
+                      </div>
 
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Linked Task
-        </div>
-        <div className="text-[#ede8de]">
-          {gate.required_before_task || 'No linked task'}
-        </div>
-      </div>
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Digital Signature
+                        </div>
+                        <div className="text-[#c49e48] font-semibold">
+                          {gate.reviewer_signature || 'Not recorded'}
+                        </div>
+                      </div>
 
-      <div>
-        <div className="text-[#6e7d8c] text-[11px] uppercase">
-          Evidence Count
-        </div>
-        <div className="text-[#ede8de]">
-          {gate.evidence_photos?.length || 0} photo(s)
-        </div>
-      </div>
-    </div>
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Approval Date
+                        </div>
+                        <div className="text-[#ede8de]">
+                          {gate.reviewed_at
+                            ? new Date(gate.reviewed_at).toLocaleString('en-GB')
+                            : 'Not recorded'}
+                        </div>
+                      </div>
 
-    {gate.rejection_reason && (
-      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-        <div className="text-[11px] uppercase text-red-400 font-semibold">
-          Previous Rejection
-        </div>
-        <div className="text-sm text-[#bfb9ae] mt-1">
-          {gate.rejection_reason}
-        </div>
-      </div>
-    )}
-  </div>
-)}
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Linked Task
+                        </div>
+                        <div className="text-[#ede8de]">
+                          {gate.required_before_task || 'No linked task'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[#6e7d8c] text-[11px] uppercase">
+                          Evidence Count
+                        </div>
+                        <div className="text-[#ede8de]">
+                          {gate.evidence_photos?.length || 0} photo(s)
+                        </div>
+                      </div>
+                    </div>
+
+                    {gate.rejection_reason && (
+                      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                        <div className="text-[11px] uppercase text-red-400 font-semibold">
+                          Previous Rejection
+                        </div>
+                        <div className="text-sm text-[#bfb9ae] mt-1">
+                          {gate.rejection_reason}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2 justify-end">
@@ -827,53 +768,33 @@ const { error } = await supabase
                       hidden
                       accept="image/*"
                       onChange={async e => {
-                        const file =
-                          e.target.files?.[0]
-
+                        const file = e.target.files?.[0]
                         if (!file) return
 
                         try {
-                          const uploadedPhotoUrl =
-                            await uploadEvidencePhoto(
-                              file
-                            )
+                          const uploadedPhotoUrl = await uploadEvidencePhoto(file)
 
                           const updatedPhotos = [
-                            ...(gate.evidence_photos ||
-                              []),
+                            ...(gate.evidence_photos || []),
                             uploadedPhotoUrl,
                           ]
 
-                          const { error } =
-                            await supabase
-                              .from(
-                                'quality_gates'
-                              )
-                              .update({
-                                evidence_photos:
-                                  updatedPhotos,
-                              })
-                              .eq(
-                                'id',
-                                gate.id
-                              )
+                          const { error } = await supabase
+                            .from('quality_gates')
+                            .update({
+                              evidence_photos: updatedPhotos,
+                            })
+                            .eq('id', gate.id)
 
                           if (error) {
-                            setCustomAlert(
-                              error.message
-                            )
+                            setCustomAlert(error.message)
                             return
                           }
 
                           await loadQualityGates()
-
-                          setCustomAlert(
-                            'Evidence uploaded successfully.'
-                          )
+                          setCustomAlert('Evidence uploaded successfully.')
                         } catch (err: any) {
-                          setCustomAlert(
-                            err.message
-                          )
+                          setCustomAlert(err.message)
                         }
 
                         e.target.value = ''
@@ -884,13 +805,10 @@ const { error } = await supabase
 
                 {canRequestInspection(gate) && (
                   <button
-                    onClick={() =>
-                      requestInspection(gate)
-                    }
+                    onClick={() => requestInspection(gate)}
                     className="btn btn-sm btn-ghost"
                   >
-                    {gate.inspection_status ===
-                    'Rejected'
+                    {gate.inspection_status === 'Rejected'
                       ? 'Re-submit Inspection'
                       : 'Request Inspection'}
                   </button>
@@ -898,9 +816,7 @@ const { error } = await supabase
 
                 {canStartReview(gate) && (
                   <button
-                    onClick={() =>
-                      startReview(gate)
-                    }
+                    onClick={() => startReview(gate)}
                     className="btn btn-sm btn-ghost"
                   >
                     Start Review
@@ -910,9 +826,10 @@ const { error } = await supabase
                 {canApproveOrReject(gate) && (
                   <>
                     <button
-                      onClick={() =>
-                        approveGate(gate)
-                      }
+                      onClick={() => {
+                        setApprovalGate(gate)
+                        setShowApproveModal(true)
+                      }}
                       className="btn btn-sm btn-success"
                     >
                       Approve
@@ -921,9 +838,7 @@ const { error } = await supabase
                     <button
                       onClick={() => {
                         setSelectedGate(gate)
-                        setShowRejectModal(
-                          true
-                        )
+                        setShowRejectModal(true)
                       }}
                       className="btn btn-sm btn-danger"
                     >
@@ -932,72 +847,12 @@ const { error } = await supabase
                   </>
                 )}
 
-             {(gate.inspection_status === 'Approved' ||
-  gate.inspection_status === 'Reapproved') && (
-  <div className="w-full mt-3">
-    <div className="border border-emerald-500/30 bg-emerald-500/10 rounded-xl p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-emerald-400 font-semibold text-sm">
-            FINAL APPROVAL CERTIFICATE
-          </div>
-
-          <div className="text-[11px] text-[#9ca3af] mt-1">
-            Passport ID: {gate.passport_id}
-          </div>
-        </div>
-
-        <div className="badge badge-green">
-          {gate.status}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-            Reviewed By
-          </div>
-
-          <div className="text-sm text-[#ede8de]">
-            {gate.reviewed_by || '—'}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-            Company
-          </div>
-
-          <div className="text-sm text-[#ede8de]">
-            {gate.reviewer_company || '—'}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-            Digital Signature
-          </div>
-
-          <div className="text-sm text-[#c49e48] font-semibold">
-            {gate.reviewer_signature || '—'}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-            Approval Timestamp
-          </div>
-
-          <div className="text-sm text-[#ede8de]">
-            {new Date(
-              gate.approved_at
-            ).toLocaleString()}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+                {(gate.inspection_status === 'Approved' ||
+                  gate.inspection_status === 'Reapproved') && (
+                  <span className="badge badge-green">
+                    FINAL APPROVED
+                  </span>
+                )}
               </div>
             </div>
           ))
