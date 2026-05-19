@@ -120,10 +120,9 @@ export default function QualityPage() {
     }
 
     let uploadedPhotoUrl: string | null = null
+    
     const passportPrefix = `QG-${String(projectId).padStart(3, '0')}`
-
 const passportNumber = qualityGates.length + 1
-
 const passportId = `${passportPrefix}-${String(passportNumber).padStart(4, '0')}`
 
     try {
