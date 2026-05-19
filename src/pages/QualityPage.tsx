@@ -120,6 +120,11 @@ export default function QualityPage() {
     }
 
     let uploadedPhotoUrl: string | null = null
+    const passportPrefix = `QG-${String(projectId).padStart(3, '0')}`
+
+const passportNumber = qualityGates.length + 1
+
+const passportId = `${passportPrefix}-${String(passportNumber).padStart(4, '0')}`
 
     try {
       if (selectedPhoto) {
@@ -131,6 +136,7 @@ export default function QualityPage() {
         .insert([
           {
             project_id: projectId,
+            passport_id: passportId,
             gate_name: gateName,
             gate_type: responsibleTeam,
             inspector_name: inspectorName || null,
@@ -574,6 +580,9 @@ export default function QualityPage() {
                 <div className="text-lg font-semibold text-[#ede8de]">
                   {gate.gate_name}
                 </div>
+                <div className="text-[11px] text-[#c49e48] font-mono mt-1">
+  Passport ID: {gate.passport_id || 'Not generated'}
+</div>
 
                 <div className="text-sm text-[#6e7d8c]">
                   Responsible:{' '}
