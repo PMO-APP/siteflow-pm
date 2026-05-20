@@ -659,7 +659,7 @@ export default function QualityPage() {
           qualityGates.map(gate => (
             <div
               key={gate.id}
-              className="card p-4 flex flex-col md:flex-row md:items-start md:justify-between gap-4"
+              className="card p-4 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-5"
             >
               <div>
                 <div className="text-lg font-semibold text-[#ede8de]">
@@ -722,198 +722,158 @@ export default function QualityPage() {
                     {gate.status}
                   </span>
                 </div>
-
-                {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
-                  <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                    <div className="text-[11px] uppercase tracking-widest text-emerald-400 font-semibold">
-                      Final Approval Record
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Passport ID
-                        </div>
-                        <div className="text-[#ede8de] font-mono">
-                          {gate.passport_id || 'Not generated'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Final Status
-                        </div>
-                        <div className="text-emerald-400 font-semibold">
-                          {gate.status}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Reviewed By
-                        </div>
-                        <div className="text-[#ede8de]">
-                          {gate.reviewed_by || 'Not recorded'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Company
-                        </div>
-                        <div className="text-[#ede8de]">
-                          {gate.reviewer_company || 'Not recorded'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Digital Signature
-                        </div>
-                        <div className="text-[#c49e48] font-semibold">
-                          {gate.reviewer_signature || 'Not recorded'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Approval Date
-                        </div>
-                        <div className="text-[#ede8de]">
-                          {gate.reviewed_at
-                            ? new Date(gate.reviewed_at).toLocaleString('en-GB')
-                            : 'Not recorded'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Linked Task
-                        </div>
-                        <div className="text-[#ede8de]">
-                          {gate.required_before_task || 'No linked task'}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#6e7d8c] text-[11px] uppercase">
-                          Evidence Count
-                        </div>
-                        <div className="text-[#ede8de]">
-                          {gate.evidence_photos?.length || 0} photo(s)
-                        </div>
-                      </div>
-                    </div>
-
-                    {gate.rejection_reason && (
-                      <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3">
-                        <div className="text-[11px] uppercase text-red-400 font-semibold">
-                          Previous Rejection
-                        </div>
-                        <div className="text-sm text-[#bfb9ae] mt-1">
-                          {gate.rejection_reason}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
-              <div className="flex flex-wrap gap-2 justify-end">
-                {canUploadEvidence(gate) && (
-                  <label className="btn btn-sm btn-ghost cursor-pointer">
-                    Upload Evidence
+              <div className="flex flex-col gap-3 items-stretch">
+                {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-emerald-400 font-semibold text-sm uppercase tracking-widest">
+                          Final Approval Record
+                        </div>
 
-                    <input
-                      type="file"
-                      hidden
-                      accept="image/*"
-                      onChange={async e => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
+                        <div className="text-[11px] text-[#9ca3af] mt-1">
+                          Passport ID: {gate.passport_id}
+                        </div>
+                      </div>
 
-                        try {
-                          const uploadedPhotoUrl = await uploadEvidencePhoto(file)
+                      <div className="badge badge-green">{gate.status}</div>
+                    </div>
 
-                          const updatedPhotos = [
-                            ...(gate.evidence_photos || []),
-                            uploadedPhotoUrl,
-                          ]
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                          Reviewed By
+                        </div>
+                        <div className="text-sm text-[#ede8de]">
+                          {gate.reviewed_by || '—'}
+                        </div>
+                      </div>
 
-                          const { error } = await supabase
-                            .from('quality_gates')
-                            .update({
-                              evidence_photos: updatedPhotos,
-                            })
-                            .eq('id', gate.id)
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                          Company
+                        </div>
+                        <div className="text-sm text-[#ede8de]">
+                          {gate.reviewer_company || '—'}
+                        </div>
+                      </div>
 
-                          if (error) {
-                            setCustomAlert(error.message)
-                            return
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                          Digital Signature
+                        </div>
+                        <div className="text-sm text-[#c49e48] font-semibold">
+                          {gate.reviewer_signature || '—'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                          Approval Date
+                        </div>
+                        <div className="text-sm text-[#ede8de]">
+                          {gate.approved_at
+                            ? new Date(gate.approved_at).toLocaleString('en-GB')
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {canUploadEvidence(gate) && (
+                    <label className="btn btn-sm btn-ghost cursor-pointer">
+                      Upload Evidence
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+
+                          try {
+                            const uploadedPhotoUrl = await uploadEvidencePhoto(file)
+
+                            const updatedPhotos = [
+                              ...(gate.evidence_photos || []),
+                              uploadedPhotoUrl,
+                            ]
+
+                            const { error } = await supabase
+                              .from('quality_gates')
+                              .update({ evidence_photos: updatedPhotos })
+                              .eq('id', gate.id)
+
+                            if (error) {
+                              setCustomAlert(error.message)
+                              return
+                            }
+
+                            await loadQualityGates()
+                            setCustomAlert('Evidence uploaded successfully.')
+                          } catch (err: any) {
+                            setCustomAlert(err.message)
                           }
 
-                          await loadQualityGates()
-                          setCustomAlert('Evidence uploaded successfully.')
-                        } catch (err: any) {
-                          setCustomAlert(err.message)
-                        }
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  )}
 
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                )}
-
-                {canRequestInspection(gate) && (
-                  <button
-                    onClick={() => requestInspection(gate)}
-                    className="btn btn-sm btn-ghost"
-                  >
-                    {gate.inspection_status === 'Rejected'
-                      ? 'Re-submit Inspection'
-                      : 'Request Inspection'}
-                  </button>
-                )}
-
-                {canStartReview(gate) && (
-                  <button
-                    onClick={() => startReview(gate)}
-                    className="btn btn-sm btn-ghost"
-                  >
-                    Start Review
-                  </button>
-                )}
-
-                {canApproveOrReject(gate) && (
-                  <>
+                  {canRequestInspection(gate) && (
                     <button
-                      onClick={() => {
-                        setApprovalGate(gate)
-                        setShowApproveModal(true)
-                      }}
-                      className="btn btn-sm btn-success"
+                      onClick={() => requestInspection(gate)}
+                      className="btn btn-sm btn-ghost"
                     >
-                      Approve
+                      {gate.inspection_status === 'Rejected'
+                        ? 'Re-submit Inspection'
+                        : 'Request Inspection'}
                     </button>
+                  )}
 
+                  {canStartReview(gate) && (
                     <button
-                      onClick={() => {
-                        setSelectedGate(gate)
-                        setShowRejectModal(true)
-                      }}
-                      className="btn btn-sm btn-danger"
+                      onClick={() => startReview(gate)}
+                      className="btn btn-sm btn-ghost"
                     >
-                      Reject
+                      Start Review
                     </button>
-                  </>
-                )}
+                  )}
 
-                {(gate.inspection_status === 'Approved' ||
-                  gate.inspection_status === 'Reapproved') && (
-                  <span className="badge badge-green">
-                    FINAL APPROVED
-                  </span>
-                )}
+                  {canApproveOrReject(gate) && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setApprovalGate(gate)
+                          setShowApproveModal(true)
+                        }}
+                        className="btn btn-sm btn-success"
+                      >
+                        Approve
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedGate(gate)
+                          setShowRejectModal(true)
+                        }}
+                        className="btn btn-sm btn-danger"
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+
+                  {(gate.inspection_status === 'Approved' ||
+                    gate.inspection_status === 'Reapproved') && (
+                    <span className="badge badge-green">FINAL APPROVED</span>
+                  )}
+                </div>
               </div>
             </div>
           ))
