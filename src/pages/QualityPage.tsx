@@ -651,7 +651,7 @@ export default function QualityPage() {
 
             <input
               className="form-control"
-              placeholder="Contractor / Inspector Name"
+              placeholder="Contractor"
               value={inspectorName}
               onChange={e => setInspectorName(e.target.value)}
             />
