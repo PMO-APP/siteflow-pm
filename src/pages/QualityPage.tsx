@@ -910,21 +910,21 @@ async function downloadApprovalCard(gate: any) {
                     </>
                   )}
 
-                  {(gate.inspection_status === 'Approved' ||
-                    gate.inspection_status === 'Reapproved') && (
-                  <div className="flex items-center gap-2">
-  <span className="badge badge-green">
-    FINAL APPROVED
-  </span>
+                  {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
+  <div className="flex flex-wrap items-center justify-end gap-2">
+    <span className="badge badge-green">
+      FINAL APPROVED
+    </span>
 
-  <button
-    onClick={() => downloadApprovalCard(gate)}
-    className="btn btn-sm btn-ghost"
-  >
-    Download PDF
-  </button>
-</div>
-                  )}
+    <button
+      type="button"
+      onClick={() => downloadApprovalCard(gate)}
+      className="btn btn-sm btn-gold"
+    >
+      Download PDF
+    </button>
+  </div>
+)}
                 </div>
               </div>
             </div>
