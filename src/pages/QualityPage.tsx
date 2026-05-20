@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
 import { ClipboardCheck, Plus } from 'lucide-react'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
@@ -413,7 +415,43 @@ export default function QualityPage() {
 
   const canApproveOrReject = (gate: any) =>
     canReview && gate.inspection_status === 'Under Review'
+async function downloadApprovalCard(gate: any) {
+  const element = document.getElementById(
+    `approval-card-${gate.id}`
+  )
 
+  if (!element) {
+    setCustomAlert('Approval card not found.')
+    return
+  }
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    backgroundColor: '#111827',
+  })
+
+  const imgData = canvas.toDataURL('image/png')
+
+  const pdf = new jsPDF('p', 'mm', 'a4')
+
+  const pdfWidth = pdf.internal.pageSize.getWidth()
+
+  const imgHeight =
+    (canvas.height * pdfWidth) / canvas.width
+
+  pdf.addImage(
+    imgData,
+    'PNG',
+    0,
+    0,
+    pdfWidth,
+    imgHeight
+  )
+
+  pdf.save(
+    `${gate.passport_id || 'approval-record'}.pdf`
+  )
+}
   const canUploadEvidence = (gate: any) =>
     gate.inspection_status !== 'Approved' &&
     gate.inspection_status !== 'Reapproved'
@@ -726,7 +764,10 @@ export default function QualityPage() {
 
               <div className="flex flex-col gap-3 items-stretch">
                 {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div
+  id={`approval-card-${gate.id}`}
+  className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"
+>
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-emerald-400 font-semibold text-sm uppercase tracking-widest">
@@ -872,6 +913,12 @@ export default function QualityPage() {
                   {(gate.inspection_status === 'Approved' ||
                     gate.inspection_status === 'Reapproved') && (
                     <span className="badge badge-green">FINAL APPROVED</span>
+              <button
+  onClick={() => downloadApprovalCard(gate)}
+  className="btn btn-sm btn-ghost"
+>
+  Download PDF
+</button>
                   )}
                 </div>
               </div>
