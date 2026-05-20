@@ -206,11 +206,41 @@ export default function QualityPage() {
     if (template.discipline === 'INF') {
       setResponsibleTeam('Infrastructure Team')
     }
+
+    const keyword = template.task_keyword?.toLowerCase()
+
+    const matchedTask = tasks.find(task => {
+      const taskName = task.name?.toLowerCase() || ''
+      const taskPhase = task.phase?.toLowerCase() || ''
+      const taskCategory = task.category?.toLowerCase() || ''
+
+      return (
+        keyword &&
+        (
+          taskName.includes(keyword) ||
+          taskPhase.includes(keyword) ||
+          taskCategory.includes(keyword)
+        )
+      )
+    })
+
+    if (matchedTask) {
+      setBlocksTaskId(matchedTask.id)
+      setRequiredBeforeTask(matchedTask.name)
+    } else {
+      setBlocksTaskId('')
+      setRequiredBeforeTask('')
+      setCustomAlert(
+        'No matching task was found for this hold point. Please check the task names or template keyword.'
+      )
+    }
   }
 
   async function createGate() {
     if (!gateName || !responsibleTeam || !projectId || !blocksTaskId) {
-      setCustomAlert('Please complete gate name, responsible team, and blocked task.')
+      setCustomAlert(
+        'Please complete gate name, responsible team, and ensure a linked task is detected.'
+      )
       return
     }
 
@@ -234,7 +264,9 @@ export default function QualityPage() {
           blocks_task_id: blocksTaskId,
           required_before_task: requiredBeforeTask,
           status: 'Pending',
-          inspection_status: 'Not Requested',
+          inspection_status: 'Inspection Requested',
+          requested_by: user?.email || user?.full_name || 'Unknown user',
+          requested_at: new Date().toISOString(),
         },
       ])
 
@@ -253,7 +285,7 @@ export default function QualityPage() {
       setRequiredBeforeTask('')
 
       await loadQualityGates()
-      setCustomAlert('Quality gate created successfully.')
+      setCustomAlert('Inspection request created successfully.')
     } catch (err: any) {
       setCustomAlert(err.message)
     }
@@ -383,6 +415,28 @@ export default function QualityPage() {
     setCustomAlert('Quality gate rejected.')
   }
 
+  async function downloadApprovalCard(gate: any) {
+    const element = document.getElementById(`approval-card-${gate.id}`)
+
+    if (!element) {
+      setCustomAlert('Approval card not found.')
+      return
+    }
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      backgroundColor: '#111827',
+    })
+
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight)
+    pdf.save(`${gate.passport_id || 'approval-record'}.pdf`)
+  }
+
   const statusClass = (status: string) => {
     if (status === 'Approved' || status === 'Reapproved') return 'badge-green'
     if (status === 'Rejected') return 'badge-red'
@@ -395,16 +449,15 @@ export default function QualityPage() {
     return 'badge-muted'
   }
 
-  const canCreateGate = projectRole === 'admin' || projectRole === 'pmo'
+  const canCreateGate =
+    projectRole === 'admin' ||
+    projectRole === 'pmo' ||
+    projectRole === 'contractor'
 
   const canReview =
     projectRole === 'admin' ||
     projectRole === 'consultant' ||
     projectRole === 'pmo'
-
-  const canRequestInspection = (gate: any) =>
-    gate.inspection_status === 'Not Requested' ||
-    gate.inspection_status === 'Rejected'
 
   const canStartReview = (gate: any) =>
     canReview &&
@@ -415,43 +468,7 @@ export default function QualityPage() {
 
   const canApproveOrReject = (gate: any) =>
     canReview && gate.inspection_status === 'Under Review'
-async function downloadApprovalCard(gate: any) {
-  const element = document.getElementById(
-    `approval-card-${gate.id}`
-  )
 
-  if (!element) {
-    setCustomAlert('Approval card not found.')
-    return
-  }
-
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    backgroundColor: '#111827',
-  })
-
-  const imgData = canvas.toDataURL('image/png')
-
-  const pdf = new jsPDF('p', 'mm', 'a4')
-
-  const pdfWidth = pdf.internal.pageSize.getWidth()
-
-  const imgHeight =
-    (canvas.height * pdfWidth) / canvas.width
-
-  pdf.addImage(
-    imgData,
-    'PNG',
-    0,
-    0,
-    pdfWidth,
-    imgHeight
-  )
-
-  pdf.save(
-    `${gate.passport_id || 'approval-record'}.pdf`
-  )
-}
   const canUploadEvidence = (gate: any) =>
     gate.inspection_status !== 'Approved' &&
     gate.inspection_status !== 'Reapproved'
@@ -579,7 +596,7 @@ async function downloadApprovalCard(gate: any) {
         </div>
 
         <p className="text-sm text-[#6e7d8c] mt-1">
-          Site inspection requests, reviews, evidence, and hold-point approvals
+          Contractor inspection requests, consultant reviews, evidence, and hold-point approvals
         </p>
 
         <div className="mt-3">
@@ -618,54 +635,36 @@ async function downloadApprovalCard(gate: any) {
               value={responsibleTeam}
               onChange={e => setResponsibleTeam(e.target.value)}
             >
-              <option value="">Select Responsible Team</option>
+              <option value="">Select Responsible Consultant</option>
               <option>Architectural Consultant</option>
               <option>Structural Consultant</option>
               <option>MEP Consultant</option>
               <option>Infrastructure Team</option>
               <option>PMO</option>
-              <option>Design Team</option>
-              <option>MEP Team</option>
-              <option>Housebuild Team</option>
             </select>
 
-            <select
-              className="form-control"
-              value={blocksTaskId}
-              onChange={e => {
-                const selectedTask = tasks.find(
-                  task => task.id === e.target.value
-                )
-
-                setBlocksTaskId(e.target.value)
-                setRequiredBeforeTask(selectedTask?.name || '')
-              }}
-            >
-              <option value="">Select task this gate blocks</option>
-
-              {tasks.map(task => (
-                <option key={task.id} value={task.id}>
-                  #{task.task_number} — {task.name}
-                </option>
-              ))}
-            </select>
+            <div className="form-control">
+              {requiredBeforeTask
+                ? `Linked Task: ${requiredBeforeTask}`
+                : 'Linked Task will auto-fill from template'}
+            </div>
 
             <input
               className="form-control"
-              placeholder="Inspector Name"
+              placeholder="Contractor / Inspector Name"
               value={inspectorName}
               onChange={e => setInspectorName(e.target.value)}
             />
 
             <textarea
               className="form-control"
-              placeholder="Inspection Comments"
+              placeholder="Contractor Comment / Readiness Note"
               value={inspectionComments}
               onChange={e => setInspectionComments(e.target.value)}
             />
 
             <label className="btn-ghost btn cursor-pointer">
-              {selectedPhoto ? selectedPhoto.name : 'Upload Evidence Photo'}
+              {selectedPhoto ? selectedPhoto.name : 'Upload Contractor Evidence'}
 
               <input
                 type="file"
@@ -681,7 +680,7 @@ async function downloadApprovalCard(gate: any) {
             className="btn-gold btn flex items-center gap-2"
           >
             <Plus size={14} />
-            Create Quality Gate
+            Request Inspection
           </button>
         </div>
       )}
@@ -713,11 +712,11 @@ async function downloadApprovalCard(gate: any) {
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Blocks: {gate.required_before_task || 'No task linked'}
+                  Auto-blocked Task: {gate.required_before_task || 'No task linked'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
-                  Inspector: {gate.inspector_name || '—'}
+                  Raised by: {gate.inspector_name || '—'}
                 </div>
 
                 <div className="text-sm text-[#6e7d8c]">
@@ -765,9 +764,9 @@ async function downloadApprovalCard(gate: any) {
               <div className="flex flex-col gap-3 items-stretch">
                 {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
                   <div
-  id={`approval-card-${gate.id}`}
-  className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"
->
+                    id={`approval-card-${gate.id}`}
+                    className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"
+                  >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-emerald-400 font-semibold text-sm uppercase tracking-widest">
@@ -866,17 +865,6 @@ async function downloadApprovalCard(gate: any) {
                     </label>
                   )}
 
-                  {canRequestInspection(gate) && (
-                    <button
-                      onClick={() => requestInspection(gate)}
-                      className="btn btn-sm btn-ghost"
-                    >
-                      {gate.inspection_status === 'Rejected'
-                        ? 'Re-submit Inspection'
-                        : 'Request Inspection'}
-                    </button>
-                  )}
-
                   {canStartReview(gate) && (
                     <button
                       onClick={() => startReview(gate)}
@@ -911,20 +899,20 @@ async function downloadApprovalCard(gate: any) {
                   )}
 
                   {(gate.status === 'Approved' || gate.status === 'Reapproved') && (
-  <div className="flex flex-wrap items-center justify-end gap-2">
-    <span className="badge badge-green">
-      FINAL APPROVED
-    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <span className="badge badge-green">
+                        FINAL APPROVED
+                      </span>
 
-    <button
-      type="button"
-      onClick={() => downloadApprovalCard(gate)}
-      className="btn btn-sm btn-gold"
-    >
-      Download PDF
-    </button>
-  </div>
-)}
+                      <button
+                        type="button"
+                        onClick={() => downloadApprovalCard(gate)}
+                        className="btn btn-sm btn-gold"
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
