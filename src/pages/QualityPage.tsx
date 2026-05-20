@@ -16,9 +16,11 @@ export default function QualityPage() {
   )
 
   const [qualityGates, setQualityGates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [projectRole, setProjectRole] = useState('guest')
 
+  const [selectedTemplate, setSelectedTemplate] = useState('')
   const [gateName, setGateName] = useState('')
   const [responsibleTeam, setResponsibleTeam] = useState('')
   const [inspectorName, setInspectorName] = useState('')
@@ -40,6 +42,10 @@ export default function QualityPage() {
   useEffect(() => {
     loadQualityGates()
   }, [projectId])
+
+  useEffect(() => {
+    loadTemplates()
+  }, [])
 
   useEffect(() => {
     async function loadUserRole() {
@@ -67,6 +73,18 @@ export default function QualityPage() {
 
     loadUserRole()
   }, [projectId, user])
+
+  async function loadTemplates() {
+    const { data, error } = await supabase
+      .from('hold_point_templates')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('sequence_no', { ascending: true })
+
+    if (!error) {
+      setTemplates(data || [])
+    }
+  }
 
   async function loadQualityGates() {
     if (!projectId) return
@@ -157,7 +175,35 @@ export default function QualityPage() {
 
     const passportNumber = qualityGates.length + 1
 
-    return `QG-${projectCode}-${disciplineCode}-${String(passportNumber).padStart(4, '0')}`
+    return `QG-${projectCode}-${disciplineCode}-${String(
+      passportNumber
+    ).padStart(4, '0')}`
+  }
+
+  function handleTemplateChange(templateId: string) {
+    setSelectedTemplate(templateId)
+
+    const template = templates.find(t => t.id === templateId)
+
+    if (!template) return
+
+    setGateName(template.gate_name)
+
+    if (template.discipline === 'STR') {
+      setResponsibleTeam('Structural Consultant')
+    }
+
+    if (template.discipline === 'ARC') {
+      setResponsibleTeam('Architectural Consultant')
+    }
+
+    if (template.discipline === 'MEP') {
+      setResponsibleTeam('MEP Consultant')
+    }
+
+    if (template.discipline === 'INF') {
+      setResponsibleTeam('Infrastructure Team')
+    }
   }
 
   async function createGate() {
@@ -195,6 +241,7 @@ export default function QualityPage() {
         return
       }
 
+      setSelectedTemplate('')
       setGateName('')
       setResponsibleTeam('')
       setInspectorName('')
@@ -507,6 +554,20 @@ export default function QualityPage() {
       {canCreateGate && (
         <div className="card p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              className="form-control"
+              value={selectedTemplate}
+              onChange={e => handleTemplateChange(e.target.value)}
+            >
+              <option value="">Select Hold Point Template</option>
+
+              {templates.map(template => (
+                <option key={template.id} value={template.id}>
+                  [{template.category}] {template.gate_name}
+                </option>
+              ))}
+            </select>
+
             <input
               className="form-control"
               placeholder="Gate Name"
