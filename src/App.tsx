@@ -1,4 +1,5 @@
 import QualityPage from '@/pages/QualityPage'
+import { useThemeStore } from '@/store/theme'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import ProfilePage from '@/pages/ProfilePage'
 import AdminPage from '@/pages/AdminPage'
@@ -61,7 +62,13 @@ function RequireProject({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { user, setUser, setLoading } = useAuthStore()
-  const role = getRole(user?.email)
+const { theme } = useThemeStore()
+const role = getRole(user?.email)
+
+useEffect(() => {
+  document.documentElement.classList.remove('dark', 'light')
+  document.documentElement.classList.add(theme)
+}, [theme])
 
   useEffect(() => {
     let mounted = true
@@ -165,16 +172,16 @@ export default function App() {
         />
 
         <Route
-          path="/app"
-          element={
-            <RequireAuth>
-              <RequireProject>
-                <Layout />
-              </RequireProject>
-            </RequireAuth>
-          }
-        >
-          <Route index element={<Dashboard />} />
+  path="/app"
+  element={
+    <RequireAuth>
+      <RequireProject>
+        <Layout />
+      </RequireProject>
+    </RequireAuth>
+  }
+>
+  <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
