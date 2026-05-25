@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { User, Lock, Users, Settings, Shield } from 'lucide-react'
+import { useThemeStore } from '@/store/theme'
 
 const adminTabs = [
   'My Profile',
@@ -11,6 +12,7 @@ const adminTabs = [
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('My Profile')
+  const { theme, setTheme } = useThemeStore()
 
   return (
     <div className="space-y-6">
@@ -92,15 +94,50 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'System Settings' && (
-          <div>
-            <h2 className="text-lg font-semibold text-[#ede8de]">
-              System Settings
-            </h2>
-            <p className="text-sm text-[#6e7d8c] mt-1">
-              Organisation and project preferences will be managed here.
-            </p>
-          </div>
-        )}
+  <div className="space-y-4">
+    <h2 className="text-lg font-semibold text-[#ede8de]">
+      System Settings
+    </h2>
+
+    <p className="text-sm text-[#6e7d8c] mt-1">
+      Organisation and project preferences
+    </p>
+
+    <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
+      <div className="text-sm font-semibold text-[#ede8de]">
+        Appearance
+      </div>
+
+      <p className="text-xs text-[#6e7d8c] mt-1">
+        Select your preferred theme.
+      </p>
+
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={() => setTheme('dark')}
+          className={`btn btn-sm ${
+            theme === 'dark'
+              ? 'btn-gold'
+              : 'btn-ghost'
+          }`}
+        >
+          Dark Mode
+        </button>
+
+        <button
+          onClick={() => setTheme('light')}
+          className={`btn btn-sm ${
+            theme === 'light'
+              ? 'btn-gold'
+              : 'btn-ghost'
+          }`}
+        >
+          Light Mode
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   )
