@@ -280,3 +280,104 @@ body {
 .soft-divider {
   border-color: rgba(255, 255, 255, 0.06);
 }
+    /* =========================
+   LIGHT MODE
+========================= */
+
+html.light body {
+  background: #f5f7fa;
+  color: #111827;
+}
+
+html.light .card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+html.light .card:hover {
+  border-color: rgba(196, 158, 72, 0.35);
+}
+
+html.light .stat-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+html.light .page-title {
+  color: #111827;
+}
+
+html.light .page-subtitle {
+  color: #6b7280;
+}
+
+html.light .card-title,
+html.light .section-title,
+html.light .modal-title {
+  color: #111827;
+}
+
+html.light .form-control {
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+html.light .form-control::placeholder {
+  color: #9ca3af;
+}
+
+html.light .tbl th {
+  background: #f8fafc;
+  color: #6b7280;
+  border-color: #e5e7eb;
+}
+
+html.light .tbl td {
+  color: #374151;
+  border-color: #f1f5f9;
+}
+
+html.light .tbl tr:hover td {
+  background: #f8fafc;
+}
+
+html.light .nav-item {
+  color: #475569;
+}
+
+html.light .nav-item:hover {
+  background: #f8fafc;
+  color: #111827;
+}
+
+html.light .nav-item.active {
+  background: rgba(196, 158, 72, 0.12);
+  color: #c49e48;
+}
+
+html.light .btn-ghost {
+  background: #f8fafc;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+html.light .modal {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+html.light .modal-head {
+  background: #ffffff;
+}
+
+html.light .empty-state {
+  color: #6b7280;
+}
+
+html.light .soft-divider {
+  border-color: #e5e7eb;
+}
