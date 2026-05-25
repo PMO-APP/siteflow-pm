@@ -1,6 +1,7 @@
 import QualityPage from '@/pages/QualityPage'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import ProfilePage from '@/pages/ProfilePage'
+import AdminPage from '@/pages/AdminPage'
 import SettingsPage from '@/pages/SettingsPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import { useProjectStore } from '@/store/project'
@@ -190,6 +191,7 @@ export default function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={<AdminPage />} />
 
           {role === 'admin' && <Route path="audit" element={<AuditPage />} />}
         </Route>
