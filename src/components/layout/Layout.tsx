@@ -32,7 +32,6 @@ import NotificationsPanel from '@/components/modules/dashboard/NotificationsPane
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import {
   Settings,
-  UserCircle,
 } from 'lucide-react'
 
 const NAV = [
@@ -50,10 +49,8 @@ const NAV = [
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/team', icon: Users, label: 'Team' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
-  { to: '/app/profile', icon: UserCircle, label: 'Profile' },
-{ to: '/app/settings', icon: Settings, label: 'Settings' },
-  { to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
-  { to: '/app/team-access', icon: Users, label: 'Team Access' },
+{ to: '/app/admin', icon: Settings, label: 'Admin' },
+{ to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
 ]
 
 export default function Layout() {
