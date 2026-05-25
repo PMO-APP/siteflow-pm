@@ -109,7 +109,7 @@ export default function AdminPage() {
       </div>
 
       <p className="text-xs text-[#6e7d8c] mt-1">
-        Select your preferred theme.
+        Choose your preferred theme
       </p>
 
       <div className="flex gap-2 mt-4">
