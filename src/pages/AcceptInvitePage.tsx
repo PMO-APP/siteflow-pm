@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react'
 import { CheckCircle, AlertTriangle } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
 
 export default function AcceptInvitePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { user } = useAuthStore()
-
   const token = searchParams.get('token')
 
   const [loading, setLoading] = useState(true)
   const [invite, setInvite] = useState<any>(null)
   const [error, setError] = useState('')
   const [accepted, setAccepted] = useState(false)
+
+  const [fullName, setFullName] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
     loadInvite()
@@ -28,57 +29,101 @@ export default function AcceptInvitePage() {
     }
 
     const { data, error } = await supabase
-      .from('organization_invites')
-      .select('*, organizations(name)')
+      .from('team_invitations')
+      .select('*')
       .eq('token', token)
-      .single()
+      .eq('status', 'pending')
+      .maybeSingle()
 
     if (error || !data) {
-      setError('Invite not found or expired.')
+      setError('Invite not found, expired, or already accepted.')
+      setLoading(false)
+      return
+    }
+
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      setError('This invitation has expired.')
       setLoading(false)
       return
     }
 
     setInvite(data)
+    setFullName(data.full_name || '')
     setLoading(false)
   }
 
   async function acceptInvite() {
-    if (!user) {
-      navigate(`/signup?invite=${token}`)
-      return
-    }
+    setError('')
 
     if (!invite) return
 
-    const userEmail = user.email?.toLowerCase()
-    const inviteEmail = invite.email?.toLowerCase()
-
-    if (userEmail !== inviteEmail) {
-      setError(
-        `This invite was sent to ${invite.email}. Please sign in with that email.`
-      )
+    if (!fullName.trim()) {
+      setError('Full name is required.')
       return
     }
 
-    const { error: memberError } = await supabase
-      .from('organization_members')
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    const email = invite.email.trim().toLowerCase()
+
+    const { data: signUpData, error: signUpError } =
+      await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: invite.role,
+          },
+        },
+      })
+
+    if (signUpError) {
+      setError(signUpError.message)
+      return
+    }
+
+    const userId = signUpData.user?.id
+
+    if (!userId) {
+      setError('Account created, but user profile was not returned.')
+      return
+    }
+
+    await supabase.from('profiles').upsert({
+      id: userId,
+      email,
+      full_name: fullName,
+      role: invite.role,
+      updated_at: new Date().toISOString(),
+    })
+
+    const { error: teamError } = await supabase
+      .from('project_team_members')
       .insert({
-        organization_id: invite.organization_id,
-        user_id: user.id,
+        project_id: invite.project_id,
+        email,
+        full_name: fullName,
         role: invite.role,
       })
 
-    if (memberError) {
-      setError(memberError.message)
+    if (teamError) {
+      setError(teamError.message)
       return
     }
 
     const { error: inviteError } = await supabase
-      .from('organization_invites')
+      .from('team_invitations')
       .update({
         status: 'accepted',
-        accepted_by: user.id,
         accepted_at: new Date().toISOString(),
       })
       .eq('id', invite.id)
@@ -104,40 +149,37 @@ export default function AcceptInvitePage() {
       <div className="card w-full max-w-md p-8 text-center">
         {accepted ? (
           <>
-            <CheckCircle
-              size={42}
-              className="text-emerald-400 mx-auto mb-4"
-            />
+            <CheckCircle size={42} className="text-emerald-400 mx-auto mb-4" />
 
-            <h1 className="text-2xl font-bold">
-              Invite accepted
+            <h1 className="text-2xl font-bold text-[#ede8de]">
+              Account activated
             </h1>
 
-            <p className="text-slate-400 mt-3">
-              You now have access to {invite.organizations?.name}.
+            <p className="text-[#6e7d8c] mt-3">
+              Your PMOCorex access has been created successfully.
             </p>
 
             <button
-              onClick={() => navigate('/projects')}
+              onClick={() => navigate('/mixta-admin-login')}
               className="btn-gold btn w-full justify-center mt-6"
             >
-              Go to Workspace Hub
+              Go to Login
             </button>
           </>
         ) : (
           <>
             <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-              PMOCorex Invite
+              PMOCorex Invitation
             </div>
 
-            <h1 className="text-2xl font-bold">
-              Join {invite?.organizations?.name}
+            <h1 className="text-2xl font-bold text-[#ede8de]">
+              Join PMOCorex
             </h1>
 
-            <p className="text-slate-400 mt-3">
+            <p className="text-[#6e7d8c] mt-3">
               You have been invited as{' '}
-              <span className="text-[#c49e48]">
-                {invite?.role?.replace('_', ' ')}
+              <span className="text-[#c49e48] font-semibold">
+                {invite?.role}
               </span>
               .
             </p>
@@ -145,25 +187,47 @@ export default function AcceptInvitePage() {
             {error && (
               <div className="mt-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex gap-2 text-left">
                 <AlertTriangle size={16} />
-                {error}
+                <span>{error}</span>
               </div>
             )}
+
+            <div className="space-y-3 mt-6 text-left">
+              <input
+                className="form-control"
+                placeholder="Full Name"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+              />
+
+              <input
+                className="form-control"
+                value={invite?.email || ''}
+                disabled
+              />
+
+              <input
+                className="form-control"
+                type="password"
+                placeholder="Create Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+
+              <input
+                className="form-control"
+                type="password"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+              />
+            </div>
 
             <button
               onClick={acceptInvite}
               className="btn-gold btn w-full justify-center mt-6"
             >
-              {user ? 'Accept Invite' : 'Create Account to Accept'}
+              Activate Account
             </button>
-
-            {!user && (
-              <button
-                onClick={() => navigate('/login')}
-                className="btn-ghost btn w-full justify-center mt-3"
-              >
-                I already have an account
-              </button>
-            )}
           </>
         )}
       </div>
