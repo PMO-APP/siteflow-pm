@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { User, Lock, Users, Settings, Shield } from 'lucide-react'
 import { useThemeStore } from '@/store/theme'
+import { supabase } from '@/lib/supabase'
+import { useProjectStore } from '@/store/project'
+import { useAuthStore } from '@/store/auth'
 
 const adminTabs = [
   'My Profile',
@@ -13,6 +16,53 @@ const adminTabs = [
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('My Profile')
   const { theme, setTheme } = useThemeStore()
+  const { projectId } = useProjectStore()
+  const { user } = useAuthStore()
+
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteRole, setInviteRole] = useState('contractor')
+  const [inviteLink, setInviteLink] = useState('')
+  const [notice, setNotice] = useState('')
+
+  async function sendInvite() {
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    if (!inviteEmail.trim()) {
+      setNotice('Email address is required.')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('team_invitations')
+      .insert([
+        {
+          email: inviteEmail.trim().toLowerCase(),
+          full_name: inviteName || null,
+          role: inviteRole,
+          project_id: projectId,
+          invited_by: user?.email || 'Admin',
+        },
+      ])
+      .select('token')
+      .single()
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    const link = `${window.location.origin}/accept-invite?token=${data.token}`
+
+    setInviteLink(link)
+    setNotice('Invitation created successfully.')
+    setInviteEmail('')
+    setInviteName('')
+    setInviteRole('contractor')
+  }
 
   return (
     <div className="space-y-6">
@@ -25,7 +75,8 @@ export default function AdminPage() {
         </div>
 
         <p className="text-sm text-[#6e7d8c] mt-1">
-          Manage profile, security, users, roles, project team, and system settings
+          Manage profile, security, users, roles, project team, and system
+          settings
         </p>
       </div>
 
@@ -72,13 +123,78 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'Users & Roles' && (
-          <div>
-            <h2 className="text-lg font-semibold text-[#ede8de]">
-              Users & Roles
-            </h2>
-            <p className="text-sm text-[#6e7d8c] mt-1">
-              Admins will assign user roles here.
-            </p>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-[#ede8de]">
+                Users & Roles
+              </h2>
+
+              <p className="text-sm text-[#6e7d8c] mt-1">
+                Invite users into this project workspace.
+              </p>
+            </div>
+
+            {notice && (
+              <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+                {notice}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input
+                className="form-control"
+                placeholder="Full Name"
+                value={inviteName}
+                onChange={e => setInviteName(e.target.value)}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Email Address"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+              />
+
+              <select
+                className="form-control"
+                value={inviteRole}
+                onChange={e => setInviteRole(e.target.value)}
+              >
+                <option value="admin">Admin</option>
+                <option value="pmo">PMO</option>
+                <option value="consultant">Consultant</option>
+                <option value="contractor">Contractor</option>
+                <option value="design">Design Team</option>
+                <option value="housebuild">Housebuild</option>
+                <option value="mep">MEP</option>
+                <option value="infrastructure">Infrastructure</option>
+                <option value="costing">Costing</option>
+                <option value="guest">Guest</option>
+              </select>
+            </div>
+
+            <button onClick={sendInvite} className="btn btn-gold">
+              Create Invitation
+            </button>
+
+            {inviteLink && (
+              <div className="rounded-xl border border-white/10 p-4 bg-white/5">
+                <div className="font-semibold text-[#ede8de]">
+                  Invitation Link
+                </div>
+
+                <div className="text-xs mt-2 break-all text-[#6e7d8c]">
+                  {inviteLink}
+                </div>
+
+                <button
+                  onClick={() => navigator.clipboard.writeText(inviteLink)}
+                  className="btn btn-sm btn-ghost mt-3"
+                >
+                  Copy Link
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -94,50 +210,46 @@ export default function AdminPage() {
         )}
 
         {activeTab === 'System Settings' && (
-  <div className="space-y-4">
-    <h2 className="text-lg font-semibold text-[#ede8de]">
-      System Settings
-    </h2>
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-[#ede8de]">
+              System Settings
+            </h2>
 
-    <p className="text-sm text-[#6e7d8c] mt-1">
-      Organisation and project preferences
-    </p>
+            <p className="text-sm text-[#6e7d8c] mt-1">
+              Organisation and project preferences
+            </p>
 
-    <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
-      <div className="text-sm font-semibold text-[#ede8de]">
-        Appearance
-      </div>
+            <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
+              <div className="text-sm font-semibold text-[#ede8de]">
+                Appearance
+              </div>
 
-      <p className="text-xs text-[#6e7d8c] mt-1">
-        Choose your preferred theme
-      </p>
+              <p className="text-xs text-[#6e7d8c] mt-1">
+                Choose your preferred theme
+              </p>
 
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={() => setTheme('dark')}
-          className={`btn btn-sm ${
-            theme === 'dark'
-              ? 'btn-gold'
-              : 'btn-ghost'
-          }`}
-        >
-          Dark Mode
-        </button>
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`btn btn-sm ${
+                    theme === 'dark' ? 'btn-gold' : 'btn-ghost'
+                  }`}
+                >
+                  Dark Mode
+                </button>
 
-        <button
-          onClick={() => setTheme('light')}
-          className={`btn btn-sm ${
-            theme === 'light'
-              ? 'btn-gold'
-              : 'btn-ghost'
-          }`}
-        >
-          Light Mode
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`btn btn-sm ${
+                    theme === 'light' ? 'btn-gold' : 'btn-ghost'
+                  }`}
+                >
+                  Light Mode
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
