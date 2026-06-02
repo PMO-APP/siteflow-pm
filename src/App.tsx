@@ -28,6 +28,7 @@ import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 import { getRole } from '@/lib/access'
+import AcceptInvitePage from '@/pages/AcceptInvitePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -158,7 +159,7 @@ useEffect(() => {
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/signin" element={<Navigate to="/" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
-        <Route path="/accept-invite" element={<Navigate to="/" replace />} />
+       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
         <Route path="/mixta-admin-login" element={<LoginPage />} />
 
