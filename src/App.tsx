@@ -26,6 +26,7 @@ import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
+import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -177,13 +178,13 @@ export default function App() {
         />
 
         <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <AdminPage />
-            </RequireAuth>
-          }
-        />
+  path="/admin"
+  element={
+    <RequireAuth>
+      <WorkspaceAdminPage />
+    </RequireAuth>
+  }
+/>
 
         <Route
           path="/admin/audit"
