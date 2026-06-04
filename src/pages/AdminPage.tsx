@@ -13,21 +13,39 @@ const adminTabs = [
   'System Settings',
 ]
 
+type InviteScope = 'workspace' | 'project'
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('My Profile')
   const { theme, setTheme } = useThemeStore()
   const { projectId } = useProjectStore()
   const { user } = useAuthStore()
 
+  const [inviteScope, setInviteScope] = useState<InviteScope>('project')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteName, setInviteName] = useState('')
   const [inviteRole, setInviteRole] = useState('contractor')
   const [inviteLink, setInviteLink] = useState('')
   const [notice, setNotice] = useState('')
 
+  function handleScopeChange(scope: InviteScope) {
+    setInviteScope(scope)
+    setInviteLink('')
+    setNotice('')
+
+    if (scope === 'workspace') {
+      setInviteRole('pmo')
+    } else {
+      setInviteRole('contractor')
+    }
+  }
+
   async function sendInvite() {
-    if (!projectId) {
-      setNotice('No project selected.')
+    setNotice('')
+    setInviteLink('')
+
+    if (inviteScope === 'project' && !projectId) {
+      setNotice('No project selected for project access.')
       return
     }
 
@@ -43,7 +61,9 @@ export default function AdminPage() {
           email: inviteEmail.trim().toLowerCase(),
           full_name: inviteName || null,
           role: inviteRole,
-          project_id: projectId,
+          invite_scope: inviteScope,
+          project_id: inviteScope === 'project' ? projectId : null,
+          status: 'pending',
           invited_by: user?.email || 'Admin',
         },
       ])
@@ -58,10 +78,15 @@ export default function AdminPage() {
     const link = `${window.location.origin}/accept-invite?token=${data.token}`
 
     setInviteLink(link)
-    setNotice('Invitation created successfully.')
+    setNotice(
+      inviteScope === 'workspace'
+        ? 'Workspace invitation created successfully.'
+        : 'Project invitation created successfully.'
+    )
+
     setInviteEmail('')
     setInviteName('')
-    setInviteRole('contractor')
+    setInviteRole(inviteScope === 'workspace' ? 'pmo' : 'contractor')
   }
 
   return (
@@ -130,7 +155,7 @@ export default function AdminPage() {
               </h2>
 
               <p className="text-sm text-[#6e7d8c] mt-1">
-                Invite users into this project workspace.
+                Invite users into PMOCorex or into the current project.
               </p>
             </div>
 
@@ -139,6 +164,41 @@ export default function AdminPage() {
                 {notice}
               </div>
             )}
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+              <div>
+                <div className="text-sm font-semibold text-[#ede8de]">
+                  Invite Scope
+                </div>
+
+                <p className="text-xs text-[#6e7d8c] mt-1">
+                  Workspace access is for PMO/Admin users. Project access is for
+                  consultants, contractors, and delivery teams.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('workspace')}
+                  className={`btn btn-sm ${
+                    inviteScope === 'workspace' ? 'btn-gold' : 'btn-ghost'
+                  }`}
+                >
+                  Workspace Access
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange('project')}
+                  className={`btn btn-sm ${
+                    inviteScope === 'project' ? 'btn-gold' : 'btn-ghost'
+                  }`}
+                >
+                  Project Access
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
@@ -155,22 +215,34 @@ export default function AdminPage() {
                 onChange={e => setInviteEmail(e.target.value)}
               />
 
-              <select
-                className="form-control"
-                value={inviteRole}
-                onChange={e => setInviteRole(e.target.value)}
-              >
-                <option value="admin">Admin</option>
-                <option value="pmo">PMO</option>
-                <option value="consultant">Consultant</option>
-                <option value="contractor">Contractor</option>
-                <option value="design">Design Team</option>
-                <option value="housebuild">Housebuild</option>
-                <option value="mep">MEP</option>
-                <option value="infrastructure">Infrastructure</option>
-                <option value="costing">Costing</option>
-                <option value="guest">Guest</option>
-              </select>
+              {inviteScope === 'workspace' ? (
+                <select
+                  className="form-control"
+                  value={inviteRole}
+                  onChange={e => setInviteRole(e.target.value)}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="pmo">PMO</option>
+                  <option value="portfolio_manager">
+                    Portfolio Manager
+                  </option>
+                </select>
+              ) : (
+                <select
+                  className="form-control"
+                  value={inviteRole}
+                  onChange={e => setInviteRole(e.target.value)}
+                >
+                  <option value="consultant">Consultant</option>
+                  <option value="contractor">Contractor</option>
+                  <option value="design">Design Team</option>
+                  <option value="housebuild">Housebuild</option>
+                  <option value="mep">MEP</option>
+                  <option value="infrastructure">Infrastructure</option>
+                  <option value="costing">Costing</option>
+                  <option value="guest">Guest</option>
+                </select>
+              )}
             </div>
 
             <button onClick={sendInvite} className="btn btn-gold">
