@@ -109,19 +109,36 @@ export default function AcceptInvitePage() {
       updated_at: new Date().toISOString(),
     })
 
-    const { error: teamError } = await supabase
-      .from('project_team_members')
-      .insert({
-        project_id: invite.project_id,
-        email,
-        full_name: fullName,
-        role: invite.role,
-      })
+if (invite.invite_scope === 'project') {
+  const { error: teamError } = await supabase
+    .from('project_team_members')
+    .insert({
+      project_id: invite.project_id,
+      email,
+      full_name: fullName,
+      role: invite.role,
+    })
 
-    if (teamError) {
-      setError(teamError.message)
-      return
-    }
+  if (teamError) {
+    setError(teamError.message)
+    return
+  }
+}
+
+if (invite.invite_scope === 'workspace') {
+  const { error: workspaceError } = await supabase
+    .from('workspace_members')
+    .insert({
+      email,
+      full_name: fullName,
+      role: invite.role,
+    })
+
+  if (workspaceError) {
+    setError(workspaceError.message)
+    return
+  }
+}
 
     const { error: inviteError } = await supabase
       .from('team_invitations')
