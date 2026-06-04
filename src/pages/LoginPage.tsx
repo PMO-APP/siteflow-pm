@@ -19,62 +19,56 @@ export default function LoginPage() {
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
-    try {
-      const cleanEmail = email.toLowerCase().trim()
+  try {
+    const cleanEmail = email.toLowerCase().trim()
 
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password,
-        })
+    const authResponse = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    })
 
-      if (authError) throw authError
-      if (!authData.user) throw new Error('Unable to sign in.')
+    if (authResponse.error) throw authResponse.error
+    if (!authResponse.data.user) throw new Error('Unable to sign in.')
 
-      const { data: membershipData, error: membershipError } = await supabase
-        .from('memberships')
-        .select('id,email,role,access_scope,organization_id')
-        .eq('email', cleanEmail)
-        .limit(1)
+    const membershipResponse = await supabase
+      .from('memberships')
+      .select('id,email,role,access_scope,organization_id')
+      .eq('email', cleanEmail)
+      .limit(1)
 
-      if (membershipError) throw membershipError
+    if (membershipResponse.error) throw membershipResponse.error
 
-      if (!membershipData || membershipData.length === 0) {
-        await supabase.auth.signOut()
-        throw new Error('Access restricted. You have not been added to PMOCorex.')
-      }
-
-      localStorage.setItem('savedEmail', cleanEmail)
-
-      if (!rememberMe) {
-        localStorage.removeItem('savedPassword')
-      }
-
-      localStorage.removeItem('projectId')
-      localStorage.removeItem('projectName')
-      localStorage.removeItem('organizationId')
-      localStorage.removeItem('portfolioId')
-
-      window.location.href = '/projects'
-    } catch (err: any) {
-      const msg = err.message?.toLowerCase() || ''
-
-      if (msg.includes('invalid')) {
-        setError('Incorrect email or password.')
-      } else if (msg.includes('confirm')) {
-        setError('Please verify your email first.')
-      } else {
-        setError(err.message || 'Unable to sign in.')
-      }
-
-      setLoading(false)
+    if (!membershipResponse.data || membershipResponse.data.length === 0) {
+      await supabase.auth.signOut()
+      throw new Error('Access restricted. You have not been added to PMOCorex.')
     }
-  }
 
+    localStorage.setItem('savedEmail', cleanEmail)
+
+    localStorage.removeItem('projectId')
+    localStorage.removeItem('projectName')
+    localStorage.removeItem('organizationId')
+    localStorage.removeItem('portfolioId')
+
+    window.location.href = '/projects'
+  } catch (err: any) {
+    const msg = err.message?.toLowerCase() || ''
+
+    if (msg.includes('invalid')) {
+      setError('Incorrect email or password.')
+    } else if (msg.includes('confirm')) {
+      setError('Please verify your email first.')
+    } else {
+      setError(err.message || 'Unable to sign in.')
+    }
+
+    setLoading(false)
+  }
+}
   return (
     <div className="min-h-screen bg-[#0c1014] text-white grid lg:grid-cols-2 overflow-hidden">
       <div className="relative hidden lg:flex flex-col justify-between p-12 border-r border-white/[0.06] bg-gradient-to-br from-[#101820] via-[#121b24] to-[#0c1014]">
