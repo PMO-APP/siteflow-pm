@@ -53,9 +53,12 @@ export default function AcceptInvitePage() {
   }
 
   async function acceptInvite() {
-    setError('')
+  if (!invite) {
+    setError('Invite data could not be loaded. Please refresh or request a new invite link.')
+    return
+  }
 
-    if (!invite) return
+  setError('')
 
     if (!fullName.trim()) {
       setError('Full name is required.')
