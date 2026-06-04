@@ -18,15 +18,6 @@ export default function LoginPage() {
     if (savedEmail) setEmail(savedEmail)
   }, [])
 
-  async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out. Please try again.')), ms)
-      ),
-    ])
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -35,32 +26,33 @@ export default function LoginPage() {
     try {
       const cleanEmail = email.toLowerCase().trim()
 
-      const { data, error: signInError } = await withTimeout(
-        supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password,
         })
-      )
 
-      if (signInError) throw signInError
-      if (!data.user) throw new Error('Unable to sign in.')
+      if (authError) throw authError
+      if (!authData.user) throw new Error('Unable to sign in.')
 
-      const { data: memberships, error: membershipError } = await withTimeout(
-        supabase
-          .from('memberships')
-          .select('*')
-          .or(`email.eq.${cleanEmail},user_id.eq.${data.user.id}`)
-          .limit(1)
-      )
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('memberships')
+        .select('id,email,role,access_scope,organization_id')
+        .eq('email', cleanEmail)
+        .limit(1)
 
       if (membershipError) throw membershipError
 
-      if (!memberships || memberships.length === 0) {
+      if (!membershipData || membershipData.length === 0) {
         await supabase.auth.signOut()
         throw new Error('Access restricted. You have not been added to PMOCorex.')
       }
 
       localStorage.setItem('savedEmail', cleanEmail)
+
+      if (!rememberMe) {
+        localStorage.removeItem('savedPassword')
+      }
 
       localStorage.removeItem('projectId')
       localStorage.removeItem('projectName')
@@ -89,7 +81,10 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(196,158,72,0.20),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(69,153,212,0.12),transparent_35%)]" />
 
         <div className="relative z-10">
-          <div className="text-3xl font-black text-[#c49e48]">PMOCorex</div>
+          <div className="text-3xl font-black text-[#c49e48]">
+            PMOCorex
+          </div>
+
           <div className="text-xs uppercase tracking-[0.35em] text-slate-500 mt-1">
             Portfolio Control System
           </div>
@@ -141,7 +136,9 @@ export default function LoginPage() {
 
               <div className="mb-4 p-3 rounded-md bg-[#c49e48]/10 border border-[#c49e48]/20 text-[#c49e48] text-sm flex gap-2">
                 <ShieldCheck size={16} className="mt-0.5 flex-shrink-0" />
-                <span>Access is restricted to approved workspace members.</span>
+                <span>
+                  Access is restricted to approved workspace members.
+                </span>
               </div>
 
               {error && (
@@ -153,11 +150,13 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="form-label">Email</label>
+
                   <input
                     className="form-control"
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
+                    placeholder="you@company.com"
                     required
                   />
                 </div>
@@ -171,6 +170,7 @@ export default function LoginPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      placeholder="••••••••"
                       required
                       minLength={6}
                     />
