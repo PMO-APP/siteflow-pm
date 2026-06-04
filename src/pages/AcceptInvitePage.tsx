@@ -53,12 +53,14 @@ export default function AcceptInvitePage() {
   }
 
   async function acceptInvite() {
-  if (!invite) {
-    setError('Invite data could not be loaded. Please refresh or request a new invite link.')
-    return
-  }
+    if (!invite) {
+      setError(
+        'Invite data could not be loaded. Please refresh or request a new invite link.'
+      )
+      return
+    }
 
-  setError('')
+    setError('')
 
     if (!fullName.trim()) {
       setError('Full name is required.')
@@ -76,6 +78,7 @@ export default function AcceptInvitePage() {
     }
 
     const email = invite.email.trim().toLowerCase()
+    const inviteScope = invite.invite_scope || invite.access_scope || 'project'
 
     const { data: signUpData, error: signUpError } =
       await supabase.auth.signUp({
@@ -101,7 +104,7 @@ export default function AcceptInvitePage() {
       return
     }
 
-    await supabase.from('profiles').upsert({
+    const { error: profileError } = await supabase.from('profiles').upsert({
       id: userId,
       email,
       full_name: fullName,
@@ -109,36 +112,44 @@ export default function AcceptInvitePage() {
       updated_at: new Date().toISOString(),
     })
 
-if (invite.invite_scope === 'project') {
-  const { error: teamError } = await supabase
-    .from('project_team_members')
-    .insert({
-      project_id: invite.project_id,
-      email,
-      full_name: fullName,
-      role: invite.role,
-    })
+    if (profileError) {
+      setError(profileError.message)
+      return
+    }
 
-  if (teamError) {
-    setError(teamError.message)
-    return
-  }
-}
+    const { error: membershipError } = await supabase
+      .from('memberships')
+      .insert({
+        user_id: userId,
+        organization_id: invite.organization_id || 1,
+        email,
+        full_name: fullName,
+        role: invite.role,
+        access_scope: inviteScope,
+        project_id: inviteScope === 'project' ? invite.project_id : null,
+        portfolio_id: inviteScope === 'portfolio' ? invite.portfolio_id : null,
+      })
 
-if (invite.invite_scope === 'workspace') {
-  const { error: workspaceError } = await supabase
-    .from('workspace_members')
-    .insert({
-      email,
-      full_name: fullName,
-      role: invite.role,
-    })
+    if (membershipError) {
+      setError(membershipError.message)
+      return
+    }
 
-  if (workspaceError) {
-    setError(workspaceError.message)
-    return
-  }
-}
+    if (inviteScope === 'project') {
+      const { error: teamError } = await supabase
+        .from('project_team_members')
+        .insert({
+          project_id: invite.project_id,
+          email,
+          full_name: fullName,
+          role: invite.role,
+        })
+
+      if (teamError) {
+        setError(teamError.message)
+        return
+      }
+    }
 
     const { error: inviteError } = await supabase
       .from('team_invitations')
@@ -199,7 +210,7 @@ if (invite.invite_scope === 'workspace') {
             <p className="text-[#6e7d8c] mt-3">
               You have been invited as{' '}
               <span className="text-[#c49e48] font-semibold">
-                {invite?.role}
+                {invite?.role || 'team member'}
               </span>
               .
             </p>
