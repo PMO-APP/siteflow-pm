@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -45,6 +46,7 @@ export default function ProjectsPage() {
         supabase.from('organizations').select('*').order('created_at'),
         supabase.from('portfolios').select('*').order('created_at'),
         supabase.from('projects').select('*').order('id'),
+        
       ])
 
     if (error) {
@@ -147,13 +149,13 @@ export default function ProjectsPage() {
           </button>
 
           <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
-            <button
-              onClick={() => navigate('/admin')}
-              className="btn-ghost btn-sm btn justify-center"
-            >
-              <Shield size={14} />
-              Admin Console
-            </button>
+           <button
+  onClick={() => navigate('/admin')}
+  className="btn-ghost btn-sm btn justify-center"
+>
+  <Shield size={14} />
+  Admin Console
+</button>
 
             <button
               onClick={() => setShowOrgModal(true)}
