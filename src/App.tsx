@@ -1,9 +1,7 @@
 import QualityPage from '@/pages/QualityPage'
 import { useThemeStore } from '@/store/theme'
 import ComingSoonPage from '@/pages/ComingSoonPage'
-import ProfilePage from '@/pages/ProfilePage'
 import AdminPage from '@/pages/AdminPage'
-import SettingsPage from '@/pages/SettingsPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import { useProjectStore } from '@/store/project'
 import ProjectsPage from '@/pages/ProjectsPage'
@@ -27,7 +25,6 @@ import RiskPage from '@/pages/RiskPage'
 import TeamPage from '@/pages/TeamPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
-import { getRole } from '@/lib/access'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -62,14 +59,13 @@ function RequireProject({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user, setUser, setLoading } = useAuthStore()
-const { theme } = useThemeStore()
-const role = getRole(user?.email)
+  const { setUser, setLoading } = useAuthStore()
+  const { theme } = useThemeStore()
 
-useEffect(() => {
-  document.documentElement.classList.remove('dark', 'light')
-  document.documentElement.classList.add(theme)
-}, [theme])
+  useEffect(() => {
+    document.documentElement.classList.remove('dark', 'light')
+    document.documentElement.classList.add(theme)
+  }, [theme])
 
   useEffect(() => {
     let mounted = true
@@ -124,21 +120,29 @@ useEffect(() => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session?.user) {
         setUser(null)
         setLoading(false)
         return
       }
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
       setUser({
         ...session.user,
-        email: session.user.email,
+        ...(profile || {}),
+        email: profile?.email || session.user.email,
         full_name:
+          profile?.full_name ||
           session.user.user_metadata?.full_name ||
           session.user.email ||
           'Admin',
-        role: 'admin',
+        role: profile?.role || 'admin',
       } as any)
 
       setLoading(false)
@@ -159,8 +163,8 @@ useEffect(() => {
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/signin" element={<Navigate to="/" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
-       <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
+        <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
 
         <Route
@@ -173,16 +177,34 @@ useEffect(() => {
         />
 
         <Route
-  path="/app"
-  element={
-    <RequireAuth>
-      <RequireProject>
-        <Layout />
-      </RequireProject>
-    </RequireAuth>
-  }
->
-  <Route index element={<Dashboard />} />
+          path="/admin"
+          element={
+            <RequireAuth>
+              <AdminPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/admin/audit"
+          element={
+            <RequireAuth>
+              <AuditPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/app"
+          element={
+            <RequireAuth>
+              <RequireProject>
+                <Layout />
+              </RequireProject>
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
@@ -197,11 +219,6 @@ useEffect(() => {
           <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminPage />} />
-
-          {role === 'admin' && <Route path="audit" element={<AuditPage />} />}
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
