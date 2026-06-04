@@ -3,13 +3,7 @@ import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
-const allowedEmails = [
-  'ebikienmo.bi@gmail.com',
-  'ebi4real96@gmail.com',
-  'e.bio-ibogomo@mixtafrica.com',
-]
-
-export default function SignInPage() {
+export default function LoginPage() {
   const navigate = useNavigate()
 
   const [email, setEmail] = useState('')
@@ -21,14 +15,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
-    const savedPassword = localStorage.getItem('savedPassword')
-
     if (savedEmail) setEmail(savedEmail)
-
-    if (savedPassword) {
-      setPassword(savedPassword)
-      setRememberMe(true)
-    }
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,23 +26,31 @@ export default function SignInPage() {
     try {
       const cleanEmail = email.toLowerCase().trim()
 
-      if (!allowedEmails.includes(cleanEmail)) {
-        throw new Error('Access restricted.')
-      }
+      const { data, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        })
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      })
-
-      if (error) throw error
+      if (signInError) throw signInError
       if (!data.user) throw new Error('Unable to sign in.')
+
+      const { data: membership, error: membershipError } = await supabase
+        .from('memberships')
+        .select('*')
+        .eq('email', cleanEmail)
+        .maybeSingle()
+
+      if (membershipError) throw membershipError
+
+      if (!membership) {
+        await supabase.auth.signOut()
+        throw new Error('Access restricted. You have not been added to PMOCorex.')
+      }
 
       localStorage.setItem('savedEmail', cleanEmail)
 
-      if (rememberMe) {
-        localStorage.setItem('savedPassword', password)
-      } else {
+      if (!rememberMe) {
         localStorage.removeItem('savedPassword')
       }
 
@@ -64,13 +59,11 @@ export default function SignInPage() {
       localStorage.removeItem('organizationId')
       localStorage.removeItem('portfolioId')
 
-      window.location.href = '/projects'
+      navigate('/projects', { replace: true })
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
 
-      if (msg.includes('access restricted')) {
-        setError('Access restricted. This platform is for authorized users only.')
-      } else if (msg.includes('invalid')) {
+      if (msg.includes('invalid')) {
         setError('Incorrect email or password.')
       } else if (msg.includes('confirm')) {
         setError('Please verify your email first.')
@@ -91,6 +84,7 @@ export default function SignInPage() {
           <div className="text-3xl font-black text-[#c49e48]">
             PMOCorex
           </div>
+
           <div className="text-xs uppercase tracking-[0.35em] text-slate-500 mt-1">
             Portfolio Control System
           </div>
@@ -143,7 +137,7 @@ export default function SignInPage() {
               <div className="mb-4 p-3 rounded-md bg-[#c49e48]/10 border border-[#c49e48]/20 text-[#c49e48] text-sm flex gap-2">
                 <ShieldCheck size={16} className="mt-0.5 flex-shrink-0" />
                 <span>
-                  Access is restricted to approved internal users.
+                  Access is restricted to approved workspace members.
                 </span>
               </div>
 
@@ -156,6 +150,7 @@ export default function SignInPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="form-label">Email</label>
+
                   <input
                     className="form-control"
                     type="email"
