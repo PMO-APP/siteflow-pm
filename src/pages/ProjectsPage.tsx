@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Layers,
   Activity,
+  Shield,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -58,24 +59,24 @@ export default function ProjectsPage() {
     setLoading(false)
   }
 
-  function openProject(p: any) {
-  setProject(
-    Number(p.id),
-    p.project_name,
-    p.organization_id ?? null,
-    p.portfolio_id ?? null,
-    p.project_owner_email ?? null
-  )
+  function openProject(project: any) {
+    setProject(
+      Number(project.id),
+      project.project_name,
+      project.organization_id ?? null,
+      project.portfolio_id ?? null,
+      project.project_owner_email ?? null
+    )
 
-  navigate('/app')
-}
+    navigate('/app')
+  }
 
   async function createOrganization() {
     if (!newOrgName.trim()) return
 
     const { error } = await supabase
       .from('organizations')
-      .insert({ name: newOrgName })
+      .insert({ name: newOrgName.trim() })
 
     if (error) {
       alert(error.message)
@@ -90,12 +91,10 @@ export default function ProjectsPage() {
   async function createPortfolio() {
     if (!newPortfolioName.trim() || !selectedOrgId) return
 
-    const { error } = await supabase
-      .from('portfolios')
-      .insert({
-        name: newPortfolioName,
-        organization_id: selectedOrgId,
-      })
+    const { error } = await supabase.from('portfolios').insert({
+      name: newPortfolioName.trim(),
+      organization_id: selectedOrgId,
+    })
 
     if (error) {
       alert(error.message)
@@ -111,14 +110,12 @@ export default function ProjectsPage() {
   async function createProject() {
     if (!newProjectName.trim()) return
 
-    const { error } = await supabase
-      .from('projects')
-      .insert({
-        project_name: newProjectName,
-        status: 'Active',
-        organization_id: selectedOrgId || null,
-        portfolio_id: selectedPortfolioId || null,
-      })
+    const { error } = await supabase.from('projects').insert({
+      project_name: newProjectName.trim(),
+      status: 'Active',
+      organization_id: selectedOrgId || null,
+      portfolio_id: selectedPortfolioId || null,
+    })
 
     if (error) {
       alert(error.message)
@@ -133,15 +130,13 @@ export default function ProjectsPage() {
   }
 
   const totalProjects = projects.length
-
   const activeProjects = projects.filter(
-    p => (p.status || 'Active') === 'Active'
+    project => (project.status || 'Active') === 'Active'
   ).length
 
   return (
     <div className="min-h-dvh bg-[#0c1014] text-white overflow-x-hidden overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-[calc(10rem+env(safe-area-inset-bottom))] space-y-10">
-        {/* Topbar */}
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <button
             type="button"
@@ -152,6 +147,14 @@ export default function ProjectsPage() {
           </button>
 
           <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+            <button
+              onClick={() => navigate('/admin')}
+              className="btn-ghost btn-sm btn justify-center"
+            >
+              <Shield size={14} />
+              Admin Console
+            </button>
+
             <button
               onClick={() => setShowOrgModal(true)}
               className="btn-ghost btn-sm btn justify-center"
@@ -178,7 +181,6 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Hero */}
         <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8 lg:p-10">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
@@ -192,39 +194,19 @@ export default function ProjectsPage() {
             </h1>
 
             <p className="text-slate-400 mt-4 leading-relaxed max-w-2xl text-sm sm:text-base">
-              Create organizations, group projects into portfolios,
-              and manage each project from its own PMOCorex command centre.
+              Manage organizations, portfolios, projects, team access, and
+              delivery command centres from one workspace hub.
             </p>
           </div>
 
           <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <MetricCard
-              title="Organizations"
-              value={organizations.length}
-              icon={Building2}
-            />
-
-            <MetricCard
-              title="Portfolios"
-              value={portfolios.length}
-              icon={Briefcase}
-            />
-
-            <MetricCard
-              title="Projects"
-              value={totalProjects}
-              icon={FolderKanban}
-            />
-
-            <MetricCard
-              title="Active"
-              value={activeProjects}
-              icon={Activity}
-            />
+            <MetricCard title="Organizations" value={organizations.length} icon={Building2} />
+            <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
+            <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
+            <MetricCard title="Active" value={activeProjects} icon={Activity} />
           </div>
         </div>
 
-        {/* Content */}
         {loading ? (
           <div className="card p-8 text-slate-400">
             Loading workspace…
@@ -240,25 +222,19 @@ export default function ProjectsPage() {
             ) : (
               organizations.map(org => {
                 const orgPortfolios = portfolios.filter(
-                  p => p.organization_id === org.id
+                  portfolio => portfolio.organization_id === org.id
                 )
 
                 const orgProjects = projects.filter(
-  p => p.organization_id === org.id
-)
+                  project => project.organization_id === org.id
+                )
 
                 return (
-                  <div
-                    key={org.id}
-                    className="card p-5 sm:p-6 lg:p-7"
-                  >
+                  <div key={org.id} className="card p-5 sm:p-6 lg:p-7">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Building2
-                            size={18}
-                            className="text-[#c49e48]"
-                          />
+                          <Building2 size={18} className="text-[#c49e48]" />
 
                           <h2 className="text-xl font-bold text-[#ede8de]">
                             {org.name}
@@ -271,22 +247,43 @@ export default function ProjectsPage() {
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setSelectedOrgId(org.id)
-                          setShowProjectModal(true)
-                        }}
-                        className="btn-gold btn-sm btn w-fit"
-                      >
-                        <Plus size={14} />
-                        Add Project
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => navigate('/admin')}
+                          className="btn-ghost btn-sm btn w-fit"
+                        >
+                          <Shield size={14} />
+                          Manage Access
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedOrgId(org.id)
+                            setShowPortfolioModal(true)
+                          }}
+                          className="btn-ghost btn-sm btn w-fit"
+                        >
+                          <Briefcase size={14} />
+                          Add Portfolio
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setSelectedOrgId(org.id)
+                            setShowProjectModal(true)
+                          }}
+                          className="btn-gold btn-sm btn w-fit"
+                        >
+                          <Plus size={14} />
+                          Add Project
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
                       {orgPortfolios.map(portfolio => {
                         const portfolioProjects = projects.filter(
-                          p => p.portfolio_id === portfolio.id
+                          project => project.portfolio_id === portfolio.id
                         )
 
                         return (
@@ -297,10 +294,7 @@ export default function ProjectsPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Layers
-                                    size={16}
-                                    className="text-[#c49e48]"
-                                  />
+                                  <Layers size={16} className="text-[#c49e48]" />
 
                                   <div className="font-semibold text-white">
                                     {portfolio.name}
@@ -308,13 +302,12 @@ export default function ProjectsPage() {
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description ||
-                                    'Project delivery portfolio'}
+                                  {portfolio.description || 'Project delivery portfolio'}
                                 </div>
                               </div>
 
                               <div className="text-xs text-slate-500">
-                                {portfolioProjects.length} projects
+                                {portfolioProjects.length} project(s)
                               </div>
                             </div>
 
@@ -360,12 +353,32 @@ export default function ProjectsPage() {
                         </div>
                       )}
                     </div>
+
+                    {orgProjects.filter(project => !project.portfolio_id).length > 0 && (
+                      <div className="mt-6">
+                        <div className="text-sm font-semibold text-[#ede8de] mb-3">
+                          Projects not assigned to a portfolio
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {orgProjects
+                            .filter(project => !project.portfolio_id)
+                            .map(project => (
+                              <ProjectCard
+                                key={project.id}
+                                project={project}
+                                onClick={() => openProject(project)}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })
             )}
 
-            {projects.filter(p => !p.organization_id).length > 0 && (
+            {projects.filter(project => !project.organization_id).length > 0 && (
               <div className="card p-5 sm:p-6 lg:p-7">
                 <div className="mb-5">
                   <h2 className="text-xl font-bold text-[#ede8de]">
@@ -379,7 +392,7 @@ export default function ProjectsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {projects
-                    .filter(p => !p.organization_id)
+                    .filter(project => !project.organization_id)
                     .map(project => (
                       <ProjectCard
                         key={project.id}
@@ -396,12 +409,8 @@ export default function ProjectsPage() {
         <div className="h-40" />
       </div>
 
-      {/* Organization Modal */}
       {showOrgModal && (
-        <Modal
-          title="Create Organization"
-          onClose={() => setShowOrgModal(false)}
-        >
+        <Modal title="Create Organization" onClose={() => setShowOrgModal(false)}>
           <input
             className="form-control mb-4"
             placeholder="Organization name"
@@ -418,12 +427,8 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {/* Portfolio Modal */}
       {showPortfolioModal && (
-        <Modal
-          title="Create Portfolio"
-          onClose={() => setShowPortfolioModal(false)}
-        >
+        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
           <select
             className="form-control mb-4"
             value={selectedOrgId}
@@ -454,12 +459,8 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {/* Project Modal */}
       {showProjectModal && (
-        <Modal
-          title="Create Project"
-          onClose={() => setShowProjectModal(false)}
-        >
+        <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
           <select
             className="form-control mb-4"
             value={selectedOrgId}
@@ -485,14 +486,10 @@ export default function ProjectsPage() {
             <option value="">Select portfolio</option>
 
             {portfolios
-              .filter(
-                p =>
-                  !selectedOrgId ||
-                  p.organization_id === selectedOrgId
-              )
-              .map(port => (
-                <option key={port.id} value={port.id}>
-                  {port.name}
+              .filter(portfolio => !selectedOrgId || portfolio.organization_id === selectedOrgId)
+              .map(portfolio => (
+                <option key={portfolio.id} value={portfolio.id}>
+                  {portfolio.name}
                 </option>
               ))}
           </select>
@@ -576,10 +573,7 @@ function EmptyHub({ title, message, action }: any) {
   return (
     <div className="card p-10 text-center">
       <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-        <Building2
-          size={24}
-          className="text-[#c49e48]"
-        />
+        <Building2 size={24} className="text-[#c49e48]" />
       </div>
 
       <div className="text-xl font-bold text-white">
@@ -590,10 +584,7 @@ function EmptyHub({ title, message, action }: any) {
         {message}
       </div>
 
-      <button
-        onClick={action}
-        className="btn-gold btn mt-5"
-      >
+      <button onClick={action} className="btn-gold btn mt-5">
         Create Organization
       </button>
     </div>
