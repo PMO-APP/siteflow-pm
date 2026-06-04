@@ -49,8 +49,6 @@ const NAV = [
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/team', icon: Users, label: 'Team' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
-{ to: '/app/admin', icon: Settings, label: 'Admin' },
-{ to: '/app/audit', icon: ShieldCheck, label: 'Audit Trail' },
 ]
 
 export default function Layout() {
