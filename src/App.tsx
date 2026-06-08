@@ -71,113 +71,90 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    let mounted = true
+  let mounted = true
 
-    async function loadMembership(sessionUser: any) {
-      const email = sessionUser.email?.toLowerCase()?.trim()
+  async function loadAuthUser() {
+    try {
+      setLoading(true)
 
-      if (!email) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!mounted) return
+
+      if (!session?.user) {
         clearMembership()
-        return null
+        setUser(null)
+        return
       }
 
-      const { data } = await supabase
-        .from('memberships')
-        .select('*')
-        .eq('email', email)
-        .limit(1)
-        .maybeSingle()
+      setUser({
+        ...session.user,
+        email: session.user.email,
+        full_name:
+          session.user.user_metadata?.full_name ||
+          session.user.email ||
+          'Admin',
+        role: 'admin',
+      } as any)
 
       setMembership({
-        role: data?.role || 'guest',
-        accessScope: data?.access_scope || 'project',
-        organizationId: data?.organization_id ?? null,
-        portfolioId: data?.portfolio_id ?? null,
-        projectId: data?.project_id ?? null,
+        role: 'admin',
+        accessScope: 'workspace',
+        organizationId: 1,
+        portfolioId: null,
+        projectId: null,
       })
-
-      return data
-    }
-
-    async function loadAuthUser() {
-      try {
-        setLoading(true)
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!mounted) return
-
-        if (!session?.user) {
-          clearMembership()
-          setUser(null)
-          return
-        }
-
-        const membership = await loadMembership(session.user)
-
-        if (!mounted) return
-
-        setUser({
-          ...session.user,
-          email: session.user.email,
-          full_name:
-            session.user.user_metadata?.full_name ||
-            session.user.email ||
-            'Admin',
-          role: membership?.role || 'guest',
-        } as any)
-      } catch (error) {
-        console.error('Auth loading failed:', error)
-        clearMembership()
-        setUser(null)
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadAuthUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        setLoading(true)
-
-        if (!session?.user) {
-          clearMembership()
-          setUser(null)
-          return
-        }
-
-        const membership = await loadMembership(session.user)
-
-        setUser({
-          ...session.user,
-          email: session.user.email,
-          full_name:
-            session.user.user_metadata?.full_name ||
-            session.user.email ||
-            'Admin',
-          role: membership?.role || 'guest',
-        } as any)
-      } catch (error) {
-        console.error('Auth state change failed:', error)
-        clearMembership()
-        setUser(null)
-      } finally {
+    } catch (error) {
+      console.error('Auth loading failed:', error)
+      clearMembership()
+      setUser(null)
+    } finally {
+      if (mounted) {
         setLoading(false)
       }
+    }
+  }
+
+  loadAuthUser()
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session?.user) {
+      clearMembership()
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
+    setUser({
+      ...session.user,
+      email: session.user.email,
+      full_name:
+        session.user.user_metadata?.full_name ||
+        session.user.email ||
+        'Admin',
+      role: 'admin',
+    } as any)
+
+    setMembership({
+      role: 'admin',
+      accessScope: 'workspace',
+      organizationId: 1,
+      portfolioId: null,
+      projectId: null,
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [setUser, setLoading, setMembership, clearMembership])
+    setLoading(false)
+  })
+
+  return () => {
+    mounted = false
+    subscription.unsubscribe()
+  }
+}, [setUser, setLoading, setMembership, clearMembership]) 
 
   return (
     <BrowserRouter>
