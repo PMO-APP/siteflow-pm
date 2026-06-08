@@ -1,3 +1,5 @@
+import RequireRole from '@/components/auth/RequireRole'
+import { useMembershipStore } from '@/store/membership'
 import QualityPage from '@/pages/QualityPage'
 import { useThemeStore } from '@/store/theme'
 import ComingSoonPage from '@/pages/ComingSoonPage'
@@ -61,6 +63,8 @@ function RequireProject({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { setUser, setLoading } = useAuthStore()
   const { theme } = useThemeStore()
+  const { setMembership, clearMembership } =
+  useMembershipStore()
 
   useEffect(() => {
     document.documentElement.classList.remove('dark', 'light')
@@ -81,34 +85,79 @@ export default function App() {
     if (!mounted) return
 
     if (error || !session?.user) {
+      clearMembership()
       setUser(null)
       setLoading(false)
       return
     }
+const { data: membership } = await supabase
+  .from('memberships')
+  .select('*')
+  .eq(
+    'email',
+    session.user.email?.toLowerCase()
+  )
+  .limit(1)
+  .maybeSingle()
 
+setMembership({
+  role: membership?.role || 'guest',
+  accessScope:
+    membership?.access_scope || 'project',
+  organizationId:
+    membership?.organization_id,
+  portfolioId:
+    membership?.portfolio_id,
+  projectId:
+    membership?.project_id,
+})
     setUser({
-      ...session.user,
-      email: session.user.email,
-      full_name:
-        session.user.user_metadata?.full_name ||
-        session.user.email ||
-        'Admin',
-      role: session.user.user_metadata?.role || 'admin',
-    } as any)
+  ...session.user,
+  email: session.user.email,
+  full_name:
+    session.user.user_metadata?.full_name ||
+    session.user.email ||
+    'Admin',
+  role: membership?.role || 'guest',
+} as any)
 
     setLoading(false)
   }
 
   loadAuthUser()
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
+ const {
+  data: { subscription },
+} = supabase.auth.onAuthStateChange(
+  async (_event, session) => {
     if (!session?.user) {
+      clearMembership()
       setUser(null)
       setLoading(false)
       return
     }
+
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq(
+        'email',
+        session.user.email?.toLowerCase()
+      )
+      .limit(1)
+      .maybeSingle()
+
+    setMembership({
+      role: membership?.role || 'guest',
+      accessScope:
+        membership?.access_scope || 'project',
+      organizationId:
+        membership?.organization_id,
+      portfolioId:
+        membership?.portfolio_id,
+      projectId:
+        membership?.project_id,
+    })
 
     setUser({
       ...session.user,
@@ -117,11 +166,12 @@ export default function App() {
         session.user.user_metadata?.full_name ||
         session.user.email ||
         'Admin',
-      role: session.user.user_metadata?.role || 'admin',
+      role: membership?.role || 'guest',
     } as any)
 
     setLoading(false)
-  })
+  }
+)
 
   return () => {
     mounted = false
@@ -155,19 +205,35 @@ export default function App() {
   path="/admin"
   element={
     <RequireAuth>
-      <WorkspaceAdminPage />
+      <RequireRole
+        allowedRoles={[
+          'workspace_admin',
+          'admin',
+          'pmo',
+          'portfolio_manager',
+        ]}
+      >
+        <WorkspaceAdminPage />
+      </RequireRole>
     </RequireAuth>
   }
 />
 
         <Route
-          path="/admin/audit"
-          element={
-            <RequireAuth>
-              <AuditPage />
-            </RequireAuth>
-          }
-        />
+  path="/admin/audit"
+  element={
+    <RequireAuth>
+      <RequireRole
+        allowedRoles={[
+          'workspace_admin',
+          'admin',
+        ]}
+      >
+        <AuditPage />
+      </RequireRole>
+    </RequireAuth>
+  }
+/>
 
         <Route
           path="/app"
