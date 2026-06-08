@@ -20,39 +20,31 @@ export default function LoginPage() {
 
 async function handleSubmit(e: React.FormEvent) {
   e.preventDefault()
+
+  console.log('STEP 1')
+
   setLoading(true)
   setError('')
 
   try {
-    const cleanEmail = email.toLowerCase().trim()
+    console.log('STEP 2')
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
+      email: email.toLowerCase().trim(),
       password,
     })
 
+    console.log('STEP 3', { data, error })
+
     if (error) throw error
-    if (!data.user) throw new Error('Unable to sign in.')
 
-    localStorage.setItem('savedEmail', cleanEmail)
-
-    localStorage.removeItem('projectId')
-    localStorage.removeItem('projectName')
-    localStorage.removeItem('organizationId')
-    localStorage.removeItem('portfolioId')
+    console.log('STEP 4')
 
     window.location.assign('/projects')
-  } catch (err: any) {
-    const msg = err.message?.toLowerCase() || ''
 
-    if (msg.includes('invalid')) {
-      setError('Incorrect email or password.')
-    } else if (msg.includes('confirm')) {
-      setError('Please verify your email first.')
-    } else {
-      setError(err.message || 'Unable to sign in.')
-    }
-
+    console.log('STEP 5')
+  } catch (err) {
+    console.error('LOGIN ERROR', err)
     setLoading(false)
   }
 }
