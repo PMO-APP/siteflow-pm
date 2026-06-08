@@ -1,7 +1,6 @@
 import QualityPage from '@/pages/QualityPage'
 import { useThemeStore } from '@/store/theme'
 import ComingSoonPage from '@/pages/ComingSoonPage'
-import AdminPage from '@/pages/AdminPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import { useProjectStore } from '@/store/project'
 import ProjectsPage from '@/pages/ProjectsPage'
