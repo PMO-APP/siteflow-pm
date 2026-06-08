@@ -27,22 +27,23 @@ async function handleSubmit(e: React.FormEvent) {
   setError('')
 
   try {
+    const cleanEmail = email.toLowerCase().trim()
+
     console.log('STEP 2')
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.toLowerCase().trim(),
-      password,
-    })
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      })
 
-    console.log('STEP 3', { data, error })
+    console.log('STEP 3', data, error)
 
     if (error) throw error
 
     console.log('STEP 4')
 
-    window.location.assign('/projects')
-
-    console.log('STEP 5')
+    window.location.href = '/projects'
   } catch (err) {
     console.error('LOGIN ERROR', err)
     setLoading(false)
