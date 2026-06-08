@@ -18,7 +18,7 @@ export default function LoginPage() {
     if (savedEmail) setEmail(savedEmail)
   }, [])
 
-  async function handleSubmit(e: React.FormEvent) {
+async function handleSubmit(e: React.FormEvent) {
   e.preventDefault()
   setLoading(true)
   setError('')
@@ -26,26 +26,13 @@ export default function LoginPage() {
   try {
     const cleanEmail = email.toLowerCase().trim()
 
-    const authResponse = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password,
     })
 
-    if (authResponse.error) throw authResponse.error
-    if (!authResponse.data.user) throw new Error('Unable to sign in.')
-
-    const membershipResponse = await supabase
-      .from('memberships')
-      .select('id,email,role,access_scope,organization_id')
-      .eq('email', cleanEmail)
-      .limit(1)
-
-    if (membershipResponse.error) throw membershipResponse.error
-
-    if (!membershipResponse.data || membershipResponse.data.length === 0) {
-      await supabase.auth.signOut()
-      throw new Error('Access restricted. You have not been added to PMOCorex.')
-    }
+    if (error) throw error
+    if (!data.user) throw new Error('Unable to sign in.')
 
     localStorage.setItem('savedEmail', cleanEmail)
 
@@ -54,7 +41,7 @@ export default function LoginPage() {
     localStorage.removeItem('organizationId')
     localStorage.removeItem('portfolioId')
 
-    window.location.href = '/projects'
+    window.location.assign('/projects')
   } catch (err: any) {
     const msg = err.message?.toLowerCase() || ''
 
