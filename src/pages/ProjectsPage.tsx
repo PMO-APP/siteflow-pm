@@ -38,29 +38,109 @@ export default function ProjectsPage() {
     loadHub()
   }, [])
 
-  async function loadHub() {
-    setLoading(true)
+ async function loadHub() {
+  setLoading(true)
 
-    const [{ data: orgs }, { data: ports }, { data: projs, error }] =
-      await Promise.all([
-        supabase.from('organizations').select('*').order('created_at'),
-        supabase.from('portfolios').select('*').order('created_at'),
-        supabase.from('projects').select('*').order('id'),
-        
-      ])
+  const { data: sessionData } = await supabase.auth.getSession()
+  const currentUser = sessionData.session?.user
 
-    if (error) {
-      alert(error.message)
-      setLoading(false)
-      return
-    }
+  if (!currentUser?.email) {
+    setLoading(false)
+    return
+  }
 
+  const cleanEmail = currentUser.email.toLowerCase().trim()
+
+  const { data: membershipRows, error: membershipError } = await supabase
+    .from('memberships')
+    .select('*')
+    .eq('email', cleanEmail)
+
+  if (membershipError) {
+    alert(membershipError.message)
+    setLoading(false)
+    return
+  }
+
+  const memberships = membershipRows || []
+
+  if (memberships.length === 0) {
+    setOrganizations([])
+    setPortfolios([])
+    setProjects([])
+    setLoading(false)
+    return
+  }
+
+  const hasWorkspaceAccess = memberships.some(
+    membership => membership.access_scope === 'workspace'
+  )
+
+  const [
+    { data: orgs, error: orgError },
+    { data: ports, error: portError },
+    { data: projs, error: projectError },
+  ] = await Promise.all([
+    supabase.from('organizations').select('*').order('created_at'),
+    supabase.from('portfolios').select('*').order('created_at'),
+    supabase.from('projects').select('*').order('id'),
+  ])
+
+  if (orgError || portError || projectError) {
+    alert(
+      orgError?.message ||
+        portError?.message ||
+        projectError?.message ||
+        'Unable to load workspace.'
+    )
+    setLoading(false)
+    return
+  }
+
+  if (hasWorkspaceAccess) {
     setOrganizations(orgs || [])
     setPortfolios(ports || [])
     setProjects(projs || [])
     setLoading(false)
+    return
   }
 
+  const allowedProjectIds = memberships
+    .filter(membership => membership.access_scope === 'project')
+    .map(membership => membership.project_id)
+
+  const allowedPortfolioIds = memberships
+    .filter(membership => membership.access_scope === 'portfolio')
+    .map(membership => membership.portfolio_id)
+
+  const visibleProjects = (projs || []).filter(project => {
+    return (
+      allowedProjectIds.includes(project.id) ||
+      allowedPortfolioIds.includes(project.portfolio_id)
+    )
+  })
+
+  const visiblePortfolioIds = [
+    ...new Set(visibleProjects.map(project => project.portfolio_id)),
+  ]
+
+  const visibleOrgIds = [
+    ...new Set(visibleProjects.map(project => project.organization_id)),
+  ]
+
+  const visiblePortfolios = (ports || []).filter(portfolio =>
+    visiblePortfolioIds.includes(portfolio.id)
+  )
+
+  const visibleOrganizations = (orgs || []).filter(org =>
+    visibleOrgIds.includes(org.id)
+  )
+
+  setOrganizations(visibleOrganizations)
+  setPortfolios(visiblePortfolios)
+  setProjects(visibleProjects)
+  setLoading(false)
+}
   function openProject(project: any) {
     setProject(
       Number(project.id),
