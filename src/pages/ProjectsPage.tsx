@@ -14,12 +14,12 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
-
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [canManageWorkspace, setCanManageWorkspace] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showOrgModal, setShowOrgModal] = useState(false)
@@ -38,109 +38,123 @@ export default function ProjectsPage() {
     loadHub()
   }, [])
 
- async function loadHub() {
-  setLoading(true)
+  async function loadHub() {
+    setLoading(true)
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const currentUser = sessionData.session?.user
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUser = sessionData.session?.user
 
-  if (!currentUser?.email) {
-    setLoading(false)
-    return
-  }
+    if (!currentUser?.email) {
+      setLoading(false)
+      return
+    }
 
-  const cleanEmail = currentUser.email.toLowerCase().trim()
+    const cleanEmail = currentUser.email.toLowerCase().trim()
 
-  const { data: membershipRows, error: membershipError } = await supabase
-    .from('memberships')
-    .select('*')
-    .eq('email', cleanEmail)
+    const { data: membershipRows, error: membershipError } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq('email', cleanEmail)
 
-  if (membershipError) {
-    alert(membershipError.message)
-    setLoading(false)
-    return
-  }
+    if (membershipError) {
+      alert(membershipError.message)
+      setLoading(false)
+      return
+    }
 
-  const memberships = membershipRows || []
+    const memberships = membershipRows || []
 
-  if (memberships.length === 0) {
-    setOrganizations([])
-    setPortfolios([])
-    setProjects([])
-    setLoading(false)
-    return
-  }
+    if (memberships.length === 0) {
+      setOrganizations([])
+      setPortfolios([])
+      setProjects([])
+      setCanManageWorkspace(false)
+      setLoading(false)
+      return
+    }
 
-  const hasWorkspaceAccess = memberships.some(
-    membership => membership.access_scope === 'workspace'
-  )
-
-  const [
-    { data: orgs, error: orgError },
-    { data: ports, error: portError },
-    { data: projs, error: projectError },
-  ] = await Promise.all([
-    supabase.from('organizations').select('*').order('created_at'),
-    supabase.from('portfolios').select('*').order('created_at'),
-    supabase.from('projects').select('*').order('id'),
-  ])
-
-  if (orgError || portError || projectError) {
-    alert(
-      orgError?.message ||
-        portError?.message ||
-        projectError?.message ||
-        'Unable to load workspace.'
+    const hasWorkspaceAccess = memberships.some(
+      membership => membership.access_scope === 'workspace'
     )
-    setLoading(false)
-    return
-  }
 
-  if (hasWorkspaceAccess) {
-    setOrganizations(orgs || [])
-    setPortfolios(ports || [])
-    setProjects(projs || [])
-    setLoading(false)
-    return
-  }
+    setCanManageWorkspace(hasWorkspaceAccess)
 
-  const allowedProjectIds = memberships
-    .filter(membership => membership.access_scope === 'project')
-    .map(membership => membership.project_id)
+    const [
+      { data: orgs, error: orgError },
+      { data: ports, error: portError },
+      { data: projs, error: projectError },
+    ] = await Promise.all([
+      supabase.from('organizations').select('*').order('created_at'),
+      supabase.from('portfolios').select('*').order('created_at'),
+      supabase.from('projects').select('*').order('id'),
+    ])
 
-  const allowedPortfolioIds = memberships
-    .filter(membership => membership.access_scope === 'portfolio')
-    .map(membership => membership.portfolio_id)
+    if (orgError || portError || projectError) {
+      alert(
+        orgError?.message ||
+          portError?.message ||
+          projectError?.message ||
+          'Unable to load workspace.'
+      )
+      setLoading(false)
+      return
+    }
 
-  const visibleProjects = (projs || []).filter(project => {
-    return (
-      allowedProjectIds.includes(project.id) ||
-      allowedPortfolioIds.includes(project.portfolio_id)
+    if (hasWorkspaceAccess) {
+      setOrganizations(orgs || [])
+      setPortfolios(ports || [])
+      setProjects(projs || [])
+      setLoading(false)
+      return
+    }
+
+    const allowedProjectIds = memberships
+      .filter(membership => membership.access_scope === 'project')
+      .map(membership => membership.project_id)
+      .filter(Boolean)
+
+    const allowedPortfolioIds = memberships
+      .filter(membership => membership.access_scope === 'portfolio')
+      .map(membership => membership.portfolio_id)
+      .filter(Boolean)
+
+    const visibleProjects = (projs || []).filter(project => {
+      return (
+        allowedProjectIds.includes(project.id) ||
+        allowedPortfolioIds.includes(project.portfolio_id)
+      )
+    })
+
+    const visiblePortfolioIds = [
+      ...new Set(
+        visibleProjects
+          .map(project => project.portfolio_id)
+          .filter(Boolean)
+      ),
+    ]
+
+    const visibleOrgIds = [
+      ...new Set(
+        visibleProjects
+          .map(project => project.organization_id)
+          .filter(Boolean)
+      ),
+    ]
+
+    const visiblePortfolios = (ports || []).filter(portfolio =>
+      visiblePortfolioIds.includes(portfolio.id)
     )
-  })
 
-  const visiblePortfolioIds = [
-    ...new Set(visibleProjects.map(project => project.portfolio_id)),
-  ]
+    const visibleOrganizations = (orgs || []).filter(org =>
+      visibleOrgIds.includes(org.id)
+    )
 
-  const visibleOrgIds = [
-    ...new Set(visibleProjects.map(project => project.organization_id)),
-  ]
+    setOrganizations(visibleOrganizations)
+    setPortfolios(visiblePortfolios)
+    setProjects(visibleProjects)
+    setLoading(false)
+  }
 
-  const visiblePortfolios = (ports || []).filter(portfolio =>
-    visiblePortfolioIds.includes(portfolio.id)
-  )
-
-  const visibleOrganizations = (orgs || []).filter(org =>
-    visibleOrgIds.includes(org.id)
-  )
-
-  setOrganizations(visibleOrganizations)
-  setPortfolios(visiblePortfolios)
-  setProjects(visibleProjects)
-  setLoading(false)
-}
   function openProject(project: any) {
     setProject(
       Number(project.id),
@@ -212,6 +226,7 @@ export default function ProjectsPage() {
   }
 
   const totalProjects = projects.length
+
   const activeProjects = projects.filter(
     project => (project.status || 'Active') === 'Active'
   ).length
@@ -228,39 +243,41 @@ export default function ProjectsPage() {
             <PMOCorexLogo size={42} />
           </button>
 
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
-           <button
-  onClick={() => navigate('/admin')}
-  className="btn-ghost btn-sm btn justify-center"
->
-  <Shield size={14} />
-  Admin Console
-</button>
+          {canManageWorkspace && (
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+              <button
+                onClick={() => navigate('/admin')}
+                className="btn-ghost btn-sm btn justify-center"
+              >
+                <Shield size={14} />
+                Admin Console
+              </button>
 
-            <button
-              onClick={() => setShowOrgModal(true)}
-              className="btn-ghost btn-sm btn justify-center"
-            >
-              <Building2 size={14} />
-              New Organization
-            </button>
+              <button
+                onClick={() => setShowOrgModal(true)}
+                className="btn-ghost btn-sm btn justify-center"
+              >
+                <Building2 size={14} />
+                New Organization
+              </button>
 
-            <button
-              onClick={() => setShowPortfolioModal(true)}
-              className="btn-ghost btn-sm btn justify-center"
-            >
-              <Briefcase size={14} />
-              New Portfolio
-            </button>
+              <button
+                onClick={() => setShowPortfolioModal(true)}
+                className="btn-ghost btn-sm btn justify-center"
+              >
+                <Briefcase size={14} />
+                New Portfolio
+              </button>
 
-            <button
-              onClick={() => setShowProjectModal(true)}
-              className="btn-gold btn-sm btn justify-center col-span-2 sm:col-span-1"
-            >
-              <Plus size={14} />
-              New Project
-            </button>
-          </div>
+              <button
+                onClick={() => setShowProjectModal(true)}
+                className="btn-gold btn-sm btn justify-center col-span-2 sm:col-span-1"
+              >
+                <Plus size={14} />
+                New Project
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8 lg:p-10">
@@ -290,16 +307,14 @@ export default function ProjectsPage() {
         </div>
 
         {loading ? (
-          <div className="card p-8 text-slate-400">
-            Loading workspace…
-          </div>
+          <div className="card p-8 text-slate-400">Loading workspace…</div>
         ) : (
           <div className="space-y-10">
             {organizations.length === 0 ? (
               <EmptyHub
-                title="No organization yet"
-                message="Create your first organization to start grouping portfolios and projects."
-                action={() => setShowOrgModal(true)}
+                title="No workspace access"
+                message="You do not currently have access to any organization, portfolio, or project."
+                action={() => navigate('/mixta-admin-login')}
               />
             ) : (
               organizations.map(org => {
@@ -329,37 +344,39 @@ export default function ProjectsPage() {
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => navigate('/admin')}
-                          className="btn-ghost btn-sm btn w-fit"
-                        >
-                          <Shield size={14} />
-                          Manage Access
-                        </button>
+                      {canManageWorkspace && (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => navigate('/admin')}
+                            className="btn-ghost btn-sm btn w-fit"
+                          >
+                            <Shield size={14} />
+                            Manage Access
+                          </button>
 
-                        <button
-                          onClick={() => {
-                            setSelectedOrgId(org.id)
-                            setShowPortfolioModal(true)
-                          }}
-                          className="btn-ghost btn-sm btn w-fit"
-                        >
-                          <Briefcase size={14} />
-                          Add Portfolio
-                        </button>
+                          <button
+                            onClick={() => {
+                              setSelectedOrgId(org.id)
+                              setShowPortfolioModal(true)
+                            }}
+                            className="btn-ghost btn-sm btn w-fit"
+                          >
+                            <Briefcase size={14} />
+                            Add Portfolio
+                          </button>
 
-                        <button
-                          onClick={() => {
-                            setSelectedOrgId(org.id)
-                            setShowProjectModal(true)
-                          }}
-                          className="btn-gold btn-sm btn w-fit"
-                        >
-                          <Plus size={14} />
-                          Add Project
-                        </button>
-                      </div>
+                          <button
+                            onClick={() => {
+                              setSelectedOrgId(org.id)
+                              setShowProjectModal(true)
+                            }}
+                            className="btn-gold btn-sm btn w-fit"
+                          >
+                            <Plus size={14} />
+                            Add Project
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
@@ -423,15 +440,17 @@ export default function ProjectsPage() {
                             Infrastructure, or Commercial.
                           </div>
 
-                          <button
-                            onClick={() => {
-                              setSelectedOrgId(org.id)
-                              setShowPortfolioModal(true)
-                            }}
-                            className="btn-gold btn mt-5"
-                          >
-                            Create Portfolio
-                          </button>
+                          {canManageWorkspace && (
+                            <button
+                              onClick={() => {
+                                setSelectedOrgId(org.id)
+                                setShowPortfolioModal(true)
+                              }}
+                              className="btn-gold btn mt-5"
+                            >
+                              Create Portfolio
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -459,39 +478,13 @@ export default function ProjectsPage() {
                 )
               })
             )}
-
-            {projects.filter(project => !project.organization_id).length > 0 && (
-              <div className="card p-5 sm:p-6 lg:p-7">
-                <div className="mb-5">
-                  <h2 className="text-xl font-bold text-[#ede8de]">
-                    Unassigned Projects
-                  </h2>
-
-                  <p className="text-sm text-slate-500 mt-1">
-                    These projects are not yet linked to an organization or portfolio.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {projects
-                    .filter(project => !project.organization_id)
-                    .map(project => (
-                      <ProjectCard
-                        key={project.id}
-                        project={project}
-                        onClick={() => openProject(project)}
-                      />
-                    ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         <div className="h-40" />
       </div>
 
-      {showOrgModal && (
+      {showOrgModal && canManageWorkspace && (
         <Modal title="Create Organization" onClose={() => setShowOrgModal(false)}>
           <input
             className="form-control mb-4"
@@ -509,7 +502,7 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {showPortfolioModal && (
+      {showPortfolioModal && canManageWorkspace && (
         <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
           <select
             className="form-control mb-4"
@@ -541,7 +534,7 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {showProjectModal && (
+      {showProjectModal && canManageWorkspace && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
           <select
             className="form-control mb-4"
@@ -568,7 +561,11 @@ export default function ProjectsPage() {
             <option value="">Select portfolio</option>
 
             {portfolios
-              .filter(portfolio => !selectedOrgId || portfolio.organization_id === selectedOrgId)
+              .filter(
+                portfolio =>
+                  !selectedOrgId ||
+                  portfolio.organization_id === selectedOrgId
+              )
               .map(portfolio => (
                 <option key={portfolio.id} value={portfolio.id}>
                   {portfolio.name}
@@ -658,16 +655,12 @@ function EmptyHub({ title, message, action }: any) {
         <Building2 size={24} className="text-[#c49e48]" />
       </div>
 
-      <div className="text-xl font-bold text-white">
-        {title}
-      </div>
+      <div className="text-xl font-bold text-white">{title}</div>
 
-      <div className="text-sm text-slate-500 mt-2">
-        {message}
-      </div>
+      <div className="text-sm text-slate-500 mt-2">{message}</div>
 
       <button onClick={action} className="btn-gold btn mt-5">
-        Create Organization
+        Back to Login
       </button>
     </div>
   )
@@ -678,14 +671,9 @@ function Modal({ title, children, onClose }: any) {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="card w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-white">
-            {title}
-          </h2>
+          <h2 className="text-lg font-bold text-white">{title}</h2>
 
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-white"
-          >
+          <button onClick={onClose} className="text-slate-500 hover:text-white">
             ✕
           </button>
         </div>
