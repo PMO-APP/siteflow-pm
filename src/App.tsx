@@ -69,91 +69,66 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-    let mounted = true
+  let mounted = true
 
-    async function loadAuthUser() {
-      try {
-        setLoading(true)
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!mounted) return
-
-        if (!session?.user) {
-          setUser(null)
-          return
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        if (!mounted) return
-
-        setUser({
-          ...session.user,
-          ...(profile || {}),
-          email: profile?.email || session.user.email,
-          full_name:
-            profile?.full_name ||
-            session.user.user_metadata?.full_name ||
-            'Admin',
-          role: profile?.role || 'admin',
-        } as any)
-      } catch (error) {
-        console.error('Auth initialization failed:', error)
-
-        if (mounted) {
-          setUser(null)
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadAuthUser()
+  async function loadAuthUser() {
+    setLoading(true)
 
     const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) {
-        setUser(null)
-        setLoading(false)
-        return
-      }
+      data: { session },
+      error,
+    } = await supabase.auth.getSession()
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle()
+    if (!mounted) return
 
-      setUser({
-        ...session.user,
-        ...(profile || {}),
-        email: profile?.email || session.user.email,
-        full_name:
-          profile?.full_name ||
-          session.user.user_metadata?.full_name ||
-          session.user.email ||
-          'Admin',
-        role: profile?.role || 'admin',
-      } as any)
-
+    if (error || !session?.user) {
+      setUser(null)
       setLoading(false)
-    })
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
+      return
     }
-  }, [setUser, setLoading])
+
+    setUser({
+      ...session.user,
+      email: session.user.email,
+      full_name:
+        session.user.user_metadata?.full_name ||
+        session.user.email ||
+        'Admin',
+      role: session.user.user_metadata?.role || 'admin',
+    } as any)
+
+    setLoading(false)
+  }
+
+  loadAuthUser()
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session?.user) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
+    setUser({
+      ...session.user,
+      email: session.user.email,
+      full_name:
+        session.user.user_metadata?.full_name ||
+        session.user.email ||
+        'Admin',
+      role: session.user.user_metadata?.role || 'admin',
+    } as any)
+
+    setLoading(false)
+  })
+
+  return () => {
+    mounted = false
+    subscription.unsubscribe()
+  }
+}, [setUser, setLoading])
 
   return (
     <BrowserRouter>
