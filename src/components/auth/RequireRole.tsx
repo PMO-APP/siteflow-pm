@@ -8,15 +8,7 @@ export default function RequireRole({
   children: React.ReactNode
   allowedRoles: string[]
 }) {
-  const { role, loading } = useMembershipStore()
-
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    )
-  }
+  const role = useMembershipStore(state => state.role)
 
   if (!role || !allowedRoles.includes(role)) {
     return <Navigate to="/projects" replace />
