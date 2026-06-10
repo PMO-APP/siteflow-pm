@@ -151,12 +151,7 @@ export default function RiskPage() {
 
   const role = getRole(user?.email)
 
-  const canEdit = canEditRisk(
-    role,
-    'risk',
-    user?.email,
-    projectOwnerEmail
-  )
+  const canEdit = canEditRisk(role)
   const [modal, setModal] = useState<Risk | null | 'new'>(null)
   const [catFilter, setCatFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
