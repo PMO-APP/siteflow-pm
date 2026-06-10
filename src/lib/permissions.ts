@@ -120,7 +120,15 @@ export function canManageFinancials(role?: string | null) {
     'portfolio_manager',
   ].includes(role || '')
 }
-
+export function canExportReports(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_owner',
+    'project_manager',
+  ].includes(role || '')
+}
 export function isReadOnly(role?: string | null) {
   return role === 'guest'
 }
