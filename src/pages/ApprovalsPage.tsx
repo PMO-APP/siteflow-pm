@@ -1,7 +1,5 @@
-import { useProjectStore } from '@/store/project'
-import { canEditPage, canDelete } from '@/lib/permissions'
-import { useAuthStore } from '@/store/auth'
-import { getRole } from '@/lib/access'
+import { useMembershipStore } from '@/store/membership'
+import { canApprove } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useApprovals, useUpsertApproval } from '@/hooks/useData'
@@ -53,10 +51,7 @@ function ApprovalModal({
 
   const set = (key: string, value: any) => {
     setForm(prev => {
-      const next = {
-        ...prev,
-        [key]: value,
-      }
+      const next = { ...prev, [key]: value }
 
       if (key === 'status' && value === 'Approved' && !next.approved_date) {
         next.approved_date = new Date().toISOString().slice(0, 10)
@@ -70,9 +65,8 @@ function ApprovalModal({
     })
   }
 
-  const cleanDate = (value: string) => {
-    return value && value.trim() !== '' ? value : null
-  }
+  const cleanDate = (value: string) =>
+    value && value.trim() !== '' ? value : null
 
   const save = async () => {
     if (!form.title.trim() && !isEditMode) return
@@ -136,27 +130,12 @@ function ApprovalModal({
         {isEditMode && (
           <div className="grid grid-cols-2 gap-2 px-5 py-3 bg-[#111820] border-b border-white/[0.06]">
             {[
-              {
-                label: 'Title',
-                value: item.title,
-              },
-              {
-                label: 'Type',
-                value: item.type,
-              },
-              {
-                label: 'Submitted',
-                value: fdate(item.submitted_date),
-              },
-              {
-                label: 'Deadline',
-                value: fdate(item.deadline),
-              },
+              { label: 'Title', value: item.title },
+              { label: 'Type', value: item.type },
+              { label: 'Submitted', value: fdate(item.submitted_date) },
+              { label: 'Deadline', value: fdate(item.deadline) },
             ].map(info => (
-              <div
-                key={info.label}
-                className="rounded-lg bg-[#1c2a36] p-2"
-              >
+              <div key={info.label} className="rounded-lg bg-[#1c2a36] p-2">
                 <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase tracking-widest">
                   {info.label}
                 </div>
@@ -274,11 +253,6 @@ function ApprovalModal({
               rows={3}
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              placeholder={
-                isEditMode
-                  ? 'Add description, update, approval condition, or clarification…'
-                  : 'Describe the approval request…'
-              }
             />
           </div>
 
@@ -301,16 +275,12 @@ function ApprovalModal({
               rows={3}
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
-              placeholder="Add latest action, responsible party, remarks, or next step…"
             />
           </div>
         </div>
 
         <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
-          <button
-            className="btn-ghost btn-sm btn"
-            onClick={onClose}
-          >
+          <button className="btn-ghost btn-sm btn" onClick={onClose}>
             Cancel
           </button>
 
@@ -333,17 +303,9 @@ function ApprovalModal({
 
 export default function ApprovalsPage() {
   const { data: approvals = [], isLoading } = useApprovals()
-  const { user } = useAuthStore()
-const { projectOwnerEmail } = useProjectStore()
+  const role = useMembershipStore(state => state.role)
+  const canEdit = canApprove(role)
 
-const role = getRole(user?.email)
-
-const canEdit = canEditPage(
-  role,
-  'approvals',
-  user?.email,
-  projectOwnerEmail
-)
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
   const [typeFilter, setTypeFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
@@ -394,23 +356,22 @@ const canEdit = canEditPage(
 
   return (
     <div className="space-y-4">
+      {!canEdit && (
+        <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+          View Only Mode — you can view approvals, but you cannot create,
+          approve, reject, or update approval records.
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
         {[
-          {
-            label: 'Pending',
-            value: pending,
-            color: 'text-amber-400',
-          },
+          { label: 'Pending', value: pending, color: 'text-amber-400' },
           {
             label: 'Overdue',
             value: overdue,
             color: overdue > 0 ? 'text-red-400' : 'text-emerald-400',
           },
-          {
-            label: 'Approved',
-            value: approved,
-            color: 'text-emerald-400',
-          },
+          { label: 'Approved', value: approved, color: 'text-emerald-400' },
         ].map(stat => (
           <div key={stat.label} className="card p-3">
             <div className={`font-display text-3xl font-bold ${stat.color}`}>
@@ -450,14 +411,14 @@ const canEdit = canEditPage(
         </select>
 
         {canEdit && (
-  <button
-    className="btn-gold btn-sm btn ml-auto"
-    onClick={() => setModal('new')}
-  >
-    <Plus size={13} />
-    New Approval
-  </button>
-)}
+          <button
+            className="btn-gold btn-sm btn ml-auto"
+            onClick={() => setModal('new')}
+          >
+            <Plus size={13} />
+            New Approval
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -552,17 +513,19 @@ const canEdit = canEditPage(
                       </td>
 
                       <td>
-  {canEdit ? (
-    <button
-      className="tbl-action"
-      onClick={() => setModal(approval)}
-    >
-      Edit
-    </button>
-  ) : (
-    <span className="text-[10px] text-[#6e7d8c]">View only</span>
-  )}
-</td>
+                        {canEdit ? (
+                          <button
+                            className="tbl-action"
+                            onClick={() => setModal(approval)}
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-[#6e7d8c]">
+                            View only
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   )
                 })
@@ -572,7 +535,7 @@ const canEdit = canEditPage(
         </div>
       </div>
 
-      {modal !== null && (
+      {modal !== null && canEdit && (
         <ApprovalModal
           item={modal === 'new' ? null : (modal as Approval)}
           onClose={() => setModal(null)}
