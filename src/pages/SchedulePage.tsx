@@ -165,7 +165,6 @@ export default function SchedulePage() {
           phase: row['Phase'] || 'Imported Excel Schedule',
           start_date: excelDateToISO(row['Start Date']),
           finish_date: excelDateToISO(row['Finish Date']),
-          duration_days: row['Duration'] ? Number(row['Duration']) : null,
           dependencies: row['Dependencies'] || null,
           responsible: row['Responsible'] || null,
           status: row['Status'] || 'Not Started',
@@ -261,7 +260,6 @@ export default function SchedulePage() {
               : 'Imported MS Project Schedule',
           start_date: start ? start.slice(0, 10) : null,
           finish_date: finish ? finish.slice(0, 10) : null,
-          duration_days: msProjectDurationToDays(duration),
           dependencies: null,
           responsible: null,
           status:
