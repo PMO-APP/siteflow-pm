@@ -1,9 +1,11 @@
-import { useProjectStore } from '@/store/project'
-import { useAuthStore } from '@/store/auth'
+import { useMembershipStore } from '@/store/membership'
+import { canEditProcurement } from '@/lib/permissions'
 import { useState } from 'react'
-import { getRole } from '@/lib/access'
 import { Plus, X, Search } from 'lucide-react'
-import { useProcurement, useUpsertProcurement } from '@/hooks/useData'
+import {
+  useProcurement,
+  useUpsertProcurement,
+} from '@/hooks/useData'
 import { fdate, urgencyColor } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { ProcurementItem } from '@/types'
@@ -41,13 +43,6 @@ function ProcModal({
   onClose: () => void
 }) {
   const upsert = useUpsertProcurement()
-const { user } = useAuthStore()
-  const role = getRole(user?.email)
-const isEditMode = !!item
-const canEdit =
-  role === 'admin' ||
-  !item ||
-  item.created_by === user?.id
 
   const [form, setForm] = useState({
     name: item?.name || '',
@@ -72,6 +67,8 @@ const canEdit =
     notes: item?.notes || '',
   })
 
+  const isEditMode = !!item
+
   const set = (key: string, value: any) => {
     setForm(prev => {
       const next = {
@@ -87,11 +84,10 @@ const canEdit =
     })
   }
 
-  const cleanDate = (value: string) => {
-    return value && value.trim() !== '' ? value : null
-  }
+  const cleanDate = (value: string) =>
+    value && value.trim() !== '' ? value : null
 
-  const save = async () => {
+  async function save() {
     if (!isEditMode && !form.name.trim()) return
 
     if (isEditMode) {
@@ -109,7 +105,6 @@ const canEdit =
     } else {
       await upsert.mutateAsync({
         name: form.name.trim(),
-        created_by: user?.id,
         specification: form.specification || null,
         category: form.category,
         quantity: Number(form.quantity || 0),
@@ -138,11 +133,14 @@ const canEdit =
   return (
     <div
       className="modal-overlay"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose()
+      onClick={event => {
+        if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal max-w-2xl"
+        onClick={event => event.stopPropagation()}
+      >
         <div className="gold-bar" />
 
         <div className="modal-head">
@@ -164,7 +162,10 @@ const canEdit =
               { label: 'Item', value: item.name },
               { label: 'Category', value: item.category },
               { label: 'Order By', value: fdate(item.order_by_date) },
-              { label: 'Required On Site', value: fdate(item.required_on_site) },
+              {
+                label: 'Required On Site',
+                value: fdate(item.required_on_site),
+              },
             ].map(info => (
               <div key={info.label} className="rounded-lg bg-[#1c2a36] p-2">
                 <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase tracking-widest">
@@ -187,7 +188,7 @@ const canEdit =
                 <input
                   className="form-control"
                   value={form.name}
-                  onChange={e => set('name', e.target.value)}
+                  onChange={event => set('name', event.target.value)}
                 />
               </div>
 
@@ -197,7 +198,7 @@ const canEdit =
                   className="form-control"
                   rows={2}
                   value={form.specification}
-                  onChange={e => set('specification', e.target.value)}
+                  onChange={event => set('specification', event.target.value)}
                 />
               </div>
 
@@ -207,7 +208,7 @@ const canEdit =
                   <select
                     className="form-control"
                     value={form.category}
-                    onChange={e => set('category', e.target.value)}
+                    onChange={event => set('category', event.target.value)}
                   >
                     {CATS.map(category => (
                       <option key={category}>{category}</option>
@@ -220,7 +221,7 @@ const canEdit =
                   <select
                     className="form-control"
                     value={form.status}
-                    onChange={e => set('status', e.target.value)}
+                    onChange={event => set('status', event.target.value)}
                   >
                     {STATUSES.map(status => (
                       <option key={status}>{status}</option>
@@ -236,7 +237,9 @@ const canEdit =
                     type="number"
                     className="form-control"
                     value={form.quantity}
-                    onChange={e => set('quantity', Number(e.target.value))}
+                    onChange={event =>
+                      set('quantity', Number(event.target.value))
+                    }
                   />
                 </div>
 
@@ -245,7 +248,7 @@ const canEdit =
                   <input
                     className="form-control"
                     value={form.unit}
-                    onChange={e => set('unit', e.target.value)}
+                    onChange={event => set('unit', event.target.value)}
                     placeholder="m², nr, set…"
                   />
                 </div>
@@ -256,7 +259,9 @@ const canEdit =
                     type="number"
                     className="form-control"
                     value={form.unit_cost}
-                    onChange={e => set('unit_cost', Number(e.target.value))}
+                    onChange={event =>
+                      set('unit_cost', Number(event.target.value))
+                    }
                   />
                 </div>
               </div>
@@ -268,7 +273,7 @@ const canEdit =
                     type="date"
                     className="form-control"
                     value={form.order_by_date}
-                    onChange={e => set('order_by_date', e.target.value)}
+                    onChange={event => set('order_by_date', event.target.value)}
                   />
                 </div>
 
@@ -278,7 +283,9 @@ const canEdit =
                     type="date"
                     className="form-control"
                     value={form.required_on_site}
-                    onChange={e => set('required_on_site', e.target.value)}
+                    onChange={event =>
+                      set('required_on_site', event.target.value)
+                    }
                   />
                 </div>
               </div>
@@ -290,7 +297,9 @@ const canEdit =
                     type="number"
                     className="form-control"
                     value={form.lead_time_days}
-                    onChange={e => set('lead_time_days', Number(e.target.value))}
+                    onChange={event =>
+                      set('lead_time_days', Number(event.target.value))
+                    }
                   />
                 </div>
 
@@ -299,7 +308,9 @@ const canEdit =
                     type="checkbox"
                     id="imported-item"
                     checked={form.is_imported}
-                    onChange={e => set('is_imported', e.target.checked)}
+                    onChange={event =>
+                      set('is_imported', event.target.checked)
+                    }
                     className="accent-[#c49e48]"
                   />
 
@@ -328,7 +339,7 @@ const canEdit =
             <select
               className="form-control"
               value={form.status}
-              onChange={e => set('status', e.target.value)}
+              onChange={event => set('status', event.target.value)}
             >
               {STATUSES.map(status => (
                 <option key={status}>{status}</option>
@@ -342,7 +353,7 @@ const canEdit =
               <input
                 className="form-control"
                 value={form.vendor}
-                onChange={e => set('vendor', e.target.value)}
+                onChange={event => set('vendor', event.target.value)}
               />
             </div>
 
@@ -351,7 +362,7 @@ const canEdit =
               <input
                 className="form-control"
                 value={form.vendor_contact}
-                onChange={e => set('vendor_contact', e.target.value)}
+                onChange={event => set('vendor_contact', event.target.value)}
               />
             </div>
 
@@ -361,7 +372,7 @@ const canEdit =
                 type="email"
                 className="form-control"
                 value={form.vendor_email}
-                onChange={e => set('vendor_email', e.target.value)}
+                onChange={event => set('vendor_email', event.target.value)}
               />
             </div>
           </div>
@@ -372,7 +383,7 @@ const canEdit =
               <input
                 className="form-control"
                 value={form.po_number}
-                onChange={e => set('po_number', e.target.value)}
+                onChange={event => set('po_number', event.target.value)}
               />
             </div>
 
@@ -382,7 +393,7 @@ const canEdit =
                 type="date"
                 className="form-control"
                 value={form.po_date}
-                onChange={e => set('po_date', e.target.value)}
+                onChange={event => set('po_date', event.target.value)}
               />
             </div>
 
@@ -392,7 +403,7 @@ const canEdit =
                 type="date"
                 className="form-control"
                 value={form.delivery_date}
-                onChange={e => set('delivery_date', e.target.value)}
+                onChange={event => set('delivery_date', event.target.value)}
               />
             </div>
           </div>
@@ -403,7 +414,7 @@ const canEdit =
               className="form-control"
               rows={3}
               value={form.notes}
-              onChange={e => set('notes', e.target.value)}
+              onChange={event => set('notes', event.target.value)}
               placeholder="Add latest procurement update, vendor response, delay reason, or delivery note…"
             />
           </div>
@@ -414,19 +425,17 @@ const canEdit =
             Cancel
           </button>
 
-          {canEdit && (
-  <button
-    className="btn-gold btn-sm btn"
-    onClick={save}
-    disabled={upsert.isPending}
-  >
-    {upsert.isPending
-      ? 'Saving…'
-      : isEditMode
-      ? 'Save Update'
-      : 'Create Item'}
-  </button>
-)}
+          <button
+            className="btn-gold btn-sm btn"
+            onClick={save}
+            disabled={upsert.isPending}
+          >
+            {upsert.isPending
+              ? 'Saving…'
+              : isEditMode
+              ? 'Save Update'
+              : 'Create Item'}
+          </button>
         </div>
       </div>
     </div>
@@ -435,19 +444,9 @@ const canEdit =
 
 export default function ProcurementPage() {
   const { data: items = [], isLoading } = useProcurement()
- const { user } = useAuthStore()
-const { projectOwnerEmail } = useProjectStore()
+  const role = useMembershipStore(state => state.role)
+  const canEdit = canEditProcurement(role)
 
-const canCreate = !!user
-
-const role = getRole(user?.email)
-
-const canEditProcurement = (item: ProcurementItem) => {
-  return (
-    role === 'admin' ||
-    (!!user?.id && item.created_by === user.id)
-  )
-}
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
@@ -522,6 +521,13 @@ const canEditProcurement = (item: ProcurementItem) => {
 
   return (
     <div className="space-y-4">
+      {!canEdit && (
+        <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+          Procurement Register View Only — you can view procurement records,
+          but you cannot add, edit, or update procurement items.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {
@@ -568,14 +574,14 @@ const canEditProcurement = (item: ProcurementItem) => {
             className="form-control pl-7 text-[12px] py-1.5"
             placeholder="Search items…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={event => setSearch(event.target.value)}
           />
         </div>
 
         <select
           className="form-control text-[12px] py-1.5 w-auto"
           value={catFilter}
-          onChange={e => setCatFilter(e.target.value)}
+          onChange={event => setCatFilter(event.target.value)}
         >
           <option value="">All Categories</option>
 
@@ -587,7 +593,7 @@ const canEditProcurement = (item: ProcurementItem) => {
         <select
           className="form-control text-[12px] py-1.5 w-auto"
           value={statFilter}
-          onChange={e => setStatFilter(e.target.value)}
+          onChange={event => setStatFilter(event.target.value)}
         >
           <option value="">All</option>
           <option value="OVERDUE">🔴 Overdue</option>
@@ -595,15 +601,15 @@ const canEditProcurement = (item: ProcurementItem) => {
           <option value="OK">🟢 On Track</option>
         </select>
 
-        {canCreate && (
-  <button
-    className="btn-gold btn-sm btn ml-auto"
-    onClick={() => setModal('new')}
-  >
-    <Plus size={13} />
-    Add Item
-  </button>
-)}
+        {canEdit && (
+          <button
+            className="btn-gold btn-sm btn ml-auto"
+            onClick={() => setModal('new')}
+          >
+            <Plus size={13} />
+            Add Item
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -626,10 +632,7 @@ const canEditProcurement = (item: ProcurementItem) => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td
-                    colSpan={9}
-                    className="text-center py-6 text-[#6e7d8c]"
-                  >
+                  <td colSpan={9} className="text-center py-6 text-[#6e7d8c]">
                     Loading…
                   </td>
                 </tr>
@@ -665,9 +668,7 @@ const canEditProcurement = (item: ProcurementItem) => {
                     item.status === 'In Transit'
                   ) {
                     statusBadge = (
-                      <span className="badge badge-blue">
-                        {item.status}
-                      </span>
+                      <span className="badge badge-blue">{item.status}</span>
                     )
                   } else if (overdue) {
                     statusBadge = (
@@ -710,7 +711,9 @@ const canEditProcurement = (item: ProcurementItem) => {
                             {fdate(item.order_by_date)}
                             {days !== null && (
                               <span className="text-[9px] ml-1">
-                                ({days < 0 ? `${Math.abs(days)}d ago` : `${days}d`})
+                                {days < 0
+                                  ? `(${Math.abs(days)}d ago)`
+                                  : `(${days}d)`}
                               </span>
                             )}
                           </>
@@ -735,33 +738,40 @@ const canEditProcurement = (item: ProcurementItem) => {
                         {item.vendor || '—'}
                       </td>
 
-                     <td>
-  {canEditProcurement(item) ? (
-  <button
-    className="tbl-action"
-    onClick={() => setModal(item)}
-  >
-    Edit
-  </button>
-) : (
-  <button
-    className="tbl-action"
-    onClick={() => setModal(item)}
-  >
-    View
-  </button>
-)}
-</td>
+                      <td>
+                        {canEdit ? (
+                          <button
+                            className="tbl-action"
+                            onClick={() => setModal(item)}
+                          >
+                            Edit
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-[#6e7d8c]">
+                            View only
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   )
                 })
+              )}
+
+              {!isLoading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-[#6e7d8c]">
+                    {items.length === 0
+                      ? 'No procurement items logged yet.'
+                      : 'No procurement items match filters.'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {modal !== null && (
+      {modal !== null && canEdit && (
         <ProcModal
           item={modal === 'new' ? null : (modal as ProcurementItem)}
           onClose={() => setModal(null)}
