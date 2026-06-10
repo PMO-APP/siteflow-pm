@@ -497,6 +497,7 @@ export default function AdminPage() {
 
                   {inviteScope === 'project' && (
                     <select
+                      
                       className="form-control"
                       value={selectedProjectId}
                       onChange={e =>
@@ -504,7 +505,7 @@ export default function AdminPage() {
                       }
                     >
                       <option value="">Select Project</option>
-
+<option value="project_owner">Project Owner</option>
                       {filteredProjects.map(project => (
                         <option key={project.id} value={project.id}>
                           {project.project_name}
