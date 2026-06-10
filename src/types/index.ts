@@ -342,3 +342,69 @@ export interface QualityGate {
   photos?: string[]
   created_at: string
 }
+// ─────────────────────────────────────────────
+// WEEKLY REPORTS
+// ─────────────────────────────────────────────
+
+export interface WeeklyReport {
+  id: string
+
+  project_id: number
+
+  reporting_officer?: string
+  report_date: string
+
+  status?: string
+
+  pending_issues?: string
+  matters_arising?: string
+  look_ahead?: string
+  next_meeting?: string
+
+  quality_tracking?: string
+  procurement_tracking?: string
+  safety_tracking?: string
+
+  created_at?: string
+}
+
+export interface WeeklyActivity {
+  id: string
+
+  report_id: string
+
+  activity: string
+
+  last_week?: number
+  this_week?: number
+  planned?: number
+
+  remarks?: string
+
+  created_at?: string
+}
+
+export interface WeeklyPhoto {
+  id: string
+
+  report_id: string
+
+  photo_url: string
+  caption?: string
+
+  created_at?: string
+}
+
+export interface SafetyLog {
+  id: string
+
+  report_id: string
+
+  ua_uc?: number
+  near_miss?: number
+  lti?: number
+  accidents?: number
+  fatalities?: number
+
+  created_at?: string
+}
