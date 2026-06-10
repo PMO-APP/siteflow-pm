@@ -8,7 +8,6 @@ interface MembershipState {
   organizationId: number | null
   portfolioId: number | null
   projectId: number | null
-  loading: boolean
 
   setMembership: (membership: {
     role: string | null
@@ -18,7 +17,6 @@ interface MembershipState {
     projectId?: number | null
   }) => void
 
-  setMembershipLoading: (loading: boolean) => void
   clearMembership: () => void
 }
 
@@ -28,7 +26,6 @@ export const useMembershipStore = create<MembershipState>(set => ({
   organizationId: null,
   portfolioId: null,
   projectId: null,
-  loading: true,
 
   setMembership: membership =>
     set({
@@ -37,10 +34,7 @@ export const useMembershipStore = create<MembershipState>(set => ({
       organizationId: membership.organizationId ?? null,
       portfolioId: membership.portfolioId ?? null,
       projectId: membership.projectId ?? null,
-      loading: false,
     }),
-
-  setMembershipLoading: loading => set({ loading }),
 
   clearMembership: () =>
     set({
@@ -49,6 +43,5 @@ export const useMembershipStore = create<MembershipState>(set => ({
       organizationId: null,
       portfolioId: null,
       projectId: null,
-      loading: false,
     }),
 }))
