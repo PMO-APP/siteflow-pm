@@ -23,6 +23,9 @@ export function canEditSchedule(role?: string | null) {
     'project_manager',
   ].includes(role || '')
 }
+export const canEditDocuments = (role?: string) => {
+  return role === 'admin' || role === 'pmo'
+}
 export function canEditProcurement(role?: string | null) {
   return [
     'workspace_admin',
