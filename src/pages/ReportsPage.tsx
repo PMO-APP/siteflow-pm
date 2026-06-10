@@ -140,7 +140,7 @@ export default function ReportsPage() {
       last_week: Number(activityForm.last_week || 0),
       this_week: Number(activityForm.this_week || 0),
       planned: Number(activityForm.planned || 0),
-      remarks: activityForm.remarks || null,
+      remarks: activityForm.remarks || undefined,
     })
 
     setActivityForm({
