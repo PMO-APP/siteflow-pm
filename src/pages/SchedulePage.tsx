@@ -1,12 +1,25 @@
 import { useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
-import { Upload, Plus, List, BarChart2, Flag, Search } from 'lucide-react'
+import {
+  Upload,
+  Plus,
+  List,
+  BarChart2,
+  Flag,
+  Search,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
+import { useMembershipStore } from '@/store/membership'
+import { canEditSchedule } from '@/lib/permissions'
 import { Fragment, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useQualityGates } from '@/hooks/useData'
-import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
+import {
+  fdate,
+  urgencyColor,
+  computeRAG,
+} from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { Task } from '@/types'
 import TaskModal from '@/components/modules/schedule/TaskModal'
@@ -17,6 +30,9 @@ type View = 'list' | 'gantt' | 'milestones'
 
 export default function SchedulePage() {
   const { projectId, projectName } = useProjectStore()
+  const role = useMembershipStore(state => state.role)
+  const canEdit = canEditSchedule(role)
+
   const queryClient = useQueryClient()
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
@@ -66,6 +82,11 @@ export default function SchedulePage() {
   const handlePdfUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
+    if (!canEdit) {
+      event.target.value = ''
+      return
+    }
+
     const file = event.target.files?.[0]
 
     if (!file || !projectId) {
@@ -91,6 +112,11 @@ export default function SchedulePage() {
   const handleScheduleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
+    if (!canEdit) {
+      event.target.value = ''
+      return
+    }
+
     const file = event.target.files?.[0]
 
     if (!file || !projectId) {
@@ -139,7 +165,9 @@ export default function SchedulePage() {
         }))
 
       if (!tasksToInsert.length) {
-        alert('No valid tasks found. Make sure your Excel has a Task Name column.')
+        alert(
+          'No valid tasks found. Make sure your Excel has a Task Name column.'
+        )
         return
       }
 
@@ -203,7 +231,12 @@ export default function SchedulePage() {
 
       if (phaseFilter !== 'All' && task.phase !== phaseFilter) return false
       if (ragFilter && getRag(task) !== ragFilter) return false
-      if (statusFilter && (task.status || 'Not Started') !== statusFilter) return false
+      if (
+        statusFilter &&
+        (task.status || 'Not Started') !== statusFilter
+      ) {
+        return false
+      }
 
       return true
     })
@@ -232,24 +265,39 @@ export default function SchedulePage() {
     red: tasks.filter(task => getRag(task) === 'RED').length,
     amber: tasks.filter(task => getRag(task) === 'AMBER').length,
   }
-const isTaskLocked = (task: Task) => {
-  return qualityGates.some(
-    gate =>
-      gate.blocks_task_id === task.id &&
-      gate.status !== 'Approved' &&
-      gate.status !== 'Reapproved'
-  )
-}
+
+  const isTaskLocked = (task: Task) => {
+    return qualityGates.some(
+      gate =>
+        gate.blocks_task_id === task.id &&
+        gate.status !== 'Approved' &&
+        gate.status !== 'Reapproved'
+    )
+  }
+
   const getBlockingGate = (task: Task) => {
-  return qualityGates.find(
-    gate =>
-      gate.blocks_task_id === task.id &&
-      gate.status !== 'Approved' &&
-      gate.status !== 'Reapproved'
-  )
-}
+    return qualityGates.find(
+      gate =>
+        gate.blocks_task_id === task.id &&
+        gate.status !== 'Approved' &&
+        gate.status !== 'Reapproved'
+    )
+  }
+
+  const openTaskModal = (task: Task | 'new') => {
+    if (!canEdit) return
+    setModalTask(task)
+  }
+
   return (
     <div className="space-y-4">
+      {!canEdit && (
+        <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+          Schedule View Only — you can view the master schedule, but you cannot
+          upload, add, or edit tasks.
+        </div>
+      )}
+
       <div>
         <div className="text-xl font-semibold text-[#ede8de]">
           Master Schedule
@@ -356,43 +404,47 @@ const isTaskLocked = (task: Task) => {
           ))}
         </select>
 
-        <div className="flex gap-2 ml-auto">
-          <label className="btn-ghost btn-sm btn cursor-pointer">
-            <Upload size={13} />
-            Upload Schedule
-            <input
-              type="file"
-              hidden
-              accept=".xlsx,.xls,.csv"
-              onChange={handleScheduleUpload}
-            />
-          </label>
+        {canEdit && (
+          <div className="flex gap-2 ml-auto">
+            <label className="btn-ghost btn-sm btn cursor-pointer">
+              <Upload size={13} />
+              Upload Schedule
+              <input
+                type="file"
+                hidden
+                accept=".xlsx,.xls,.csv"
+                onChange={handleScheduleUpload}
+              />
+            </label>
 
-          <label className="btn-ghost btn-sm btn cursor-pointer">
-            <Upload size={13} />
-            Upload PDF
-            <input
-              type="file"
-              hidden
-              accept=".pdf"
-              onChange={handlePdfUpload}
-            />
-          </label>
+            <label className="btn-ghost btn-sm btn cursor-pointer">
+              <Upload size={13} />
+              Upload PDF
+              <input
+                type="file"
+                hidden
+                accept=".pdf"
+                onChange={handlePdfUpload}
+              />
+            </label>
 
-          <button
-            className="btn-gold btn-sm btn"
-            onClick={() => setModalTask('new')}
-          >
-            <Plus size={13} />
-            Add Task
-          </button>
-        </div>
+            <button
+              className="btn-gold btn-sm btn"
+              onClick={() => openTaskModal('new')}
+            >
+              <Plus size={13} />
+              Add Task
+            </button>
+          </div>
+        )}
       </div>
 
       {view === 'gantt' && (
         <GanttView
           tasks={filtered}
-          onTaskClick={(task: Task) => setModalTask(task)}
+          onTaskClick={(task: Task) => {
+            if (canEdit) openTaskModal(task)
+          }}
         />
       )}
 
@@ -548,7 +600,9 @@ const isTaskLocked = (task: Task) => {
                                 <div className="h-1 w-16 bg-white/5 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-[#c49e48] rounded-full"
-                                    style={{ width: `${getTaskProgress(task)}%` }}
+                                    style={{
+                                      width: `${getTaskProgress(task)}%`,
+                                    }}
                                   />
                                 </div>
 
@@ -563,25 +617,31 @@ const isTaskLocked = (task: Task) => {
                             </td>
 
                             <td>
-  {isTaskLocked(task) ? (
-    <div className="flex flex-col gap-1">
-      <span className="badge badge-red">
-        LOCKED
-      </span>
+                              {isTaskLocked(task) ? (
+                                <div className="flex flex-col gap-1">
+                                  <span className="badge badge-red">
+                                    LOCKED
+                                  </span>
 
-      <span className="text-[9px] text-[#6e7d8c] max-w-[120px]">
-        Pending: {getBlockingGate(task)?.gate_name || 'Quality Gate'}
-      </span>
-    </div>
-  ) : (
-    <button
-      className="tbl-action"
-      onClick={() => setModalTask(task)}
-    >
-      Edit
-    </button>
-  )}
-</td>
+                                  <span className="text-[9px] text-[#6e7d8c] max-w-[120px]">
+                                    Pending:{' '}
+                                    {getBlockingGate(task)?.gate_name ||
+                                      'Quality Gate'}
+                                  </span>
+                                </div>
+                              ) : canEdit ? (
+                                <button
+                                  className="tbl-action"
+                                  onClick={() => openTaskModal(task)}
+                                >
+                                  Edit
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-[#6e7d8c]">
+                                  View only
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}
@@ -594,7 +654,7 @@ const isTaskLocked = (task: Task) => {
         </div>
       )}
 
-      {modalTask !== null && (
+      {modalTask !== null && canEdit && (
         <TaskModal
           task={modalTask === 'new' ? null : modalTask}
           onClose={() => setModalTask(null)}
