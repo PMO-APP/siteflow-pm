@@ -29,11 +29,7 @@ export function canEditProjectInfo(
   projectOwnerEmail?: string | null
 ) {
   if (
-    [
-      'workspace_admin',
-      'admin',
-      'pmo',
-    ].includes(role || '')
+    ['workspace_admin', 'admin', 'pmo'].includes(role || '')
   ) {
     return true
   }
