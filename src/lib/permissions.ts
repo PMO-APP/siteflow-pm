@@ -41,7 +41,7 @@ export function canApprove(role?: string | null) {
   ].includes(role || '')
 }
 
-export function canViewFinancials(role?: string | null) {
+export function canManageFinancials(role?: string | null) {
   return [
     'workspace_admin',
     'admin',
