@@ -71,90 +71,122 @@ export default function App() {
   }, [theme])
 
   useEffect(() => {
-  let mounted = true
+    let mounted = true
 
-  async function loadAuthUser() {
-    try {
-      setLoading(true)
+    async function getMembership(email?: string | null) {
+      if (!email) return null
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const cleanEmail = email.toLowerCase().trim()
 
-      if (!mounted) return
+        const { data, error } = await supabase
+          .from('memberships')
+          .select('*')
+          .eq('email', cleanEmail)
+          .limit(1)
+          .maybeSingle()
 
-      if (!session?.user) {
-        clearMembership()
-        setUser(null)
-        return
+        console.log('MEMBERSHIP EMAIL:', cleanEmail)
+        console.log('MEMBERSHIP DATA:', data)
+        console.log('MEMBERSHIP ERROR:', error)
+
+        if (error) return null
+
+        return data
+      } catch (error) {
+        console.error('Membership lookup failed:', error)
+        return null
       }
+    }
 
-      setUser({
-        ...session.user,
-        email: session.user.email,
-        full_name:
-          session.user.user_metadata?.full_name ||
-          session.user.email ||
-          'Admin',
-        role: 'admin',
-      } as any)
+    function applyUser(sessionUser: any, membership: any) {
+      const fallbackRole = 'guest'
+      const fallbackScope = 'project'
 
       setMembership({
-        role: 'admin',
-        accessScope: 'workspace',
-        organizationId: 1,
-        portfolioId: null,
-        projectId: null,
+        role: membership?.role || fallbackRole,
+        accessScope: membership?.access_scope || fallbackScope,
+        organizationId: membership?.organization_id ?? null,
+        portfolioId: membership?.portfolio_id ?? null,
+        projectId: membership?.project_id ?? null,
       })
-    } catch (error) {
-      console.error('Auth loading failed:', error)
-      clearMembership()
-      setUser(null)
-    } finally {
-      if (mounted) {
-        setLoading(false)
+
+      setUser({
+        ...sessionUser,
+        email: sessionUser.email,
+        full_name:
+          membership?.full_name ||
+          sessionUser.user_metadata?.full_name ||
+          sessionUser.email ||
+          'User',
+        role: membership?.role || fallbackRole,
+      } as any)
+    }
+
+    async function loadAuthUser() {
+      try {
+        setLoading(true)
+
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
+
+        if (!mounted) return
+
+        if (error || !session?.user) {
+          clearMembership()
+          setUser(null)
+          return
+        }
+
+        const membership = await getMembership(session.user.email)
+
+        if (!mounted) return
+
+        applyUser(session.user, membership)
+      } catch (error) {
+        console.error('Auth loading failed:', error)
+        clearMembership()
+        setUser(null)
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
-  }
 
-  loadAuthUser()
+    loadAuthUser()
 
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!session?.user) {
-      clearMembership()
-      setUser(null)
-      setLoading(false)
-      return
-    }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        setLoading(true)
 
-    setUser({
-      ...session.user,
-      email: session.user.email,
-      full_name:
-        session.user.user_metadata?.full_name ||
-        session.user.email ||
-        'Admin',
-      role: 'admin',
-    } as any)
+        if (!session?.user) {
+          clearMembership()
+          setUser(null)
+          return
+        }
 
-    setMembership({
-      role: 'admin',
-      accessScope: 'workspace',
-      organizationId: 1,
-      portfolioId: null,
-      projectId: null,
+        const membership = await getMembership(session.user.email)
+
+        applyUser(session.user, membership)
+      } catch (error) {
+        console.error('Auth state change failed:', error)
+        clearMembership()
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     })
 
-    setLoading(false)
-  })
-
-  return () => {
-    mounted = false
-    subscription.unsubscribe()
-  }
-}, [setUser, setLoading, setMembership, clearMembership]) 
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [setUser, setLoading, setMembership, clearMembership])
 
   return (
     <BrowserRouter>
