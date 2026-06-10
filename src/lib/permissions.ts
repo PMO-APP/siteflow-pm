@@ -1,50 +1,56 @@
-export function isProjectOwner(
-  userEmail?: string,
-  projectOwnerEmail?: string | null
-) {
-  if (!userEmail || !projectOwnerEmail) {
-    return false
-  }
+import { useMembershipStore } from '@/store/membership'
 
-  return (
-    userEmail.toLowerCase().trim() ===
-    projectOwnerEmail.toLowerCase().trim()
-  )
+export function canManageWorkspace(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+  ].includes(role || '')
 }
 
-export function canEditPage(
-  role: string,
-  page: string,
-  userEmail?: string,
-  projectOwnerEmail?: string | null
-) {
-  const owner = isProjectOwner(userEmail, projectOwnerEmail)
-
-  if (role === 'admin' || owner) {
-    return true
-  }
-
-  if (role === 'design') {
-    return ['documents', 'snags', 'risk'].includes(page)
-  }
-
-  if (role === 'costing') {
-    return ['financial', 'snags', 'risk'].includes(page)
-  }
-
-  return false
+export function canManageUsers(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+  ].includes(role || '')
 }
 
-export function canDelete(
-  role: string,
-  userEmail?: string,
-  projectOwnerEmail?: string | null
-) {
-  const owner = isProjectOwner(userEmail, projectOwnerEmail)
-
-  return role === 'admin' || owner
+export function canManagePortfolio(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'portfolio_manager',
+  ].includes(role || '')
 }
 
-export function canAssignProjectOwner(role: string) {
-  return role === 'admin'
+export function canEditProject(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'portfolio_manager',
+    'project_manager',
+  ].includes(role || '')
+}
+
+export function canApprove(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_manager',
+  ].includes(role || '')
+}
+
+export function canViewFinancials(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'costing',
+    'portfolio_manager',
+  ].includes(role || '')
+}
+
+export function isReadOnly(role?: string | null) {
+  return role === 'guest'
 }
