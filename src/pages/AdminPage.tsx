@@ -14,8 +14,14 @@ import { useThemeStore } from '@/store/theme'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useNavigate } from 'react-router-dom'
+import { useMembershipStore } from '@/store/membership'
+import {
+  canManageUsers,
+  canManageWorkspace,
+  canManagePortfolio,
+} from '@/lib/permissions'
 
-const adminTabs = [
+const baseAdminTabs = [
   'Overview',
   'My Profile',
   'Security',
@@ -30,6 +36,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('Overview')
   const { theme, setTheme } = useThemeStore()
   const { user } = useAuthStore()
+  const role = useMembershipStore(state => state.role)
   const navigate = useNavigate()
 
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -51,6 +58,19 @@ export default function AdminPage() {
     useState<number | ''>('')
   const [inviteLink, setInviteLink] = useState('')
   const [notice, setNotice] = useState('')
+
+  const adminTabs = baseAdminTabs.filter(tab => {
+    if (tab === 'Users & Roles') return canManageUsers(role)
+    if (tab === 'Organizations') return canManageWorkspace(role)
+    if (tab === 'System Settings') return canManageWorkspace(role)
+    return true
+  })
+
+  useEffect(() => {
+    if (!adminTabs.includes(activeTab)) {
+      setActiveTab('Overview')
+    }
+  }, [role])
 
   useEffect(() => {
     loadAdminData()
@@ -90,20 +110,17 @@ export default function AdminPage() {
     setSelectedPortfolioId('')
     setSelectedProjectId('')
 
-    if (scope === 'workspace') {
-      setInviteRole('pmo')
-    }
-
-    if (scope === 'portfolio') {
-      setInviteRole('portfolio_manager')
-    }
-
-    if (scope === 'project') {
-      setInviteRole('contractor')
-    }
+    if (scope === 'workspace') setInviteRole('pmo')
+    if (scope === 'portfolio') setInviteRole('portfolio_manager')
+    if (scope === 'project') setInviteRole('contractor')
   }
 
   async function sendInvite() {
+    if (!canManageUsers(role)) {
+      setNotice('You do not have permission to invite users.')
+      return
+    }
+
     setNotice('')
     setInviteLink('')
 
@@ -114,6 +131,16 @@ export default function AdminPage() {
 
     if (!selectedOrganizationId) {
       setNotice('Organization is required.')
+      return
+    }
+
+    if (inviteScope === 'workspace' && !canManageWorkspace(role)) {
+      setNotice('You do not have permission to create workspace invitations.')
+      return
+    }
+
+    if (inviteScope === 'portfolio' && !canManagePortfolio(role)) {
+      setNotice('You do not have permission to create portfolio invitations.')
       return
     }
 
@@ -329,7 +356,7 @@ export default function AdminPage() {
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <InfoCard label="Name" value={user?.full_name || 'Admin'} />
                   <InfoCard label="Email" value={user?.email || '—'} />
-                  <InfoCard label="Role" value={user?.role || 'admin'} />
+                  <InfoCard label="Role" value={role || 'guest'} />
                 </div>
               </div>
             )}
@@ -346,7 +373,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'Users & Roles' && (
+            {activeTab === 'Users & Roles' && canManageUsers(role) && (
               <div className="space-y-6">
                 <div>
                   <h2 className="text-lg font-semibold text-[#ede8de]">
@@ -377,29 +404,33 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleScopeChange('workspace')}
-                      className={`btn btn-sm ${
-                        inviteScope === 'workspace'
-                          ? 'btn-gold'
-                          : 'btn-ghost'
-                      }`}
-                    >
-                      Workspace Access
-                    </button>
+                    {canManageWorkspace(role) && (
+                      <button
+                        type="button"
+                        onClick={() => handleScopeChange('workspace')}
+                        className={`btn btn-sm ${
+                          inviteScope === 'workspace'
+                            ? 'btn-gold'
+                            : 'btn-ghost'
+                        }`}
+                      >
+                        Workspace Access
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleScopeChange('portfolio')}
-                      className={`btn btn-sm ${
-                        inviteScope === 'portfolio'
-                          ? 'btn-gold'
-                          : 'btn-ghost'
-                      }`}
-                    >
-                      Portfolio Access
-                    </button>
+                    {canManagePortfolio(role) && (
+                      <button
+                        type="button"
+                        onClick={() => handleScopeChange('portfolio')}
+                        className={`btn btn-sm ${
+                          inviteScope === 'portfolio'
+                            ? 'btn-gold'
+                            : 'btn-ghost'
+                        }`}
+                      >
+                        Portfolio Access
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -625,7 +656,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'Organizations' && (
+            {activeTab === 'Organizations' && canManageWorkspace(role) && (
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-[#ede8de]">
                   Organizations
@@ -650,47 +681,48 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'System Settings' && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-[#ede8de]">
-                  System Settings
-                </h2>
+            {activeTab === 'System Settings' &&
+              canManageWorkspace(role) && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-[#ede8de]">
+                    System Settings
+                  </h2>
 
-                <p className="text-sm text-[#6e7d8c] mt-1">
-                  Organisation and workspace preferences.
-                </p>
-
-                <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
-                  <div className="text-sm font-semibold text-[#ede8de]">
-                    Appearance
-                  </div>
-
-                  <p className="text-xs text-[#6e7d8c] mt-1">
-                    Choose your preferred theme.
+                  <p className="text-sm text-[#6e7d8c] mt-1">
+                    Organisation and workspace preferences.
                   </p>
 
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => setTheme('dark')}
-                      className={`btn btn-sm ${
-                        theme === 'dark' ? 'btn-gold' : 'btn-ghost'
-                      }`}
-                    >
-                      Dark Mode
-                    </button>
+                  <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
+                    <div className="text-sm font-semibold text-[#ede8de]">
+                      Appearance
+                    </div>
 
-                    <button
-                      onClick={() => setTheme('light')}
-                      className={`btn btn-sm ${
-                        theme === 'light' ? 'btn-gold' : 'btn-ghost'
-                      }`}
-                    >
-                      Light Mode
-                    </button>
+                    <p className="text-xs text-[#6e7d8c] mt-1">
+                      Choose your preferred theme.
+                    </p>
+
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => setTheme('dark')}
+                        className={`btn btn-sm ${
+                          theme === 'dark' ? 'btn-gold' : 'btn-ghost'
+                        }`}
+                      >
+                        Dark Mode
+                      </button>
+
+                      <button
+                        onClick={() => setTheme('light')}
+                        className={`btn btn-sm ${
+                          theme === 'light' ? 'btn-gold' : 'btn-ghost'
+                        }`}
+                      >
+                        Light Mode
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
       </div>
