@@ -79,7 +79,23 @@ export default function SchedulePage() {
     return parsed.toISOString().slice(0, 10)
   }
 
-  const handlePdfUpload = async (
+  const msProjectDurationToDays = (duration: string) => {
+    if (!duration) return null
+
+    const dayMatch = duration.match(/(\d+)D/)
+    const hourMatch = duration.match(/(\d+)H/)
+    const minuteMatch = duration.match(/(\d+)M/)
+
+    const days = dayMatch ? Number(dayMatch[1]) : 0
+    const hours = hourMatch ? Number(hourMatch[1]) : 0
+    const minutes = minuteMatch ? Number(minuteMatch[1]) : 0
+
+    const totalDays = days + hours / 8 + minutes / 480
+
+    return totalDays > 0 ? Math.ceil(totalDays) : null
+  }
+
+  const handleBackupUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!canEdit) {
@@ -94,7 +110,7 @@ export default function SchedulePage() {
       return
     }
 
-    const fileName = `${projectId}/${Date.now()}-${file.name}`
+    const fileName = `${projectId}/schedule-backups/${Date.now()}-${file.name}`
 
     const { error } = await supabase.storage
       .from('project-files')
@@ -105,7 +121,7 @@ export default function SchedulePage() {
       return
     }
 
-    alert('PDF uploaded successfully.')
+    alert('Schedule backup uploaded successfully.')
     event.target.value = ''
   }
 
@@ -146,7 +162,7 @@ export default function SchedulePage() {
           project_id: projectId,
           task_number: Number(row['Task Number'] || index + 1),
           name: row['Task Name'] || row['Name'],
-          phase: row['Phase'] || 'General',
+          phase: row['Phase'] || 'Imported Excel Schedule',
           start_date: excelDateToISO(row['Start Date']),
           finish_date: excelDateToISO(row['Finish Date']),
           duration_days: row['Duration'] ? Number(row['Duration']) : null,
@@ -182,12 +198,112 @@ export default function SchedulePage() {
         queryKey: ['tasks', projectId],
       })
 
-      alert(`${tasksToInsert.length} tasks uploaded successfully.`)
+      alert(`${tasksToInsert.length} Excel tasks imported successfully.`)
 
       event.target.value = ''
     }
 
     reader.readAsArrayBuffer(file)
+  }
+
+  const handleXmlScheduleUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!canEdit) {
+      event.target.value = ''
+      return
+    }
+
+    const file = event.target.files?.[0]
+
+    if (!file || !projectId) {
+      alert('No project selected.')
+      return
+    }
+
+    const text = await file.text()
+    const parser = new DOMParser()
+    const xml = parser.parseFromString(text, 'text/xml')
+
+    const parseError = xml.getElementsByTagName('parsererror')[0]
+    if (parseError) {
+      alert('Invalid XML file. Please export again from MS Project as XML.')
+      event.target.value = ''
+      return
+    }
+
+    const xmlTasks = Array.from(xml.getElementsByTagName('Task'))
+
+    const tasksToInsert = xmlTasks
+      .map((taskNode, index) => {
+        const getText = (tag: string) =>
+          taskNode.getElementsByTagName(tag)[0]?.textContent || ''
+
+        const name = getText('Name')?.trim()
+        const uid = getText('UID')
+        const id = getText('ID')
+        const outlineLevel = getText('OutlineLevel')
+        const start = getText('Start')
+        const finish = getText('Finish')
+        const duration = getText('Duration')
+        const milestone = getText('Milestone')
+        const percentComplete = Number(getText('PercentComplete') || 0)
+
+        if (!name) return null
+
+        return {
+          project_id: projectId,
+          task_number: Number(id || uid || index + 1),
+          name,
+          phase:
+            outlineLevel === '1'
+              ? name
+              : 'Imported MS Project Schedule',
+          start_date: start ? start.slice(0, 10) : null,
+          finish_date: finish ? finish.slice(0, 10) : null,
+          duration_days: msProjectDurationToDays(duration),
+          dependencies: null,
+          responsible: null,
+          status:
+            percentComplete >= 100
+              ? 'Completed'
+              : percentComplete > 0
+              ? 'In Progress'
+              : 'Not Started',
+          rag: '',
+          progress_pct: percentComplete,
+          procurement_deadline: null,
+          approval_deadline: null,
+          notes: `Imported from MS Project XML. UID: ${uid || 'N/A'}`,
+          is_milestone:
+            milestone === '1' ||
+            milestone?.toLowerCase() === 'true',
+        }
+      })
+      .filter(Boolean)
+
+    if (!tasksToInsert.length) {
+      alert('No valid tasks found in the XML file.')
+      event.target.value = ''
+      return
+    }
+
+    const { error } = await supabase
+      .from('tasks')
+      .insert(tasksToInsert as any[])
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    await queryClient.invalidateQueries({
+      queryKey: ['tasks', projectId],
+    })
+
+    alert(`${tasksToInsert.length} MS Project XML tasks imported successfully.`)
+
+    event.target.value = ''
   }
 
   const getTaskProgress = (task: Task): number => {
@@ -408,7 +524,7 @@ export default function SchedulePage() {
           <div className="flex gap-2 ml-auto">
             <label className="btn-ghost btn-sm btn cursor-pointer">
               <Upload size={13} />
-              Upload Schedule
+              Import Excel
               <input
                 type="file"
                 hidden
@@ -419,12 +535,23 @@ export default function SchedulePage() {
 
             <label className="btn-ghost btn-sm btn cursor-pointer">
               <Upload size={13} />
-              Upload PDF
+              Import MS Project XML
               <input
                 type="file"
                 hidden
-                accept=".pdf"
-                onChange={handlePdfUpload}
+                accept=".xml"
+                onChange={handleXmlScheduleUpload}
+              />
+            </label>
+
+            <label className="btn-ghost btn-sm btn cursor-pointer">
+              <Upload size={13} />
+              Upload PDF/MPP Backup
+              <input
+                type="file"
+                hidden
+                accept=".pdf,.mpp"
+                onChange={handleBackupUpload}
               />
             </label>
 
