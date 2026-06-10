@@ -116,85 +116,108 @@ export default function AdminPage() {
   }
 
   async function sendInvite() {
-    if (!canManageUsers(role)) {
-      setNotice('You do not have permission to invite users.')
-      return
-    }
-
-    setNotice('')
-    setInviteLink('')
-
-    if (!inviteEmail.trim()) {
-      setNotice('Email address is required.')
-      return
-    }
-
-    if (!selectedOrganizationId) {
-      setNotice('Organization is required.')
-      return
-    }
-
-    if (inviteScope === 'workspace' && !canManageWorkspace(role)) {
-      setNotice('You do not have permission to create workspace invitations.')
-      return
-    }
-
-    if (inviteScope === 'portfolio' && !canManagePortfolio(role)) {
-      setNotice('You do not have permission to create portfolio invitations.')
-      return
-    }
-
-    if (inviteScope === 'portfolio' && !selectedPortfolioId) {
-      setNotice('Select a portfolio for portfolio access.')
-      return
-    }
-
-    if (inviteScope === 'project' && !selectedProjectId) {
-      setNotice('Select a project for project access.')
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('team_invitations')
-      .insert([
-        {
-          email: inviteEmail.trim().toLowerCase(),
-          full_name: inviteName || null,
-          role: inviteRole,
-          invite_scope: inviteScope,
-          access_scope: inviteScope,
-          organization_id: selectedOrganizationId,
-          portfolio_id:
-            inviteScope === 'portfolio' ? selectedPortfolioId : null,
-          project_id: inviteScope === 'project' ? selectedProjectId : null,
-          status: 'pending',
-          invited_by: user?.email || 'Admin',
-        },
-      ])
-      .select('token')
-      .single()
-
-    if (error) {
-      setNotice(error.message)
-      return
-    }
-
-    const link = `${window.location.origin}/accept-invite?token=${data.token}`
-
-    setInviteLink(link)
-    setNotice('Invitation created successfully.')
-    setInviteEmail('')
-    setInviteName('')
-    setInviteRole(
-      inviteScope === 'workspace'
-        ? 'pmo'
-        : inviteScope === 'portfolio'
-        ? 'portfolio_manager'
-        : 'contractor'
-    )
-
-    await loadAdminData()
+  if (!canManageUsers(role)) {
+    setNotice('You do not have permission to invite users.')
+    return
   }
+
+  setNotice('')
+  setInviteLink('')
+
+  if (!inviteEmail.trim()) {
+    setNotice('Email address is required.')
+    return
+  }
+
+  if (!selectedOrganizationId) {
+    setNotice('Organization is required.')
+    return
+  }
+
+  if (inviteScope === 'workspace' && !canManageWorkspace(role)) {
+    setNotice('You do not have permission to create workspace invitations.')
+    return
+  }
+
+  if (inviteScope === 'portfolio' && !canManagePortfolio(role)) {
+    setNotice('You do not have permission to create portfolio invitations.')
+    return
+  }
+
+  if (inviteScope === 'portfolio' && !selectedPortfolioId) {
+    setNotice('Select a portfolio for portfolio access.')
+    return
+  }
+
+  if (inviteScope === 'project' && !selectedProjectId) {
+    setNotice('Select a project for project access.')
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('team_invitations')
+    .insert([
+      {
+        email: inviteEmail.trim().toLowerCase(),
+        full_name: inviteName || null,
+        role: inviteRole,
+        invite_scope: inviteScope,
+        access_scope: inviteScope,
+        organization_id: selectedOrganizationId,
+        portfolio_id:
+          inviteScope === 'portfolio' ? selectedPortfolioId : null,
+        project_id: inviteScope === 'project' ? selectedProjectId : null,
+        status: 'pending',
+        invited_by: user?.email || 'Admin',
+      },
+    ])
+    .select('*')
+    .single()
+
+  if (error) {
+    setNotice(error.message)
+    return
+  }
+
+  const link = `${window.location.origin}/accept-invite?token=${data.token}`
+
+  const { error: emailError } = await supabase.functions.invoke(
+    'send-invite-email',
+    {
+      body: {
+        email: data.email,
+        fullName: data.full_name,
+        role: data.role,
+        inviteScope: data.invite_scope,
+        inviteLink: link,
+        invitedBy: user?.email || 'PMOCorex Admin',
+      },
+    }
+  )
+
+  if (emailError) {
+    setInviteLink(link)
+    setNotice(
+      `Invitation created, but email failed to send: ${emailError.message}`
+    )
+    await loadAdminData()
+    return
+  }
+
+  setInviteLink(link)
+  setNotice('Invitation created and email sent successfully.')
+  setInviteEmail('')
+  setInviteName('')
+  setInviteRole(
+    inviteScope === 'workspace'
+      ? 'pmo'
+      : inviteScope === 'portfolio'
+      ? 'portfolio_manager'
+      : 'contractor'
+  )
+
+  await loadAdminData()
+}
 
   const pendingInvites = invitations.filter(
     invite => invite.status === 'pending'
@@ -505,7 +528,7 @@ export default function AdminPage() {
                       }
                     >
                       <option value="">Select Project</option>
-<option value="project_owner">Project Owner</option>
+
                       {filteredProjects.map(project => (
                         <option key={project.id} value={project.id}>
                           {project.project_name}
