@@ -1,6 +1,6 @@
 import { useProjectStore } from '@/store/project'
 import { getRole } from '@/lib/access'
-import { canEditPage } from '@/lib/permissions'
+import { canEditRisk } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Shield } from 'lucide-react'
 import { useRisks, useUpsertRisk } from '@/hooks/useData'
@@ -151,7 +151,7 @@ export default function RiskPage() {
 
   const role = getRole(user?.email)
 
-  const canEdit = canEditPage(
+  const canEdit = canEditRisk(
     role,
     'risk',
     user?.email,
