@@ -105,11 +105,11 @@ function DocModal({
 
     setUploading(true)
 
-    const result = await uploadFile(
-      'documents',
-      file,
-      `projects/${projectId}/docs`
-    )
+   const result = await uploadFile(
+  'project-files',
+  file,
+  `projects/${projectId}/documents`
+)
 
     if (result) {
       set('storage_path', result.path)
