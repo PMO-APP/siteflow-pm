@@ -5,7 +5,11 @@ import type {
   ProcurementItem, Approval, SiteReport, Snag,
   Document, FinancialItem, Risk, Comment, Meeting,
   QualityGate,
-  ContractorScore, Notification
+  ContractorScore, Notification, WeeklyReport,
+  WeeklyActivity,
+  WeeklyPhoto,
+  SafetyLog
+
 } from '@/types'
 
 // ─── HELPERS ───────────────────────────────────────────
