@@ -124,7 +124,7 @@ export default function ReportsPage() {
     await upsertReport.mutateAsync({
       id: selectedReportId || undefined,
       ...reportForm,
-      next_meeting: reportForm.next_meeting,
+      next_meeting: reportForm.next_meeting || undefined,
     } as any)
 
     setShowReportModal(false)
