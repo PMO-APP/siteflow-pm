@@ -14,6 +14,15 @@ export function canManageUsers(role?: string | null) {
     'pmo',
   ].includes(role || '')
 }
+export function canEditSchedule(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_owner',
+    'project_manager',
+  ].includes(role || '')
+}
 export function canEditProcurement(role?: string | null) {
   return [
     'workspace_admin',
