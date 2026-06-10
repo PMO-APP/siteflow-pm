@@ -18,6 +18,7 @@ import { uploadFile } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import type { Document } from '@/types'
+import DocumentRepository from '@/components/DocumentRepository'
 
 const TYPES: Document['type'][] = [
   'Drawing',
@@ -62,6 +63,23 @@ const REVISIONS = [
   '3',
 ]
 
+function getDocumentFolder(type: string, discipline?: string) {
+  const cleanDiscipline = (discipline || 'general')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+
+  if (type === 'Drawing') return `drawings/${cleanDiscipline}`
+  if (type === 'Report') return 'reports'
+  if (type === 'Contract') return 'contracts'
+  if (type === 'RFI') return 'rfis'
+  if (type === 'BOQ') return 'boq'
+  if (type === 'Method Statement') return 'method-statements'
+  if (type === 'Submittal') return 'submittals'
+  if (type === 'Specification') return 'specifications'
+
+  return 'other'
+}
+
 function DocModal({
   item,
   onClose,
@@ -97,25 +115,37 @@ function DocModal({
       [key]: value,
     }))
 
-  async function handleFile(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
 
-    setUploading(true)
+    if (!projectId) {
+      alert('No project selected.')
+      return
+    }
 
-   const result = await uploadFile(
-  'project-files',
-  file,
-  `projects/${projectId}/documents`
-)
+    try {
+      setUploading(true)
 
-    if (result) {
+      const folder = getDocumentFolder(form.type, form.discipline)
+
+      const result = await uploadFile(
+        'project-files',
+        file,
+        `projects/${projectId}/${folder}`
+      )
+
+      console.log('DOCUMENT UPLOAD RESULT:', result)
+
+      if (!result) {
+        alert('Upload failed. No file path returned.')
+        return
+      }
+
       set('storage_path', result.path)
       set('public_url', result.publicUrl)
       set('file_size_kb', Math.round(file.size / 1024))
-      set('file_type', file.type)
+      set('file_type', file.type || file.name.split('.').pop() || 'file')
 
       await logAudit(
         user,
@@ -124,9 +154,13 @@ function DocModal({
         item?.id || 'new',
         `${form.title || file.name} Rev ${form.revision}`
       )
+    } catch (error: any) {
+      console.error('Document upload failed:', error)
+      alert(error?.message || 'Document upload failed')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
     }
-
-    setUploading(false)
   }
 
   async function save() {
@@ -198,9 +232,7 @@ function DocModal({
               <input
                 className="form-control"
                 value={form.document_number}
-                onChange={event =>
-                  set('document_number', event.target.value)
-                }
+                onChange={event => set('document_number', event.target.value)}
                 placeholder="e.g. A-100, S-201"
               />
             </div>
@@ -267,9 +299,7 @@ function DocModal({
                 type="date"
                 className="form-control"
                 value={form.revision_date}
-                onChange={event =>
-                  set('revision_date', event.target.value)
-                }
+                onChange={event => set('revision_date', event.target.value)}
               />
             </div>
           </div>
@@ -354,6 +384,7 @@ export default function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [discFilter, setDiscFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
+  const [viewMode, setViewMode] = useState<'register' | 'repository'>('register')
 
   const filtered = docs.filter(document => {
     const searchText = search.toLowerCase()
@@ -361,9 +392,7 @@ export default function DocumentsPage() {
     const matchesSearch =
       !search ||
       document.title.toLowerCase().includes(searchText) ||
-      (document.document_number || '')
-        .toLowerCase()
-        .includes(searchText)
+      (document.document_number || '').toLowerCase().includes(searchText)
 
     if (!matchesSearch) return false
     if (typeFilter && document.type !== typeFilter) return false
@@ -404,201 +433,227 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(byType)
-          .filter(([, count]) => count > 0)
-          .map(([type, count]) => (
-            <button
-              key={type}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${
-                typeFilter === type
-                  ? 'bg-[#c49e48] text-[#0c1014] border-[#c49e48]'
-                  : 'bg-[#1c2a36] text-[#bfb9ae] border-white/[0.08] hover:border-[#c49e48]/30'
-              }`}
-              onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+      <div className="flex gap-2">
+        <button
+          className={`btn btn-sm ${
+            viewMode === 'register' ? 'btn-gold' : 'btn-ghost'
+          }`}
+          onClick={() => setViewMode('register')}
+        >
+          Register
+        </button>
+
+        <button
+          className={`btn btn-sm ${
+            viewMode === 'repository' ? 'btn-gold' : 'btn-ghost'
+          }`}
+          onClick={() => setViewMode('repository')}
+        >
+          Repository
+        </button>
+      </div>
+
+      {viewMode === 'register' ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(byType)
+              .filter(([, count]) => count > 0)
+              .map(([type, count]) => (
+                <button
+                  key={type}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${
+                    typeFilter === type
+                      ? 'bg-[#c49e48] text-[#0c1014] border-[#c49e48]'
+                      : 'bg-[#1c2a36] text-[#bfb9ae] border-white/[0.08] hover:border-[#c49e48]/30'
+                  }`}
+                  onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+                >
+                  <span>{typeIcon(type)}</span>
+                  {type}
+                  <span className="font-mono">{count}</span>
+                </button>
+              ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[160px] max-w-xs">
+              <Search
+                size={12}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
+              />
+
+              <input
+                className="form-control pl-7 text-[12px] py-1.5"
+                placeholder="Search title or number…"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+              />
+            </div>
+
+            <select
+              className="form-control text-[12px] py-1.5 w-auto"
+              value={discFilter}
+              onChange={event => setDiscFilter(event.target.value)}
             >
-              <span>{typeIcon(type)}</span>
-              {type}
-              <span className="font-mono">{count}</span>
-            </button>
-          ))}
-      </div>
+              <option value="">All Disciplines</option>
+              {DISCIPLINES.map(discipline => (
+                <option key={discipline}>{discipline}</option>
+              ))}
+            </select>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Search
-            size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
-          />
+            <select
+              className="form-control text-[12px] py-1.5 w-auto"
+              value={statFilter}
+              onChange={event => setStatFilter(event.target.value)}
+            >
+              <option value="">All Status</option>
+              {STATUSES.map(status => (
+                <option key={status}>{status}</option>
+              ))}
+            </select>
 
-          <input
-            className="form-control pl-7 text-[12px] py-1.5"
-            placeholder="Search title or number…"
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-          />
-        </div>
+            {canEdit && (
+              <button
+                className="btn-gold btn-sm btn ml-auto"
+                onClick={() => setModal('new')}
+              >
+                <Plus size={13} />
+                Register Doc
+              </button>
+            )}
+          </div>
 
-        <select
-          className="form-control text-[12px] py-1.5 w-auto"
-          value={discFilter}
-          onChange={event => setDiscFilter(event.target.value)}
-        >
-          <option value="">All Disciplines</option>
-          {DISCIPLINES.map(discipline => (
-            <option key={discipline}>{discipline}</option>
-          ))}
-        </select>
-
-        <select
-          className="form-control text-[12px] py-1.5 w-auto"
-          value={statFilter}
-          onChange={event => setStatFilter(event.target.value)}
-        >
-          <option value="">All Status</option>
-          {STATUSES.map(status => (
-            <option key={status}>{status}</option>
-          ))}
-        </select>
-
-        {canEdit && (
-          <button
-            className="btn-gold btn-sm btn ml-auto"
-            onClick={() => setModal('new')}
-          >
-            <Plus size={13} />
-            Register Doc
-          </button>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Doc No.</th>
-                <th>Title</th>
-                <th>Type</th>
-                <th className="hide-mobile">Discipline</th>
-                <th>Rev</th>
-                <th>Rev Date</th>
-                <th>Status</th>
-                <th className="hide-mobile">Issued By</th>
-                <th className="hide-mobile">Size</th>
-                <th></th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-6 text-[#6e7d8c]">
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-8 text-[#6e7d8c]">
-                    {docs.length === 0
-                      ? 'No documents registered yet.'
-                      : 'No documents match filters.'}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map(document => (
-                  <tr
-                    key={document.id}
-                    className={
-                      document.status === 'Superseded' ||
-                      document.status === 'Void'
-                        ? 'opacity-50'
-                        : ''
-                    }
-                  >
-                    <td className="font-mono text-[10px] text-[#c49e48]">
-                      {document.document_number || '—'}
-                    </td>
-
-                    <td
-                      className="font-medium text-[#ede8de] max-w-[200px] truncate"
-                      title={document.title}
-                    >
-                      {document.title}
-                    </td>
-
-                    <td>
-                      <span className="text-[9px]">
-                        {typeIcon(document.type)}
-                      </span>{' '}
-                      <span className="text-[10px] text-[#6e7d8c]">
-                        {document.type}
-                      </span>
-                    </td>
-
-                    <td className="hide-mobile">
-                      <span className="badge badge-muted">
-                        {document.discipline || '—'}
-                      </span>
-                    </td>
-
-                    <td className="font-mono text-[11px] text-[#6e7d8c]">
-                      Rev {document.revision}
-                    </td>
-
-                    <td>{fdate(document.revision_date)}</td>
-
-                    <td>
-                      <span className={`badge ${statBadge(document.status)}`}>
-                        {document.status}
-                      </span>
-                    </td>
-
-                    <td className="hide-mobile text-[11px] text-[#6e7d8c]">
-                      {document.issued_by || '—'}
-                    </td>
-
-                    <td className="hide-mobile text-[10px] font-mono text-[#6e7d8c]">
-                      {document.file_size_kb
-                        ? `${document.file_size_kb}KB`
-                        : '—'}
-                    </td>
-
-                    <td>
-                      <div className="flex gap-1">
-                        {document.public_url && (
-                          <a
-                            href={document.public_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="tbl-action"
-                            title="Download"
-                          >
-                            <Download size={10} />
-                          </a>
-                        )}
-
-                        {canEdit ? (
-                          <button
-                            className="tbl-action"
-                            onClick={() => setModal(document)}
-                          >
-                            Edit
-                          </button>
-                        ) : (
-                          <span className="text-[#6e7d8c] text-[11px] px-2">
-                            View
-                          </span>
-                        )}
-                      </div>
-                    </td>
+          <div className="card">
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Doc No.</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th className="hide-mobile">Discipline</th>
+                    <th>Rev</th>
+                    <th>Rev Date</th>
+                    <th>Status</th>
+                    <th className="hide-mobile">Issued By</th>
+                    <th className="hide-mobile">Size</th>
+                    <th></th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-6 text-[#6e7d8c]">
+                        Loading…
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-8 text-[#6e7d8c]">
+                        {docs.length === 0
+                          ? 'No documents registered yet.'
+                          : 'No documents match filters.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map(document => (
+                      <tr
+                        key={document.id}
+                        className={
+                          document.status === 'Superseded' ||
+                          document.status === 'Void'
+                            ? 'opacity-50'
+                            : ''
+                        }
+                      >
+                        <td className="font-mono text-[10px] text-[#c49e48]">
+                          {document.document_number || '—'}
+                        </td>
+
+                        <td
+                          className="font-medium text-[#ede8de] max-w-[200px] truncate"
+                          title={document.title}
+                        >
+                          {document.title}
+                        </td>
+
+                        <td>
+                          <span className="text-[9px]">
+                            {typeIcon(document.type)}
+                          </span>{' '}
+                          <span className="text-[10px] text-[#6e7d8c]">
+                            {document.type}
+                          </span>
+                        </td>
+
+                        <td className="hide-mobile">
+                          <span className="badge badge-muted">
+                            {document.discipline || '—'}
+                          </span>
+                        </td>
+
+                        <td className="font-mono text-[11px] text-[#6e7d8c]">
+                          Rev {document.revision}
+                        </td>
+
+                        <td>{fdate(document.revision_date)}</td>
+
+                        <td>
+                          <span className={`badge ${statBadge(document.status)}`}>
+                            {document.status}
+                          </span>
+                        </td>
+
+                        <td className="hide-mobile text-[11px] text-[#6e7d8c]">
+                          {document.issued_by || '—'}
+                        </td>
+
+                        <td className="hide-mobile text-[10px] font-mono text-[#6e7d8c]">
+                          {document.file_size_kb
+                            ? `${document.file_size_kb}KB`
+                            : '—'}
+                        </td>
+
+                        <td>
+                          <div className="flex gap-1">
+                            {document.public_url && (
+                              <a
+                                href={document.public_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="tbl-action"
+                                title="Download"
+                              >
+                                <Download size={10} />
+                              </a>
+                            )}
+
+                            {canEdit ? (
+                              <button
+                                className="tbl-action"
+                                onClick={() => setModal(document)}
+                              >
+                                Edit
+                              </button>
+                            ) : (
+                              <span className="text-[#6e7d8c] text-[11px] px-2">
+                                View
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        <DocumentRepository />
+      )}
 
       {modal !== null && canEdit && (
         <DocModal
