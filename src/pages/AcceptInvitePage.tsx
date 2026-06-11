@@ -104,21 +104,19 @@ export default function AcceptInvitePage() {
           },
         })
 
-      if (signUpError) {
-        const alreadyRegistered =
-          signUpError.message.toLowerCase().includes('already registered') ||
-          signUpError.message.toLowerCase().includes('already exists')
+     if (signUpError) {
+  if (
+    signUpError.message.toLowerCase().includes('already registered')
+  ) {
+    setError(
+      'An account already exists for this email. Please sign in instead.'
+    )
+    return
+  }
 
-        if (alreadyRegistered) {
-          setError(
-            'This email already has a PMOCorex account. Please use the Sign In link below.'
-          )
-          return
-        }
-
-        setError(signUpError.message)
-        return
-      }
+  setError(signUpError.message)
+  return
+}
 
       const userId = signUpData.user?.id
 
