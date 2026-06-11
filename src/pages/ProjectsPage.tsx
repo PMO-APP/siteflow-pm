@@ -14,12 +14,23 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
+const ADMIN_ROLES = ['workspace_admin', 'admin']
+
+const CREATE_ROLES = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'portfolio_manager',
+]
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [canManageWorkspace, setCanManageWorkspace] = useState(false)
+
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false)
+  const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showOrgModal, setShowOrgModal] = useState(false)
@@ -54,7 +65,7 @@ export default function ProjectsPage() {
     const { data: membershipRows, error: membershipError } = await supabase
       .from('memberships')
       .select('*')
-      .eq('email', cleanEmail)
+      .or(`user_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
 
     if (membershipError) {
       alert(membershipError.message)
@@ -68,16 +79,30 @@ export default function ProjectsPage() {
       setOrganizations([])
       setPortfolios([])
       setProjects([])
-      setCanManageWorkspace(false)
+      setCanAccessAdmin(false)
+      setCanCreateWorkspaceItems(false)
       setLoading(false)
       return
     }
 
+    const userRoles = memberships.map(membership =>
+      String(membership.role || '').toLowerCase()
+    )
+
+    const userCanAccessAdmin = userRoles.some(role =>
+      ADMIN_ROLES.includes(role)
+    )
+
+    const userCanCreateWorkspaceItems = userRoles.some(role =>
+      CREATE_ROLES.includes(role)
+    )
+
+    setCanAccessAdmin(userCanAccessAdmin)
+    setCanCreateWorkspaceItems(userCanCreateWorkspaceItems)
+
     const hasWorkspaceAccess = memberships.some(
       membership => membership.access_scope === 'workspace'
     )
-
-    setCanManageWorkspace(hasWorkspaceAccess)
 
     const [
       { data: orgs, error: orgError },
@@ -141,16 +166,16 @@ export default function ProjectsPage() {
       ),
     ]
 
-    const visiblePortfolios = (ports || []).filter(portfolio =>
-      visiblePortfolioIds.includes(portfolio.id)
+    setOrganizations(
+      (orgs || []).filter(org => visibleOrgIds.includes(org.id))
     )
 
-    const visibleOrganizations = (orgs || []).filter(org =>
-      visibleOrgIds.includes(org.id)
+    setPortfolios(
+      (ports || []).filter(portfolio =>
+        visiblePortfolioIds.includes(portfolio.id)
+      )
     )
 
-    setOrganizations(visibleOrganizations)
-    setPortfolios(visiblePortfolios)
     setProjects(visibleProjects)
     setLoading(false)
   }
@@ -168,7 +193,7 @@ export default function ProjectsPage() {
   }
 
   async function createOrganization() {
-    if (!newOrgName.trim()) return
+    if (!canAccessAdmin || !newOrgName.trim()) return
 
     const { error } = await supabase
       .from('organizations')
@@ -185,7 +210,9 @@ export default function ProjectsPage() {
   }
 
   async function createPortfolio() {
-    if (!newPortfolioName.trim() || !selectedOrgId) return
+    if (!canCreateWorkspaceItems || !newPortfolioName.trim() || !selectedOrgId) {
+      return
+    }
 
     const { error } = await supabase.from('portfolios').insert({
       name: newPortfolioName.trim(),
@@ -204,7 +231,7 @@ export default function ProjectsPage() {
   }
 
   async function createProject() {
-    if (!newProjectName.trim()) return
+    if (!canCreateWorkspaceItems || !newProjectName.trim()) return
 
     const { error } = await supabase.from('projects').insert({
       project_name: newProjectName.trim(),
@@ -243,8 +270,8 @@ export default function ProjectsPage() {
             <PMOCorexLogo size={42} />
           </button>
 
-          {canManageWorkspace && (
-            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+            {canAccessAdmin && (
               <button
                 onClick={() => navigate('/admin')}
                 className="btn-ghost btn-sm btn justify-center"
@@ -252,7 +279,9 @@ export default function ProjectsPage() {
                 <Shield size={14} />
                 Admin Console
               </button>
+            )}
 
+            {canAccessAdmin && (
               <button
                 onClick={() => setShowOrgModal(true)}
                 className="btn-ghost btn-sm btn justify-center"
@@ -260,7 +289,9 @@ export default function ProjectsPage() {
                 <Building2 size={14} />
                 New Organization
               </button>
+            )}
 
+            {canCreateWorkspaceItems && (
               <button
                 onClick={() => setShowPortfolioModal(true)}
                 className="btn-ghost btn-sm btn justify-center"
@@ -268,7 +299,9 @@ export default function ProjectsPage() {
                 <Briefcase size={14} />
                 New Portfolio
               </button>
+            )}
 
+            {canCreateWorkspaceItems && (
               <button
                 onClick={() => setShowProjectModal(true)}
                 className="btn-gold btn-sm btn justify-center col-span-2 sm:col-span-1"
@@ -276,8 +309,8 @@ export default function ProjectsPage() {
                 <Plus size={14} />
                 New Project
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8 lg:p-10">
@@ -344,8 +377,8 @@ export default function ProjectsPage() {
                         </p>
                       </div>
 
-                      {canManageWorkspace && (
-                        <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {canAccessAdmin && (
                           <button
                             onClick={() => navigate('/admin')}
                             className="btn-ghost btn-sm btn w-fit"
@@ -353,7 +386,9 @@ export default function ProjectsPage() {
                             <Shield size={14} />
                             Manage Access
                           </button>
+                        )}
 
+                        {canCreateWorkspaceItems && (
                           <button
                             onClick={() => {
                               setSelectedOrgId(org.id)
@@ -364,7 +399,9 @@ export default function ProjectsPage() {
                             <Briefcase size={14} />
                             Add Portfolio
                           </button>
+                        )}
 
+                        {canCreateWorkspaceItems && (
                           <button
                             onClick={() => {
                               setSelectedOrgId(org.id)
@@ -375,8 +412,8 @@ export default function ProjectsPage() {
                             <Plus size={14} />
                             Add Project
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
@@ -440,7 +477,7 @@ export default function ProjectsPage() {
                             Infrastructure, or Commercial.
                           </div>
 
-                          {canManageWorkspace && (
+                          {canCreateWorkspaceItems && (
                             <button
                               onClick={() => {
                                 setSelectedOrgId(org.id)
@@ -484,7 +521,7 @@ export default function ProjectsPage() {
         <div className="h-40" />
       </div>
 
-      {showOrgModal && canManageWorkspace && (
+      {showOrgModal && canAccessAdmin && (
         <Modal title="Create Organization" onClose={() => setShowOrgModal(false)}>
           <input
             className="form-control mb-4"
@@ -502,7 +539,7 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {showPortfolioModal && canManageWorkspace && (
+      {showPortfolioModal && canCreateWorkspaceItems && (
         <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
           <select
             className="form-control mb-4"
@@ -534,7 +571,7 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
-      {showProjectModal && canManageWorkspace && (
+      {showProjectModal && canCreateWorkspaceItems && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
           <select
             className="form-control mb-4"
