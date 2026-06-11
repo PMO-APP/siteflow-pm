@@ -104,13 +104,13 @@ export default function AcceptInvitePage() {
       return
     }
 
-    const { error: profileError } = await supabase.from('profiles').upsert({
-      id: userId,
-      email,
-      full_name: fullName,
-      role: invite.role,
-      updated_at: new Date().toISOString(),
-    })
+    const { error: profileError } = await supabase.from('profiles').insert({
+  id: userId,
+  email,
+  full_name: fullName,
+  role: invite.role,
+  updated_at: new Date().toISOString(),
+})
 
     if (profileError) {
       setError(profileError.message)
