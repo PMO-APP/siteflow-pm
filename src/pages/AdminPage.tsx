@@ -124,7 +124,9 @@ export default function AdminPage() {
   setNotice('')
   setInviteLink('')
 
-  if (!inviteEmail.trim()) {
+  const cleanEmail = inviteEmail.trim().toLowerCase()
+
+  if (!cleanEmail) {
     setNotice('Email address is required.')
     return
   }
@@ -158,8 +160,8 @@ export default function AdminPage() {
     .from('team_invitations')
     .insert([
       {
-        email: inviteEmail.trim().toLowerCase(),
-        full_name: inviteName || null,
+        email: cleanEmail,
+        full_name: inviteName.trim() || null,
         role: inviteRole,
         invite_scope: inviteScope,
         access_scope: inviteScope,
@@ -181,28 +183,33 @@ export default function AdminPage() {
 
   const link = `${window.location.origin}/accept-invite?token=${data.token}`
 
-  const { error: emailError } = await supabase.functions.invoke(
-    'send-invite-email',
-    {
+  const { data: emailData, error: emailError } =
+    await supabase.functions.invoke('send-invite-email', {
       body: {
         email: data.email,
-        fullName: data.full_name,
+        fullName: data.full_name || '',
         role: data.role,
-        inviteScope: data.invite_scope,
+        inviteScope: data.invite_scope || data.access_scope,
         inviteLink: link,
         invitedBy: user?.email || 'PMOCorex Admin',
       },
-    }
-  )
+    })
 
   if (emailError) {
+    console.error('Invite email failed:', emailError)
+
     setInviteLink(link)
     setNotice(
-      `Invitation created, but email failed to send: ${emailError.message}`
+      `Invitation created, but email failed to send: ${
+        emailError.message || 'Unknown email error'
+      }`
     )
+
     await loadAdminData()
     return
   }
+
+  console.log('Invite email response:', emailData)
 
   setInviteLink(link)
   setNotice('Invitation created and email sent successfully.')
