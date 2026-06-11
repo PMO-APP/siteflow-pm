@@ -24,35 +24,38 @@ export default function LoginPage() {
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  e.preventDefault()
 
-    setLoading(true)
-    setError('')
-    setNotice('')
+  setLoading(true)
+  setError('')
+  setNotice('')
 
-    try {
-      const cleanEmail = email.toLowerCase().trim()
+  try {
+    const cleanEmail = email.toLowerCase().trim()
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      })
+    const { error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    })
 
-      if (error) throw error
-
-      if (rememberMe) {
-        localStorage.setItem('savedEmail', cleanEmail)
-      } else {
-        localStorage.removeItem('savedEmail')
-      }
-
-      window.location.href = '/projects'
-    } catch (err: any) {
-      setError(err?.message || 'Unable to sign in. Please try again.')
-    } finally {
-      setLoading(false)
+    if (error) {
+      setError(error.message)
+      return
     }
+
+    if (rememberMe) {
+      localStorage.setItem('savedEmail', cleanEmail)
+    } else {
+      localStorage.removeItem('savedEmail')
+    }
+
+    navigate('/projects')
+  } catch (err: any) {
+    setError(err?.message || 'Unable to sign in. Please try again.')
+  } finally {
+    setLoading(false)
   }
+}
 
   async function handleForgotPassword() {
     setError('')
