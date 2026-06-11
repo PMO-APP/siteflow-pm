@@ -1,4 +1,3 @@
-
 import { useBrowserBranding } from '@/hooks/useBrowserBranding'
 import { supabase } from '@/lib/supabase'
 import { parseISO } from 'date-fns'
@@ -22,17 +21,14 @@ import {
   LogOut,
   Menu,
   BarChart3,
-  ShieldCheck,
   ClipboardCheck,
+  UserCircle,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { differenceInDays } from 'date-fns'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
-import {
-  Settings,
-} from 'lucide-react'
 
 const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -56,20 +52,12 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
-  const [handoverDate, setHandoverDate] =
-    useState<Date | null>(null)
-  const [organizationName, setOrganizationName] =
-    useState('')
-  const [portfolioName, setPortfolioName] =
-    useState('')
+  const [handoverDate, setHandoverDate] = useState<Date | null>(null)
+  const [organizationName, setOrganizationName] = useState('')
+  const [portfolioName, setPortfolioName] = useState('')
 
   const { user, signOut } = useAuthStore()
-
-  const {
-    projectName,
-    organizationId,
-    portfolioId,
-  } = useProjectStore()
+  const { projectName, organizationId, portfolioId } = useProjectStore()
 
   const role = getRole(user?.email)
   const location = useLocation()
@@ -161,9 +149,7 @@ export default function Layout() {
   })
 
   const currentPage = allowedNav.find(n =>
-    n.exact
-      ? location.pathname === n.to
-      : location.pathname.startsWith(n.to)
+    n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to)
   )
 
   const pageTitle = currentPage?.label || 'Dashboard'
@@ -189,12 +175,12 @@ export default function Layout() {
 
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
           <button
-  type="button"
-  onClick={() => navigate('/')}
-  className="text-left"
->
-  <PMOCorexLogo size={34} />
-</button>
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-left"
+          >
+            <PMOCorexLogo size={34} />
+          </button>
 
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
             <div>
@@ -297,9 +283,13 @@ export default function Layout() {
         </nav>
 
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
-          <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5">
+          <button
+            type="button"
+            onClick={() => navigate('/admin?tab=profile')}
+            className="w-full flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5 hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all text-left"
+          >
             <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
-             {user ? getInitials(user.full_name || 'Admin') : 'A'}
+              {user ? getInitials(user.full_name || 'Admin') : 'A'}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -320,14 +310,22 @@ export default function Layout() {
               </div>
             </div>
 
-            <button
-              onClick={signOut}
-              className="text-[#6e7d8c] hover:text-red-400 transition-colors"
-              title="Sign out"
-            >
-              <LogOut size={14} />
-            </button>
-          </div>
+            <div className="flex items-center gap-2">
+              <UserCircle size={16} className="text-[#c49e48]" />
+
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  signOut()
+                }}
+                className="text-[#6e7d8c] hover:text-red-400 transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          </button>
         </div>
       </aside>
 
@@ -341,10 +339,7 @@ export default function Layout() {
           </button>
 
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <button
-              onClick={() => navigate(-1)}
-              className="btn-ghost btn-sm btn"
-            >
+            <button onClick={() => navigate(-1)} className="btn-ghost btn-sm btn">
               ← Back
             </button>
 
@@ -374,9 +369,7 @@ export default function Layout() {
 
           <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="text-[11px] text-emerald-400">
-              Live
-            </span>
+            <span className="text-[11px] text-emerald-400">Live</span>
           </div>
 
           <div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
