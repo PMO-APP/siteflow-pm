@@ -16,9 +16,9 @@ const ROLES = [
   'consultant',
   'housebuild',
   'infrastructure',
-  'mep'
-  'design'
-'costing'
+  'mep',
+  'design',
+'costing',
   'contractor',
   'viewer',
 ]
