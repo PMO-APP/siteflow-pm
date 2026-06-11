@@ -8,6 +8,8 @@ import {
   Layers,
   Activity,
   Shield,
+  Search,
+  Filter,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -23,6 +25,27 @@ const CREATE_ROLES = [
   'portfolio_manager',
 ]
 
+const PROJECT_STATUSES = [
+  'Planning',
+  'Active',
+  'On Hold',
+  'Completed',
+  'Cancelled',
+]
+
+const PROJECT_PHASES = [
+  'Concept',
+  'Design',
+  'Procurement',
+  'Mobilization',
+  'Execution',
+  'Finishing',
+  'Testing & Commissioning',
+  'Handover',
+  'Defects Liability',
+  'Closed Out',
+]
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -30,17 +53,27 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
 
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
-  const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] = useState(false)
+  const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] =
+    useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showOrgModal, setShowOrgModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
 
   const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectStatus, setNewProjectStatus] = useState('Planning')
+  const [newProjectPhase, setNewProjectPhase] = useState('Concept')
   const [newOrgName, setNewOrgName] = useState('')
   const [newPortfolioName, setNewPortfolioName] = useState('')
   const [selectedOrgId, setSelectedOrgId] = useState<number | ''>('')
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('')
+  const [selectedPortfolioId, setSelectedPortfolioId] =
+    useState<number | ''>('')
+
+  const [searchTerm, setSearchTerm] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('All')
+  const [portfolioFilter, setPortfolioFilter] = useState('All')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [phaseFilter, setPhaseFilter] = useState('All')
 
   const navigate = useNavigate()
   const { setProject } = useProjectStore()
@@ -89,16 +122,10 @@ export default function ProjectsPage() {
       String(membership.role || '').toLowerCase()
     )
 
-    const userCanAccessAdmin = userRoles.some(role =>
-      ADMIN_ROLES.includes(role)
+    setCanAccessAdmin(userRoles.some(role => ADMIN_ROLES.includes(role)))
+    setCanCreateWorkspaceItems(
+      userRoles.some(role => CREATE_ROLES.includes(role))
     )
-
-    const userCanCreateWorkspaceItems = userRoles.some(role =>
-      CREATE_ROLES.includes(role)
-    )
-
-    setCanAccessAdmin(userCanAccessAdmin)
-    setCanCreateWorkspaceItems(userCanCreateWorkspaceItems)
 
     const hasWorkspaceAccess = memberships.some(
       membership => membership.access_scope === 'workspace'
@@ -235,7 +262,8 @@ export default function ProjectsPage() {
 
     const { error } = await supabase.from('projects').insert({
       project_name: newProjectName.trim(),
-      status: 'Active',
+      status: newProjectStatus,
+      phase: newProjectPhase,
       organization_id: selectedOrgId || null,
       portfolio_id: selectedPortfolioId || null,
     })
@@ -246,16 +274,55 @@ export default function ProjectsPage() {
     }
 
     setNewProjectName('')
+    setNewProjectStatus('Planning')
+    setNewProjectPhase('Concept')
     setSelectedOrgId('')
     setSelectedPortfolioId('')
     setShowProjectModal(false)
     loadHub()
   }
 
-  const totalProjects = projects.length
+  const filteredProjects = projects.filter(project => {
+    const search = searchTerm.toLowerCase().trim()
 
-  const activeProjects = projects.filter(
-    project => (project.status || 'Active') === 'Active'
+    const matchesSearch =
+      !search ||
+      String(project.project_name || '')
+        .toLowerCase()
+        .includes(search) ||
+      String(project.location || '')
+        .toLowerCase()
+        .includes(search)
+
+    const matchesOrganization =
+      organizationFilter === 'All' ||
+      String(project.organization_id || '') === organizationFilter
+
+    const matchesPortfolio =
+      portfolioFilter === 'All' ||
+      String(project.portfolio_id || '') === portfolioFilter
+
+    const matchesStatus =
+      statusFilter === 'All' ||
+      String(project.status || 'Planning') === statusFilter
+
+    const matchesPhase =
+      phaseFilter === 'All' ||
+      String(project.phase || 'Planning') === phaseFilter
+
+    return (
+      matchesSearch &&
+      matchesOrganization &&
+      matchesPortfolio &&
+      matchesStatus &&
+      matchesPhase
+    )
+  })
+
+  const totalProjects = filteredProjects.length
+
+  const activeProjects = filteredProjects.filter(
+    project => (project.status || 'Planning') === 'Active'
   ).length
 
   return (
@@ -339,6 +406,81 @@ export default function ProjectsPage() {
           </div>
         </div>
 
+        <div className="card p-4 space-y-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
+            <Filter size={15} className="text-[#c49e48]" />
+            Project Search & Filters
+          </div>
+
+          <div className="relative">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
+            />
+
+            <input
+              className="form-control pl-9"
+              placeholder="Search by project name or location..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select
+              className="form-control"
+              value={organizationFilter}
+              onChange={e => setOrganizationFilter(e.target.value)}
+            >
+              <option value="All">All Organizations</option>
+              {organizations.map(org => (
+                <option key={org.id} value={String(org.id)}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-control"
+              value={portfolioFilter}
+              onChange={e => setPortfolioFilter(e.target.value)}
+            >
+              <option value="All">All Portfolios</option>
+              {portfolios.map(portfolio => (
+                <option key={portfolio.id} value={String(portfolio.id)}>
+                  {portfolio.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-control"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All Statuses</option>
+              {PROJECT_STATUSES.map(status => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-control"
+              value={phaseFilter}
+              onChange={e => setPhaseFilter(e.target.value)}
+            >
+              <option value="All">All Phases</option>
+              {PROJECT_PHASES.map(phase => (
+                <option key={phase} value={phase}>
+                  {phase}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {loading ? (
           <div className="card p-8 text-slate-400">Loading workspace…</div>
         ) : (
@@ -355,9 +497,11 @@ export default function ProjectsPage() {
                   portfolio => portfolio.organization_id === org.id
                 )
 
-                const orgProjects = projects.filter(
+                const orgProjects = filteredProjects.filter(
                   project => project.organization_id === org.id
                 )
+
+                if (orgProjects.length === 0 && searchTerm) return null
 
                 return (
                   <div key={org.id} className="card p-5 sm:p-6 lg:p-7">
@@ -373,7 +517,7 @@ export default function ProjectsPage() {
 
                         <p className="text-sm text-slate-500 mt-1">
                           {orgPortfolios.length} portfolio(s) •{' '}
-                          {orgProjects.length} project(s)
+                          {orgProjects.length} visible project(s)
                         </p>
                       </div>
 
@@ -418,9 +562,13 @@ export default function ProjectsPage() {
 
                     <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
                       {orgPortfolios.map(portfolio => {
-                        const portfolioProjects = projects.filter(
+                        const portfolioProjects = filteredProjects.filter(
                           project => project.portfolio_id === portfolio.id
                         )
+
+                        if (portfolioProjects.length === 0 && searchTerm) {
+                          return null
+                        }
 
                         return (
                           <div
@@ -430,7 +578,10 @@ export default function ProjectsPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Layers size={16} className="text-[#c49e48]" />
+                                  <Layers
+                                    size={16}
+                                    className="text-[#c49e48]"
+                                  />
 
                                   <div className="font-semibold text-white">
                                     {portfolio.name}
@@ -438,7 +589,8 @@ export default function ProjectsPage() {
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description || 'Project delivery portfolio'}
+                                  {portfolio.description ||
+                                    'Project delivery portfolio'}
                                 </div>
                               </div>
 
@@ -492,7 +644,8 @@ export default function ProjectsPage() {
                       )}
                     </div>
 
-                    {orgProjects.filter(project => !project.portfolio_id).length > 0 && (
+                    {orgProjects.filter(project => !project.portfolio_id).length >
+                      0 && (
                       <div className="mt-6">
                         <div className="text-sm font-semibold text-[#ede8de] mb-3">
                           Projects not assigned to a portfolio
@@ -617,6 +770,30 @@ export default function ProjectsPage() {
             onChange={e => setNewProjectName(e.target.value)}
           />
 
+          <select
+            className="form-control mb-4"
+            value={newProjectStatus}
+            onChange={e => setNewProjectStatus(e.target.value)}
+          >
+            {PROJECT_STATUSES.map(status => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="form-control mb-4"
+            value={newProjectPhase}
+            onChange={e => setNewProjectPhase(e.target.value)}
+          >
+            {PROJECT_PHASES.map(phase => (
+              <option key={phase} value={phase}>
+                {phase}
+              </option>
+            ))}
+          </select>
+
           <button
             className="btn-gold btn w-full justify-center"
             onClick={createProject}
@@ -650,6 +827,9 @@ function MetricCard({ title, value, icon: Icon }: any) {
 }
 
 function ProjectCard({ project, onClick }: any) {
+  const status = project.status || 'Planning'
+  const phase = project.phase || 'Planning'
+
   return (
     <div
       onClick={onClick}
@@ -664,6 +844,10 @@ function ProjectCard({ project, onClick }: any) {
           <div className="text-xs text-slate-500 mt-1 truncate">
             {project.location || 'No location set'}
           </div>
+
+          <div className="text-xs text-[#c49e48] mt-2 truncate">
+            Phase: {phase}
+          </div>
         </div>
 
         <ArrowRight
@@ -674,7 +858,7 @@ function ProjectCard({ project, onClick }: any) {
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 flex-shrink-0">
-          {project.status || 'Active'}
+          {status}
         </span>
 
         <span className="text-xs text-slate-500 truncate">
