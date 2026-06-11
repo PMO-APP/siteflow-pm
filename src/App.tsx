@@ -1,22 +1,25 @@
-import ResetPasswordPage from '@/pages/ResetPasswordPage'
-import { useMembershipStore } from '@/store/membership'
-import RequireRole from '@/components/auth/RequireRole'
-import QualityPage from '@/pages/QualityPage'
-import { useThemeStore } from '@/store/theme'
-import ComingSoonPage from '@/pages/ComingSoonPage'
-import TeamAccessPage from '@/pages/TeamAccessPage'
-import { useProjectStore } from '@/store/project'
-import ProjectsPage from '@/pages/ProjectsPage'
-import RiskTrendPage from '@/pages/RiskTrendPage'
-import AuditPage from '@/pages/AuditPage'
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { useMembershipStore } from '@/store/membership'
+import { useProjectStore } from '@/store/project'
+import { useThemeStore } from '@/store/theme'
+
+import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
+
+import ComingSoonPage from '@/pages/ComingSoonPage'
 import LoginPage from '@/pages/LoginPage'
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
+import AcceptInvitePage from '@/pages/AcceptInvitePage'
+import ProjectsPage from '@/pages/ProjectsPage'
+import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
+import AuditPage from '@/pages/AuditPage'
+
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
+import QualityPage from '@/pages/QualityPage'
 import ProcurementPage from '@/pages/ProcurementPage'
 import ApprovalsPage from '@/pages/ApprovalsPage'
 import SitePage from '@/pages/SitePage'
@@ -24,11 +27,11 @@ import SnagsPage from '@/pages/SnagsPage'
 import DocumentsPage from '@/pages/DocumentsPage'
 import FinancialPage from '@/pages/FinancialPage'
 import RiskPage from '@/pages/RiskPage'
+import RiskTrendPage from '@/pages/RiskTrendPage'
 import TeamPage from '@/pages/TeamPage'
+import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
-import AcceptInvitePage from '@/pages/AcceptInvitePage'
-import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -71,6 +74,27 @@ export default function App() {
     document.documentElement.classList.add(theme)
   }, [theme])
 
+  async function loadMembership(userId: string) {
+    const { data: membership, error } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (error || !membership) {
+      clearMembership()
+      return
+    }
+
+    setMembership({
+      role: membership.role,
+      accessScope: membership.access_scope,
+      organizationId: membership.organization_id,
+      portfolioId: membership.portfolio_id,
+      projectId: membership.project_id,
+    })
+  }
+
   useEffect(() => {
     let mounted = true
 
@@ -90,23 +114,17 @@ export default function App() {
           return
         }
 
+        const { user } = session
+
         setUser({
-          ...session.user,
-          email: session.user.email,
+          ...user,
+          email: user.email,
           full_name:
-            session.user.user_metadata?.full_name ||
-            session.user.email ||
-            'Admin',
-          role: 'admin',
+            user.user_metadata?.full_name || user.email || 'User',
+          role: user.user_metadata?.role || null,
         } as any)
 
-        setMembership({
-          role: 'admin',
-          accessScope: 'workspace',
-          organizationId: 1,
-          portfolioId: null,
-          projectId: null,
-        })
+        await loadMembership(user.id)
       } catch (error) {
         console.error('Auth loading failed:', error)
         clearMembership()
@@ -120,7 +138,7 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session?.user) {
         clearMembership()
         setUser(null)
@@ -128,23 +146,17 @@ export default function App() {
         return
       }
 
+      const { user } = session
+
       setUser({
-        ...session.user,
-        email: session.user.email,
+        ...user,
+        email: user.email,
         full_name:
-          session.user.user_metadata?.full_name ||
-          session.user.email ||
-          'Admin',
-        role: 'admin',
+          user.user_metadata?.full_name || user.email || 'User',
+        role: user.user_metadata?.role || null,
       } as any)
 
-      setMembership({
-        role: 'admin',
-        accessScope: 'workspace',
-        organizationId: 1,
-        portfolioId: null,
-        projectId: null,
-      })
+      await loadMembership(user.id)
 
       setLoading(false)
     })
