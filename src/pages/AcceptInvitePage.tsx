@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, AlertTriangle } from 'lucide-react'
+import {
+  CheckCircle,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+} from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
@@ -9,6 +14,7 @@ export default function AcceptInvitePage() {
   const token = searchParams.get('token')
 
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [invite, setInvite] = useState<any>(null)
   const [error, setError] = useState('')
   const [accepted, setAccepted] = useState(false)
@@ -16,6 +22,8 @@ export default function AcceptInvitePage() {
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     loadInvite()
@@ -77,94 +85,113 @@ export default function AcceptInvitePage() {
       return
     }
 
-    const email = invite.email.trim().toLowerCase()
-    const inviteScope = invite.invite_scope || invite.access_scope || 'project'
+    try {
+      setSubmitting(true)
 
-    const { data: signUpData, error: signUpError } =
-      await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: invite.role,
+      const email = invite.email.trim().toLowerCase()
+      const inviteScope =
+        invite.invite_scope || invite.access_scope || 'project'
+
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              role: invite.role,
+            },
           },
-        },
-      })
+        })
 
-    if (signUpError) {
-      setError(signUpError.message)
-      return
-    }
+      if (signUpError) {
+        const alreadyRegistered =
+          signUpError.message.toLowerCase().includes('already registered') ||
+          signUpError.message.toLowerCase().includes('already exists')
 
-    const userId = signUpData.user?.id
+        if (alreadyRegistered) {
+          setError(
+            'This email already has a PMOCorex account. Please use the Sign In link below.'
+          )
+          return
+        }
 
-    if (!userId) {
-      setError('Account created, but user profile was not returned.')
-      return
-    }
+        setError(signUpError.message)
+        return
+      }
 
-    const { error: profileError } = await supabase.from('profiles').insert({
-  id: userId,
-  email,
-  full_name: fullName,
-  role: invite.role,
-  updated_at: new Date().toISOString(),
-})
+      const userId = signUpData.user?.id
 
-    if (profileError) {
-      setError(profileError.message)
-      return
-    }
+      if (!userId) {
+        setError('Account created, but user profile was not returned.')
+        return
+      }
 
-    const { error: membershipError } = await supabase
-      .from('memberships')
-      .insert({
-        user_id: userId,
-        organization_id: invite.organization_id || 1,
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: userId,
         email,
         full_name: fullName,
         role: invite.role,
-        access_scope: inviteScope,
-        project_id: inviteScope === 'project' ? invite.project_id : null,
-        portfolio_id: inviteScope === 'portfolio' ? invite.portfolio_id : null,
+        updated_at: new Date().toISOString(),
       })
 
-    if (membershipError) {
-      setError(membershipError.message)
-      return
-    }
+      if (profileError) {
+        setError(profileError.message)
+        return
+      }
 
-    if (inviteScope === 'project') {
-      const { error: teamError } = await supabase
-        .from('project_team_members')
+      const { error: membershipError } = await supabase
+        .from('memberships')
         .insert({
-          project_id: invite.project_id,
+          user_id: userId,
+          organization_id: invite.organization_id || 1,
           email,
           full_name: fullName,
           role: invite.role,
+          access_scope: inviteScope,
+          project_id: inviteScope === 'project' ? invite.project_id : null,
+          portfolio_id:
+            inviteScope === 'portfolio' ? invite.portfolio_id : null,
         })
 
-      if (teamError) {
-        setError(teamError.message)
+      if (membershipError) {
+        setError(membershipError.message)
         return
       }
+
+      if (inviteScope === 'project') {
+        const { error: teamError } = await supabase
+          .from('project_team_members')
+          .insert({
+            project_id: invite.project_id,
+            email,
+            full_name: fullName,
+            role: invite.role,
+          })
+
+        if (teamError) {
+          setError(teamError.message)
+          return
+        }
+      }
+
+      const { error: inviteError } = await supabase
+        .from('team_invitations')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+        })
+        .eq('id', invite.id)
+
+      if (inviteError) {
+        setError(inviteError.message)
+        return
+      }
+
+      setAccepted(true)
+    } finally {
+      setSubmitting(false)
     }
-
-    const { error: inviteError } = await supabase
-      .from('team_invitations')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString(),
-      })
-      .eq('id', invite.id)
-
-    if (inviteError) {
-      setError(inviteError.message)
-      return
-    }
-
-    setAccepted(true)
   }
 
   if (loading) {
@@ -236,29 +263,70 @@ export default function AcceptInvitePage() {
                 disabled
               />
 
-              <input
-                className="form-control"
-                type="password"
-                placeholder="Create Password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  className="form-control pr-10"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Create Password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
 
-              <input
-                className="form-control"
-                type="password"
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-              />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(current => !current)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              <div className="relative">
+                <input
+                  className="form-control pr-10"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowConfirmPassword(current => !current)
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={16} />
+                  ) : (
+                    <Eye size={16} />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button
               onClick={acceptInvite}
+              disabled={submitting}
               className="btn-gold btn w-full justify-center mt-6"
             >
-              Activate Account
+              {submitting ? 'Activating…' : 'Activate Account'}
             </button>
+
+            <div className="mt-4 text-center">
+              <span className="text-[#6e7d8c] text-sm">
+                Already have an account?{' '}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => navigate('/mixta-admin-login')}
+                className="text-[#c49e48] text-sm hover:underline"
+              >
+                Sign In
+              </button>
+            </div>
           </>
         )}
       </div>
