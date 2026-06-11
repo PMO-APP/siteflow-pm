@@ -138,28 +138,29 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session?.user) {
-        clearMembership()
-        setUser(null)
-        setLoading(false)
-        return
-      }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+  if (!session?.user) {
+    clearMembership()
+    setUser(null)
+    setLoading(false)
+    return
+  }
 
-      const { user } = session
+  const { user } = session
 
-      setUser({
-        ...user,
-        email: user.email,
-        full_name:
-          user.user_metadata?.full_name || user.email || 'User',
-        role: user.user_metadata?.role || null,
-      } as any)
+  setUser({
+    ...user,
+    email: user.email,
+    full_name:
+      user.user_metadata?.full_name || user.email || 'User',
+    role: user.user_metadata?.role || null,
+  } as any)
 
-      await loadMembership(user.id)
-
-      setLoading(false)
-    })
+  setTimeout(async () => {
+    await loadMembership(user.id)
+    setLoading(false)
+  }, 0)
+})
 
     return () => {
       mounted = false
