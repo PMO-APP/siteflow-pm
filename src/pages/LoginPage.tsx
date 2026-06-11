@@ -11,44 +11,75 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
-    if (savedEmail) setEmail(savedEmail)
+    if (savedEmail) {
+      setEmail(savedEmail)
+      setRememberMe(true)
+    }
   }, [])
 
-async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault()
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
 
-  console.log('STEP 1')
+    setLoading(true)
+    setError('')
+    setNotice('')
 
-  setLoading(true)
-  setError('')
+    try {
+      const cleanEmail = email.toLowerCase().trim()
 
-  try {
-    const cleanEmail = email.toLowerCase().trim()
-
-    console.log('STEP 2')
-
-    const { data, error } =
-      await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       })
 
-    console.log('STEP 3', data, error)
+      if (error) throw error
 
-    if (error) throw error
+      if (rememberMe) {
+        localStorage.setItem('savedEmail', cleanEmail)
+      } else {
+        localStorage.removeItem('savedEmail')
+      }
 
-    console.log('STEP 4')
-
-    window.location.href = '/projects'
-  } catch (err) {
-    console.error('LOGIN ERROR', err)
-    setLoading(false)
+      window.location.href = '/projects'
+    } catch (err: any) {
+      setError(err?.message || 'Unable to sign in. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
-}
+
+  async function handleForgotPassword() {
+    setError('')
+    setNotice('')
+
+    const cleanEmail = email.toLowerCase().trim()
+
+    if (!cleanEmail) {
+      setError('Enter your email address first, then click Forgot Password.')
+      return
+    }
+
+    setResetLoading(true)
+
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setNotice('Password reset link sent. Please check your email.')
+    }
+
+    setResetLoading(false)
+  }
+
   return (
     <div className="min-h-screen bg-[#0c1014] text-white grid lg:grid-cols-2 overflow-hidden">
       <div className="relative hidden lg:flex flex-col justify-between p-12 border-r border-white/[0.06] bg-gradient-to-br from-[#101820] via-[#121b24] to-[#0c1014]">
@@ -121,6 +152,12 @@ async function handleSubmit(e: React.FormEvent) {
                 </div>
               )}
 
+              {notice && (
+                <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+                  {notice}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="form-label">Email</label>
@@ -151,22 +188,33 @@ async function handleSubmit(e: React.FormEvent) {
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-[#6e7d8c] hover:text-white"
+                      onClick={() => setShowPassword(current => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-white"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={() => setRememberMe(!rememberMe)}
-                  />
-                  Remember me
-                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={() => setRememberMe(current => !current)}
+                    />
+                    Remember me
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={resetLoading}
+                    className="text-sm text-[#c49e48] hover:underline disabled:opacity-60"
+                  >
+                    {resetLoading ? 'Sending…' : 'Forgot Password?'}
+                  </button>
+                </div>
 
                 <button
                   type="submit"
