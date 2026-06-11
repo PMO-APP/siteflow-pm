@@ -1,3 +1,4 @@
+import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import { useMembershipStore } from '@/store/membership'
 import RequireRole from '@/components/auth/RequireRole'
 import QualityPage from '@/pages/QualityPage'
@@ -70,22 +71,60 @@ export default function App() {
     document.documentElement.classList.add(theme)
   }, [theme])
 
- useEffect(() => {
-  let mounted = true
+  useEffect(() => {
+    let mounted = true
 
-  async function loadAuthUser() {
-    try {
-      setLoading(true)
+    async function loadAuthUser() {
+      try {
+        setLoading(true)
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-      if (!mounted) return
+        if (!mounted) return
 
+        if (!session?.user) {
+          clearMembership()
+          setUser(null)
+          return
+        }
+
+        setUser({
+          ...session.user,
+          email: session.user.email,
+          full_name:
+            session.user.user_metadata?.full_name ||
+            session.user.email ||
+            'Admin',
+          role: 'admin',
+        } as any)
+
+        setMembership({
+          role: 'admin',
+          accessScope: 'workspace',
+          organizationId: 1,
+          portfolioId: null,
+          projectId: null,
+        })
+      } catch (error) {
+        console.error('Auth loading failed:', error)
+        clearMembership()
+        setUser(null)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    loadAuthUser()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
         clearMembership()
         setUser(null)
+        setLoading(false)
         return
       }
 
@@ -106,53 +145,15 @@ export default function App() {
         portfolioId: null,
         projectId: null,
       })
-    } catch (error) {
-      console.error('Auth loading failed:', error)
-      clearMembership()
-      setUser(null)
-    } finally {
-      if (mounted) setLoading(false)
-    }
-  }
 
-  loadAuthUser()
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!session?.user) {
-      clearMembership()
-      setUser(null)
       setLoading(false)
-      return
-    }
-
-    setUser({
-      ...session.user,
-      email: session.user.email,
-      full_name:
-        session.user.user_metadata?.full_name ||
-        session.user.email ||
-        'Admin',
-      role: 'admin',
-    } as any)
-
-    setMembership({
-      role: 'admin',
-      accessScope: 'workspace',
-      organizationId: 1,
-      portfolioId: null,
-      projectId: null,
     })
 
-    setLoading(false)
-  })
-
-  return () => {
-    mounted = false
-    subscription.unsubscribe()
-  }
-}, [setUser, setLoading, setMembership, clearMembership])
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [setUser, setLoading, setMembership, clearMembership])
 
   return (
     <BrowserRouter>
@@ -166,6 +167,7 @@ export default function App() {
 
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route
           path="/projects"
