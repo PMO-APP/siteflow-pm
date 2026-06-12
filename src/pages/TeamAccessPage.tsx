@@ -18,7 +18,7 @@ const ROLES = [
   'infrastructure',
   'mep',
   'design',
-'costing',
+  'costing',
   'contractor',
   'viewer',
 ]
@@ -75,6 +75,18 @@ export default function TeamAccessPage() {
     setSending(true)
 
     const cleanEmail = email.toLowerCase().trim()
+    const { data: existingInvite } = await supabase
+  .from('team_invitations')
+  .select('id')
+  .eq('email', cleanEmail)
+  .eq('status', 'pending')
+  .maybeSingle()
+
+if (existingInvite) {
+  setSending(false)
+  alert('This user already has a pending invitation.')
+  return
+}
     const token = crypto.randomUUID()
 
     const { data, error } = await supabase
@@ -102,18 +114,27 @@ export default function TeamAccessPage() {
 
     const inviteLink = `${window.location.origin}/accept-invite?token=${data.token}`
 
-    const { error: emailError } = await supabase.functions.invoke(
-      'send-invite-email',
-      {
-        body: {
-          email: cleanEmail,
-          fullName: fullName.trim() || cleanEmail,
-          role,
-          inviteLink,
-          invitedBy: user?.email || 'PMOCorex Admin',
-        },
-      }
-    )
+  const selectedOrganization = organizations.find(
+  org => org.id === Number(organizationId)
+)
+
+const { error: emailError } = await supabase.functions.invoke(
+  'send-invite-email',
+  {
+    body: {
+      email: cleanEmail,
+      fullName: fullName.trim() || cleanEmail,
+      role,
+      inviteLink,
+      invitedBy:
+        user?.user_metadata?.full_name ||
+        user?.email ||
+        'PMOCorex Admin',
+      organizationName:
+        selectedOrganization?.name || 'PMOCorex Workspace',
+    },
+  }
+)
 
     if (emailError) {
       await navigator.clipboard.writeText(inviteLink)
