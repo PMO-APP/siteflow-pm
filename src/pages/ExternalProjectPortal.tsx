@@ -84,11 +84,12 @@ export default function ExternalProjectPortal() {
             description="Send daily or weekly progress updates for internal review."
           />
 
-          <PortalCard
-            icon={FolderUp}
-            title="Upload Documents"
-            description="Upload drawings, reports, photos, certificates, or supporting files."
-          />
+         <PortalCard
+  icon={FolderUp}
+  title="Upload Documents"
+  description="Upload drawings, reports, photos, certificates, or supporting files."
+  onClick={() => navigate('/external-project/documents')}
+/>
 
           <PortalCard
             icon={FileText}
