@@ -223,28 +223,35 @@ export default function ProjectsPage() {
   }
 
   async function updateProject() {
-    if (!editingProject || !editProjectName.trim()) return
+  if (!editingProject || !editProjectName.trim()) return
 
-    const { error } = await supabase
-      .from('projects')
-      .update({
-        project_name: editProjectName.trim(),
-        status: editProjectStatus,
-        phase: editProjectPhase,
-        location: editProjectLocation.trim() || null,
-        handover_date: editProjectHandoverDate || null,
-      })
-      .eq('id', editingProject.id)
+  const { data, error } = await supabase
+    .from('projects')
+    .update({
+      project_name: editProjectName.trim(),
+      status: editProjectStatus,
+      phase: editProjectPhase,
+      location: editProjectLocation.trim() || null,
+      handover_date: editProjectHandoverDate || null,
+    })
+    .eq('id', editingProject.id)
+    .select('*')
+    .single()
 
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    setEditingProject(null)
-    setShowEditProjectModal(false)
-    loadHub()
+  if (error) {
+    alert(error.message)
+    return
   }
+
+  setProjects(current =>
+    current.map(project =>
+      project.id === editingProject.id ? data : project
+    )
+  )
+
+  setEditingProject(null)
+  setShowEditProjectModal(false)
+}
 
   async function createOrganization() {
     if (!canAccessAdmin || !newOrgName.trim()) return
@@ -872,8 +879,8 @@ function MetricCard({ title, value, icon: Icon }: any) {
 }
 
 function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
-  const status = project.status || 'Planning'
-  const phase = project.phase || 'Planning'
+  const status = project.status || 'Not set'
+  const phase = project.phase || 'Not set'
 
   return (
     <div className="group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200">
