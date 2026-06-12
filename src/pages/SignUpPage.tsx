@@ -3,6 +3,14 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
+function makeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+}
+
 export default function SignUpPage() {
   const navigate = useNavigate()
 
@@ -22,15 +30,29 @@ export default function SignUpPage() {
     setSuccess('')
 
     try {
-      const cleanEmail = email.trim().toLowerCase()
       const cleanName = name.trim()
       const cleanOrgName = organizationName.trim()
+      const cleanEmail = email.trim().toLowerCase()
+      const orgSlug = makeSlug(cleanOrgName)
 
       if (!cleanName) throw new Error('Full name is required.')
       if (!cleanOrgName) throw new Error('Organization name is required.')
+      if (!orgSlug) throw new Error('Organization name must contain letters or numbers.')
       if (!cleanEmail) throw new Error('Email is required.')
       if (password.length < 8) {
         throw new Error('Password must be at least 8 characters.')
+      }
+
+      const { data: existingOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', orgSlug)
+        .maybeSingle()
+
+      if (existingOrg) {
+        throw new Error(
+          'This organization already exists. Please ask your workspace administrator to invite you.'
+        )
       }
 
       const { data: signUpData, error: signUpError } =
@@ -42,6 +64,7 @@ export default function SignUpPage() {
               full_name: cleanName,
               role: 'workspace_admin',
               organization_name: cleanOrgName,
+              organization_slug: orgSlug,
             },
             emailRedirectTo: `${window.location.origin}/Login`,
           },
@@ -69,6 +92,7 @@ export default function SignUpPage() {
         .from('organizations')
         .insert({
           name: cleanOrgName,
+          slug: orgSlug,
           created_by: userId,
         })
         .select()
@@ -85,8 +109,8 @@ export default function SignUpPage() {
           full_name: cleanName,
           role: 'workspace_admin',
           access_scope: 'workspace',
-          project_id: null,
           portfolio_id: null,
+          project_id: null,
         })
 
       if (membershipError) throw membershipError
@@ -97,20 +121,22 @@ export default function SignUpPage() {
       setPassword('')
 
       setSuccess(
-        'Workspace created successfully. Please check your email to verify your account before signing in.'
+        `Workspace created successfully. Your workspace URL will be pmocorex.com/${orgSlug}. Please check your email to verify your account before signing in.`
       )
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
 
-      if (msg.includes('already')) {
+      if (msg.includes('already registered') || msg.includes('already')) {
         setError('You already have an account. Please sign in.')
       } else {
-        setError(err.message || 'Unable to create account.')
+        setError(err.message || 'Unable to create workspace.')
       }
     } finally {
       setLoading(false)
     }
   }
+
+  const previewSlug = makeSlug(organizationName)
 
   return (
     <div className="min-h-screen bg-[#0c1014] text-white grid lg:grid-cols-2 overflow-hidden">
@@ -205,6 +231,15 @@ export default function SignUpPage() {
                     placeholder="e.g. Mixta Africa"
                     required
                   />
+
+                  {previewSlug && (
+                    <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-[#6e7d8c]">
+                      Workspace URL:{' '}
+                      <span className="text-[#c49e48]">
+                        pmocorex.com/{previewSlug}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
