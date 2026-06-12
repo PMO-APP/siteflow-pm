@@ -14,6 +14,7 @@ import LoginPage from '@/pages/LoginPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
 import ProjectsPage from '@/pages/ProjectsPage'
+import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
 
@@ -119,8 +120,7 @@ export default function App() {
         setUser({
           ...user,
           email: user.email,
-          full_name:
-            user.user_metadata?.full_name || user.email || 'User',
+          full_name: user.user_metadata?.full_name || user.email || 'User',
           role: user.user_metadata?.role || null,
         } as any)
 
@@ -139,28 +139,27 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-  if (!session?.user) {
-    clearMembership()
-    setUser(null)
-    setLoading(false)
-    return
-  }
+      if (!session?.user) {
+        clearMembership()
+        setUser(null)
+        setLoading(false)
+        return
+      }
 
-  const { user } = session
+      const { user } = session
 
-  setUser({
-    ...user,
-    email: user.email,
-    full_name:
-      user.user_metadata?.full_name || user.email || 'User',
-    role: user.user_metadata?.role || null,
-  } as any)
+      setUser({
+        ...user,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.email || 'User',
+        role: user.user_metadata?.role || null,
+      } as any)
 
-  setTimeout(async () => {
-    await loadMembership(user.id)
-    setLoading(false)
-  }, 0)
-})
+      setTimeout(async () => {
+        await loadMembership(user.id)
+        setLoading(false)
+      }, 0)
+    })
 
     return () => {
       mounted = false
@@ -183,6 +182,15 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <ProfilePage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
           path="/projects"
           element={
             <RequireAuth>
@@ -195,14 +203,7 @@ export default function App() {
           path="/admin"
           element={
             <RequireAuth>
-              <RequireRole
-                allowedRoles={[
-                  'workspace_admin',
-                  'admin',
-                  'pmo',
-                  'portfolio_manager',
-                ]}
-              >
+              <RequireRole allowedRoles={['workspace_admin', 'admin']}>
                 <WorkspaceAdminPage />
               </RequireRole>
             </RequireAuth>
