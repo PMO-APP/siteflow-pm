@@ -100,11 +100,12 @@ export default function ExternalProjectPortal() {
             description="Submit site reports, inspection notes, method statements, or progress reports."
           />
 
-          <PortalCard
-            icon={MessageSquare}
-            title="Comments / RFIs"
-            description="Raise questions, respond to comments, or submit RFIs to the project team."
-          />
+         <PortalCard
+  icon={MessageSquare}
+  title="Comments / RFIs"
+  description="Raise questions, respond to comments, or submit RFIs to the project team."
+  onClick={() => navigate('/external-project/rfis')}
+/>
 
           <PortalCard
             icon={CheckCircle}
