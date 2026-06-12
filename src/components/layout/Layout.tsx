@@ -1,8 +1,8 @@
 import { useBrowserBranding } from '@/hooks/useBrowserBranding'
 import { supabase } from '@/lib/supabase'
-import { parseISO } from 'date-fns'
+import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
-import { getRole } from '@/lib/access'
+import { useMembershipStore } from '@/store/membership'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
@@ -25,7 +25,6 @@ import {
   UserCircle,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
-import { differenceInDays } from 'date-fns'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
@@ -47,6 +46,37 @@ const NAV = [
   { to: '/app/reports', icon: FileText, label: 'Reports' },
 ]
 
+const FULL_ACCESS_ROLES = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'portfolio_manager',
+  'project_manager',
+]
+
+function formatRoleLabel(role: string | null) {
+  if (!role) return 'Team Member'
+
+  const labels: Record<string, string> = {
+    workspace_admin: 'Workspace Admin',
+    admin: 'Administrator',
+    pmo: 'PMO',
+    portfolio_manager: 'Portfolio Manager',
+    project_manager: 'Project Manager',
+    contractor: 'Contractor',
+    consultant: 'Consultant',
+    design: 'Design Team',
+    costing: 'Costing Team',
+    housebuild: 'Housebuild',
+    mep: 'MEP',
+    infrastructure: 'Infrastructure',
+    viewer: 'Viewer',
+    guest: 'Guest',
+  }
+
+  return labels[role] || role.replaceAll('_', ' ')
+}
+
 export default function Layout() {
   useBrowserBranding()
 
@@ -58,8 +88,8 @@ export default function Layout() {
 
   const { user, signOut } = useAuthStore()
   const { projectName, organizationId, portfolioId } = useProjectStore()
-
   const role = useMembershipStore(state => state.role)
+
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -81,13 +111,9 @@ export default function Layout() {
       .from('projects')
       .select('handover_date')
       .eq('project_name', projectName)
-      .single()
+      .maybeSingle()
 
-    if (data?.handover_date) {
-      setHandoverDate(parseISO(data.handover_date))
-    } else {
-      setHandoverDate(null)
-    }
+    setHandoverDate(data?.handover_date ? parseISO(data.handover_date) : null)
   }
 
   async function loadWorkspaceContext() {
@@ -96,7 +122,7 @@ export default function Layout() {
         .from('organizations')
         .select('name')
         .eq('id', organizationId)
-        .single()
+        .maybeSingle()
 
       setOrganizationName(data?.name || '')
     } else {
@@ -108,7 +134,7 @@ export default function Layout() {
         .from('portfolios')
         .select('name')
         .eq('id', portfolioId)
-        .single()
+        .maybeSingle()
 
       setPortfolioName(data?.name || '')
     } else {
@@ -121,8 +147,7 @@ export default function Layout() {
     : null
 
   const allowedNav = NAV.filter(item => {
-    if (role === 'admin') return true
-    if (role === 'project') return item.to !== '/app/audit'
+    if (FULL_ACCESS_ROLES.includes(role || '')) return true
 
     if (role === 'design') {
       return [
@@ -145,6 +170,16 @@ export default function Layout() {
       ].includes(item.to)
     }
 
+    if (role === 'contractor' || role === 'consultant') {
+      return [
+        '/app',
+        '/app/schedule',
+        '/app/site',
+        '/app/snags',
+        '/app/documents',
+      ].includes(item.to)
+    }
+
     return ['/app', '/app/recovery'].includes(item.to)
   })
 
@@ -164,64 +199,23 @@ export default function Layout() {
       )}
 
       <aside
-        className={`
-          fixed lg:relative z-30 h-full w-[280px] flex-shrink-0
-          border-r border-white/[0.06] bg-[#0f141a]/95 backdrop-blur-xl
-          flex flex-col transform transition-transform duration-200
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
+        className={`fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r border-white/[0.06] bg-[#0f141a]/95 backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
         <div className="h-[2px] bg-gradient-to-r from-[#c49e48] via-[#e3c06a] to-transparent flex-shrink-0" />
 
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-left"
-          >
+          <button type="button" onClick={() => navigate('/')} className="text-left">
             <PMOCorexLogo size={34} />
           </button>
 
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
-            <div>
-              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-                Organization
-              </div>
-
-              <div className="mt-1 truncate text-xs font-semibold text-[#ede8de]">
-                {organizationName || 'No organization'}
-              </div>
-            </div>
-
+            <InfoBlock label="Organization" value={organizationName || 'No organization'} />
             <div className="h-px bg-white/[0.06]" />
-
-            <div>
-              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-                Portfolio
-              </div>
-
-              <div className="mt-1 truncate text-xs font-semibold text-[#ede8de]">
-                {portfolioName || 'No portfolio'}
-              </div>
-            </div>
-
+            <InfoBlock label="Portfolio" value={portfolioName || 'No portfolio'} />
             <div className="h-px bg-white/[0.06]" />
-
-            <div>
-              <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-                Project
-              </div>
-
-              <div className="mt-1 truncate text-sm font-bold text-[#c49e48]">
-                {projectName || 'No project selected'}
-              </div>
-            </div>
-
-            {role === 'guest' && (
-              <div className="mt-2 inline-block px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-semibold tracking-wide text-amber-400">
-                Executive View
-              </div>
-            )}
+            <InfoBlock label="Project" value={projectName || 'No project selected'} highlight />
           </div>
         </div>
 
@@ -229,9 +223,7 @@ export default function Layout() {
           <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#111820] px-3 py-3">
             <div
               className={`font-display text-3xl font-black leading-none ${
-                daysLeft !== null && daysLeft < 60
-                  ? 'text-red-400'
-                  : 'text-[#c49e48]'
+                daysLeft !== null && daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'
               }`}
             >
               {daysLeft !== null ? Math.max(0, daysLeft) : '-'}
@@ -240,9 +232,7 @@ export default function Layout() {
             <div>
               <div
                 className={`text-[10px] font-semibold ${
-                  daysLeft !== null && daysLeft < 60
-                    ? 'text-red-400'
-                    : 'text-[#c49e48]'
+                  daysLeft !== null && daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'
                 }`}
               >
                 DAYS LEFT
@@ -285,28 +275,20 @@ export default function Layout() {
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
           <button
             type="button"
-            onClick={() => navigate('/admin?tab=profile')}
+            onClick={() => navigate('/profile')}
             className="w-full flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5 hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all text-left"
           >
             <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
-              {user ? getInitials(user.full_name || 'Admin') : 'A'}
+              {user ? getInitials(user.full_name || user.email || 'User') : 'U'}
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="text-[11px] font-medium text-[#ede8de] truncate">
-                {user?.full_name || 'Admin'}
+                {user?.full_name || user?.email || 'User'}
               </div>
 
               <div className="text-[9px] text-[#6e7d8c] capitalize">
-                {role === 'guest'
-                  ? 'Management'
-                  : role === 'project'
-                  ? 'Project Team'
-                  : role === 'design'
-                  ? 'Design Team'
-                  : role === 'costing'
-                  ? 'Costing Team'
-                  : 'Administrator'}
+                {formatRoleLabel(role)}
               </div>
             </div>
 
@@ -343,10 +325,7 @@ export default function Layout() {
               ← Back
             </button>
 
-            <button
-              onClick={() => navigate('/projects')}
-              className="btn-ghost btn-sm btn"
-            >
+            <button onClick={() => navigate('/projects')} className="btn-ghost btn-sm btn">
               Workspace Hub
             </button>
 
@@ -360,9 +339,7 @@ export default function Layout() {
                 <span>/</span>
                 <span>{portfolioName || 'Portfolio'}</span>
                 <span>/</span>
-                <span className="text-[#c49e48]">
-                  {projectName || 'Project'}
-                </span>
+                <span className="text-[#c49e48]">{projectName || 'Project'}</span>
               </div>
             </div>
           </div>
@@ -400,6 +377,34 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+    </div>
+  )
+}
+
+function InfoBlock({
+  label,
+  value,
+  highlight,
+}: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
+  return (
+    <div>
+      <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+        {label}
+      </div>
+
+      <div
+        className={`mt-1 truncate ${
+          highlight
+            ? 'text-sm font-bold text-[#c49e48]'
+            : 'text-xs font-semibold text-[#ede8de]'
+        }`}
+      >
+        {value}
+      </div>
     </div>
   )
 }
