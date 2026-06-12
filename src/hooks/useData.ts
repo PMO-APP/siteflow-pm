@@ -841,3 +841,92 @@ export const useSafetyLogs = (reportId?: string | null) => {
     },
   })
 }
+// ─── PROJECT TEAM ──────────────────────────────────────
+export const useProjectTeam = () => {
+  const { projectId } = useProjectStore()
+
+  return useQuery({
+    queryKey: ['project_team', projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_team')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export const useUpsertProjectTeamMember = () => {
+  const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
+  return useMutation({
+    mutationFn: async (item: any & { id?: string }) => {
+      const pid = requireProject(projectId)
+      const { id, ...rest } = item
+
+      const query = id
+        ? supabase
+            .from('project_team')
+            .update({
+              ...rest,
+              project_id: pid,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', id)
+            .eq('project_id', pid)
+        : supabase
+            .from('project_team')
+            .insert({
+              ...rest,
+              project_id: pid,
+            })
+
+      const { data, error } = await query.select().single()
+
+      if (error) {
+        alert(error.message)
+        throw error
+      }
+
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ['project_team', projectId],
+      })
+    },
+  })
+}
+
+export const useDeleteProjectTeamMember = () => {
+  const qc = useQueryClient()
+  const { projectId } = useProjectStore()
+
+  return useMutation({
+    mutationFn: async (id: string | number) => {
+      const pid = requireProject(projectId)
+
+      const { error } = await supabase
+        .from('project_team')
+        .delete()
+        .eq('id', id)
+        .eq('project_id', pid)
+
+      if (error) {
+        alert(error.message)
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ['project_team', projectId],
+      })
+    },
+  })
+}
