@@ -107,11 +107,12 @@ export default function ExternalProjectPortal() {
   onClick={() => navigate('/external-project/rfis')}
 />
 
-          <PortalCard
-            icon={CheckCircle}
-            title="Submission Status"
-            description="Track whether your submitted items are pending, reviewed, approved, or rejected."
-          />
+         <PortalCard
+  icon={CheckCircle}
+  title="Submission Status"
+  description="Track whether your submitted items are pending, reviewed, approved, or rejected."
+  onClick={() => navigate('/external-project/submissions')}
+/>
         </section>
       </div>
     </div>
