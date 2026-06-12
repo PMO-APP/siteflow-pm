@@ -29,6 +29,10 @@ export default function AcceptInvitePage() {
     loadInvite()
   }, [token])
 
+  function cleanRole(role: string | null | undefined) {
+    return String(role || '').toLowerCase().trim()
+  }
+
   async function loadInvite() {
     if (!token) {
       setError('Invite token is missing.')
@@ -89,6 +93,7 @@ export default function AcceptInvitePage() {
       setSubmitting(true)
 
       const email = invite.email.trim().toLowerCase()
+      const role = cleanRole(invite.role)
       const inviteScope =
         invite.invite_scope || invite.access_scope || 'project'
 
@@ -99,24 +104,24 @@ export default function AcceptInvitePage() {
           options: {
             data: {
               full_name: fullName,
-              role: invite.role,
+              role,
             },
           },
         })
 
-     if (signUpError) {
-  if (
-    signUpError.message.toLowerCase().includes('already registered')
-  ) {
-    setError(
-      'An account already exists for this email. Please sign in instead.'
-    )
-    return
-  }
+      if (signUpError) {
+        if (
+          signUpError.message.toLowerCase().includes('already registered')
+        ) {
+          setError(
+            'An account already exists for this email. Please sign in instead.'
+          )
+          return
+        }
 
-  setError(signUpError.message)
-  return
-}
+        setError(signUpError.message)
+        return
+      }
 
       const userId = signUpData.user?.id
 
@@ -126,12 +131,12 @@ export default function AcceptInvitePage() {
       }
 
       const { error: profileError } = await supabase.from('profiles').upsert({
-  id: userId,
-  email,
-  full_name: fullName,
-  role: invite.role,
-  updated_at: new Date().toISOString(),
-})
+        id: userId,
+        email,
+        full_name: fullName,
+        role,
+        updated_at: new Date().toISOString(),
+      })
 
       if (profileError) {
         setError(profileError.message)
@@ -145,7 +150,7 @@ export default function AcceptInvitePage() {
           organization_id: invite.organization_id || 1,
           email,
           full_name: fullName,
-          role: invite.role,
+          role,
           access_scope: inviteScope,
           project_id: inviteScope === 'project' ? invite.project_id : null,
           portfolio_id:
@@ -160,12 +165,18 @@ export default function AcceptInvitePage() {
       if (inviteScope === 'project') {
         const { error: teamError } = await supabase
           .from('project_team_members')
-          .insert({
-            project_id: invite.project_id,
-            email,
-            full_name: fullName,
-            role: invite.role,
-          })
+          .upsert(
+            {
+              user_id: userId,
+              project_id: invite.project_id,
+              email,
+              full_name: fullName,
+              role,
+            },
+            {
+              onConflict: 'project_id,email',
+            }
+          )
 
         if (teamError) {
           setError(teamError.message)
@@ -235,7 +246,7 @@ export default function AcceptInvitePage() {
             <p className="text-[#6e7d8c] mt-3">
               You have been invited as{' '}
               <span className="text-[#c49e48] font-semibold">
-                {invite?.role || 'team member'}
+                {cleanRole(invite?.role) || 'team member'}
               </span>
               .
             </p>
