@@ -63,6 +63,7 @@ function formatRoleLabel(role: string | null) {
     pmo: 'PMO',
     portfolio_manager: 'Portfolio Manager',
     project_manager: 'Project Manager',
+    project_owner: 'Project Owner',
     contractor: 'Contractor',
     consultant: 'Consultant',
     design: 'Design Team',
@@ -74,7 +75,7 @@ function formatRoleLabel(role: string | null) {
     guest: 'Guest',
   }
 
-  return labels[role] || role.replaceAll('_', ' ')
+  return labels[role] || role.replace(/_/g, ' ')
 }
 
 export default function Layout() {
