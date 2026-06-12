@@ -165,23 +165,31 @@ export default function ProfilePage() {
     <div className="min-h-dvh bg-[#0c1014] text-white">
       <div className="mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-left w-fit"
-          >
-            <PMOCorexLogo size={42} />
-          </button>
+  <button
+    type="button"
+    onClick={() => navigate('/')}
+    className="text-left w-fit"
+  >
+    <PMOCorexLogo size={42} />
+  </button>
 
-          <button
-            onClick={() => navigate('/projects')}
-            className="btn btn-ghost w-fit"
-          >
-            <ArrowLeft size={15} />
-            Back to Workspace Hub
-          </button>
-        </div>
+  <div className="flex gap-2">
+    <button
+      onClick={() => navigate(-1)}
+      className="btn btn-ghost"
+    >
+      <ArrowLeft size={15} />
+      Back
+    </button>
 
+    <button
+      onClick={() => navigate('/projects')}
+      className="btn btn-gold"
+    >
+      Workspace Hub
+    </button>
+  </div>
+</div>
         <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
