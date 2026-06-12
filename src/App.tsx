@@ -17,6 +17,7 @@ import ProjectsPage from '@/pages/ProjectsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
+import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -33,6 +34,8 @@ import TeamPage from '@/pages/TeamPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
+
+const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -60,6 +63,16 @@ function RequireProject({ children }: { children: React.ReactNode }) {
 
   if (!projectId) {
     return <Navigate to="/projects" replace />
+  }
+
+  return <>{children}</>
+}
+
+function RequireInternal({ children }: { children: React.ReactNode }) {
+  const role = useMembershipStore(state => state.role)
+
+  if (EXTERNAL_ROLES.includes(role || '')) {
+    return <Navigate to="/external-project" replace />
   }
 
   return <>{children}</>
@@ -191,10 +204,21 @@ export default function App() {
         />
 
         <Route
+          path="/external-project"
+          element={
+            <RequireAuth>
+              <ExternalProjectPortal />
+            </RequireAuth>
+          }
+        />
+
+        <Route
           path="/projects"
           element={
             <RequireAuth>
-              <ProjectsPage />
+              <RequireInternal>
+                <ProjectsPage />
+              </RequireInternal>
             </RequireAuth>
           }
         />
@@ -203,9 +227,18 @@ export default function App() {
           path="/admin"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={['workspace_admin', 'admin']}>
-                <WorkspaceAdminPage />
-              </RequireRole>
+              <RequireInternal>
+                <RequireRole
+                  allowedRoles={[
+                    'workspace_admin',
+                    'admin',
+                    'pmo',
+                    'portfolio_manager',
+                  ]}
+                >
+                  <WorkspaceAdminPage />
+                </RequireRole>
+              </RequireInternal>
             </RequireAuth>
           }
         />
@@ -214,9 +247,11 @@ export default function App() {
           path="/admin/audit"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={['workspace_admin', 'admin']}>
-                <AuditPage />
-              </RequireRole>
+              <RequireInternal>
+                <RequireRole allowedRoles={['workspace_admin', 'admin']}>
+                  <AuditPage />
+                </RequireRole>
+              </RequireInternal>
             </RequireAuth>
           }
         />
@@ -225,9 +260,11 @@ export default function App() {
           path="/app"
           element={
             <RequireAuth>
-              <RequireProject>
-                <Layout />
-              </RequireProject>
+              <RequireInternal>
+                <RequireProject>
+                  <Layout />
+                </RequireProject>
+              </RequireInternal>
             </RequireAuth>
           }
         >
