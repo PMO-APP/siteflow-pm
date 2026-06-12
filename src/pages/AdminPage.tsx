@@ -24,7 +24,6 @@ import {
 
 const baseAdminTabs = [
   'Overview',
-  'My Profile',
   'Security',
   'Users & Roles',
   'Organizations',
@@ -396,38 +395,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'My Profile' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#ede8de]">
-                    My Profile
-                  </h2>
-
-                  <p className="text-sm text-[#6e7d8c] mt-1">
-                    View your login details and workspace access.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <InfoCard label="Name" value={user?.full_name || 'User'} />
-                  <InfoCard label="Login Email" value={user?.email || '—'} />
-                  <InfoCard label="Role" value={role || 'guest'} />
-                  <InfoCard label="Access Scope" value={accessScope || '—'} />
-                  <InfoCard
-                    label="Organization"
-                    value={userOrganization?.name || organizationId || '—'}
-                  />
-                  <InfoCard
-                    label="Portfolio"
-                    value={userPortfolio?.name || portfolioId || '—'}
-                  />
-                  <InfoCard
-                    label="Project"
-                    value={userProject?.project_name || projectId || '—'}
-                  />
-                </div>
-              </div>
-            )}
+           
 
             {activeTab === 'Security' && (
               <div className="space-y-6">
