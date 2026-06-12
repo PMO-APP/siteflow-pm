@@ -3,6 +3,8 @@ import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
+const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
+
 export default function LoginPage() {
   const navigate = useNavigate()
 
@@ -17,45 +19,83 @@ export default function LoginPage() {
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
+
     if (savedEmail) {
       setEmail(savedEmail)
       setRememberMe(true)
     }
   }, [])
 
-  async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault()
-
-  setLoading(true)
-  setError('')
-  setNotice('')
-
-  try {
-    const cleanEmail = email.toLowerCase().trim()
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    })
+  async function getLoginRedirectPath(userId: string) {
+    const { data: membership, error } = await supabase
+      .from('memberships')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle()
 
     if (error) {
-      setError(error.message)
-      return
+      throw error
     }
 
-    if (rememberMe) {
-      localStorage.setItem('savedEmail', cleanEmail)
-    } else {
-      localStorage.removeItem('savedEmail')
+    const role = String(membership?.role || '').toLowerCase().trim()
+
+    if (EXTERNAL_ROLES.includes(role)) {
+      return '/external-project'
     }
 
-    navigate('/projects')
-  } catch (err: any) {
-    setError(err?.message || 'Unable to sign in. Please try again.')
-  } finally {
-    setLoading(false)
+    return '/projects'
   }
-}
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+
+    setLoading(true)
+    setError('')
+    setNotice('')
+
+    try {
+      const cleanEmail = email.toLowerCase().trim()
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      })
+
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      if (rememberMe) {
+        localStorage.setItem('savedEmail', cleanEmail)
+      } else {
+        localStorage.removeItem('savedEmail')
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError) {
+        setError(userError.message)
+        return
+      }
+
+      if (!user) {
+        navigate('/projects')
+        return
+      }
+
+      const redirectPath = await getLoginRedirectPath(user.id)
+
+      navigate(redirectPath)
+    } catch (err: any) {
+      setError(err?.message || 'Unable to sign in. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleForgotPassword() {
     setError('')
