@@ -58,8 +58,14 @@ export default function ExternalProjectPortal() {
             </p>
 
             <div className="mt-5 text-sm text-slate-500">
-              Role: <span className="text-[#c49e48]">{role || 'External User'}</span>
-              {' '}• Project ID: <span className="text-[#c49e48]">{projectId || 'Not assigned'}</span>
+              Role:{' '}
+              <span className="text-[#c49e48]">
+                {role || 'External User'}
+              </span>{' '}
+              • Project ID:{' '}
+              <span className="text-[#c49e48]">
+                {projectId || 'Not assigned'}
+              </span>
             </div>
           </div>
         </section>
@@ -69,6 +75,7 @@ export default function ExternalProjectPortal() {
             icon={ClipboardList}
             title="My Assigned Tasks"
             description="View and update tasks assigned to your company or project role."
+            onClick={() => navigate('/external-project/tasks')}
           />
 
           <PortalCard
@@ -110,10 +117,12 @@ function PortalCard({
   icon: Icon,
   title,
   description,
+  onClick,
 }: {
   icon: any
   title: string
   description: string
+  onClick?: () => void
 }) {
   return (
     <div className="card p-6 hover:border-[#c49e48]/30 transition">
@@ -127,7 +136,10 @@ function PortalCard({
         {description}
       </p>
 
-      <button className="btn btn-ghost mt-5 w-full justify-center">
+      <button
+        onClick={onClick}
+        className="btn btn-ghost mt-5 w-full justify-center"
+      >
         Open
       </button>
     </div>
