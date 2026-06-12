@@ -222,30 +222,30 @@ export default function ProjectsPage() {
     setShowEditProjectModal(true)
   }
 
- async function updateProject() {
-  if (!editingProject || !editProjectName.trim()) return
+  async function updateProject() {
+    if (!editingProject || !editProjectName.trim()) return
 
-  const { error } = await supabase
-    .from('projects')
-    .update({
-      project_name: editProjectName.trim(),
-      status: editProjectStatus,
-      phase: editProjectPhase,
-      location: editProjectLocation.trim() || null,
-      handover_date: editProjectHandoverDate || null,
-    })
-    .eq('id', editingProject.id)
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        project_name: editProjectName.trim(),
+        status: editProjectStatus,
+        phase: editProjectPhase,
+        location: editProjectLocation.trim() || null,
+        handover_date: editProjectHandoverDate || null,
+      })
+      .eq('id', editingProject.id)
 
-  if (error) {
-    alert(error.message)
-    return
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setEditingProject(null)
+    setShowEditProjectModal(false)
+
+    await loadHub()
   }
-
-  setEditingProject(null)
-  setShowEditProjectModal(false)
-
-  await loadHub()
-}
 
   async function createOrganization() {
     if (!canAccessAdmin || !newOrgName.trim()) return
@@ -326,11 +326,11 @@ export default function ProjectsPage() {
 
     const matchesStatus =
       statusFilter === 'All' ||
-      String(project.status || 'Planning') === statusFilter
+      String(project.status || 'Not set') === statusFilter
 
     const matchesPhase =
       phaseFilter === 'All' ||
-      String(project.phase || 'Planning') === phaseFilter
+      String(project.phase || 'Not set') === phaseFilter
 
     return (
       matchesSearch &&
@@ -344,7 +344,7 @@ export default function ProjectsPage() {
   const totalProjects = filteredProjects.length
 
   const activeProjects = filteredProjects.filter(
-    project => (project.status || 'Planning') === 'Active'
+    project => (project.status || 'Not set') === 'Active'
   ).length
 
   return (
@@ -877,39 +877,26 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
   const phase = project.phase || 'Not set'
 
   const statusStyles: Record<string, string> = {
-    Planning:
-      'bg-blue-500/10 text-blue-400 border-blue-500/20',
-
-    Active:
-      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-
-    'On Hold':
-      'bg-amber-500/10 text-amber-400 border-amber-500/20',
-
-    Inactive:
-      'bg-slate-500/10 text-slate-400 border-slate-500/20',
-
-    Delayed:
-      'bg-red-500/10 text-red-400 border-red-500/20',
-
-    Completed:
-      'bg-purple-500/10 text-purple-400 border-purple-500/20',
-
-    Cancelled:
-      'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    Planning: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    Active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    'On Hold': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    Inactive: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    Delayed: 'bg-red-500/10 text-red-400 border-red-500/20',
+    Completed: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    Cancelled: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
   }
 
-  const phaseStyles: Record<string, string> = {
-    Concept: 'text-slate-400',
-    Design: 'text-indigo-400',
-    Procurement: 'text-orange-400',
-    Mobilization: 'text-cyan-400',
-    Execution: 'text-emerald-400',
-    Finishing: 'text-yellow-400',
-    'Testing & Commissioning': 'text-teal-400',
-    Handover: 'text-purple-400',
-    'Defects Liability': 'text-pink-400',
-    'Closed Out': 'text-gray-400',
+  const phaseBadgeStyles: Record<string, string> = {
+    Concept: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+    Design: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    Procurement: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    Mobilization: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    Execution: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
+    Finishing: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+    'Testing & Commissioning': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    Handover: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+    'Defects Liability': 'bg-stone-500/10 text-stone-400 border-stone-500/20',
+    'Closed Out': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
   }
 
   const stripColors: Record<string, string> = {
@@ -924,8 +911,6 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
 
   return (
     <div className="relative overflow-hidden group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200">
-
-      {/* Status Strip */}
       <div
         className={`absolute left-0 top-0 h-full w-1 ${
           stripColors[status] || 'bg-slate-500'
@@ -942,13 +927,14 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
             {project.location || 'No location set'}
           </div>
 
-          <div
-            className={`text-xs mt-2 font-medium ${
-              phaseStyles[phase] || 'text-[#c49e48]'
+          <span
+            className={`inline-flex mt-3 text-xs px-2 py-1 rounded-full border ${
+              phaseBadgeStyles[phase] ||
+              'bg-slate-500/10 text-slate-400 border-slate-500/20'
             }`}
           >
             Phase: {phase}
-          </div>
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -959,7 +945,8 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
                 e.stopPropagation()
                 onEdit()
               }}
-              className="text-slate-500 hover:text-[#c49e48]"
+              className="text-slate-500 hover:text-[#c49e48] transition"
+              title="Edit project"
             >
               <Pencil size={15} />
             </button>
@@ -968,7 +955,7 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
           <button
             type="button"
             onClick={onClick}
-            className="text-slate-500 group-hover:text-[#c49e48]"
+            className="text-slate-500 group-hover:text-[#c49e48] transition"
           >
             <ArrowRight size={16} />
           </button>
@@ -982,7 +969,7 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
             'bg-slate-500/10 text-slate-400 border-slate-500/20'
           }`}
         >
-          {status}
+          Status: {status}
         </span>
 
         <span className="text-xs text-slate-500 truncate">
@@ -992,6 +979,7 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
     </div>
   )
 }
+
 function EmptyHub({ title, message, action }: any) {
   return (
     <div className="card p-10 text-center">
