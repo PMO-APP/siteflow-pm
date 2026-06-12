@@ -5,9 +5,6 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
-import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
-import ExternalRFIPage from '@/pages/external/ExternalRFIPage'
-import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -20,8 +17,13 @@ import ProjectsPage from '@/pages/ProjectsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
+
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
+import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
+import ExternalRFIPage from '@/pages/external/ExternalRFIPage'
+import ExternalProgressReportPage from '@/pages/external/ExternalProgressReportPage'
+import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -197,7 +199,6 @@ export default function App() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="external-review" element={<ExternalReviewDashboard />} />
 
         <Route
           path="/profile"
@@ -207,22 +208,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/external-project/documents"
-  element={
-    <RequireAuth>
-      <ExternalDocumentsPage />
-    </RequireAuth>
-  }
-/>
-        <Route
-  path="/external-project/rfis"
-  element={
-    <RequireAuth>
-      <ExternalRFIPage />
-    </RequireAuth>
-  }
-/>
+
         <Route
           path="/external-project"
           element={
@@ -237,6 +223,33 @@ export default function App() {
           element={
             <RequireAuth>
               <ExternalTasksPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/external-project/documents"
+          element={
+            <RequireAuth>
+              <ExternalDocumentsPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/external-project/progress-report"
+          element={
+            <RequireAuth>
+              <ExternalProgressReportPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/external-project/rfis"
+          element={
+            <RequireAuth>
+              <ExternalRFIPage />
             </RequireAuth>
           }
         />
@@ -309,6 +322,7 @@ export default function App() {
           <Route path="financial" element={<FinancialPage />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
+          <Route path="external-review" element={<ExternalReviewDashboard />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
