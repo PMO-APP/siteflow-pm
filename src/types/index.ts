@@ -275,7 +275,20 @@ export interface ContractorScore {
   scored_by?: string
   created_at: string
 }
+export interface ProjectTeamMember {
+  id: string
+  project_id: number
 
+  company_name: string
+  role: string
+  contact_person?: string
+  email?: string
+  phone?: string
+
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
 export interface Notification {
   id: string
   user_id: string
