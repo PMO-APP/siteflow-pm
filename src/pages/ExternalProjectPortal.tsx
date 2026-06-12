@@ -78,11 +78,14 @@ export default function ExternalProjectPortal() {
             onClick={() => navigate('/external-project/tasks')}
           />
 
-          <PortalCard
-            icon={UploadCloud}
-            title="Submit Progress Update"
-            description="Send daily or weekly progress updates for internal review."
-          />
+         <PortalCard
+  icon={UploadCloud}
+  title="Submit Progress Update"
+  description="Send daily or weekly progress updates for internal review."
+  onClick={() =>
+    navigate('/external-project/progress-report')
+  }
+/>
 
          <PortalCard
   icon={FolderUp}
