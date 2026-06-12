@@ -681,23 +681,25 @@ export default function AdminPage() {
                     </select>
                   )}
 
-                  {inviteScope === 'project' && (
-                    <select
-                      className="form-control"
-                      value={inviteRole}
-                      onChange={e => setInviteRole(e.target.value)}
-                    >
-                      <option value="consultant">Consultant</option>
-                      <option value="contractor">Contractor</option>
-                      <option value="project_manager">Project Manager</option>
-                      <option value="design">Design Team</option>
-                      <option value="housebuild">Housebuild</option>
-                      <option value="mep">MEP</option>
-                      <option value="infrastructure">Infrastructure</option>
-                      <option value="costing">Costing</option>
-                      <option value="guest">Guest</option>
-                    </select>
-                  )}
+                {inviteScope === 'project' && (
+  <select
+    className="form-control"
+    value={inviteRole}
+    onChange={e => setInviteRole(e.target.value)}
+  >
+    <option value="consultant">Consultant</option>
+    <option value="contractor">Contractor</option>
+    <option value="project_manager">Project Manager</option>
+    <option value="project_owner">Project Owner</option>
+    <option value="design">Design Team</option>
+    <option value="housebuild">Housebuild</option>
+    <option value="mep">MEP</option>
+    <option value="infrastructure">Infrastructure</option>
+    <option value="costing">Costing</option>
+    <option value="viewer">Viewer</option>
+    <option value="guest">Guest</option>
+  </select>
+)}
                 </div>
 
                 <button onClick={sendInvite} className="btn btn-gold">
