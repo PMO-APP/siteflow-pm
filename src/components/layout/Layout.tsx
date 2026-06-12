@@ -15,6 +15,7 @@ import {
   FolderOpen,
   DollarSign,
   Shield,
+  ClipboardList,
   Users,
   FileText,
   Bell,
@@ -43,6 +44,11 @@ const NAV = [
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
+  {
+  to: '/app/internal-assignments',
+  icon: ClipboardList,
+  label: 'Internal Assignments',
+},
   { to: '/app/reports', icon: FileText, label: 'Reports' },
   {
     to: '/app/external-review',
