@@ -26,7 +26,6 @@ const baseAdminTabs = [
   'Overview',
   'Security',
   'Users & Roles',
-  'Organizations',
 ]
 
 type InviteScope = 'workspace' | 'portfolio' | 'project'
@@ -119,6 +118,9 @@ export default function AdminPage() {
     ])
 
     setOrganizations(orgs || [])
+    if (orgs?.[0]?.id) {
+  setSelectedOrganizationId(orgs[0].id)
+}
     setPortfolios(ports || [])
     setProjects(projs || [])
     setMemberships(memberRows || [])
@@ -367,9 +369,10 @@ export default function AdminPage() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <AdminMetric
-                    title="Organizations"
-                    value={organizations.length}
-                    icon={Building2}
+  title={organizations[0]?.name || 'Organization'}
+  value="Workspace"
+  icon={Building2}
+/>
                   />
                   <AdminMetric
                     title="Portfolios"
@@ -600,21 +603,15 @@ export default function AdminPage() {
                     onChange={e => setInviteEmail(e.target.value)}
                   />
 
-                  <select
-                    className="form-control"
-                    value={selectedOrganizationId}
-                    onChange={e =>
-                      setSelectedOrganizationId(Number(e.target.value))
-                    }
-                  >
-                    <option value="">Select Organization</option>
+                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+  <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+    Organization
+  </div>
 
-                    {organizations.map(org => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
+  <div className="text-sm font-semibold text-[#ede8de] mt-1">
+    {organizations[0]?.name || 'Organization'}
+  </div>
+</div>
 
                   {inviteScope === 'portfolio' && (
                     <select
@@ -727,28 +724,7 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'Organizations' && canManageWorkspace(role) && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-[#ede8de]">
-                  Organizations
-                </h2>
-
-                {organizations.map(org => (
-                  <div
-                    key={org.id}
-                    className="rounded-xl border border-white/10 bg-white/5 p-4"
-                  >
-                    <div className="font-semibold text-[#ede8de]">
-                      {org.name}
-                    </div>
-
-                    <div className="text-xs text-[#6e7d8c] mt-1">
-                      Organization ID: {org.id}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        
           </div>
         )}
       </div>
