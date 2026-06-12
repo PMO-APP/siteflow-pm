@@ -60,7 +60,6 @@ export default function ProjectsPage() {
   const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [showOrgModal, setShowOrgModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
 
@@ -69,7 +68,6 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectStatus, setNewProjectStatus] = useState('Planning')
   const [newProjectPhase, setNewProjectPhase] = useState('Concept')
-  const [newOrgName, setNewOrgName] = useState('')
   const [newPortfolioName, setNewPortfolioName] = useState('')
   const [selectedOrgId, setSelectedOrgId] = useState<number | ''>('')
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('')
@@ -81,7 +79,6 @@ export default function ProjectsPage() {
   const [editProjectHandoverDate, setEditProjectHandoverDate] = useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [organizationFilter, setOrganizationFilter] = useState('All')
   const [portfolioFilter, setPortfolioFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [phaseFilter, setPhaseFilter] = useState('All')
@@ -247,23 +244,6 @@ export default function ProjectsPage() {
     await loadHub()
   }
 
-  async function createOrganization() {
-    if (!canAccessAdmin || !newOrgName.trim()) return
-
-    const { error } = await supabase
-      .from('organizations')
-      .insert({ name: newOrgName.trim() })
-
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    setNewOrgName('')
-    setShowOrgModal(false)
-    loadHub()
-  }
-
   async function createPortfolio() {
     if (!canCreateWorkspaceItems || !newPortfolioName.trim() || !selectedOrgId) return
 
@@ -290,7 +270,7 @@ export default function ProjectsPage() {
       project_name: newProjectName.trim(),
       status: newProjectStatus,
       phase: newProjectPhase,
-      organization_id: selectedOrgId || null,
+      organization_id: selectedOrgId || organizations[0]?.id || null,
       portfolio_id: selectedPortfolioId || null,
     })
 
@@ -316,10 +296,6 @@ export default function ProjectsPage() {
       String(project.project_name || '').toLowerCase().includes(search) ||
       String(project.location || '').toLowerCase().includes(search)
 
-    const matchesOrganization =
-      organizationFilter === 'All' ||
-      String(project.organization_id || '') === organizationFilter
-
     const matchesPortfolio =
       portfolioFilter === 'All' ||
       String(project.portfolio_id || '') === portfolioFilter
@@ -332,13 +308,7 @@ export default function ProjectsPage() {
       phaseFilter === 'All' ||
       String(project.phase || 'Not set') === phaseFilter
 
-    return (
-      matchesSearch &&
-      matchesOrganization &&
-      matchesPortfolio &&
-      matchesStatus &&
-      matchesPhase
-    )
+    return matchesSearch && matchesPortfolio && matchesStatus && matchesPhase
   })
 
   const totalProjects = filteredProjects.length
@@ -346,6 +316,8 @@ export default function ProjectsPage() {
   const activeProjects = filteredProjects.filter(
     project => (project.status || 'Not set') === 'Active'
   ).length
+
+  const workspaceName = organizations[0]?.name || 'Workspace'
 
   return (
     <div className="min-h-dvh bg-[#0c1014] text-white overflow-x-hidden overflow-y-auto">
@@ -360,6 +332,11 @@ export default function ProjectsPage() {
           </button>
 
           <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
+            <div className="btn-ghost btn-sm btn justify-center pointer-events-none">
+              <Building2 size={14} />
+              {workspaceName}
+            </div>
+
             <button
               onClick={() => navigate('/profile')}
               className="btn-ghost btn-sm btn justify-center"
@@ -378,19 +355,12 @@ export default function ProjectsPage() {
               </button>
             )}
 
-            {canAccessAdmin && (
-              <button
-                onClick={() => setShowOrgModal(true)}
-                className="btn-ghost btn-sm btn justify-center"
-              >
-                <Building2 size={14} />
-                New Organization
-              </button>
-            )}
-
             {canCreateWorkspaceItems && (
               <button
-                onClick={() => setShowPortfolioModal(true)}
+                onClick={() => {
+                  setSelectedOrgId(organizations[0]?.id || '')
+                  setShowPortfolioModal(true)
+                }}
                 className="btn-ghost btn-sm btn justify-center"
               >
                 <Briefcase size={14} />
@@ -400,7 +370,10 @@ export default function ProjectsPage() {
 
             {canCreateWorkspaceItems && (
               <button
-                onClick={() => setShowProjectModal(true)}
+                onClick={() => {
+                  setSelectedOrgId(organizations[0]?.id || '')
+                  setShowProjectModal(true)
+                }}
                 className="btn-gold btn-sm btn justify-center col-span-2 sm:col-span-1"
               >
                 <Plus size={14} />
@@ -423,13 +396,13 @@ export default function ProjectsPage() {
             </h1>
 
             <p className="text-slate-400 mt-4 leading-relaxed max-w-2xl text-sm sm:text-base">
-              Manage organizations, portfolios, projects, team access, and
-              delivery command centres from one workspace hub.
+              Manage portfolios, projects, team access, and delivery command
+              centres from one organization workspace.
             </p>
           </div>
 
           <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <MetricCard title="Organizations" value={organizations.length} icon={Building2} />
+            <MetricCard title={workspaceName} value="Workspace" icon={Building2} />
             <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
             <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
             <MetricCard title="Active" value={activeProjects} icon={Activity} />
@@ -457,18 +430,15 @@ export default function ProjectsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <select
-              className="form-control"
-              value={organizationFilter}
-              onChange={e => setOrganizationFilter(e.target.value)}
-            >
-              <option value="All">All Organizations</option>
-              {organizations.map(org => (
-                <option key={org.id} value={String(org.id)}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
+            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#ede8de]">
+              <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                Organization
+              </div>
+
+              <div className="mt-1 font-semibold">
+                {workspaceName}
+              </div>
+            </div>
 
             <select
               className="form-control"
@@ -676,36 +646,17 @@ export default function ProjectsPage() {
         <div className="h-40" />
       </div>
 
-      {showOrgModal && canAccessAdmin && (
-        <Modal title="Create Organization" onClose={() => setShowOrgModal(false)}>
-          <input
-            className="form-control mb-4"
-            placeholder="Organization name"
-            value={newOrgName}
-            onChange={e => setNewOrgName(e.target.value)}
-          />
-
-          <button className="btn-gold btn w-full justify-center" onClick={createOrganization}>
-            Create Organization
-          </button>
-        </Modal>
-      )}
-
       {showPortfolioModal && canCreateWorkspaceItems && (
         <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
-          <select
-            className="form-control mb-4"
-            value={selectedOrgId}
-            onChange={e => setSelectedOrgId(Number(e.target.value))}
-          >
-            <option value="">Select organization</option>
+          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+              Organization
+            </div>
 
-            {organizations.map(org => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
+            <div className="text-sm font-semibold text-[#ede8de] mt-1">
+              {workspaceName}
+            </div>
+          </div>
 
           <input
             className="form-control mb-4"
@@ -722,22 +673,15 @@ export default function ProjectsPage() {
 
       {showProjectModal && canCreateWorkspaceItems && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
-          <select
-            className="form-control mb-4"
-            value={selectedOrgId}
-            onChange={e => {
-              setSelectedOrgId(Number(e.target.value))
-              setSelectedPortfolioId('')
-            }}
-          >
-            <option value="">Select organization</option>
+          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
+            <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+              Organization
+            </div>
 
-            {organizations.map(org => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
+            <div className="text-sm font-semibold text-[#ede8de] mt-1">
+              {workspaceName}
+            </div>
+          </div>
 
           <select
             className="form-control mb-4"
