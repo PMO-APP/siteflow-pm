@@ -373,7 +373,7 @@ export default function AdminPage() {
   value="Workspace"
   icon={Building2}
 />
-                  />
+                 
                   <AdminMetric
                     title="Portfolios"
                     value={portfolios.length}
