@@ -222,10 +222,10 @@ export default function ProjectsPage() {
     setShowEditProjectModal(true)
   }
 
-  async function updateProject() {
+ async function updateProject() {
   if (!editingProject || !editProjectName.trim()) return
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('projects')
     .update({
       project_name: editProjectName.trim(),
@@ -235,22 +235,16 @@ export default function ProjectsPage() {
       handover_date: editProjectHandoverDate || null,
     })
     .eq('id', editingProject.id)
-    .select('*')
-    .single()
 
   if (error) {
     alert(error.message)
     return
   }
 
-  setProjects(current =>
-    current.map(project =>
-      project.id === editingProject.id ? data : project
-    )
-  )
-
   setEditingProject(null)
   setShowEditProjectModal(false)
+
+  await loadHub()
 }
 
   async function createOrganization() {
