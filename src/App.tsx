@@ -18,6 +18,7 @@ import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
+import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -208,6 +209,15 @@ export default function App() {
           element={
             <RequireAuth>
               <ExternalProjectPortal />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/external-project/tasks"
+          element={
+            <RequireAuth>
+              <ExternalTasksPage />
             </RequireAuth>
           }
         />
