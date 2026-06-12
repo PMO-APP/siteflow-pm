@@ -2,14 +2,23 @@ import { useProjectStore } from '@/store/project'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type {
-  ProcurementItem, Approval, SiteReport, Snag,
-  Document, FinancialItem, Risk, Comment, Meeting,
+  ProcurementItem,
+  Approval,
+  SiteReport,
+  Snag,
+  Document,
+  FinancialItem,
+  Risk,
+  Comment,
+  Meeting,
   QualityGate,
-  ContractorScore, Notification, WeeklyReport,
+  ContractorScore,
+  ProjectTeamMember,
+  Notification,
+  WeeklyReport,
   WeeklyActivity,
   WeeklyPhoto,
   SafetyLog
-
 } from '@/types'
 
 // ─── HELPERS ───────────────────────────────────────────
