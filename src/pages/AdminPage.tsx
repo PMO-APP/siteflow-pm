@@ -3,7 +3,6 @@ import {
   User,
   Lock,
   Users,
-  Settings,
   Shield,
   Building2,
   Briefcase,
@@ -29,7 +28,6 @@ const baseAdminTabs = [
   'Security',
   'Users & Roles',
   'Organizations',
-  'System Settings',
 ]
 
 type InviteScope = 'workspace' | 'portfolio' | 'project'
@@ -83,7 +81,6 @@ export default function AdminPage() {
   const adminTabs = baseAdminTabs.filter(tab => {
     if (tab === 'Users & Roles') return canManageUsers(role)
     if (tab === 'Organizations') return canManageWorkspace(role)
-    if (tab === 'System Settings') return canManageWorkspace(role)
     return true
   })
 
@@ -146,8 +143,8 @@ export default function AdminPage() {
     setPasswordNotice('')
     setPasswordError('')
 
-    if (!newPassword || newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters.')
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters.')
       return
     }
 
@@ -346,7 +343,6 @@ export default function AdminPage() {
               {tab === 'Security' && <Lock size={14} />}
               {tab === 'Users & Roles' && <Users size={14} />}
               {tab === 'Organizations' && <Building2 size={14} />}
-              {tab === 'System Settings' && <Settings size={14} />}
               {tab}
             </button>
           ))}
@@ -371,11 +367,31 @@ export default function AdminPage() {
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                  <AdminMetric title="Organizations" value={organizations.length} icon={Building2} />
-                  <AdminMetric title="Portfolios" value={portfolios.length} icon={Briefcase} />
-                  <AdminMetric title="Projects" value={projects.length} icon={FolderKanban} />
-                  <AdminMetric title="Members" value={activeMembers} icon={Users} />
-                  <AdminMetric title="Pending Invites" value={pendingInvites} icon={Mail} />
+                  <AdminMetric
+                    title="Organizations"
+                    value={organizations.length}
+                    icon={Building2}
+                  />
+                  <AdminMetric
+                    title="Portfolios"
+                    value={portfolios.length}
+                    icon={Briefcase}
+                  />
+                  <AdminMetric
+                    title="Projects"
+                    value={projects.length}
+                    icon={FolderKanban}
+                  />
+                  <AdminMetric
+                    title="Members"
+                    value={activeMembers}
+                    icon={Users}
+                  />
+                  <AdminMetric
+                    title="Pending Invites"
+                    value={pendingInvites}
+                    icon={Mail}
+                  />
                 </div>
               </div>
             )}
@@ -388,7 +404,7 @@ export default function AdminPage() {
                   </h2>
 
                   <p className="text-sm text-[#6e7d8c] mt-1">
-                    View your login details, access level, and security options.
+                    View your login details and workspace access.
                   </p>
                 </div>
 
@@ -397,9 +413,32 @@ export default function AdminPage() {
                   <InfoCard label="Login Email" value={user?.email || '—'} />
                   <InfoCard label="Role" value={role || 'guest'} />
                   <InfoCard label="Access Scope" value={accessScope || '—'} />
-                  <InfoCard label="Organization" value={userOrganization?.name || organizationId || '—'} />
-                  <InfoCard label="Portfolio" value={userPortfolio?.name || portfolioId || '—'} />
-                  <InfoCard label="Project" value={userProject?.project_name || projectId || '—'} />
+                  <InfoCard
+                    label="Organization"
+                    value={userOrganization?.name || organizationId || '—'}
+                  />
+                  <InfoCard
+                    label="Portfolio"
+                    value={userPortfolio?.name || portfolioId || '—'}
+                  />
+                  <InfoCard
+                    label="Project"
+                    value={userProject?.project_name || projectId || '—'}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'Security' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#ede8de]">
+                    Security & Preferences
+                  </h2>
+
+                  <p className="text-sm text-[#6e7d8c] mt-1">
+                    Manage your password, account session, and display theme.
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
@@ -409,7 +448,7 @@ export default function AdminPage() {
                     </div>
 
                     <p className="text-xs text-[#6e7d8c] mt-1">
-                      Update your password for future sign-ins.
+                      Update your password for future PMOCorex sign-ins.
                     </p>
                   </div>
 
@@ -460,40 +499,67 @@ export default function AdminPage() {
                         }
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
                       >
-                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showConfirmPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={updatePassword}
+                    disabled={passwordLoading}
+                    className="btn btn-gold"
+                  >
+                    {passwordLoading ? 'Updating…' : 'Update Password'}
+                  </button>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-sm font-semibold text-[#ede8de]">
+                    Appearance
+                  </div>
+
+                  <p className="text-xs text-[#6e7d8c] mt-1">
+                    Choose your preferred PMOCorex theme.
+                  </p>
+
+                  <div className="flex gap-2 mt-4">
                     <button
-                      onClick={updatePassword}
-                      disabled={passwordLoading}
-                      className="btn btn-gold"
+                      onClick={() => setTheme('dark')}
+                      className={`btn btn-sm ${
+                        theme === 'dark' ? 'btn-gold' : 'btn-ghost'
+                      }`}
                     >
-                      {passwordLoading ? 'Updating…' : 'Update Password'}
+                      Dark Mode
                     </button>
 
                     <button
-                      onClick={signOut}
-                      className="btn btn-ghost"
+                      onClick={() => setTheme('light')}
+                      className={`btn btn-sm ${
+                        theme === 'light' ? 'btn-gold' : 'btn-ghost'
+                      }`}
                     >
-                      Sign Out
+                      Light Mode
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {activeTab === 'Security' && (
-              <div>
-                <h2 className="text-lg font-semibold text-[#ede8de]">
-                  Security
-                </h2>
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
+                  <div className="text-sm font-semibold text-red-400">
+                    Account Session
+                  </div>
 
-                <p className="text-sm text-[#6e7d8c] mt-1">
-                  Password change is available under My Profile.
-                </p>
+                  <p className="text-xs text-[#6e7d8c] mt-1">
+                    Sign out of this PMOCorex session.
+                  </p>
+
+                  <button onClick={signOut} className="btn btn-ghost mt-4">
+                    Sign Out
+                  </button>
+                </div>
               </div>
             )}
 
@@ -627,7 +693,9 @@ export default function AdminPage() {
                       <option value="workspace_admin">Workspace Admin</option>
                       <option value="admin">Admin</option>
                       <option value="pmo">PMO</option>
-                      <option value="portfolio_manager">Portfolio Manager</option>
+                      <option value="portfolio_manager">
+                        Portfolio Manager
+                      </option>
                     </select>
                   )}
 
@@ -637,7 +705,9 @@ export default function AdminPage() {
                       value={inviteRole}
                       onChange={e => setInviteRole(e.target.value)}
                     >
-                      <option value="portfolio_manager">Portfolio Manager</option>
+                      <option value="portfolio_manager">
+                        Portfolio Manager
+                      </option>
                       <option value="pmo">PMO</option>
                       <option value="viewer">Viewer</option>
                     </select>
@@ -707,40 +777,6 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {activeTab === 'System Settings' && canManageWorkspace(role) && (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-[#ede8de]">
-                  System Settings
-                </h2>
-
-                <div className="rounded-2xl border border-white/10 p-4 bg-white/5">
-                  <div className="text-sm font-semibold text-[#ede8de]">
-                    Appearance
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => setTheme('dark')}
-                      className={`btn btn-sm ${
-                        theme === 'dark' ? 'btn-gold' : 'btn-ghost'
-                      }`}
-                    >
-                      Dark Mode
-                    </button>
-
-                    <button
-                      onClick={() => setTheme('light')}
-                      className={`btn btn-sm ${
-                        theme === 'light' ? 'btn-gold' : 'btn-ghost'
-                      }`}
-                    >
-                      Light Mode
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>
