@@ -59,7 +59,7 @@ export default function Layout() {
   const { user, signOut } = useAuthStore()
   const { projectName, organizationId, portfolioId } = useProjectStore()
 
-  const role = getRole(user?.email)
+  const role = useMembershipStore(state => state.role)
   const location = useLocation()
   const navigate = useNavigate()
 
