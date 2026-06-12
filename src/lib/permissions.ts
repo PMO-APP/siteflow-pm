@@ -3,7 +3,7 @@ export function canManageWorkspace(role?: string | null) {
 }
 
 export function canManageUsers(role?: string | null) {
-  return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+  return ['workspace_admin', 'admin'].includes(role || '')
 }
 
 export function canEditSchedule(role?: string | null) {
@@ -11,6 +11,7 @@ export function canEditSchedule(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'project_manager',
   ].includes(role || '')
@@ -21,6 +22,7 @@ export function canEditDocuments(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'project_manager',
     'design',
@@ -34,6 +36,7 @@ export function canEditRisk(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'project_manager',
     'design',
@@ -48,6 +51,7 @@ export function canEditProcurement(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'costing',
     'project_owner',
     'project_manager',
@@ -55,7 +59,9 @@ export function canEditProcurement(role?: string | null) {
 }
 
 export function canManagePortfolio(role?: string | null) {
-  return ['workspace_admin', 'admin', 'portfolio_manager'].includes(role || '')
+  return ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'].includes(
+    role || ''
+  )
 }
 
 export function canEditProjectInfo(
@@ -63,7 +69,13 @@ export function canEditProjectInfo(
   userEmail?: string | null,
   projectOwnerEmail?: string | null
 ) {
-  if (['workspace_admin', 'admin', 'pmo'].includes(role || '')) return true
+  if (
+    ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'].includes(
+      role || ''
+    )
+  ) {
+    return true
+  }
 
   if (
     role === 'project_owner' &&
@@ -82,6 +94,7 @@ export function canEditHousebuild(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'housebuild',
   ].includes(role || '')
@@ -92,6 +105,7 @@ export function canEditDesign(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'design',
   ].includes(role || '')
@@ -102,6 +116,7 @@ export function canEditInfrastructure(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'infrastructure',
   ].includes(role || '')
@@ -112,6 +127,7 @@ export function canEditCosting(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'costing',
   ].includes(role || '')
@@ -122,6 +138,7 @@ export function canApprove(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_manager',
   ].includes(role || '')
 }
@@ -131,8 +148,8 @@ export function canManageFinancials(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
-    'costing',
     'portfolio_manager',
+    'costing',
   ].includes(role || '')
 }
 
@@ -141,6 +158,7 @@ export function canExportReports(role?: string | null) {
     'workspace_admin',
     'admin',
     'pmo',
+    'portfolio_manager',
     'project_owner',
     'project_manager',
   ].includes(role || '')
@@ -152,7 +170,13 @@ export function canEditPage(
   userEmail?: string | null,
   projectOwnerEmail?: string | null
 ) {
-  if (['workspace_admin', 'admin', 'pmo'].includes(role || '')) return true
+  if (
+    ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'].includes(
+      role || ''
+    )
+  ) {
+    return true
+  }
 
   if (
     role === 'project_owner' &&
@@ -178,5 +202,5 @@ export function canDelete(role?: string | null) {
 }
 
 export function isReadOnly(role?: string | null) {
-  return role === 'guest'
+  return ['guest', 'viewer'].includes(role || '')
 }
