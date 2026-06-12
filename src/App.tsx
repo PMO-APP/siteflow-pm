@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
+import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -203,7 +204,14 @@ export default function App() {
             </RequireAuth>
           }
         />
-
+<Route
+  path="/external-project/documents"
+  element={
+    <RequireAuth>
+      <ExternalDocumentsPage />
+    </RequireAuth>
+  }
+/>
         <Route
           path="/external-project"
           element={
