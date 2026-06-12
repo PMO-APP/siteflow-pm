@@ -24,6 +24,7 @@ import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
 import ExternalRFIPage from '@/pages/external/ExternalRFIPage'
 import ExternalProgressReportPage from '@/pages/external/ExternalProgressReportPage'
 import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
+import ExternalSubmissionStatusPage from '@/pages/external/ExternalSubmissionStatusPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -226,7 +227,14 @@ export default function App() {
             </RequireAuth>
           }
         />
-
+<Route
+  path="/external-project/submissions"
+  element={
+    <RequireAuth>
+      <ExternalSubmissionStatusPage />
+    </RequireAuth>
+  }
+/>
         <Route
           path="/external-project/documents"
           element={
