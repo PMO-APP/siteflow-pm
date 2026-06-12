@@ -26,6 +26,7 @@ import ExternalProgressReportPage from '@/pages/external/ExternalProgressReportP
 import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
 import ExternalSubmissionStatusPage from '@/pages/external/ExternalSubmissionStatusPage'
 import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
+import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -337,6 +338,7 @@ export default function App() {
           <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
           <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
         </Route>
 
