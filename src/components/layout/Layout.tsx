@@ -23,6 +23,7 @@ import {
   BarChart3,
   ClipboardCheck,
   UserCircle,
+  Building2,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -42,16 +43,26 @@ const NAV = [
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
-  { to: '/app/team', icon: Users, label: 'Team' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
+  {
+    to: '/app/external-review',
+    icon: Building2,
+    label: 'External Review',
+  },
+  { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
-const FULL_ACCESS_ROLES = [
+const FULL_VIEW_ROLES = [
   'workspace_admin',
   'admin',
   'pmo',
   'portfolio_manager',
-  'project_manager',
+  'project_owner',
+  'design',
+  'housebuild',
+  'costing',
+  'infrastructure',
+  'mep',
 ]
 
 function formatRoleLabel(role: string | null) {
@@ -62,15 +73,17 @@ function formatRoleLabel(role: string | null) {
     admin: 'Administrator',
     pmo: 'PMO',
     portfolio_manager: 'Portfolio Manager',
-    project_manager: 'Project Manager',
     project_owner: 'Project Owner',
+    project_manager: 'Project Manager',
+    design: 'Design Team',
+    housebuild: 'Housebuild',
+    costing: 'Costing Team',
+    infrastructure: 'Infrastructure',
+    mep: 'MEP',
     contractor: 'Contractor',
     consultant: 'Consultant',
-    design: 'Design Team',
-    costing: 'Costing Team',
-    housebuild: 'Housebuild',
-    mep: 'MEP',
-    infrastructure: 'Infrastructure',
+    vendor: 'Vendor',
+    subcontractor: 'Subcontractor',
     viewer: 'Viewer',
     guest: 'Guest',
   }
@@ -147,41 +160,8 @@ export default function Layout() {
     ? differenceInDays(handoverDate, new Date())
     : null
 
-  const allowedNav = NAV.filter(item => {
-    if (FULL_ACCESS_ROLES.includes(role || '')) return true
-
-    if (role === 'design') {
-      return [
-        '/app',
-        '/app/recovery',
-        '/app/documents',
-        '/app/snags',
-        '/app/risk',
-        '/app/quality',
-      ].includes(item.to)
-    }
-
-    if (role === 'costing') {
-      return [
-        '/app',
-        '/app/recovery',
-        '/app/financial',
-        '/app/snags',
-        '/app/risk',
-      ].includes(item.to)
-    }
-
-    if (role === 'contractor' || role === 'consultant') {
-      return [
-        '/app',
-        '/app/schedule',
-        '/app/site',
-        '/app/snags',
-        '/app/documents',
-      ].includes(item.to)
-    }
-
-    return ['/app', '/app/recovery'].includes(item.to)
+  const allowedNav = NAV.filter(() => {
+    return FULL_VIEW_ROLES.includes(role || '')
   })
 
   const currentPage = allowedNav.find(n =>
@@ -207,16 +187,30 @@ export default function Layout() {
         <div className="h-[2px] bg-gradient-to-r from-[#c49e48] via-[#e3c06a] to-transparent flex-shrink-0" />
 
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
-          <button type="button" onClick={() => navigate('/')} className="text-left">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-left"
+          >
             <PMOCorexLogo size={34} />
           </button>
 
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
-            <InfoBlock label="Organization" value={organizationName || 'No organization'} />
+            <InfoBlock
+              label="Organization"
+              value={organizationName || 'No organization'}
+            />
             <div className="h-px bg-white/[0.06]" />
-            <InfoBlock label="Portfolio" value={portfolioName || 'No portfolio'} />
+            <InfoBlock
+              label="Portfolio"
+              value={portfolioName || 'No portfolio'}
+            />
             <div className="h-px bg-white/[0.06]" />
-            <InfoBlock label="Project" value={projectName || 'No project selected'} highlight />
+            <InfoBlock
+              label="Project"
+              value={projectName || 'No project selected'}
+              highlight
+            />
           </div>
         </div>
 
@@ -224,7 +218,9 @@ export default function Layout() {
           <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#111820] px-3 py-3">
             <div
               className={`font-display text-3xl font-black leading-none ${
-                daysLeft !== null && daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'
+                daysLeft !== null && daysLeft < 60
+                  ? 'text-red-400'
+                  : 'text-[#c49e48]'
               }`}
             >
               {daysLeft !== null ? Math.max(0, daysLeft) : '-'}
@@ -233,7 +229,9 @@ export default function Layout() {
             <div>
               <div
                 className={`text-[10px] font-semibold ${
-                  daysLeft !== null && daysLeft < 60 ? 'text-red-400' : 'text-[#c49e48]'
+                  daysLeft !== null && daysLeft < 60
+                    ? 'text-red-400'
+                    : 'text-[#c49e48]'
                 }`}
               >
                 DAYS LEFT
@@ -322,11 +320,17 @@ export default function Layout() {
           </button>
 
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <button onClick={() => navigate(-1)} className="btn-ghost btn-sm btn">
+            <button
+              onClick={() => navigate(-1)}
+              className="btn-ghost btn-sm btn"
+            >
               ← Back
             </button>
 
-            <button onClick={() => navigate('/projects')} className="btn-ghost btn-sm btn">
+            <button
+              onClick={() => navigate('/projects')}
+              className="btn-ghost btn-sm btn"
+            >
               Workspace Hub
             </button>
 
@@ -340,7 +344,9 @@ export default function Layout() {
                 <span>/</span>
                 <span>{portfolioName || 'Portfolio'}</span>
                 <span>/</span>
-                <span className="text-[#c49e48]">{projectName || 'Project'}</span>
+                <span className="text-[#c49e48]">
+                  {projectName || 'Project'}
+                </span>
               </div>
             </div>
           </div>
