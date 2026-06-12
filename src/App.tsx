@@ -7,6 +7,7 @@ import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
 import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
 import ExternalRFIPage from '@/pages/external/ExternalRFIPage'
+import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -196,6 +197,7 @@ export default function App() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="external-review" element={<ExternalReviewDashboard />} />
 
         <Route
           path="/profile"
