@@ -876,8 +876,62 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
   const status = project.status || 'Not set'
   const phase = project.phase || 'Not set'
 
+  const statusStyles: Record<string, string> = {
+    Planning:
+      'bg-blue-500/10 text-blue-400 border-blue-500/20',
+
+    Active:
+      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+
+    'On Hold':
+      'bg-amber-500/10 text-amber-400 border-amber-500/20',
+
+    Inactive:
+      'bg-slate-500/10 text-slate-400 border-slate-500/20',
+
+    Delayed:
+      'bg-red-500/10 text-red-400 border-red-500/20',
+
+    Completed:
+      'bg-purple-500/10 text-purple-400 border-purple-500/20',
+
+    Cancelled:
+      'bg-rose-500/10 text-rose-400 border-rose-500/20',
+  }
+
+  const phaseStyles: Record<string, string> = {
+    Concept: 'text-slate-400',
+    Design: 'text-indigo-400',
+    Procurement: 'text-orange-400',
+    Mobilization: 'text-cyan-400',
+    Execution: 'text-emerald-400',
+    Finishing: 'text-yellow-400',
+    'Testing & Commissioning': 'text-teal-400',
+    Handover: 'text-purple-400',
+    'Defects Liability': 'text-pink-400',
+    'Closed Out': 'text-gray-400',
+  }
+
+  const stripColors: Record<string, string> = {
+    Planning: 'bg-blue-500',
+    Active: 'bg-emerald-500',
+    'On Hold': 'bg-amber-500',
+    Inactive: 'bg-slate-500',
+    Delayed: 'bg-red-500',
+    Completed: 'bg-purple-500',
+    Cancelled: 'bg-rose-500',
+  }
+
   return (
-    <div className="group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200">
+    <div className="relative overflow-hidden group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200">
+
+      {/* Status Strip */}
+      <div
+        className={`absolute left-0 top-0 h-full w-1 ${
+          stripColors[status] || 'bg-slate-500'
+        }`}
+      />
+
       <div className="flex items-start justify-between gap-3">
         <div onClick={onClick} className="min-w-0 flex-1 cursor-pointer">
           <div className="font-semibold text-white truncate">
@@ -888,7 +942,11 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
             {project.location || 'No location set'}
           </div>
 
-          <div className="text-xs text-[#c49e48] mt-2 truncate">
+          <div
+            className={`text-xs mt-2 font-medium ${
+              phaseStyles[phase] || 'text-[#c49e48]'
+            }`}
+          >
             Phase: {phase}
           </div>
         </div>
@@ -901,8 +959,7 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
                 e.stopPropagation()
                 onEdit()
               }}
-              className="text-slate-500 hover:text-[#c49e48] transition"
-              title="Edit project"
+              className="text-slate-500 hover:text-[#c49e48]"
             >
               <Pencil size={15} />
             </button>
@@ -911,7 +968,7 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
           <button
             type="button"
             onClick={onClick}
-            className="text-slate-500 group-hover:text-[#c49e48] transition"
+            className="text-slate-500 group-hover:text-[#c49e48]"
           >
             <ArrowRight size={16} />
           </button>
@@ -919,7 +976,12 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 flex-shrink-0">
+        <span
+          className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
+            statusStyles[status] ||
+            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+          }`}
+        >
           {status}
         </span>
 
@@ -930,7 +992,6 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
     </div>
   )
 }
-
 function EmptyHub({ title, message, action }: any) {
   return (
     <div className="card p-10 text-center">
