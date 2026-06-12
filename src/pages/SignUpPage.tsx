@@ -7,6 +7,7 @@ export default function SignUpPage() {
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
+  const [organizationName, setOrganizationName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -21,23 +22,82 @@ export default function SignUpPage() {
     setSuccess('')
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/Login`,
-        },
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanName = name.trim()
+      const cleanOrgName = organizationName.trim()
+
+      if (!cleanName) throw new Error('Full name is required.')
+      if (!cleanOrgName) throw new Error('Organization name is required.')
+      if (!cleanEmail) throw new Error('Email is required.')
+      if (password.length < 8) {
+        throw new Error('Password must be at least 8 characters.')
+      }
+
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: {
+            data: {
+              full_name: cleanName,
+              role: 'workspace_admin',
+              organization_name: cleanOrgName,
+            },
+            emailRedirectTo: `${window.location.origin}/Login`,
+          },
+        })
+
+      if (signUpError) throw signUpError
+
+      const userId = signUpData.user?.id
+
+      if (!userId) {
+        throw new Error('Account created, but user ID was not returned.')
+      }
+
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: userId,
+        email: cleanEmail,
+        full_name: cleanName,
+        role: 'workspace_admin',
+        updated_at: new Date().toISOString(),
       })
 
-      if (error) throw error
+      if (profileError) throw profileError
+
+      const { data: organization, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: cleanOrgName,
+          created_by: userId,
+        })
+        .select()
+        .single()
+
+      if (orgError) throw orgError
+
+      const { error: membershipError } = await supabase
+        .from('memberships')
+        .insert({
+          user_id: userId,
+          organization_id: organization.id,
+          email: cleanEmail,
+          full_name: cleanName,
+          role: 'workspace_admin',
+          access_scope: 'workspace',
+          project_id: null,
+          portfolio_id: null,
+        })
+
+      if (membershipError) throw membershipError
 
       setName('')
+      setOrganizationName('')
       setEmail('')
       setPassword('')
 
       setSuccess(
-        'Account created successfully. Please check your email to verify your account before signing in.'
+        'Workspace created successfully. Please check your email to verify your account before signing in.'
       )
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
@@ -76,8 +136,8 @@ export default function SignUpPage() {
           </h1>
 
           <p className="mt-5 text-slate-400 text-lg leading-relaxed">
-            Create your PMOCorex account and start managing schedules,
-            risks, approvals, snags, procurement, and reports from one place.
+            Create your PMOCorex workspace and manage schedules, risks,
+            approvals, snags, procurement, documents, and reports from one place.
           </p>
         </div>
 
@@ -102,11 +162,11 @@ export default function SignUpPage() {
             <div className="p-7">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-[#ede8de]">
-                  Create account
+                  Create workspace
                 </h2>
 
                 <p className="text-sm text-slate-500 mt-1">
-                  Start building your project delivery command centre.
+                  Set up your organization and administrator account.
                 </p>
               </div>
 
@@ -136,6 +196,18 @@ export default function SignUpPage() {
                 </div>
 
                 <div>
+                  <label className="form-label">Organization Name</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    value={organizationName}
+                    onChange={e => setOrganizationName(e.target.value)}
+                    placeholder="e.g. Mixta Africa"
+                    required
+                  />
+                </div>
+
+                <div>
                   <label className="form-label">Email</label>
                   <input
                     className="form-control"
@@ -158,7 +230,7 @@ export default function SignUpPage() {
                       onChange={e => setPassword(e.target.value)}
                       placeholder="Create a secure password"
                       required
-                      minLength={6}
+                      minLength={8}
                     />
 
                     <button
@@ -176,7 +248,7 @@ export default function SignUpPage() {
                   disabled={loading}
                   className="btn-gold btn w-full justify-center mt-2 py-3"
                 >
-                  {loading ? 'Creating account…' : 'Create Account'}
+                  {loading ? 'Creating workspace…' : 'Create Workspace'}
                 </button>
               </form>
 
@@ -193,7 +265,7 @@ export default function SignUpPage() {
           </div>
 
           <div className="text-center mt-5 text-[10px] text-[#6e7d8c]">
-            © PMOCorex. Built for project delivery intelligence.
+            ©️ PMOCorex. Built for project delivery intelligence.
           </div>
         </div>
       </div>
