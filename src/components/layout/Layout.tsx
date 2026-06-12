@@ -44,12 +44,18 @@ const NAV = [
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
-  {
+ 
+  { to: '/app/reports', icon: FileText, label: 'Reports' },
+   {
   to: '/app/internal-assignments',
   icon: ClipboardList,
   label: 'Internal Assignments',
 },
-  { to: '/app/reports', icon: FileText, label: 'Reports' },
+  {
+  to: '/app/external-assignments',
+  icon: Building2,
+  label: 'External Assignments',
+},
   {
     to: '/app/external-review',
     icon: Building2,
