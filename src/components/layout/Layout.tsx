@@ -57,6 +57,11 @@ const NAV = [
     label: 'Internal Assignments',
   },
   {
+  to: '/app/external-task-review',
+  icon: ClipboardList,
+  label: 'Task Review',
+},
+  {
     to: '/app/external-assignments',
     icon: Building2,
     label: 'External Assignments',
