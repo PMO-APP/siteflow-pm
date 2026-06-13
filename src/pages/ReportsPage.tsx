@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Printer,
   Plus,
   FileText,
   CalendarDays,
   Image as ImageIcon,
+  UploadCloud,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
@@ -37,7 +39,7 @@ const REPORT_DEPARTMENTS = [
 ]
 
 export default function ReportsPage() {
-  const { projectName } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
   const canExport = canExportReports(role)
@@ -55,6 +57,9 @@ export default function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [photos, setPhotos] = useState<File[]>([])
+  const [reportPhotos, setReportPhotos] = useState<any[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
   const selectedReport =
     reports.find(report => report.id === selectedReportId) || reports[0]
@@ -76,12 +81,6 @@ export default function ReportsPage() {
     safety_tracking: '',
   })
 
-  const [photo1, setPhoto1] = useState('')
-  const [photo2, setPhoto2] = useState('')
-  const [photo3, setPhoto3] = useState('')
-  const [photo4, setPhoto4] = useState('')
-  const [photo5, setPhoto5] = useState('')
-
   const [activityForm, setActivityForm] = useState({
     activity: '',
     last_week: 0,
@@ -89,6 +88,31 @@ export default function ReportsPage() {
     planned: 0,
     remarks: '',
   })
+
+  useEffect(() => {
+    loadReportPhotos()
+  }, [selectedReport?.id])
+
+  async function loadReportPhotos() {
+    if (!selectedReport?.id) {
+      setReportPhotos([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('report_photos')
+      .select('*')
+      .eq('report_id', selectedReport.id)
+      .order('uploaded_at', { ascending: true })
+
+    if (error) {
+      console.error(error.message)
+      setReportPhotos([])
+      return
+    }
+
+    setReportPhotos(data || [])
+  }
 
   const openRisks = risks.filter(risk => risk.status === 'Open').length
   const highRisks = risks.filter(
@@ -108,10 +132,6 @@ export default function ReportsPage() {
     .filter(item => item.type === 'Contract Sum')
     .reduce((sum, item) => sum + item.amount, 0)
 
-  function getReportPhotos(report: any) {
-    return Array.isArray(report?.report_photos) ? report.report_photos : []
-  }
-
   function openNewReport() {
     setReportForm({
       report_date: new Date().toISOString().slice(0, 10),
@@ -128,18 +148,13 @@ export default function ReportsPage() {
       safety_tracking: '',
     })
 
-    setPhoto1('')
-    setPhoto2('')
-    setPhoto3('')
-    setPhoto4('')
-    setPhoto5('')
+    setPhotos([])
     setSelectedReportId(null)
     setShowReportModal(true)
   }
 
   function openEditReport(report: WeeklyReport) {
     const reportAny = report as any
-    const photos = getReportPhotos(reportAny)
 
     setReportForm({
       report_date: report.report_date || new Date().toISOString().slice(0, 10),
@@ -156,27 +171,103 @@ export default function ReportsPage() {
       safety_tracking: report.safety_tracking || '',
     })
 
-    setPhoto1(photos[0] || '')
-    setPhoto2(photos[1] || '')
-    setPhoto3(photos[2] || '')
-    setPhoto4(photos[3] || '')
-    setPhoto5(photos[4] || '')
-
+    setPhotos([])
     setSelectedReportId(report.id)
     setShowReportModal(true)
   }
 
+  function getSavedReportId(savedReport: any) {
+    if (!savedReport) return null
+    if (savedReport.id) return savedReport.id
+    if (Array.isArray(savedReport) && savedReport[0]?.id) return savedReport[0].id
+    if (savedReport.data?.id) return savedReport.data.id
+    if (Array.isArray(savedReport.data) && savedReport.data[0]?.id) {
+      return savedReport.data[0].id
+    }
+
+    return null
+  }
+
+  async function findReportIdFallback() {
+    if (!projectId) return null
+
+    let query = supabase
+      .from('weekly_reports')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('report_date', reportForm.report_date)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (reportForm.department) {
+      query = query.eq('department', reportForm.department)
+    }
+
+    const { data } = await query.maybeSingle()
+
+    return data?.id || null
+  }
+
+  async function uploadReportPhotos(reportId: string) {
+    if (!reportId || photos.length === 0) return
+
+    setUploadingPhotos(true)
+
+    for (const photo of photos) {
+      const safeName = photo.name.replace(/\s+/g, '-').toLowerCase()
+      const filePath = `${reportId}/${Date.now()}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('report-photos')
+        .upload(filePath, photo, {
+          cacheControl: '3600',
+          upsert: false,
+        })
+
+      if (uploadError) {
+        console.error(uploadError.message)
+        continue
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('report-photos').getPublicUrl(filePath)
+
+      const { error: photoInsertError } = await supabase
+        .from('report_photos')
+        .insert({
+          report_id: reportId,
+          photo_url: publicUrl,
+          photo_name: photo.name,
+          uploaded_by: user?.full_name || user?.email || 'User',
+        })
+
+      if (photoInsertError) {
+        console.error(photoInsertError.message)
+      }
+    }
+
+    setUploadingPhotos(false)
+    setPhotos([])
+    await loadReportPhotos()
+  }
+
   async function saveReport() {
-    await upsertReport.mutateAsync({
+    const savedReport = await upsertReport.mutateAsync({
       id: selectedReportId || undefined,
       ...reportForm,
-      report_photos: [photo1, photo2, photo3, photo4, photo5]
-        .map(photo => photo.trim())
-        .filter(Boolean),
-      reporting_officer_email: reportForm.reporting_officer_email || user?.email || '',
+      reporting_officer_email:
+        reportForm.reporting_officer_email || user?.email || '',
       created_by_role: role,
       next_meeting: reportForm.next_meeting || undefined,
     } as any)
+
+    const reportId =
+      selectedReportId || getSavedReportId(savedReport) || (await findReportIdFallback())
+
+    if (reportId) {
+      await uploadReportPhotos(reportId)
+    }
 
     setShowReportModal(false)
     setSelectedReportId(null)
@@ -221,9 +312,7 @@ export default function ReportsPage() {
             Weekly Project Reports
           </div>
 
-          <div className="text-[11px] text-[#6e7d8c] mt-1">
-            {projectName}
-          </div>
+          <div className="text-[11px] text-[#6e7d8c] mt-1">{projectName}</div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -277,7 +366,6 @@ export default function ReportsPage() {
           ) : (
             reports.map(report => {
               const reportAny = report as any
-              const photos = getReportPhotos(reportAny)
 
               return (
                 <button
@@ -307,10 +395,10 @@ export default function ReportsPage() {
                     Officer: {reportAny.reporting_officer || '—'}
                   </div>
 
-                  {photos.length > 0 && (
+                  {selectedReport?.id === report.id && reportPhotos.length > 0 && (
                     <div className="text-[10px] text-[#6e7d8c] mt-1 flex items-center gap-1">
                       <ImageIcon size={11} />
-                      {photos.length} photo(s)
+                      {reportPhotos.length} photo(s)
                     </div>
                   )}
                 </button>
@@ -344,8 +432,7 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="text-sm text-[#c49e48] mt-1">
-                      Department:{' '}
-                      {(selectedReport as any).department || '—'}
+                      Department: {(selectedReport as any).department || '—'}
                     </div>
                   </div>
 
@@ -466,8 +553,8 @@ export default function ReportsPage() {
                   <TextBlock value={selectedReport.safety_tracking} />
                 </Section>
 
-                <Section title="Report Photos">
-                  <PhotoGallery photos={getReportPhotos(selectedReport as any)} />
+                <Section title="Progress Photos">
+                  <PhotoGallery photos={reportPhotos} />
                 </Section>
 
                 <Section title="Next Site Meeting">
@@ -645,46 +732,33 @@ export default function ReportsPage() {
               }
             />
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
-                <ImageIcon size={15} className="text-[#c49e48]" />
-                Report Photo Links
+                <UploadCloud size={15} className="text-[#c49e48]" />
+                Upload Progress Photos
               </div>
 
               <input
+                type="file"
+                multiple
+                accept="image/*"
                 className="form-control"
-                placeholder="Photo URL 1"
-                value={photo1}
-                onChange={event => setPhoto1(event.target.value)}
+                onChange={event =>
+                  setPhotos(Array.from(event.target.files || []))
+                }
               />
 
-              <input
-                className="form-control"
-                placeholder="Photo URL 2"
-                value={photo2}
-                onChange={event => setPhoto2(event.target.value)}
-              />
+              {photos.length > 0 && (
+                <div className="text-xs text-[#6e7d8c]">
+                  {photos.length} photo(s) selected.
+                </div>
+              )}
 
-              <input
-                className="form-control"
-                placeholder="Photo URL 3"
-                value={photo3}
-                onChange={event => setPhoto3(event.target.value)}
-              />
-
-              <input
-                className="form-control"
-                placeholder="Photo URL 4"
-                value={photo4}
-                onChange={event => setPhoto4(event.target.value)}
-              />
-
-              <input
-                className="form-control"
-                placeholder="Photo URL 5"
-                value={photo5}
-                onChange={event => setPhoto5(event.target.value)}
-              />
+              {selectedReportId && (
+                <div className="text-[11px] text-[#6e7d8c]">
+                  Uploading new photos will add them to the existing report.
+                </div>
+              )}
             </div>
 
             <input
@@ -702,16 +776,21 @@ export default function ReportsPage() {
             <button
               className="btn-gold btn w-full justify-center"
               onClick={saveReport}
-              disabled={upsertReport.isPending}
+              disabled={upsertReport.isPending || uploadingPhotos}
             >
-              {upsertReport.isPending ? 'Saving…' : 'Save Report'}
+              {upsertReport.isPending || uploadingPhotos
+                ? 'Saving…'
+                : 'Save Report'}
             </button>
           </div>
         </Modal>
       )}
 
       {showActivityModal && (
-        <Modal title="Add Weekly Activity" onClose={() => setShowActivityModal(false)}>
+        <Modal
+          title="Add Weekly Activity"
+          onClose={() => setShowActivityModal(false)}
+        >
           <div className="space-y-3">
             <input
               className="form-control"
@@ -853,40 +932,35 @@ function InfoGrid({ items }: { items: [string, any][] }) {
             {label}
           </div>
 
-          <div className="text-sm text-[#ede8de] mt-1">
-            {value || '—'}
-          </div>
+          <div className="text-sm text-[#ede8de] mt-1">{value || '—'}</div>
         </div>
       ))}
     </div>
   )
 }
 
-function PhotoGallery({ photos }: { photos: string[] }) {
+function PhotoGallery({ photos }: { photos: any[] }) {
   if (!photos.length) {
     return <TextBlock value="No photos attached." />
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
       {photos.map((photo, index) => (
-        <a
-          key={`${photo}-${index}`}
-          href={photo}
-          target="_blank"
-          rel="noreferrer"
-          className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-[#c49e48]/30 transition"
+        <div
+          key={photo.id || `${photo.photo_url}-${index}`}
+          className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden break-inside-avoid"
         >
           <img
-            src={photo}
-            alt={`Report photo ${index + 1}`}
-            className="h-48 w-full object-cover"
+            src={photo.photo_url}
+            alt={photo.photo_name || `Report photo ${index + 1}`}
+            className="w-full h-64 object-cover print:h-auto print:max-h-[320px]"
           />
 
-          <div className="p-3 text-xs text-[#c49e48]">
-            Open Photo {index + 1}
+          <div className="p-3 text-xs text-[#6e7d8c]">
+            {photo.caption || photo.photo_name || `Progress Photo ${index + 1}`}
           </div>
-        </a>
+        </div>
       ))}
     </div>
   )
