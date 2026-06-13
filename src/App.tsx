@@ -29,6 +29,7 @@ import ExternalSubmissionStatusPage from '@/pages/external/ExternalSubmissionSta
 import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
 import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
 import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPage'
+import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReviewPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -370,6 +371,10 @@ export default function App() {
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="external-review" element={<ExternalReviewDashboard />} />
+          <Route
+  path="external-communication"
+  element={<ExternalCommunicationReviewPage />}
+/>
           <Route path="team" element={<TeamPage />} />
           <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
