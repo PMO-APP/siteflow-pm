@@ -8,6 +8,13 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 
+const EXTERNAL_ROLES = [
+  'consultant',
+  'contractor',
+  'vendor',
+  'subcontractor',
+]
+
 export default function AcceptInvitePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -31,6 +38,22 @@ export default function AcceptInvitePage() {
 
   function cleanRole(role: string | null | undefined) {
     return String(role || '').toLowerCase().trim()
+  }
+
+  function getInviteScope() {
+    return invite?.invite_scope || invite?.access_scope || 'project'
+  }
+
+  function getProjectIds() {
+    const idsFromArray = Array.isArray(invite?.project_ids)
+      ? invite.project_ids
+      : []
+
+    const idsFromSingle = invite?.project_id ? [invite.project_id] : []
+
+    return [...new Set([...idsFromArray, ...idsFromSingle])]
+      .map(id => Number(id))
+      .filter(Boolean)
   }
 
   async function loadInvite() {
@@ -94,8 +117,8 @@ export default function AcceptInvitePage() {
 
       const email = invite.email.trim().toLowerCase()
       const role = cleanRole(invite.role)
-      const inviteScope =
-        invite.invite_scope || invite.access_scope || 'project'
+      const inviteScope = getInviteScope()
+      const projectIds = getProjectIds()
 
       const { data: signUpData, error: signUpError } =
         await supabase.auth.signUp({
@@ -143,40 +166,65 @@ export default function AcceptInvitePage() {
         return
       }
 
-      const { error: membershipError } = await supabase
-        .from('memberships')
-        .insert({
+      if (inviteScope === 'workspace') {
+        const { error: membershipError } = await supabase
+          .from('memberships')
+          .insert({
+            user_id: userId,
+            organization_id: invite.organization_id || 1,
+            email,
+            full_name: fullName,
+            role,
+            access_scope: 'workspace',
+            project_id: null,
+            portfolio_id: null,
+          })
+
+        if (membershipError) {
+          setError(membershipError.message)
+          return
+        }
+      }
+
+      if (inviteScope === 'project') {
+        if (projectIds.length === 0) {
+          setError('No project was attached to this invitation.')
+          return
+        }
+
+        const membershipRows = projectIds.map(projectId => ({
           user_id: userId,
           organization_id: invite.organization_id || 1,
           email,
           full_name: fullName,
           role,
-          access_scope: inviteScope,
-          project_id: inviteScope === 'project' ? invite.project_id : null,
-          portfolio_id:
-            inviteScope === 'portfolio' ? invite.portfolio_id : null,
-        })
+          access_scope: 'project',
+          project_id: projectId,
+          portfolio_id: null,
+        }))
 
-      if (membershipError) {
-        setError(membershipError.message)
-        return
-      }
+        const { error: membershipError } = await supabase
+          .from('memberships')
+          .insert(membershipRows)
 
-      if (inviteScope === 'project') {
+        if (membershipError) {
+          setError(membershipError.message)
+          return
+        }
+
+        const teamRows = projectIds.map(projectId => ({
+          user_id: userId,
+          project_id: projectId,
+          email,
+          full_name: fullName,
+          role,
+        }))
+
         const { error: teamError } = await supabase
           .from('project_team_members')
-          .upsert(
-            {
-              user_id: userId,
-              project_id: invite.project_id,
-              email,
-              full_name: fullName,
-              role,
-            },
-            {
-              onConflict: 'project_id,email',
-            }
-          )
+          .upsert(teamRows, {
+            onConflict: 'project_id,email',
+          })
 
         if (teamError) {
           setError(teamError.message)
@@ -203,6 +251,11 @@ export default function AcceptInvitePage() {
     }
   }
 
+  const inviteScope = getInviteScope()
+  const projectCount = getProjectIds().length
+  const roleLabel = cleanRole(invite?.role) || 'team member'
+  const isExternal = EXTERNAL_ROLES.includes(roleLabel)
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0c1014] text-white flex items-center justify-center">
@@ -227,10 +280,12 @@ export default function AcceptInvitePage() {
             </p>
 
             <button
-              onClick={() => navigate('/mixta-admin-login')}
+              onClick={() =>
+                navigate(isExternal ? '/external-project' : '/mixta-admin-login')
+              }
               className="btn-gold btn w-full justify-center mt-6"
             >
-              Go to Login
+              {isExternal ? 'Go to External Portal' : 'Go to Login'}
             </button>
           </>
         ) : (
@@ -246,10 +301,17 @@ export default function AcceptInvitePage() {
             <p className="text-[#6e7d8c] mt-3">
               You have been invited as{' '}
               <span className="text-[#c49e48] font-semibold">
-                {cleanRole(invite?.role) || 'team member'}
+                {roleLabel}
               </span>
               .
             </p>
+
+            {inviteScope === 'project' && projectCount > 0 && (
+              <div className="mt-4 rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+                This invitation grants access to {projectCount} project
+                {projectCount === 1 ? '' : 's'}.
+              </div>
+            )}
 
             {error && (
               <div className="mt-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex gap-2 text-left">
