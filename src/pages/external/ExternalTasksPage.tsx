@@ -116,7 +116,7 @@ export default function ExternalTasksPage() {
       } updated task "${task?.title || 'Assigned Task'}" to ${status}.`,
       sendEmail: status === 'Submitted' || status === 'Completed',
       emailPayload: {
-        to: ['YOUR_PMO_EMAIL@company.com'],
+        to: ['e.bio-ibogomo@mixtafrica.com'],
         subject: `External Task ${status}: ${task?.title || 'Assigned Task'}`,
         type: 'External Task Update',
         projectName: externalProjectName || 'Selected Project',
