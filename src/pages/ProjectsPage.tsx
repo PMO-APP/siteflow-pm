@@ -18,13 +18,42 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
-const ADMIN_ROLES = ['workspace_admin', 'admin']
+const ADMIN_ROLES = ['workspace_admin', 'admin', 'pmo']
 
 const CREATE_ROLES = [
   'workspace_admin',
   'admin',
   'pmo',
   'portfolio_manager',
+]
+
+const INTERNAL_VIEW_ROLES = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'portfolio_manager',
+  'project_owner',
+  'design',
+  'housebuild',
+  'infrastructure',
+  'mep',
+  'costing',
+  'viewer',
+  'guest',
+]
+
+const EXTERNAL_ROLES = [
+  'consultant',
+  'contractor',
+  'vendor',
+  'subcontractor',
+]
+
+const PROJECT_EDIT_ROLES = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'project_owner',
 ]
 
 const PROJECT_STATUSES = [
@@ -58,6 +87,7 @@ export default function ProjectsPage() {
 
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
   const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] = useState(false)
+  const [canEditProjects, setCanEditProjects] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
@@ -122,19 +152,31 @@ export default function ProjectsPage() {
       setProjects([])
       setCanAccessAdmin(false)
       setCanCreateWorkspaceItems(false)
+      setCanEditProjects(false)
       setLoading(false)
       return
     }
 
     const userRoles = memberships.map(membership =>
-      String(membership.role || '').toLowerCase()
+      String(membership.role || '').toLowerCase().trim()
+    )
+
+    const isInternalUser = userRoles.some(role =>
+      INTERNAL_VIEW_ROLES.includes(role)
+    )
+
+    const isExternalUser = userRoles.some(role =>
+      EXTERNAL_ROLES.includes(role)
     )
 
     setCanAccessAdmin(userRoles.some(role => ADMIN_ROLES.includes(role)))
-    setCanCreateWorkspaceItems(userRoles.some(role => CREATE_ROLES.includes(role)))
 
-    const hasWorkspaceAccess = memberships.some(
-      membership => membership.access_scope === 'workspace'
+    setCanCreateWorkspaceItems(
+      userRoles.some(role => CREATE_ROLES.includes(role))
+    )
+
+    setCanEditProjects(
+      userRoles.some(role => PROJECT_EDIT_ROLES.includes(role))
     )
 
     const [
@@ -158,7 +200,7 @@ export default function ProjectsPage() {
       return
     }
 
-    if (hasWorkspaceAccess) {
+    if (isInternalUser) {
       setOrganizations(orgs || [])
       setPortfolios(ports || [])
       setProjects(projs || [])
@@ -166,34 +208,48 @@ export default function ProjectsPage() {
       return
     }
 
-    const allowedProjectIds = memberships
-      .filter(membership => membership.access_scope === 'project')
-      .map(membership => membership.project_id)
-      .filter(Boolean)
+    if (isExternalUser) {
+      const allowedProjectIds = memberships
+        .filter(membership => membership.access_scope === 'project')
+        .map(membership => membership.project_id)
+        .filter(Boolean)
 
-    const allowedPortfolioIds = memberships
-      .filter(membership => membership.access_scope === 'portfolio')
-      .map(membership => membership.portfolio_id)
-      .filter(Boolean)
-
-    const visibleProjects = (projs || []).filter(project => {
-      return (
-        allowedProjectIds.includes(project.id) ||
-        allowedPortfolioIds.includes(project.portfolio_id)
+      const visibleProjects = (projs || []).filter(project =>
+        allowedProjectIds.includes(project.id)
       )
-    })
 
-    const visiblePortfolioIds = [
-      ...new Set(visibleProjects.map(project => project.portfolio_id).filter(Boolean)),
-    ]
+      const visiblePortfolioIds = [
+        ...new Set(
+          visibleProjects
+            .map(project => project.portfolio_id)
+            .filter(Boolean)
+        ),
+      ]
 
-    const visibleOrgIds = [
-      ...new Set(visibleProjects.map(project => project.organization_id).filter(Boolean)),
-    ]
+      const visibleOrgIds = [
+        ...new Set(
+          visibleProjects
+            .map(project => project.organization_id)
+            .filter(Boolean)
+        ),
+      ]
 
-    setOrganizations((orgs || []).filter(org => visibleOrgIds.includes(org.id)))
-    setPortfolios((ports || []).filter(portfolio => visiblePortfolioIds.includes(portfolio.id)))
-    setProjects(visibleProjects)
+      setOrganizations((orgs || []).filter(org => visibleOrgIds.includes(org.id)))
+
+      setPortfolios(
+        (ports || []).filter(portfolio =>
+          visiblePortfolioIds.includes(portfolio.id)
+        )
+      )
+
+      setProjects(visibleProjects)
+      setLoading(false)
+      return
+    }
+
+    setOrganizations([])
+    setPortfolios([])
+    setProjects([])
     setLoading(false)
   }
 
@@ -220,6 +276,7 @@ export default function ProjectsPage() {
   }
 
   async function updateProject() {
+    if (!canEditProjects) return
     if (!editingProject || !editProjectName.trim()) return
 
     const { error } = await supabase
@@ -245,7 +302,9 @@ export default function ProjectsPage() {
   }
 
   async function createPortfolio() {
-    if (!canCreateWorkspaceItems || !newPortfolioName.trim() || !selectedOrgId) return
+    if (!canCreateWorkspaceItems || !newPortfolioName.trim() || !selectedOrgId) {
+      return
+    }
 
     const { error } = await supabase.from('portfolios').insert({
       name: newPortfolioName.trim(),
@@ -402,10 +461,29 @@ export default function ProjectsPage() {
           </div>
 
           <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <MetricCard title={workspaceName} value="Workspace" icon={Building2} />
-            <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
-            <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
-            <MetricCard title="Active" value={activeProjects} icon={Activity} />
+            <MetricCard
+              title={workspaceName}
+              value="Workspace"
+              icon={Building2}
+            />
+
+            <MetricCard
+              title="Portfolios"
+              value={portfolios.length}
+              icon={Briefcase}
+            />
+
+            <MetricCard
+              title="Projects"
+              value={totalProjects}
+              icon={FolderKanban}
+            />
+
+            <MetricCard
+              title="Active"
+              value={activeProjects}
+              icon={Activity}
+            />
           </div>
         </div>
 
@@ -435,9 +513,7 @@ export default function ProjectsPage() {
                 Organization
               </div>
 
-              <div className="mt-1 font-semibold">
-                {workspaceName}
-              </div>
+              <div className="mt-1 font-semibold">{workspaceName}</div>
             </div>
 
             <select
@@ -566,7 +642,9 @@ export default function ProjectsPage() {
                           project => project.portfolio_id === portfolio.id
                         )
 
-                        if (portfolioProjects.length === 0 && searchTerm) return null
+                        if (portfolioProjects.length === 0 && searchTerm) {
+                          return null
+                        }
 
                         return (
                           <div
@@ -576,7 +654,10 @@ export default function ProjectsPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Layers size={16} className="text-[#c49e48]" />
+                                  <Layers
+                                    size={16}
+                                    className="text-[#c49e48]"
+                                  />
 
                                   <div className="font-semibold text-white">
                                     {portfolio.name}
@@ -584,7 +665,8 @@ export default function ProjectsPage() {
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description || 'Project delivery portfolio'}
+                                  {portfolio.description ||
+                                    'Project delivery portfolio'}
                                 </div>
                               </div>
 
@@ -603,7 +685,7 @@ export default function ProjectsPage() {
                                   <ProjectCard
                                     key={project.id}
                                     project={project}
-                                    canEdit={canCreateWorkspaceItems}
+                                    canEdit={canEditProjects}
                                     onClick={() => openProject(project)}
                                     onEdit={() => openEditProject(project)}
                                   />
@@ -615,7 +697,8 @@ export default function ProjectsPage() {
                       })}
                     </div>
 
-                    {orgProjects.filter(project => !project.portfolio_id).length > 0 && (
+                    {orgProjects.filter(project => !project.portfolio_id).length >
+                      0 && (
                       <div className="mt-6">
                         <div className="text-sm font-semibold text-[#ede8de] mb-3">
                           Projects not assigned to a portfolio
@@ -628,7 +711,7 @@ export default function ProjectsPage() {
                               <ProjectCard
                                 key={project.id}
                                 project={project}
-                                canEdit={canCreateWorkspaceItems}
+                                canEdit={canEditProjects}
                                 onClick={() => openProject(project)}
                                 onEdit={() => openEditProject(project)}
                               />
@@ -647,7 +730,10 @@ export default function ProjectsPage() {
       </div>
 
       {showPortfolioModal && canCreateWorkspaceItems && (
-        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
+        <Modal
+          title="Create Portfolio"
+          onClose={() => setShowPortfolioModal(false)}
+        >
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
             <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
               Organization
@@ -665,7 +751,10 @@ export default function ProjectsPage() {
             onChange={e => setNewPortfolioName(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={createPortfolio}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createPortfolio}
+          >
             Create Portfolio
           </button>
         </Modal>
@@ -734,14 +823,20 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <button className="btn-gold btn w-full justify-center" onClick={createProject}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createProject}
+          >
             Create Project
           </button>
         </Modal>
       )}
 
-      {showEditProjectModal && editingProject && canCreateWorkspaceItems && (
-        <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
+      {showEditProjectModal && editingProject && canEditProjects && (
+        <Modal
+          title="Edit Project"
+          onClose={() => setShowEditProjectModal(false)}
+        >
           <input
             className="form-control mb-4"
             placeholder="Project name"
@@ -787,7 +882,10 @@ export default function ProjectsPage() {
             onChange={e => setEditProjectHandoverDate(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={updateProject}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={updateProject}
+          >
             Save Project Changes
           </button>
         </Modal>
@@ -805,9 +903,7 @@ function MetricCard({ title, value, icon: Icon }: any) {
             {value}
           </div>
 
-          <div className="text-xs text-slate-500 mt-1">
-            {title}
-          </div>
+          <div className="text-xs text-slate-500 mt-1">{title}</div>
         </div>
 
         <Icon size={20} className="text-[#c49e48]" />
@@ -837,9 +933,11 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
     Mobilization: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
     Execution: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
     Finishing: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    'Testing & Commissioning': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    'Testing & Commissioning':
+      'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
     Handover: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-    'Defects Liability': 'bg-stone-500/10 text-stone-400 border-stone-500/20',
+    'Defects Liability':
+      'bg-stone-500/10 text-stone-400 border-stone-500/20',
     'Closed Out': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
   }
 
