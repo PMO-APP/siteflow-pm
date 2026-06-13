@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   ClipboardList,
   FileText,
@@ -8,6 +9,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
@@ -17,7 +19,79 @@ export default function ExternalProjectPortal() {
   const { user, signOut } = useAuthStore()
 
   const role = useMembershipStore(state => state.role)
-  const projectId = useMembershipStore(state => state.projectId)
+  const organizationId = useMembershipStore(state => state.organizationId)
+
+  const [organizationName, setOrganizationName] = useState('')
+  const [assignedProjects, setAssignedProjects] = useState<any[]>([])
+  const [loadingContext, setLoadingContext] = useState(true)
+
+  useEffect(() => {
+    loadPortalContext()
+  }, [user?.email, organizationId])
+
+  async function loadPortalContext() {
+    setLoadingContext(true)
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const currentUser = sessionData.session?.user
+
+    if (!currentUser?.email) {
+      setLoadingContext(false)
+      return
+    }
+
+    const cleanEmail = currentUser.email.toLowerCase().trim()
+
+    const { data: membershipRows } = await supabase
+      .from('memberships')
+      .select('*')
+      .or(`user_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
+
+    const memberships = membershipRows || []
+
+    const orgId =
+      memberships[0]?.organization_id || organizationId || null
+
+    if (orgId) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', orgId)
+        .maybeSingle()
+
+      setOrganizationName(org?.name || '')
+    }
+
+    const projectIds = [
+      ...new Set(
+        memberships
+          .filter(item => item.access_scope === 'project')
+          .map(item => item.project_id)
+          .filter(Boolean)
+      ),
+    ]
+
+    if (projectIds.length > 0) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, project_name, location')
+        .in('id', projectIds)
+
+      setAssignedProjects(projects || [])
+    } else {
+      setAssignedProjects([])
+    }
+
+    setLoadingContext(false)
+  }
+
+  const organizationLabel = organizationName || 'your organization'
+  const projectLabel =
+    assignedProjects.length === 0
+      ? 'No project assigned'
+      : assignedProjects.length === 1
+      ? assignedProjects[0].project_name
+      : `${assignedProjects.length} assigned projects`
 
   return (
     <div className="min-h-dvh bg-[#0c1014] text-white">
@@ -54,7 +128,7 @@ export default function ExternalProjectPortal() {
 
             <p className="text-slate-400 mt-4 max-w-2xl">
               Submit updates, upload documents, respond to assigned tasks, and
-              communicate with the PMOCorex internal project team.
+              communicate with the {organizationLabel} project team.
             </p>
 
             <div className="mt-5 text-sm text-slate-500">
@@ -62,11 +136,30 @@ export default function ExternalProjectPortal() {
               <span className="text-[#c49e48]">
                 {role || 'External User'}
               </span>{' '}
-              • Project ID:{' '}
+              • Project:{' '}
               <span className="text-[#c49e48]">
-                {projectId || 'Not assigned'}
+                {loadingContext ? 'Loading…' : projectLabel}
               </span>
             </div>
+
+            {assignedProjects.length > 1 && (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs uppercase tracking-wider text-slate-500 mb-3">
+                  Assigned Projects
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {assignedProjects.map(project => (
+                    <span
+                      key={project.id}
+                      className="rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 px-3 py-1 text-xs text-[#c49e48]"
+                    >
+                      {project.project_name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -78,41 +171,40 @@ export default function ExternalProjectPortal() {
             onClick={() => navigate('/external-project/tasks')}
           />
 
-         <PortalCard
-  icon={UploadCloud}
-  title="Submit Progress Update"
-  description="Send daily or weekly progress updates for internal review."
-  onClick={() =>
-    navigate('/external-project/progress-report')
-  }
-/>
+          <PortalCard
+            icon={UploadCloud}
+            title="Submit Progress Update"
+            description="Send daily or weekly progress updates for internal review."
+            onClick={() => navigate('/external-project/progress-report')}
+          />
 
-         <PortalCard
-  icon={FolderUp}
-  title="Upload Documents"
-  description="Upload drawings, reports, photos, certificates, or supporting files."
-  onClick={() => navigate('/external-project/documents')}
-/>
+          <PortalCard
+            icon={FolderUp}
+            title="Upload Documents"
+            description="Upload drawings, reports, photos, certificates, or supporting files."
+            onClick={() => navigate('/external-project/documents')}
+          />
 
           <PortalCard
             icon={FileText}
             title="Upload Report"
             description="Submit site reports, inspection notes, method statements, or progress reports."
+            onClick={() => navigate('/external-project/progress-report')}
           />
 
-         <PortalCard
-  icon={MessageSquare}
-  title="Comments / RFIs"
-  description="Raise questions, respond to comments, or submit RFIs to the project team."
-  onClick={() => navigate('/external-project/rfis')}
-/>
+          <PortalCard
+            icon={MessageSquare}
+            title="Comments / RFIs"
+            description="Raise questions, respond to comments, or submit RFIs to the project team."
+            onClick={() => navigate('/external-project/rfis')}
+          />
 
-         <PortalCard
-  icon={CheckCircle}
-  title="Submission Status"
-  description="Track whether your submitted items are pending, reviewed, approved, or rejected."
-  onClick={() => navigate('/external-project/submissions')}
-/>
+          <PortalCard
+            icon={CheckCircle}
+            title="Submission Status"
+            description="Track whether your submitted items are pending, reviewed, approved, or rejected."
+            onClick={() => navigate('/external-project/submissions')}
+          />
         </section>
       </div>
     </div>
