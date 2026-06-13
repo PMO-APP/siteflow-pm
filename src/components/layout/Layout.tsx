@@ -9,6 +9,7 @@ import {
 } from '@/lib/permissions'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -110,11 +111,42 @@ export default function Layout() {
   const [portfolioName, setPortfolioName] = useState('')
 
   const { user, signOut } = useAuthStore()
-  const { projectName, organizationId, portfolioId } = useProjectStore()
+  const { projectId, projectName, organizationId, portfolioId } =
+    useProjectStore()
   const role = useMembershipStore(state => state.role)
 
   const location = useLocation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const { data: unreadNotifications = [] } = useQuery({
+    queryKey: ['layout-notifications', user?.id, role, projectId],
+    enabled: !!user,
+    queryFn: async () => {
+      if (!user) return []
+
+      const filters = [`user_id.eq.${user.id}`, `role.eq.${role || ''}`]
+
+      if (projectId) {
+        filters.push(`project_id.eq.${projectId}`)
+      }
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('is_read', false)
+        .or(filters.join(','))
+
+      if (error) {
+        console.error(error.message)
+        return []
+      }
+
+      return data || []
+    },
+  })
+
+  const unreadCount = unreadNotifications.length
 
   useEffect(() => {
     loadProject()
@@ -123,6 +155,29 @@ export default function Layout() {
   useEffect(() => {
     loadWorkspaceContext()
   }, [organizationId, portfolioId])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('layout-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['layout-notifications'],
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   async function loadProject() {
     if (!projectName) {
@@ -385,7 +440,12 @@ export default function Layout() {
             onClick={() => setNotifsOpen(!notifsOpen)}
           >
             <Bell size={16} />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full pulse-gold" />
+
+            {unreadCount > 0 && (
+              <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         </header>
 
