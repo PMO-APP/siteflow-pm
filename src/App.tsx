@@ -120,25 +120,44 @@ export default function App() {
   }, [theme])
 
   async function loadMembership(userId: string) {
-    const { data: membership, error } = await supabase
+  const { data: sessionData } = await supabase.auth.getSession()
+  const email = sessionData.session?.user?.email?.toLowerCase().trim()
+
+  let query = supabase
+    .from('memberships')
+    .select('*')
+    .eq('user_id', userId)
+
+  if (email) {
+    query = supabase
       .from('memberships')
       .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (error || !membership) {
-      clearMembership()
-      return
-    }
-
-    setMembership({
-      role: membership.role,
-      accessScope: membership.access_scope,
-      organizationId: membership.organization_id,
-      portfolioId: membership.portfolio_id,
-      projectId: membership.project_id,
-    })
+      .or(`user_id.eq.${userId},email.eq.${email}`)
   }
+
+  const { data: memberships, error } = await query
+
+  if (error || !memberships || memberships.length === 0) {
+    clearMembership()
+    return
+  }
+
+  const externalMembership = memberships.find(membership =>
+    ['consultant', 'contractor', 'vendor', 'subcontractor'].includes(
+      String(membership.role || '').toLowerCase().trim()
+    )
+  )
+
+  const selectedMembership = externalMembership || memberships[0]
+
+  setMembership({
+    role: selectedMembership.role,
+    accessScope: selectedMembership.access_scope,
+    organizationId: selectedMembership.organization_id,
+    portfolioId: selectedMembership.portfolio_id,
+    projectId: selectedMembership.project_id,
+  })
+}
 
   useEffect(() => {
     let mounted = true
