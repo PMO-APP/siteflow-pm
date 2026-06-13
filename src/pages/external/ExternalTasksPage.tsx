@@ -221,11 +221,12 @@ export default function ExternalTasksPage() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onStatusChange={updateTaskStatus}
-                />
+               <TaskCard
+  key={task.id}
+  task={task}
+  projectId={activeProjectId}
+  onStatusChange={updateTaskStatus}
+/>
               ))}
             </div>
           ))}
@@ -236,11 +237,14 @@ export default function ExternalTasksPage() {
 
 function TaskCard({
   task,
+  projectId,
   onStatusChange,
 }: {
   task: any
+  projectId: number | null
   onStatusChange: (taskId: number, status: string) => void
 }) {
+  const navigate = useNavigate()
   const statusStyle =
     task.status === 'Completed'
       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -306,6 +310,14 @@ function TaskCard({
           </option>
         ))}
       </select>
+      <button
+  onClick={() =>
+    navigate(`/external-project/tasks/${task.id}?project=${projectId}`)
+  }
+  className="btn btn-gold w-full justify-center"
+>
+  Open Details / Comments
+</button>
     </div>
   )
 }
