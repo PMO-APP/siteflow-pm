@@ -31,6 +31,7 @@ import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
 import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPage'
 import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReviewPage'
 import ExternalTaskDetailPage from '@/pages/external/ExternalTaskDetailPage'
+import ExternalTaskReviewPage from '@/pages/ExternalTaskReviewPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -387,6 +388,7 @@ export default function App() {
           <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="external-task-review" element={<ExternalTaskReviewPage />} />
           <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
         </Route>
 
