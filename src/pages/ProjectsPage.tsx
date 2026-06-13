@@ -17,44 +17,13 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
-
-const ADMIN_ROLES = ['workspace_admin', 'admin', 'pmo']
-
-const CREATE_ROLES = [
-  'workspace_admin',
-  'admin',
-  'pmo',
-  'portfolio_manager',
-]
-
-const INTERNAL_VIEW_ROLES = [
-  'workspace_admin',
-  'admin',
-  'pmo',
-  'portfolio_manager',
-  'project_owner',
-  'design',
-  'housebuild',
-  'infrastructure',
-  'mep',
-  'costing',
-  'viewer',
-  'guest',
-]
-
-const EXTERNAL_ROLES = [
-  'consultant',
-  'contractor',
-  'vendor',
-  'subcontractor',
-]
-
-const PROJECT_EDIT_ROLES = [
-  'workspace_admin',
-  'admin',
-  'pmo',
-  'project_owner',
-]
+import {
+  canAccessAdminConsole,
+  canCreateWorkspaceItems,
+  canEditProjectInfo,
+  canViewInternalPages,
+  isExternalRole,
+} from '@/lib/permissions'
 
 const PROJECT_STATUSES = [
   'Planning',
@@ -86,7 +55,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
 
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
-  const [canCreateWorkspaceItems, setCanCreateWorkspaceItems] = useState(false)
+  const [canCreateItems, setCanCreateItems] = useState(false)
   const [canEditProjects, setCanEditProjects] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
@@ -151,7 +120,7 @@ export default function ProjectsPage() {
       setPortfolios([])
       setProjects([])
       setCanAccessAdmin(false)
-      setCanCreateWorkspaceItems(false)
+      setCanCreateItems(false)
       setCanEditProjects(false)
       setLoading(false)
       return
@@ -161,23 +130,12 @@ export default function ProjectsPage() {
       String(membership.role || '').toLowerCase().trim()
     )
 
-    const isInternalUser = userRoles.some(role =>
-      INTERNAL_VIEW_ROLES.includes(role)
-    )
+    const isInternalUser = userRoles.some(role => canViewInternalPages(role))
+    const isExternalUser = userRoles.some(role => isExternalRole(role))
 
-    const isExternalUser = userRoles.some(role =>
-      EXTERNAL_ROLES.includes(role)
-    )
-
-    setCanAccessAdmin(userRoles.some(role => ADMIN_ROLES.includes(role)))
-
-    setCanCreateWorkspaceItems(
-      userRoles.some(role => CREATE_ROLES.includes(role))
-    )
-
-    setCanEditProjects(
-      userRoles.some(role => PROJECT_EDIT_ROLES.includes(role))
-    )
+    setCanAccessAdmin(userRoles.some(role => canAccessAdminConsole(role)))
+    setCanCreateItems(userRoles.some(role => canCreateWorkspaceItems(role)))
+    setCanEditProjects(userRoles.some(role => canEditProjectInfo(role)))
 
     const [
       { data: orgs, error: orgError },
@@ -235,13 +193,11 @@ export default function ProjectsPage() {
       ]
 
       setOrganizations((orgs || []).filter(org => visibleOrgIds.includes(org.id)))
-
       setPortfolios(
         (ports || []).filter(portfolio =>
           visiblePortfolioIds.includes(portfolio.id)
         )
       )
-
       setProjects(visibleProjects)
       setLoading(false)
       return
@@ -259,7 +215,7 @@ export default function ProjectsPage() {
       project.project_name,
       project.organization_id ?? null,
       project.portfolio_id ?? null,
-      project.project_owner_email ?? null
+      null
     )
 
     navigate('/app')
@@ -297,14 +253,11 @@ export default function ProjectsPage() {
 
     setEditingProject(null)
     setShowEditProjectModal(false)
-
     await loadHub()
   }
 
   async function createPortfolio() {
-    if (!canCreateWorkspaceItems || !newPortfolioName.trim() || !selectedOrgId) {
-      return
-    }
+    if (!canCreateItems || !newPortfolioName.trim() || !selectedOrgId) return
 
     const { error } = await supabase.from('portfolios').insert({
       name: newPortfolioName.trim(),
@@ -323,7 +276,7 @@ export default function ProjectsPage() {
   }
 
   async function createProject() {
-    if (!canCreateWorkspaceItems || !newProjectName.trim()) return
+    if (!canCreateItems || !newProjectName.trim()) return
 
     const { error } = await supabase.from('projects').insert({
       project_name: newProjectName.trim(),
@@ -382,11 +335,7 @@ export default function ProjectsPage() {
     <div className="min-h-dvh bg-[#0c1014] text-white overflow-x-hidden overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-[calc(10rem+env(safe-area-inset-bottom))] space-y-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-left w-fit"
-          >
+          <button type="button" onClick={() => navigate('/')} className="text-left w-fit">
             <PMOCorexLogo size={42} />
           </button>
 
@@ -414,7 +363,7 @@ export default function ProjectsPage() {
               </button>
             )}
 
-            {canCreateWorkspaceItems && (
+            {canCreateItems && (
               <button
                 onClick={() => {
                   setSelectedOrgId(organizations[0]?.id || '')
@@ -427,7 +376,7 @@ export default function ProjectsPage() {
               </button>
             )}
 
-            {canCreateWorkspaceItems && (
+            {canCreateItems && (
               <button
                 onClick={() => {
                   setSelectedOrgId(organizations[0]?.id || '')
@@ -461,29 +410,10 @@ export default function ProjectsPage() {
           </div>
 
           <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <MetricCard
-              title={workspaceName}
-              value="Workspace"
-              icon={Building2}
-            />
-
-            <MetricCard
-              title="Portfolios"
-              value={portfolios.length}
-              icon={Briefcase}
-            />
-
-            <MetricCard
-              title="Projects"
-              value={totalProjects}
-              icon={FolderKanban}
-            />
-
-            <MetricCard
-              title="Active"
-              value={activeProjects}
-              icon={Activity}
-            />
+            <MetricCard title={workspaceName} value="Workspace" icon={Building2} />
+            <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
+            <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
+            <MetricCard title="Active" value={activeProjects} icon={Activity} />
           </div>
         </div>
 
@@ -585,7 +515,6 @@ export default function ProjectsPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <Building2 size={18} className="text-[#c49e48]" />
-
                           <h2 className="text-xl font-bold text-[#ede8de]">
                             {org.name}
                           </h2>
@@ -608,7 +537,7 @@ export default function ProjectsPage() {
                           </button>
                         )}
 
-                        {canCreateWorkspaceItems && (
+                        {canCreateItems && (
                           <button
                             onClick={() => {
                               setSelectedOrgId(org.id)
@@ -621,7 +550,7 @@ export default function ProjectsPage() {
                           </button>
                         )}
 
-                        {canCreateWorkspaceItems && (
+                        {canCreateItems && (
                           <button
                             onClick={() => {
                               setSelectedOrgId(org.id)
@@ -642,9 +571,7 @@ export default function ProjectsPage() {
                           project => project.portfolio_id === portfolio.id
                         )
 
-                        if (portfolioProjects.length === 0 && searchTerm) {
-                          return null
-                        }
+                        if (portfolioProjects.length === 0 && searchTerm) return null
 
                         return (
                           <div
@@ -654,19 +581,14 @@ export default function ProjectsPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <Layers
-                                    size={16}
-                                    className="text-[#c49e48]"
-                                  />
-
+                                  <Layers size={16} className="text-[#c49e48]" />
                                   <div className="font-semibold text-white">
                                     {portfolio.name}
                                   </div>
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description ||
-                                    'Project delivery portfolio'}
+                                  {portfolio.description || 'Project delivery portfolio'}
                                 </div>
                               </div>
 
@@ -697,8 +619,7 @@ export default function ProjectsPage() {
                       })}
                     </div>
 
-                    {orgProjects.filter(project => !project.portfolio_id).length >
-                      0 && (
+                    {orgProjects.filter(project => !project.portfolio_id).length > 0 && (
                       <div className="mt-6">
                         <div className="text-sm font-semibold text-[#ede8de] mb-3">
                           Projects not assigned to a portfolio
@@ -729,11 +650,8 @@ export default function ProjectsPage() {
         <div className="h-40" />
       </div>
 
-      {showPortfolioModal && canCreateWorkspaceItems && (
-        <Modal
-          title="Create Portfolio"
-          onClose={() => setShowPortfolioModal(false)}
-        >
+      {showPortfolioModal && canCreateItems && (
+        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
             <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
               Organization
@@ -751,16 +669,13 @@ export default function ProjectsPage() {
             onChange={e => setNewPortfolioName(e.target.value)}
           />
 
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={createPortfolio}
-          >
+          <button className="btn-gold btn w-full justify-center" onClick={createPortfolio}>
             Create Portfolio
           </button>
         </Modal>
       )}
 
-      {showProjectModal && canCreateWorkspaceItems && (
+      {showProjectModal && canCreateItems && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
             <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
@@ -823,20 +738,14 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={createProject}
-          >
+          <button className="btn-gold btn w-full justify-center" onClick={createProject}>
             Create Project
           </button>
         </Modal>
       )}
 
       {showEditProjectModal && editingProject && canEditProjects && (
-        <Modal
-          title="Edit Project"
-          onClose={() => setShowEditProjectModal(false)}
-        >
+        <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
           <input
             className="form-control mb-4"
             placeholder="Project name"
@@ -882,10 +791,7 @@ export default function ProjectsPage() {
             onChange={e => setEditProjectHandoverDate(e.target.value)}
           />
 
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={updateProject}
-          >
+          <button className="btn-gold btn w-full justify-center" onClick={updateProject}>
             Save Project Changes
           </button>
         </Modal>
@@ -933,11 +839,9 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
     Mobilization: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
     Execution: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
     Finishing: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    'Testing & Commissioning':
-      'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    'Testing & Commissioning': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
     Handover: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-    'Defects Liability':
-      'bg-stone-500/10 text-stone-400 border-stone-500/20',
+    'Defects Liability': 'bg-stone-500/10 text-stone-400 border-stone-500/20',
     'Closed Out': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
   }
 
@@ -1030,7 +934,6 @@ function EmptyHub({ title, message, action }: any) {
       </div>
 
       <div className="text-xl font-bold text-white">{title}</div>
-
       <div className="text-sm text-slate-500 mt-2">{message}</div>
 
       <button onClick={action} className="btn-gold btn mt-5">
