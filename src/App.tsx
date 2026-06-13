@@ -28,6 +28,7 @@ import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
 import ExternalSubmissionStatusPage from '@/pages/external/ExternalSubmissionStatusPage'
 import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
 import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
+import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -290,7 +291,14 @@ export default function App() {
             </RequireAuth>
           }
         />
-
+<Route
+  path="/external-project/communication"
+  element={
+    <RequireAuth>
+      <ExternalCommunicationPage />
+    </RequireAuth>
+  }
+/>
         <Route
           path="/external-project/rfis"
           element={
