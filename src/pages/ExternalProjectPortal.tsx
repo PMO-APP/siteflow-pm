@@ -280,7 +280,7 @@ export default function ExternalProjectPortal() {
             title="Comments / RFIs"
             description="Raise questions, respond to comments, or submit RFIs to the project team."
             disabled={!externalProjectId}
-            onClick={() => openExternalPage('/external-project/rfis')}
+            onClick={() => openExternalPage('/external-project/communication')}
           />
 
           <PortalCard
