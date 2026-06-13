@@ -6,30 +6,64 @@ import {
   AlertTriangle,
   ClipboardList,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
+import { useExternalProjectStore } from '@/store/externalProject'
+import { notifyUsers } from '@/lib/notifications'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 const STATUS_OPTIONS = ['Pending', 'In Progress', 'Submitted', 'Completed']
 
 export default function ExternalTasksPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
-  const projectId = useMembershipStore(state => state.projectId)
+
   const role = useMembershipStore(state => state.role)
+
+  const {
+    externalProjectId,
+    externalProjectName,
+    setExternalProject,
+  } = useExternalProjectStore()
+
+  const projectFromUrl = searchParams.get('project')
+  const activeProjectId = externalProjectId || Number(projectFromUrl) || null
 
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
+    syncProjectFromUrl()
+  }, [projectFromUrl])
+
+  useEffect(() => {
     loadTasks()
-  }, [projectId, user?.email])
+  }, [activeProjectId, user?.email, role])
+
+  async function syncProjectFromUrl() {
+    if (!projectFromUrl) return
+
+    const projectId = Number(projectFromUrl)
+
+    if (!projectId || externalProjectId === projectId) return
+
+    const { data } = await supabase
+      .from('projects')
+      .select('id, project_name')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (data) {
+      setExternalProject(data.id, data.project_name)
+    }
+  }
 
   async function loadTasks() {
-    if (!projectId || !user?.email) {
+    if (!activeProjectId || !user?.email) {
       setLoading(false)
       return
     }
@@ -39,8 +73,8 @@ export default function ExternalTasksPage() {
     const { data, error } = await supabase
       .from('external_tasks')
       .select('*')
-      .eq('project_id', projectId)
-      .or(`assigned_to_email.eq.${user.email},assigned_role.eq.${role}`)
+      .eq('project_id', activeProjectId)
+      .or(`assigned_to_email.eq.${user.email},assigned_role.eq.${role || ''}`)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -56,6 +90,8 @@ export default function ExternalTasksPage() {
   async function updateTaskStatus(taskId: number, status: string) {
     setNotice('')
 
+    const task = tasks.find(item => item.id === taskId)
+
     const { error } = await supabase
       .from('external_tasks')
       .update({
@@ -63,11 +99,33 @@ export default function ExternalTasksPage() {
         updated_at: new Date().toISOString(),
       })
       .eq('id', taskId)
+      .eq('project_id', activeProjectId)
 
     if (error) {
       setNotice(error.message)
       return
     }
+
+    await notifyUsers({
+      projectId: activeProjectId,
+      recipientRole: 'pmo',
+      type: 'external_task_update',
+      title: 'External Task Status Updated',
+      message: `${
+        user?.full_name || user?.email || 'External user'
+      } updated task "${task?.title || 'Assigned Task'}" to ${status}.`,
+      sendEmail: status === 'Submitted' || status === 'Completed',
+      emailPayload: {
+        to: ['YOUR_PMO_EMAIL@company.com'],
+        subject: `External Task ${status}: ${task?.title || 'Assigned Task'}`,
+        type: 'External Task Update',
+        projectName: externalProjectName || 'Selected Project',
+        submittedBy: user?.full_name || user?.email || 'External User',
+        submittedByEmail: user?.email || '',
+        message: `Task: ${task?.title || 'Assigned Task'}\nStatus: ${status}`,
+        reviewUrl: `${window.location.origin}/app/external-review`,
+      },
+    })
 
     await loadTasks()
   }
@@ -109,9 +167,16 @@ export default function ExternalTasksPage() {
             </h1>
 
             <p className="text-slate-400 mt-3 max-w-2xl">
-              View tasks assigned to you, update progress, and notify the
-              internal PMOCorex project team when work is completed.
+              View and update tasks assigned to you for the selected project
+              only.
             </p>
+
+            <div className="mt-4 text-sm text-slate-500">
+              Current Project:{' '}
+              <span className="text-[#c49e48]">
+                {externalProjectName || 'No project selected'}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -121,33 +186,49 @@ export default function ExternalTasksPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="card p-6 text-slate-400">Loading tasks…</div>
-        ) : tasks.length === 0 ? (
-          <div className="card p-10 text-center">
-            <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-              <ClipboardList size={24} className="text-[#c49e48]" />
-            </div>
-
-            <div className="text-xl font-bold text-white">
-              No tasks assigned yet
-            </div>
-
-            <p className="text-sm text-slate-500 mt-2">
-              Tasks assigned by the internal team will appear here.
+        {!activeProjectId && (
+          <div className="card p-6 text-center">
+            <p className="text-slate-400">
+              Please select a project before viewing assigned tasks.
             </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {tasks.map(task => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onStatusChange={updateTaskStatus}
-              />
-            ))}
+
+            <button
+              onClick={() => navigate('/external-project')}
+              className="btn btn-gold mt-4"
+            >
+              Select Project
+            </button>
           </div>
         )}
+
+        {activeProjectId &&
+          (loading ? (
+            <div className="card p-6 text-slate-400">Loading tasks…</div>
+          ) : tasks.length === 0 ? (
+            <div className="card p-10 text-center">
+              <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
+                <ClipboardList size={24} className="text-[#c49e48]" />
+              </div>
+
+              <div className="text-xl font-bold text-white">
+                No tasks assigned yet
+              </div>
+
+              <p className="text-sm text-slate-500 mt-2">
+                Tasks assigned for this selected project will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {tasks.map(task => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onStatusChange={updateTaskStatus}
+                />
+              ))}
+            </div>
+          ))}
       </div>
     </div>
   )
@@ -170,7 +251,7 @@ function TaskCard({
       : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
 
   const priorityStyle =
-    task.priority === 'High'
+    task.priority === 'High' || task.priority === 'Critical'
       ? 'text-red-400'
       : task.priority === 'Low'
       ? 'text-slate-400'
@@ -200,11 +281,13 @@ function TaskCard({
 
       <div className="flex flex-wrap gap-2">
         <span className={`text-xs rounded-full border px-2 py-1 ${statusStyle}`}>
-          {task.status}
+          {task.status || 'Pending'}
         </span>
 
-        <span className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}>
-          Priority: {task.priority}
+        <span
+          className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}
+        >
+          Priority: {task.priority || 'Medium'}
         </span>
 
         <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-400">
@@ -214,7 +297,7 @@ function TaskCard({
 
       <select
         className="form-control"
-        value={task.status}
+        value={task.status || 'Pending'}
         onChange={e => onStatusChange(task.id, e.target.value)}
       >
         {STATUS_OPTIONS.map(status => (
