@@ -26,24 +26,25 @@ export default function LoginPage() {
     }
   }, [])
 
-  async function getLoginRedirectPath(userId: string) {
-    const { data: membership, error } = await supabase
+  async function getLoginRedirectPath(userId: string, userEmail: string) {
+    const cleanEmail = userEmail.toLowerCase().trim()
+
+    const { data: memberships, error } = await supabase
       .from('memberships')
       .select('role')
-      .eq('user_id', userId)
-      .maybeSingle()
+      .or(`user_id.eq.${userId},email.eq.${cleanEmail}`)
 
     if (error) {
       throw error
     }
 
-    const role = String(membership?.role || '').toLowerCase().trim()
+    const roles = (memberships || []).map(item =>
+      String(item.role || '').toLowerCase().trim()
+    )
 
-    if (EXTERNAL_ROLES.includes(role)) {
-      return '/external-project'
-    }
+    const isExternal = roles.some(role => EXTERNAL_ROLES.includes(role))
 
-    return '/projects'
+    return isExternal ? '/external-project' : '/projects'
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,7 +88,7 @@ export default function LoginPage() {
         return
       }
 
-      const redirectPath = await getLoginRedirectPath(user.id)
+      const redirectPath = await getLoginRedirectPath(user.id, cleanEmail)
 
       navigate(redirectPath)
     } catch (err: any) {
