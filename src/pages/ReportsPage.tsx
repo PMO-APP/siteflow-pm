@@ -58,6 +58,7 @@ export default function ReportsPage() {
   const [showReportModal, setShowReportModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
+  const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>({})
   const [reportPhotos, setReportPhotos] = useState<any[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
 
@@ -147,7 +148,7 @@ export default function ReportsPage() {
       procurement_tracking: '',
       safety_tracking: '',
     })
-
+setPhotoCaptions({})
     setPhotos([])
     setSelectedReportId(null)
     setShowReportModal(true)
@@ -170,7 +171,7 @@ export default function ReportsPage() {
       procurement_tracking: report.procurement_tracking || '',
       safety_tracking: report.safety_tracking || '',
     })
-
+setPhotoCaptions({})
     setPhotos([])
     setSelectedReportId(report.id)
     setShowReportModal(true)
@@ -239,6 +240,7 @@ export default function ReportsPage() {
           report_id: reportId,
           photo_url: publicUrl,
           photo_name: photo.name,
+          caption: photoCaptions[photo.name] || null,
           uploaded_by: user?.full_name || user?.email || 'User',
         })
 
@@ -732,131 +734,63 @@ export default function ReportsPage() {
               }
             />
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
-                <UploadCloud size={15} className="text-[#c49e48]" />
-                Upload Progress Photos
-              </div>
+           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+  <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
+    <UploadCloud size={15} className="text-[#c49e48]" />
+    Upload Progress Photos
+  </div>
 
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                className="form-control"
-                onChange={event =>
-                  setPhotos(Array.from(event.target.files || []))
-                }
-              />
+  <input
+    type="file"
+    multiple
+    accept="image/*"
+    className="form-control"
+    onChange={event => {
+      const selectedPhotos = Array.from(
+        event.target.files || []
+      )
 
-              {photos.length > 0 && (
-                <div className="text-xs text-[#6e7d8c]">
-                  {photos.length} photo(s) selected.
-                </div>
-              )}
+      setPhotos(selectedPhotos)
+      setPhotoCaptions({})
+    }}
+  />
 
-              {selectedReportId && (
-                <div className="text-[11px] text-[#6e7d8c]">
-                  Uploading new photos will add them to the existing report.
-                </div>
-              )}
-            </div>
+  {photos.length > 0 && (
+    <div className="space-y-3">
+      <div className="text-xs text-[#6e7d8c]">
+        {photos.length} photo(s) selected.
+      </div>
 
-            <input
-              type="date"
-              className="form-control"
-              value={reportForm.next_meeting}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  next_meeting: event.target.value,
-                }))
-              }
-            />
-
-            <button
-              className="btn-gold btn w-full justify-center"
-              onClick={saveReport}
-              disabled={upsertReport.isPending || uploadingPhotos}
-            >
-              {upsertReport.isPending || uploadingPhotos
-                ? 'Saving…'
-                : 'Save Report'}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {showActivityModal && (
-        <Modal
-          title="Add Weekly Activity"
-          onClose={() => setShowActivityModal(false)}
+      {photos.map(photo => (
+        <div
+          key={photo.name}
+          className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
         >
-          <div className="space-y-3">
-            <input
-              className="form-control"
-              placeholder="Activity"
-              value={activityForm.activity}
-              onChange={event =>
-                setActivityForm(current => ({
-                  ...current,
-                  activity: event.target.value,
-                }))
-              }
-            />
+          <div className="text-xs text-[#ede8de]">
+            {photo.name}
+          </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Last Week %"
-                value={activityForm.last_week}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    last_week: Number(event.target.value),
-                  }))
-                }
-              />
-
-              <input
-                type="number"
-                className="form-control"
-                placeholder="This Week %"
-                value={activityForm.this_week}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    this_week: Number(event.target.value),
-                  }))
-                }
-              />
-
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Planned %"
-                value={activityForm.planned}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    planned: Number(event.target.value),
-                  }))
-                }
-              />
-            </div>
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Remarks"
-              value={activityForm.remarks}
-              onChange={event =>
-                setActivityForm(current => ({
-                  ...current,
-                  remarks: event.target.value,
-                }))
-              }
-            />
+          <input
+            className="form-control"
+            placeholder="Photo caption"
+            value={photoCaptions[photo.name] || ''}
+            onChange={event =>
+              setPhotoCaptions(current => ({
+                ...current,
+                [photo.name]: event.target.value,
+              }))
+            }
+          />
+          <img
+  src={URL.createObjectURL(photo)}
+  alt={photo.name}
+  className="w-full max-h-48 object-cover rounded-xl border border-white/10"
+/>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
             <button
               className="btn-gold btn w-full justify-center"
