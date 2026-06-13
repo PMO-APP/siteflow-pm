@@ -8,16 +8,25 @@ import {
   MessageSquare,
   ShieldCheck,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
-import { useMembershipStore } from '@/store/membership'
+import { useExternalProjectStore } from '@/store/externalProject'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 export default function ExternalSubmissionStatusPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
-  const projectId = useMembershipStore(state => state.projectId)
+
+  const {
+    externalProjectId,
+    externalProjectName,
+    setExternalProject,
+  } = useExternalProjectStore()
+
+  const projectFromUrl = searchParams.get('project')
+  const activeProjectId = externalProjectId || Number(projectFromUrl) || null
 
   const [documents, setDocuments] = useState<any[]>([])
   const [reports, setReports] = useState<any[]>([])
@@ -26,11 +35,33 @@ export default function ExternalSubmissionStatusPage() {
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
+    syncProjectFromUrl()
+  }, [projectFromUrl])
+
+  useEffect(() => {
     loadSubmissions()
-  }, [projectId, user?.email])
+  }, [activeProjectId, user?.email])
+
+  async function syncProjectFromUrl() {
+    if (!projectFromUrl) return
+
+    const projectId = Number(projectFromUrl)
+
+    if (!projectId || externalProjectId === projectId) return
+
+    const { data } = await supabase
+      .from('projects')
+      .select('id, project_name')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (data) {
+      setExternalProject(data.id, data.project_name)
+    }
+  }
 
   async function loadSubmissions() {
-    if (!projectId || !user?.email) {
+    if (!activeProjectId || !user?.email) {
       setLoading(false)
       return
     }
@@ -45,21 +76,21 @@ export default function ExternalSubmissionStatusPage() {
       supabase
         .from('external_documents')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', activeProjectId)
         .eq('uploaded_by_email', user.email)
         .order('created_at', { ascending: false }),
 
       supabase
         .from('external_progress_reports')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', activeProjectId)
         .eq('submitted_by_email', user.email)
         .order('created_at', { ascending: false }),
 
       supabase
         .from('external_rfis')
         .select('*')
-        .eq('project_id', projectId)
+        .eq('project_id', activeProjectId)
         .eq('submitted_by_email', user.email)
         .order('created_at', { ascending: false }),
     ])
@@ -129,8 +160,15 @@ export default function ExternalSubmissionStatusPage() {
 
             <p className="text-slate-400 mt-3 max-w-2xl">
               Track the review status of your documents, progress reports, and
-              RFIs submitted to the internal PMOCorex team.
+              RFIs for the selected project only.
             </p>
+
+            <div className="mt-4 text-sm text-slate-500">
+              Current Project:{' '}
+              <span className="text-[#c49e48]">
+                {externalProjectName || 'No project selected'}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -140,61 +178,83 @@ export default function ExternalSubmissionStatusPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricCard
-            icon={ShieldCheck}
-            title="Total Submissions"
-            value={totalSubmissions}
-          />
-          <MetricCard icon={Clock} title="Pending Review" value={pendingCount} />
-          <MetricCard
-            icon={CheckCircle}
-            title="Completed / Responded"
-            value={approvedCount}
-          />
-        </section>
+        {!activeProjectId && (
+          <div className="card p-6 text-center">
+            <p className="text-slate-400">Please select a project first.</p>
 
-        {loading ? (
-          <div className="card p-6 text-slate-400">
-            Loading submissions…
+            <button
+              onClick={() => navigate('/external-project')}
+              className="btn btn-gold mt-4"
+            >
+              Select Project
+            </button>
           </div>
-        ) : totalSubmissions === 0 ? (
-          <div className="card p-10 text-center">
-            <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-              <FolderUp size={24} className="text-[#c49e48]" />
-            </div>
+        )}
 
-            <div className="text-xl font-bold text-white">
-              No submissions yet
-            </div>
+        {activeProjectId && (
+          <>
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MetricCard
+                icon={ShieldCheck}
+                title="Total Submissions"
+                value={totalSubmissions}
+              />
+              <MetricCard
+                icon={Clock}
+                title="Pending Review"
+                value={pendingCount}
+              />
+              <MetricCard
+                icon={CheckCircle}
+                title="Completed / Responded"
+                value={approvedCount}
+              />
+            </section>
 
-            <p className="text-sm text-slate-500 mt-2">
-              Your documents, reports, and RFIs will appear here once submitted.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <SubmissionSection
-              title="Documents"
-              icon={FileText}
-              items={documents}
-              type="document"
-            />
+            {loading ? (
+              <div className="card p-6 text-slate-400">
+                Loading submissions…
+              </div>
+            ) : totalSubmissions === 0 ? (
+              <div className="card p-10 text-center">
+                <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
+                  <FolderUp size={24} className="text-[#c49e48]" />
+                </div>
 
-            <SubmissionSection
-              title="Progress Reports"
-              icon={ShieldCheck}
-              items={reports}
-              type="report"
-            />
+                <div className="text-xl font-bold text-white">
+                  No submissions yet
+                </div>
 
-            <SubmissionSection
-              title="RFIs / Comments"
-              icon={MessageSquare}
-              items={rfis}
-              type="rfi"
-            />
-          </div>
+                <p className="text-sm text-slate-500 mt-2">
+                  Your documents, reports, and RFIs for this selected project
+                  will appear here once submitted.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <SubmissionSection
+                  title="Documents"
+                  icon={FileText}
+                  items={documents}
+                  type="document"
+                />
+
+                <SubmissionSection
+                  title="Progress Reports"
+                  icon={ShieldCheck}
+                  items={reports}
+                  type="report"
+                />
+
+                <SubmissionSection
+                  title="RFIs / Comments"
+                  icon={MessageSquare}
+                  items={rfis}
+                  type="rfi"
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -277,10 +337,9 @@ function SubmissionCard({
       ? item.progress_summary
       : item.subject
 
-  const date =
-    item.created_at
-      ? new Date(item.created_at).toLocaleDateString('en-GB')
-      : '—'
+  const date = item.created_at
+    ? new Date(item.created_at).toLocaleDateString('en-GB')
+    : '—'
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -290,9 +349,7 @@ function SubmissionCard({
             {title || 'Untitled submission'}
           </h3>
 
-          <p className="text-xs text-slate-500 mt-1">
-            Submitted: {date}
-          </p>
+          <p className="text-xs text-slate-500 mt-1">Submitted: {date}</p>
 
           {type === 'document' && item.file_url && (
             <a
