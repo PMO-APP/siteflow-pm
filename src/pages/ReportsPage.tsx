@@ -822,6 +822,88 @@ setPhotoCaptions({})
           </div>
         </Modal>
       )}
+      {showActivityModal && (
+  <Modal
+    title="Add Weekly Activity"
+    onClose={() => setShowActivityModal(false)}
+  >
+    <div className="space-y-3">
+      <input
+        className="form-control"
+        placeholder="Activity"
+        value={activityForm.activity}
+        onChange={event =>
+          setActivityForm(current => ({
+            ...current,
+            activity: event.target.value,
+          }))
+        }
+      />
+
+      <div className="grid grid-cols-3 gap-3">
+        <input
+          type="number"
+          className="form-control"
+          placeholder="Last Week %"
+          value={activityForm.last_week}
+          onChange={event =>
+            setActivityForm(current => ({
+              ...current,
+              last_week: Number(event.target.value),
+            }))
+          }
+        />
+
+        <input
+          type="number"
+          className="form-control"
+          placeholder="This Week %"
+          value={activityForm.this_week}
+          onChange={event =>
+            setActivityForm(current => ({
+              ...current,
+              this_week: Number(event.target.value),
+            }))
+          }
+        />
+
+        <input
+          type="number"
+          className="form-control"
+          placeholder="Planned %"
+          value={activityForm.planned}
+          onChange={event =>
+            setActivityForm(current => ({
+              ...current,
+              planned: Number(event.target.value),
+            }))
+          }
+        />
+      </div>
+
+      <textarea
+        className="form-control"
+        rows={2}
+        placeholder="Remarks"
+        value={activityForm.remarks}
+        onChange={event =>
+          setActivityForm(current => ({
+            ...current,
+            remarks: event.target.value,
+          }))
+        }
+      />
+
+      <button
+        className="btn-gold btn w-full justify-center"
+        onClick={saveActivity}
+        disabled={upsertActivity.isPending}
+      >
+        {upsertActivity.isPending ? 'Saving…' : 'Save Activity'}
+      </button>
+    </div>
+  </Modal>
+)}
     </div>
   )
 }
