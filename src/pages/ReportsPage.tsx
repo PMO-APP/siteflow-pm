@@ -254,7 +254,10 @@ setPhotoCaptions({})
     await loadReportPhotos()
   }
 
-  async function saveReport() {
+ async function saveReport() {
+  try {
+    console.log('Saving report...', reportForm)
+
     const savedReport = await upsertReport.mutateAsync({
       id: selectedReportId || undefined,
       ...reportForm,
@@ -264,16 +267,33 @@ setPhotoCaptions({})
       next_meeting: reportForm.next_meeting || undefined,
     } as any)
 
-    const reportId =
-      selectedReportId || getSavedReportId(savedReport) || (await findReportIdFallback())
+    console.log('Saved report response:', savedReport)
 
-    if (reportId) {
+    const reportId =
+      selectedReportId ||
+      getSavedReportId(savedReport) ||
+      (await findReportIdFallback())
+
+    console.log('Resolved report ID:', reportId)
+
+    if (!reportId) {
+      alert('Report saved, but report ID could not be found for photo upload.')
+      return
+    }
+
+    if (photos.length > 0) {
       await uploadReportPhotos(reportId)
     }
 
     setShowReportModal(false)
     setSelectedReportId(null)
+    setPhotos([])
+    setPhotoCaptions({})
+  } catch (error: any) {
+    console.error('Save report failed:', error)
+    alert(error?.message || 'Failed to save report.')
   }
+}
 
   async function saveActivity() {
     if (!selectedReport?.id || !activityForm.activity.trim()) return
