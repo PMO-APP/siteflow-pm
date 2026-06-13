@@ -275,14 +275,13 @@ export default function ExternalProjectPortal() {
             }
           />
 
-          <PortalCard
-            icon={MessageSquare}
-            title="Comments / RFIs"
-            description="Raise questions, respond to comments, or submit RFIs to the project team."
-            disabled={!externalProjectId}
-            onClick={() => openExternalPage('/external-project/communication')}
-          />
-
+         <PortalCard
+  icon={MessageSquare}
+  title="Project Conversations"
+  description="Communicate with PMO, Design, MEP, Infrastructure and Project Owners. Create RFIs, discussions, clarifications and project correspondence."
+  disabled={!externalProjectId}
+  onClick={() => openExternalPage('/external-project/communication')}
+/>
           <PortalCard
             icon={CheckCircle}
             title="Submission Status"
