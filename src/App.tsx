@@ -30,6 +30,7 @@ import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
 import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
 import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPage'
 import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReviewPage'
+import ExternalTaskDetailPage from '@/pages/external/ExternalTaskDetailPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -283,7 +284,14 @@ export default function App() {
             </RequireAuth>
           }
         />
-
+<Route
+  path="/external-project/tasks/:taskId"
+  element={
+    <RequireAuth>
+      <ExternalTaskDetailPage />
+    </RequireAuth>
+  }
+/>
         <Route
           path="/external-project/progress-report"
           element={
