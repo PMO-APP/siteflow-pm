@@ -812,14 +812,13 @@ setPhotoCaptions({})
   )}
 </div>
 
-            <button
+<button
   className="btn-gold btn w-full justify-center"
   onClick={saveReport}
   disabled={upsertReport.isPending || uploadingPhotos}
 >
-  {upsertReport.isPending || uploadingPhotos
-    ? 'Saving
-    </button
+  {upsertReport.isPending || uploadingPhotos ? 'Saving…' : 'Save Report'}
+</button>
           </div>
         </Modal>
       )}
