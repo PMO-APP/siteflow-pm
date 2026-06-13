@@ -1,7 +1,14 @@
 import { useState } from 'react'
-import { Printer, Plus, FileText, CalendarDays, AlertTriangle } from 'lucide-react'
+import {
+  Printer,
+  Plus,
+  FileText,
+  CalendarDays,
+  Image as ImageIcon,
+} from 'lucide-react'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { useAuthStore } from '@/store/auth'
 import { canExportReports } from '@/lib/permissions'
 import {
   useWeeklyReports,
@@ -17,9 +24,22 @@ import {
 import { fdate, formatCurrency } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 
+const REPORT_DEPARTMENTS = [
+  'PMO',
+  'Housebuild',
+  'Infrastructure',
+  'MEP',
+  'Design',
+  'Costing',
+  'Quality',
+  'HSE',
+  'Project Owner',
+]
+
 export default function ReportsPage() {
   const { projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
+  const { user } = useAuthStore()
   const canExport = canExportReports(role)
 
   const { data: reports = [], isLoading } = useWeeklyReports()
@@ -43,7 +63,9 @@ export default function ReportsPage() {
 
   const [reportForm, setReportForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
+    department: '',
     reporting_officer: '',
+    reporting_officer_email: '',
     status: 'On Track',
     pending_issues: '',
     matters_arising: '',
@@ -53,6 +75,12 @@ export default function ReportsPage() {
     procurement_tracking: '',
     safety_tracking: '',
   })
+
+  const [photo1, setPhoto1] = useState('')
+  const [photo2, setPhoto2] = useState('')
+  const [photo3, setPhoto3] = useState('')
+  const [photo4, setPhoto4] = useState('')
+  const [photo5, setPhoto5] = useState('')
 
   const [activityForm, setActivityForm] = useState({
     activity: '',
@@ -66,29 +94,30 @@ export default function ReportsPage() {
   const highRisks = risks.filter(
     risk => risk.status === 'Open' && (risk.risk_score || 0) >= 12
   ).length
-
   const openSnags = snags.filter(snag => snag.status !== 'Closed').length
   const criticalSnags = snags.filter(
     snag => snag.severity === 'Critical' && snag.status !== 'Closed'
   ).length
-
   const pendingApprovals = approvals.filter(
-    approval =>
-      approval.status !== 'Approved' && approval.status !== 'Rejected'
+    approval => approval.status !== 'Approved' && approval.status !== 'Rejected'
   ).length
-
   const pendingProcurement = procurement.filter(
     item => item.status !== 'Delivered'
   ).length
-
   const contractSum = financial
     .filter(item => item.type === 'Contract Sum')
     .reduce((sum, item) => sum + item.amount, 0)
 
+  function getReportPhotos(report: any) {
+    return Array.isArray(report?.report_photos) ? report.report_photos : []
+  }
+
   function openNewReport() {
     setReportForm({
       report_date: new Date().toISOString().slice(0, 10),
-      reporting_officer: '',
+      department: '',
+      reporting_officer: user?.full_name || '',
+      reporting_officer_email: user?.email || '',
       status: 'On Track',
       pending_issues: '',
       matters_arising: '',
@@ -99,13 +128,24 @@ export default function ReportsPage() {
       safety_tracking: '',
     })
 
+    setPhoto1('')
+    setPhoto2('')
+    setPhoto3('')
+    setPhoto4('')
+    setPhoto5('')
+    setSelectedReportId(null)
     setShowReportModal(true)
   }
 
   function openEditReport(report: WeeklyReport) {
+    const reportAny = report as any
+    const photos = getReportPhotos(reportAny)
+
     setReportForm({
       report_date: report.report_date || new Date().toISOString().slice(0, 10),
-      reporting_officer: report.reporting_officer || '',
+      department: reportAny.department || '',
+      reporting_officer: reportAny.reporting_officer || '',
+      reporting_officer_email: reportAny.reporting_officer_email || '',
       status: report.status || 'On Track',
       pending_issues: report.pending_issues || '',
       matters_arising: report.matters_arising || '',
@@ -116,6 +156,12 @@ export default function ReportsPage() {
       safety_tracking: report.safety_tracking || '',
     })
 
+    setPhoto1(photos[0] || '')
+    setPhoto2(photos[1] || '')
+    setPhoto3(photos[2] || '')
+    setPhoto4(photos[3] || '')
+    setPhoto5(photos[4] || '')
+
     setSelectedReportId(report.id)
     setShowReportModal(true)
   }
@@ -124,6 +170,11 @@ export default function ReportsPage() {
     await upsertReport.mutateAsync({
       id: selectedReportId || undefined,
       ...reportForm,
+      report_photos: [photo1, photo2, photo3, photo4, photo5]
+        .map(photo => photo.trim())
+        .filter(Boolean),
+      reporting_officer_email: reportForm.reporting_officer_email || user?.email || '',
+      created_by_role: role,
       next_meeting: reportForm.next_meeting || undefined,
     } as any)
 
@@ -178,7 +229,10 @@ export default function ReportsPage() {
         <div className="flex flex-wrap gap-2">
           {canExport && (
             <>
-              <button className="btn-ghost btn-sm btn" onClick={() => window.print()}>
+              <button
+                className="btn-ghost btn-sm btn"
+                onClick={() => window.print()}
+              >
                 <Printer size={13} />
                 Print / PDF
               </button>
@@ -194,7 +248,8 @@ export default function ReportsPage() {
 
       {!canExport && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
-          Reports View Only — you can view reports, but you cannot create or export reports.
+          Reports View Only — you can view reports, but you cannot create or
+          export reports.
         </div>
       )}
 
@@ -220,31 +275,47 @@ export default function ReportsPage() {
               No weekly reports yet.
             </div>
           ) : (
-            reports.map(report => (
-              <button
-                key={report.id}
-                onClick={() => setSelectedReportId(report.id)}
-                className={`w-full text-left rounded-xl border p-3 transition ${
-                  selectedReport?.id === report.id
-                    ? 'border-[#c49e48]/40 bg-[#c49e48]/10'
-                    : 'border-white/10 bg-white/[0.03] hover:border-[#c49e48]/30'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-[#ede8de]">
-                    {fdate(report.report_date)}
+            reports.map(report => {
+              const reportAny = report as any
+              const photos = getReportPhotos(reportAny)
+
+              return (
+                <button
+                  key={report.id}
+                  onClick={() => setSelectedReportId(report.id)}
+                  className={`w-full text-left rounded-xl border p-3 transition ${
+                    selectedReport?.id === report.id
+                      ? 'border-[#c49e48]/40 bg-[#c49e48]/10'
+                      : 'border-white/10 bg-white/[0.03] hover:border-[#c49e48]/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-[#ede8de]">
+                      {fdate(report.report_date)}
+                    </div>
+
+                    <span className={`text-[10px] font-semibold ${statusColor(report.status)}`}>
+                      {report.status || 'On Track'}
+                    </span>
                   </div>
 
-                  <span className={`text-[10px] font-semibold ${statusColor(report.status)}`}>
-                    {report.status || 'On Track'}
-                  </span>
-                </div>
+                  <div className="text-[11px] text-[#c49e48] mt-1">
+                    {reportAny.department || 'No department'}
+                  </div>
 
-                <div className="text-[11px] text-[#6e7d8c] mt-1">
-                  Officer: {report.reporting_officer || '—'}
-                </div>
-              </button>
-            ))
+                  <div className="text-[11px] text-[#6e7d8c] mt-1">
+                    Officer: {reportAny.reporting_officer || '—'}
+                  </div>
+
+                  {photos.length > 0 && (
+                    <div className="text-[10px] text-[#6e7d8c] mt-1 flex items-center gap-1">
+                      <ImageIcon size={11} />
+                      {photos.length} photo(s)
+                    </div>
+                  )}
+                </button>
+              )
+            })
           )}
         </div>
 
@@ -271,6 +342,11 @@ export default function ReportsPage() {
                     <div className="text-sm text-[#6e7d8c] mt-1">
                       Report Date: {fdate(selectedReport.report_date)}
                     </div>
+
+                    <div className="text-sm text-[#c49e48] mt-1">
+                      Department:{' '}
+                      {(selectedReport as any).department || '—'}
+                    </div>
                   </div>
 
                   <div className="text-right">
@@ -279,8 +355,15 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="text-[11px] text-[#6e7d8c] mt-1">
-                      Reporting Officer: {selectedReport.reporting_officer || '—'}
+                      Reporting Officer:{' '}
+                      {(selectedReport as any).reporting_officer || '—'}
                     </div>
+
+                    {(selectedReport as any).reporting_officer_email && (
+                      <div className="text-[10px] text-[#6e7d8c] mt-1">
+                        {(selectedReport as any).reporting_officer_email}
+                      </div>
+                    )}
 
                     {canExport && (
                       <button
@@ -299,6 +382,7 @@ export default function ReportsPage() {
                   <InfoGrid
                     items={[
                       ['Project Title', projectName || '—'],
+                      ['Department', (selectedReport as any).department || '—'],
                       ['Contract Sum', contractSum ? formatCurrency(contractSum) : 'TBC'],
                       ['Open Snags', openSnags],
                       ['Critical Snags', criticalSnags],
@@ -382,10 +466,16 @@ export default function ReportsPage() {
                   <TextBlock value={selectedReport.safety_tracking} />
                 </Section>
 
+                <Section title="Report Photos">
+                  <PhotoGallery photos={getReportPhotos(selectedReport as any)} />
+                </Section>
+
                 <Section title="Next Site Meeting">
                   <div className="flex items-center gap-2 text-[#ede8de]">
                     <CalendarDays size={14} className="text-[#c49e48]" />
-                    {selectedReport.next_meeting ? fdate(selectedReport.next_meeting) : 'Not set'}
+                    {selectedReport.next_meeting
+                      ? fdate(selectedReport.next_meeting)
+                      : 'Not set'}
                   </div>
                 </Section>
 
@@ -419,6 +509,24 @@ export default function ReportsPage() {
               }
             />
 
+            <select
+              className="form-control"
+              value={reportForm.department}
+              onChange={event =>
+                setReportForm(current => ({
+                  ...current,
+                  department: event.target.value,
+                }))
+              }
+            >
+              <option value="">Select Department</option>
+              {REPORT_DEPARTMENTS.map(department => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </select>
+
             <input
               className="form-control"
               placeholder="Reporting Officer"
@@ -427,6 +535,18 @@ export default function ReportsPage() {
                 setReportForm(current => ({
                   ...current,
                   reporting_officer: event.target.value,
+                }))
+              }
+            />
+
+            <input
+              className="form-control"
+              placeholder="Reporting Officer Email"
+              value={reportForm.reporting_officer_email}
+              onChange={event =>
+                setReportForm(current => ({
+                  ...current,
+                  reporting_officer_email: event.target.value,
                 }))
               }
             />
@@ -524,6 +644,48 @@ export default function ReportsPage() {
                 }))
               }
             />
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
+                <ImageIcon size={15} className="text-[#c49e48]" />
+                Report Photo Links
+              </div>
+
+              <input
+                className="form-control"
+                placeholder="Photo URL 1"
+                value={photo1}
+                onChange={event => setPhoto1(event.target.value)}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Photo URL 2"
+                value={photo2}
+                onChange={event => setPhoto2(event.target.value)}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Photo URL 3"
+                value={photo3}
+                onChange={event => setPhoto3(event.target.value)}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Photo URL 4"
+                value={photo4}
+                onChange={event => setPhoto4(event.target.value)}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Photo URL 5"
+                value={photo5}
+                onChange={event => setPhoto5(event.target.value)}
+              />
+            </div>
 
             <input
               type="date"
@@ -695,6 +857,36 @@ function InfoGrid({ items }: { items: [string, any][] }) {
             {value || '—'}
           </div>
         </div>
+      ))}
+    </div>
+  )
+}
+
+function PhotoGallery({ photos }: { photos: string[] }) {
+  if (!photos.length) {
+    return <TextBlock value="No photos attached." />
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {photos.map((photo, index) => (
+        <a
+          key={`${photo}-${index}`}
+          href={photo}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden hover:border-[#c49e48]/30 transition"
+        >
+          <img
+            src={photo}
+            alt={`Report photo ${index + 1}`}
+            className="h-48 w-full object-cover"
+          />
+
+          <div className="p-3 text-xs text-[#c49e48]">
+            Open Photo {index + 1}
+          </div>
+        </a>
       ))}
     </div>
   )
