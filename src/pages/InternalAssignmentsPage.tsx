@@ -39,7 +39,7 @@ const STATUS_OPTIONS = ['Open', 'In Progress', 'Pending Review', 'Completed']
 export default function InternalAssignmentsPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
-  const { projectId } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
 
   const canAssign = PMO_ASSIGNMENT_ROLES.includes(role || '')
 
@@ -93,6 +93,47 @@ export default function InternalAssignmentsPage() {
     setLoading(false)
   }
 
+  async function sendTaskEmail({
+    to,
+    assigneeName,
+    taskTitle,
+    taskDescription,
+    dueDateValue,
+    priorityValue,
+  }: {
+    to: string
+    assigneeName: string
+    taskTitle: string
+    taskDescription: string
+    dueDateValue: string
+    priorityValue: string
+  }) {
+    if (!to.trim()) return
+
+    const { error } = await supabase.functions.invoke('send-task-email', {
+      body: {
+        to: to.trim(),
+        assigneeName: assigneeName || 'Team Member',
+        taskTitle,
+        taskDescription,
+        projectName: projectName || 'PMOCorex Project',
+        dueDate: dueDateValue || 'Not set',
+        priority: priorityValue,
+        assignedBy: user?.full_name || user?.email || 'PMO Team',
+        taskUrl: `${window.location.origin}/app/internal-assignments`,
+      },
+    })
+
+    if (error) {
+      setNotice(
+        `Task was created, but email notification failed: ${error.message}`
+      )
+      return
+    }
+
+    setNotice('Internal task assigned successfully. Email notification sent.')
+  }
+
   async function createTask() {
     setNotice('')
 
@@ -113,7 +154,7 @@ export default function InternalAssignmentsPage() {
 
     setSubmitting(true)
 
-    const { error } = await supabase.from('internal_tasks').insert({
+    const taskPayload = {
       project_id: projectId,
       assigned_department: assignedDepartment,
       assigned_role: assignedRole,
@@ -126,13 +167,24 @@ export default function InternalAssignmentsPage() {
       status: 'Open',
       progress: 0,
       created_by: user?.email || 'PMO',
-    })
+    }
+
+    const { error } = await supabase.from('internal_tasks').insert(taskPayload)
 
     if (error) {
       setNotice(error.message)
       setSubmitting(false)
       return
     }
+
+    await sendTaskEmail({
+      to: assignedEmail,
+      assigneeName: assignedName,
+      taskTitle: title,
+      taskDescription: description,
+      dueDateValue: dueDate,
+      priorityValue: priority,
+    })
 
     setTitle('')
     setDescription('')
@@ -142,7 +194,6 @@ export default function InternalAssignmentsPage() {
     setAssignedName('')
     setPriority('Medium')
     setDueDate('')
-    setNotice('Internal task assigned successfully.')
     setSubmitting(false)
 
     await loadTasks()
@@ -300,7 +351,11 @@ export default function InternalAssignmentsPage() {
           </div>
         )}
 
-        <div className={canAssign ? 'xl:col-span-2 space-y-4' : 'xl:col-span-3 space-y-4'}>
+        <div
+          className={
+            canAssign ? 'xl:col-span-2 space-y-4' : 'xl:col-span-3 space-y-4'
+          }
+        >
           {loading ? (
             <div className="card p-6 text-slate-400">
               Loading internal assignments…
