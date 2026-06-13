@@ -21,6 +21,8 @@ import { useThemeStore } from '@/store/theme'
 import { getInitials } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
+const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
+
 function formatRoleLabel(role?: string | null) {
   if (!role) return 'Team Member'
 
@@ -29,10 +31,11 @@ function formatRoleLabel(role?: string | null) {
     admin: 'Administrator',
     pmo: 'PMO',
     portfolio_manager: 'Portfolio Manager',
-    project_manager: 'Project Manager',
     project_owner: 'Project Owner',
     contractor: 'Contractor',
     consultant: 'Consultant',
+    vendor: 'Vendor',
+    subcontractor: 'Subcontractor',
     design: 'Design Team',
     costing: 'Costing Team',
     housebuild: 'Housebuild',
@@ -57,9 +60,12 @@ export default function ProfilePage() {
   const portfolioId = useMembershipStore(state => state.portfolioId)
   const projectId = useMembershipStore(state => state.projectId)
 
+  const isExternalUser = EXTERNAL_ROLES.includes(role || '')
+
   const [organizationName, setOrganizationName] = useState('—')
   const [portfolioName, setPortfolioName] = useState('—')
   const [projectName, setProjectName] = useState('—')
+  const [assignedProjects, setAssignedProjects] = useState<any[]>([])
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -71,7 +77,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadAccessContext()
-  }, [organizationId, portfolioId, projectId])
+  }, [organizationId, portfolioId, projectId, user?.email])
 
   async function loadAccessContext() {
     if (organizationId) {
@@ -86,7 +92,7 @@ export default function ProfilePage() {
       setOrganizationName('—')
     }
 
-    if (portfolioId) {
+    if (!isExternalUser && portfolioId) {
       const { data } = await supabase
         .from('portfolios')
         .select('name')
@@ -98,7 +104,7 @@ export default function ProfilePage() {
       setPortfolioName('—')
     }
 
-    if (projectId) {
+    if (!isExternalUser && projectId) {
       const { data } = await supabase
         .from('projects')
         .select('project_name')
@@ -108,6 +114,34 @@ export default function ProfilePage() {
       setProjectName(data?.project_name || '—')
     } else {
       setProjectName('—')
+    }
+
+    if (isExternalUser && user?.email) {
+      const cleanEmail = user.email.toLowerCase().trim()
+
+      const { data: membershipRows } = await supabase
+        .from('memberships')
+        .select('project_id')
+        .or(`user_id.eq.${user.id},email.eq.${cleanEmail}`)
+
+      const projectIds = [
+        ...new Set(
+          (membershipRows || [])
+            .map(item => item.project_id)
+            .filter(Boolean)
+        ),
+      ]
+
+      if (projectIds.length > 0) {
+        const { data: projects } = await supabase
+          .from('projects')
+          .select('id, project_name, location')
+          .in('id', projectIds)
+
+        setAssignedProjects(projects || [])
+      } else {
+        setAssignedProjects([])
+      }
     }
   }
 
@@ -165,31 +199,38 @@ export default function ProfilePage() {
     <div className="min-h-dvh bg-[#0c1014] text-white">
       <div className="mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-  <button
-    type="button"
-    onClick={() => navigate('/')}
-    className="text-left w-fit"
-  >
-    <PMOCorexLogo size={42} />
-  </button>
+          <button
+            type="button"
+            onClick={() => navigate(isExternalUser ? '/external-project' : '/')}
+            className="text-left w-fit"
+          >
+            <PMOCorexLogo size={42} />
+          </button>
 
-  <div className="flex gap-2">
-    <button
-      onClick={() => navigate(-1)}
-      className="btn btn-ghost"
-    >
-      <ArrowLeft size={15} />
-      Back
-    </button>
+          <div className="flex gap-2">
+            <button onClick={() => navigate(-1)} className="btn btn-ghost">
+              <ArrowLeft size={15} />
+              Back
+            </button>
 
-    <button
-      onClick={() => navigate('/projects')}
-      className="btn btn-gold"
-    >
-      Workspace Hub
-    </button>
-  </div>
-</div>
+            {isExternalUser ? (
+              <button
+                onClick={() => navigate('/external-project')}
+                className="btn btn-gold"
+              >
+                External Portal
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/projects')}
+                className="btn btn-gold"
+              >
+                Workspace Hub
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
@@ -201,16 +242,14 @@ export default function ProfilePage() {
 
               <div>
                 <div className="inline-flex mb-2 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-                  PMOCorex Account
+                  {isExternalUser ? 'Partner Account' : 'PMOCorex Account'}
                 </div>
 
                 <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
                   {displayName}
                 </h1>
 
-                <p className="text-sm text-[#6e7d8c] mt-1">
-                  {displayEmail}
-                </p>
+                <p className="text-sm text-[#6e7d8c] mt-1">{displayEmail}</p>
               </div>
             </div>
 
@@ -259,39 +298,80 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            <section className="card p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <Building2 size={18} className="text-[#c49e48]" />
+            {isExternalUser ? (
+              <section className="card p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <FolderKanban size={18} className="text-[#c49e48]" />
 
-                <div>
-                  <h2 className="text-lg font-bold text-[#ede8de]">
-                    Access Details
-                  </h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-[#ede8de]">
+                      Assigned Projects
+                    </h2>
 
-                  <p className="text-xs text-[#6e7d8c]">
-                    Workspace, portfolio, and project access assigned to your account.
-                  </p>
+                    <p className="text-xs text-[#6e7d8c]">
+                      Projects where you have been granted partner access.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <InfoCard
-                  icon={Building2}
-                  label="Organization"
-                  value={organizationName}
-                />
-                <InfoCard
-                  icon={Briefcase}
-                  label="Portfolio"
-                  value={portfolioName}
-                />
-                <InfoCard
-                  icon={FolderKanban}
-                  label="Project"
-                  value={projectName}
-                />
-              </div>
-            </section>
+                {assignedProjects.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-[#6e7d8c]">
+                    No assigned projects found.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {assignedProjects.map(project => (
+                      <div
+                        key={project.id}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                      >
+                        <div className="text-sm font-bold text-[#ede8de]">
+                          {project.project_name}
+                        </div>
+
+                        <div className="text-xs text-[#6e7d8c] mt-1">
+                          {project.location || 'No location set'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : (
+              <section className="card p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <Building2 size={18} className="text-[#c49e48]" />
+
+                  <div>
+                    <h2 className="text-lg font-bold text-[#ede8de]">
+                      Access Details
+                    </h2>
+
+                    <p className="text-xs text-[#6e7d8c]">
+                      Workspace, portfolio, and project access assigned to your account.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <InfoCard
+                    icon={Building2}
+                    label="Organization"
+                    value={organizationName}
+                  />
+                  <InfoCard
+                    icon={Briefcase}
+                    label="Portfolio"
+                    value={portfolioName}
+                  />
+                  <InfoCard
+                    icon={FolderKanban}
+                    label="Project"
+                    value={projectName}
+                  />
+                </div>
+              </section>
+            )}
 
             <section className="card p-6">
               <div className="flex items-center gap-2 mb-5">
@@ -455,23 +535,34 @@ export default function ProfilePage() {
               </h2>
 
               <div className="space-y-2 mt-4">
-                <button
-                  onClick={() => navigate('/projects')}
-                  className="btn btn-ghost w-full justify-center"
-                >
-                  <ArrowLeft size={15} />
-                  Workspace Hub
-                </button>
-
-                {['workspace_admin', 'admin'].includes(role || '') && (
+                {isExternalUser ? (
                   <button
-                    onClick={() => navigate('/admin')}
+                    onClick={() => navigate('/external-project')}
                     className="btn btn-ghost w-full justify-center"
                   >
-                    <Shield size={15} />
-                    Admin Console
+                    <ArrowLeft size={15} />
+                    External Portal
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate('/projects')}
+                    className="btn btn-ghost w-full justify-center"
+                  >
+                    <ArrowLeft size={15} />
+                    Workspace Hub
                   </button>
                 )}
+
+                {!isExternalUser &&
+                  ['workspace_admin', 'admin', 'pmo'].includes(role || '') && (
+                    <button
+                      onClick={() => navigate('/admin')}
+                      className="btn btn-ghost w-full justify-center"
+                    >
+                      <Shield size={15} />
+                      Admin Console
+                    </button>
+                  )}
               </div>
             </section>
           </div>
