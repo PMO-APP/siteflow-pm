@@ -73,42 +73,99 @@ export function canCreateWorkspaceItems(role?: string | null) {
   )
 }
 
-export function canEditProjectInfo(role?: string | null) {
-  return ['workspace_admin', 'admin', 'pmo', 'project_owner'].includes(
-    role || ''
-  )
+export function canViewAllProjects(role?: string | null) {
+  return INTERNAL_VIEW_ROLES.includes(role || '')
 }
 
-export function canEditSchedule(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditAssignedProject(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  if (['workspace_admin', 'admin', 'pmo'].includes(role || '')) return true
+
+  if (role === 'project_owner' && isAssignedProjectOwner) return true
+
+  return false
 }
 
-export function canEditDocuments(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditProjectInfo(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditRisk(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditSchedule(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditProcurement(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditDocuments(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditHousebuild(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditRisk(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditDesign(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditProcurement(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditInfrastructure(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditHousebuild(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditMEP(role?: string | null) {
-  return canEditProjectInfo(role)
+export function canEditDesign(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
+}
+
+export function canEditInfrastructure(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
+}
+
+export function canEditMEP(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
+}
+
+export function canEditReports(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'portfolio_manager',
+    'design',
+    'housebuild',
+    'infrastructure',
+    'mep',
+    'costing',
+  ].includes(role || '') || canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
 export function canEditCosting(role?: string | null) {
@@ -119,10 +176,11 @@ export function canManageFinancials(role?: string | null) {
   return role === 'costing'
 }
 
-export function canApprove(role?: string | null) {
-  return ['workspace_admin', 'admin', 'pmo', 'project_owner'].includes(
-    role || ''
-  )
+export function canApprove(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
 export function canExportReports(role?: string | null) {
@@ -132,43 +190,58 @@ export function canExportReports(role?: string | null) {
     'pmo',
     'portfolio_manager',
     'project_owner',
+    'design',
+    'housebuild',
+    'infrastructure',
+    'mep',
+    'costing',
   ].includes(role || '')
 }
 
-export function canEditExternalReview(role?: string | null) {
+export function canEditExternalReview(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
   return [
     'workspace_admin',
     'admin',
     'pmo',
     'portfolio_manager',
-    'project_owner',
-  ].includes(role || '')
+  ].includes(role || '') || canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
-export function canEditPage(role?: string | null, page?: string) {
+export function canEditPage(
+  role?: string | null,
+  page?: string,
+  isAssignedProjectOwner?: boolean
+) {
   if (isExternalRole(role)) return false
   if (['viewer', 'guest'].includes(role || '')) return false
 
   if (page === 'financial') return canManageFinancials(role)
   if (page === 'costing') return canEditCosting(role)
-  if (page === 'external-review') return canEditExternalReview(role)
+  if (page === 'reports') return canEditReports(role, isAssignedProjectOwner)
+  if (page === 'external-review') {
+    return canEditExternalReview(role, isAssignedProjectOwner)
+  }
 
-  return canEditProjectInfo(role)
+  return canEditAssignedProject(role, isAssignedProjectOwner)
 }
 
 export function canDelete(role?: string | null) {
   return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
 }
 
-export function isReadOnly(role?: string | null) {
+export function isReadOnly(
+  role?: string | null,
+  isAssignedProjectOwner?: boolean
+) {
   if (isExternalRole(role)) return true
   if (['viewer', 'guest'].includes(role || '')) return true
 
-  return ![
-    'workspace_admin',
-    'admin',
-    'pmo',
-    'project_owner',
-    'costing',
-  ].includes(role || '')
+  if (['workspace_admin', 'admin', 'pmo'].includes(role || '')) return false
+  if (role === 'costing') return false
+  if (role === 'project_owner' && isAssignedProjectOwner) return false
+
+  return true
 }
