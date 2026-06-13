@@ -30,6 +30,7 @@ import {
   ClipboardCheck,
   UserCircle,
   Building2,
+  MessageSquare,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -65,6 +66,11 @@ const NAV = [
     icon: Building2,
     label: 'External Review',
   },
+  {
+  to: '/app/external-communication',
+  icon: MessageSquare,
+  label: 'Communications',
+},
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
