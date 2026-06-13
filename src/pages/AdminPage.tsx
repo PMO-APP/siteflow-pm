@@ -19,18 +19,35 @@ import { useMembershipStore } from '@/store/membership'
 import {
   canManageUsers,
   canManageWorkspace,
-  canManagePortfolio,
 } from '@/lib/permissions'
 
-const baseAdminTabs = [
-  'Overview',
-  'Security',
-  'Users & Roles',
+const baseAdminTabs = ['Overview', 'Security', 'Users & Roles']
+
+type InviteScope = 'workspace' | 'project'
+
+const WORKSPACE_ROLES = [
+  { value: 'workspace_admin', label: 'Workspace Admin' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'pmo', label: 'PMO' },
+  { value: 'portfolio_manager', label: 'Portfolio Manager' },
+  { value: 'design', label: 'Design Team' },
+  { value: 'housebuild', label: 'Housebuild' },
+  { value: 'mep', label: 'MEP' },
+  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'costing', label: 'Costing' },
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'guest', label: 'Guest' },
 ]
 
-type InviteScope = 'workspace' | 'portfolio' | 'project'
+const PROJECT_ROLES = [
+  { value: 'project_owner', label: 'Project Owner' },
+  { value: 'consultant', label: 'Consultant' },
+  { value: 'contractor', label: 'Contractor' },
+  { value: 'vendor', label: 'Vendor' },
+  { value: 'subcontractor', label: 'Subcontractor' },
+]
 
-export default function AdminPage() {
+export default function WorkspaceAdminPage() {
   const [searchParams] = useSearchParams()
   const profileTab = searchParams.get('tab')
 
@@ -41,10 +58,6 @@ export default function AdminPage() {
   const { theme, setTheme } = useThemeStore()
   const { user, signOut } = useAuthStore()
   const role = useMembershipStore(state => state.role)
-  const accessScope = useMembershipStore(state => state.accessScope)
-  const organizationId = useMembershipStore(state => state.organizationId)
-  const portfolioId = useMembershipStore(state => state.portfolioId)
-  const projectId = useMembershipStore(state => state.projectId)
 
   const navigate = useNavigate()
 
@@ -60,11 +73,8 @@ export default function AdminPage() {
   const [inviteName, setInviteName] = useState('')
   const [inviteRole, setInviteRole] = useState('pmo')
   const [selectedOrganizationId, setSelectedOrganizationId] =
-    useState<number | ''>(1)
-  const [selectedPortfolioId, setSelectedPortfolioId] =
     useState<number | ''>('')
-  const [selectedProjectId, setSelectedProjectId] =
-    useState<number | ''>('')
+  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([])
   const [inviteLink, setInviteLink] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -78,7 +88,6 @@ export default function AdminPage() {
 
   const adminTabs = baseAdminTabs.filter(tab => {
     if (tab === 'Users & Roles') return canManageUsers(role)
-    if (tab === 'Organizations') return canManageWorkspace(role)
     return true
   })
 
@@ -112,19 +121,22 @@ export default function AdminPage() {
       supabase.from('portfolios').select('*').order('created_at'),
       supabase.from('projects').select('*').order('id'),
       supabase.from('memberships').select('*').order('created_at'),
-      supabase.from('team_invitations').select('*').order('created_at', {
-        ascending: false,
-      }),
+      supabase
+        .from('team_invitations')
+        .select('*')
+        .order('created_at', { ascending: false }),
     ])
 
     setOrganizations(orgs || [])
-    if (orgs?.[0]?.id) {
-  setSelectedOrganizationId(orgs[0].id)
-}
     setPortfolios(ports || [])
     setProjects(projs || [])
     setMemberships(memberRows || [])
     setInvitations(inviteRows || [])
+
+    if (orgs?.[0]?.id) {
+      setSelectedOrganizationId(orgs[0].id)
+    }
+
     setLoading(false)
   }
 
@@ -132,12 +144,18 @@ export default function AdminPage() {
     setInviteScope(scope)
     setInviteLink('')
     setNotice('')
-    setSelectedPortfolioId('')
-    setSelectedProjectId('')
+    setSelectedProjectIds([])
 
     if (scope === 'workspace') setInviteRole('pmo')
-    if (scope === 'portfolio') setInviteRole('portfolio_manager')
     if (scope === 'project') setInviteRole('contractor')
+  }
+
+  function toggleProjectSelection(projectId: number) {
+    setSelectedProjectIds(current =>
+      current.includes(projectId)
+        ? current.filter(id => id !== projectId)
+        : [...current, projectId]
+    )
   }
 
   async function updatePassword() {
@@ -198,18 +216,8 @@ export default function AdminPage() {
       return
     }
 
-    if (inviteScope === 'portfolio' && !canManagePortfolio(role)) {
-      setNotice('You do not have permission to create portfolio invitations.')
-      return
-    }
-
-    if (inviteScope === 'portfolio' && !selectedPortfolioId) {
-      setNotice('Select a portfolio for portfolio access.')
-      return
-    }
-
-    if (inviteScope === 'project' && !selectedProjectId) {
-      setNotice('Select a project for project access.')
+    if (inviteScope === 'project' && selectedProjectIds.length === 0) {
+      setNotice('Select at least one project.')
       return
     }
 
@@ -223,9 +231,14 @@ export default function AdminPage() {
           invite_scope: inviteScope,
           access_scope: inviteScope,
           organization_id: selectedOrganizationId,
-          portfolio_id:
-            inviteScope === 'portfolio' ? selectedPortfolioId : null,
-          project_id: inviteScope === 'project' ? selectedProjectId : null,
+
+          portfolio_id: null,
+          portfolio_ids: null,
+
+          project_id: null,
+          project_ids:
+            inviteScope === 'project' ? selectedProjectIds : null,
+
           status: 'pending',
           invited_by: user?.email || 'Admin',
         },
@@ -237,6 +250,10 @@ export default function AdminPage() {
       setNotice(error.message)
       return
     }
+
+    const selectedProjectNames = projects
+      .filter(project => selectedProjectIds.includes(project.id))
+      .map(project => project.project_name)
 
     const link = `${window.location.origin}/accept-invite?token=${data.token}`
 
@@ -250,6 +267,7 @@ export default function AdminPage() {
           inviteScope: data.invite_scope || data.access_scope,
           inviteLink: link,
           invitedBy: user?.email || 'PMOCorex Admin',
+          projectNames: selectedProjectNames,
         },
       }
     )
@@ -270,13 +288,8 @@ export default function AdminPage() {
     setNotice('Invitation created and email sent successfully.')
     setInviteEmail('')
     setInviteName('')
-    setInviteRole(
-      inviteScope === 'workspace'
-        ? 'pmo'
-        : inviteScope === 'portfolio'
-        ? 'portfolio_manager'
-        : 'contractor'
-    )
+    setSelectedProjectIds([])
+    setInviteRole(inviteScope === 'workspace' ? 'pmo' : 'contractor')
 
     await loadAdminData()
   }
@@ -287,21 +300,11 @@ export default function AdminPage() {
 
   const activeMembers = memberships.length
 
-  const filteredPortfolios = portfolios.filter(
-    portfolio =>
-      !selectedOrganizationId ||
-      portfolio.organization_id === selectedOrganizationId
-  )
-
   const filteredProjects = projects.filter(
     project =>
       !selectedOrganizationId ||
       project.organization_id === selectedOrganizationId
   )
-
-  const userOrganization = organizations.find(org => org.id === organizationId)
-  const userPortfolio = portfolios.find(portfolio => portfolio.id === portfolioId)
-  const userProject = projects.find(project => project.id === projectId)
 
   return (
     <div className="min-h-dvh bg-[#0c1014] text-white">
@@ -343,7 +346,6 @@ export default function AdminPage() {
               {tab === 'My Profile' && <User size={14} />}
               {tab === 'Security' && <Lock size={14} />}
               {tab === 'Users & Roles' && <Users size={14} />}
-              {tab === 'Organizations' && <Building2 size={14} />}
               {tab}
             </button>
           ))}
@@ -369,26 +371,29 @@ export default function AdminPage() {
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <AdminMetric
-  title={organizations[0]?.name || 'Organization'}
-  value="Workspace"
-  icon={Building2}
-/>
-                 
+                    title={organizations[0]?.name || 'Organization'}
+                    value="Workspace"
+                    icon={Building2}
+                  />
+
                   <AdminMetric
                     title="Portfolios"
                     value={portfolios.length}
                     icon={Briefcase}
                   />
+
                   <AdminMetric
                     title="Projects"
                     value={projects.length}
                     icon={FolderKanban}
                   />
+
                   <AdminMetric
                     title="Members"
                     value={activeMembers}
                     icon={Users}
                   />
+
                   <AdminMetric
                     title="Pending Invites"
                     value={pendingInvites}
@@ -397,8 +402,6 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-
-           
 
             {activeTab === 'Security' && (
               <div className="space-y-6">
@@ -450,7 +453,11 @@ export default function AdminPage() {
                         onClick={() => setShowNewPassword(current => !current)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
                       >
-                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showNewPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
                       </button>
                     </div>
 
@@ -557,22 +564,12 @@ export default function AdminPage() {
                         type="button"
                         onClick={() => handleScopeChange('workspace')}
                         className={`btn btn-sm ${
-                          inviteScope === 'workspace' ? 'btn-gold' : 'btn-ghost'
+                          inviteScope === 'workspace'
+                            ? 'btn-gold'
+                            : 'btn-ghost'
                         }`}
                       >
                         Workspace Access
-                      </button>
-                    )}
-
-                    {canManagePortfolio(role) && (
-                      <button
-                        type="button"
-                        onClick={() => handleScopeChange('portfolio')}
-                        className={`btn btn-sm ${
-                          inviteScope === 'portfolio' ? 'btn-gold' : 'btn-ghost'
-                        }`}
-                      >
-                        Portfolio Access
                       </button>
                     )}
 
@@ -586,6 +583,12 @@ export default function AdminPage() {
                       Project Access
                     </button>
                   </div>
+
+                  <p className="text-xs text-[#6e7d8c]">
+                    Workspace access is for internal users who can view all
+                    projects. Project access is for project owners or external
+                    partners assigned to selected projects.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -603,29 +606,25 @@ export default function AdminPage() {
                     onChange={e => setInviteEmail(e.target.value)}
                   />
 
-                <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-  <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-    Organization
-  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                      Organization
+                    </div>
 
-  <div className="text-sm font-semibold text-[#ede8de] mt-1">
-    {organizations[0]?.name || 'Organization'}
-  </div>
-</div>
+                    <div className="text-sm font-semibold text-[#ede8de] mt-1">
+                      {organizations[0]?.name || 'Organization'}
+                    </div>
+                  </div>
 
-                  {inviteScope === 'portfolio' && (
+                  {inviteScope === 'workspace' && (
                     <select
                       className="form-control"
-                      value={selectedPortfolioId}
-                      onChange={e =>
-                        setSelectedPortfolioId(Number(e.target.value))
-                      }
+                      value={inviteRole}
+                      onChange={e => setInviteRole(e.target.value)}
                     >
-                      <option value="">Select Portfolio</option>
-
-                      {filteredPortfolios.map(portfolio => (
-                        <option key={portfolio.id} value={portfolio.id}>
-                          {portfolio.name}
+                      {WORKSPACE_ROLES.map(item => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
                         </option>
                       ))}
                     </select>
@@ -634,70 +633,65 @@ export default function AdminPage() {
                   {inviteScope === 'project' && (
                     <select
                       className="form-control"
-                      value={selectedProjectId}
-                      onChange={e =>
-                        setSelectedProjectId(Number(e.target.value))
-                      }
+                      value={inviteRole}
+                      onChange={e => setInviteRole(e.target.value)}
                     >
-                      <option value="">Select Project</option>
-
-                      {filteredProjects.map(project => (
-                        <option key={project.id} value={project.id}>
-                          {project.project_name}
+                      {PROJECT_ROLES.map(item => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
                         </option>
                       ))}
                     </select>
                   )}
-
-                  {inviteScope === 'workspace' && (
-                    <select
-                      className="form-control"
-                      value={inviteRole}
-                      onChange={e => setInviteRole(e.target.value)}
-                    >
-                      <option value="workspace_admin">Workspace Admin</option>
-                      <option value="admin">Admin</option>
-                      <option value="pmo">PMO</option>
-                      <option value="portfolio_manager">
-                        Portfolio Manager
-                      </option>
-                    </select>
-                  )}
-
-                  {inviteScope === 'portfolio' && (
-                    <select
-                      className="form-control"
-                      value={inviteRole}
-                      onChange={e => setInviteRole(e.target.value)}
-                    >
-                      <option value="portfolio_manager">
-                        Portfolio Manager
-                      </option>
-                      <option value="pmo">PMO</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                  )}
+                </div>
 
                 {inviteScope === 'project' && (
-  <select
-    className="form-control"
-    value={inviteRole}
-    onChange={e => setInviteRole(e.target.value)}
-  >
-    <option value="consultant">Consultant</option>
-    <option value="contractor">Contractor</option>
-    <option value="project_manager">Project Manager</option>
-    <option value="project_owner">Project Owner</option>
-    <option value="design">Design Team</option>
-    <option value="housebuild">Housebuild</option>
-    <option value="mep">MEP</option>
-    <option value="infrastructure">Infrastructure</option>
-    <option value="costing">Costing</option>
-    <option value="viewer">Viewer</option>
-    <option value="guest">Guest</option>
-  </select>
-)}
-                </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-[#ede8de]">
+                          Select Project(s)
+                        </div>
+
+                        <p className="text-xs text-[#6e7d8c] mt-1">
+                          One invitation email will grant access to all selected
+                          projects.
+                        </p>
+                      </div>
+
+                      <div className="text-xs rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 text-[#c49e48] px-2 py-1">
+                        {selectedProjectIds.length} selected
+                      </div>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0c1014] p-3 space-y-2">
+                      {filteredProjects.length === 0 ? (
+                        <div className="text-sm text-[#6e7d8c]">
+                          No projects available.
+                        </div>
+                      ) : (
+                        filteredProjects.map(project => (
+                          <label
+                            key={project.id}
+                            className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-sm hover:border-[#c49e48]/20 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedProjectIds.includes(project.id)}
+                              onChange={() =>
+                                toggleProjectSelection(project.id)
+                              }
+                            />
+
+                            <span className="text-[#ede8de]">
+                              {project.project_name}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <button onClick={sendInvite} className="btn btn-gold">
                   Create Invitation
@@ -723,8 +717,6 @@ export default function AdminPage() {
                 )}
               </div>
             )}
-
-        
           </div>
         )}
       </div>
@@ -743,18 +735,6 @@ function AdminMetric({ title, value, icon: Icon }: any) {
 
         <Icon size={18} className="text-[#c49e48]" />
       </div>
-    </div>
-  )
-}
-
-function InfoCard({ label, value }: any) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <div className="text-xs uppercase tracking-wider text-[#6e7d8c]">
-        {label}
-      </div>
-
-      <div className="text-sm text-[#ede8de] mt-1">{value}</div>
     </div>
   )
 }
