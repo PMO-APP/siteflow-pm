@@ -5,6 +5,9 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
+import {
+  isExternalRole,
+} from '@/lib/permissions'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -44,8 +47,12 @@ import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 
-
-const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
+const VIEWER_ALLOWED_ROUTES = [
+  '/app',
+  '/app/recovery',
+  '/app/team',
+  '/app/financial',
+]
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -81,8 +88,22 @@ function RequireProject({ children }: { children: React.ReactNode }) {
 function RequireInternal({ children }: { children: React.ReactNode }) {
   const role = useMembershipStore(state => state.role)
 
-  if (EXTERNAL_ROLES.includes(role || '')) {
+  if (isExternalRole(role)) {
     return <Navigate to="/external-project" replace />
+  }
+
+  return <>{children}</>
+}
+
+function ViewerRoute({ children }: { children: React.ReactNode }) {
+  const role = useMembershipStore(state => state.role)
+  const path = window.location.pathname
+
+  if (
+    ['viewer', 'guest'].includes(role || '') &&
+    !VIEWER_ALLOWED_ROUTES.includes(path)
+  ) {
+    return <Navigate to="/app" replace />
   }
 
   return <>{children}</>
@@ -230,14 +251,16 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/external-project/submissions"
-  element={
-    <RequireAuth>
-      <ExternalSubmissionStatusPage />
-    </RequireAuth>
-  }
-/>
+
+        <Route
+          path="/external-project/submissions"
+          element={
+            <RequireAuth>
+              <ExternalSubmissionStatusPage />
+            </RequireAuth>
+          }
+        />
+
         <Route
           path="/external-project/documents"
           element={
@@ -281,14 +304,7 @@ export default function App() {
           element={
             <RequireAuth>
               <RequireInternal>
-                <RequireRole
-                  allowedRoles={[
-                    'workspace_admin',
-                    'admin',
-                    'pmo',
-                    'portfolio_manager',
-                  ]}
-                >
+                <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
                   <WorkspaceAdminPage />
                 </RequireRole>
               </RequireInternal>
@@ -301,7 +317,7 @@ export default function App() {
           element={
             <RequireAuth>
               <RequireInternal>
-                <RequireRole allowedRoles={['workspace_admin', 'admin']}>
+                <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
                   <AuditPage />
                 </RequireRole>
               </RequireInternal>
@@ -315,7 +331,9 @@ export default function App() {
             <RequireAuth>
               <RequireInternal>
                 <RequireProject>
-                  <Layout />
+                  <ViewerRoute>
+                    <Layout />
+                  </ViewerRoute>
                 </RequireProject>
               </RequireInternal>
             </RequireAuth>
