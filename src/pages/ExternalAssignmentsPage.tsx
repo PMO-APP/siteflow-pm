@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
+import { notifyUsers } from '@/lib/notifications'
 
 const ASSIGNABLE_ROLES = [
   'consultant',
@@ -65,33 +66,6 @@ export default function ExternalAssignmentsPage() {
     setLoading(false)
   }
 
-  async function sendTaskEmail() {
-    if (!assignedEmail.trim()) return
-
-    const { error } = await supabase.functions.invoke('send-task-email', {
-      body: {
-        to: assignedEmail.trim(),
-        assigneeName: assignedName || assignedCompany || 'External Partner',
-        taskTitle: title,
-        taskDescription: description,
-        projectName: projectName || 'PMOCorex Project',
-        dueDate: dueDate || 'Not set',
-        priority,
-        assignedBy: user?.full_name || user?.email || 'PMOCorex Team',
-        taskUrl: `${window.location.origin}/external-project/tasks`,
-      },
-    })
-
-    if (error) {
-      setNotice(
-        `External task created, but email notification failed: ${error.message}`
-      )
-      return
-    }
-
-    setNotice('External task assigned successfully. Email notification sent.')
-  }
-
   async function createTask() {
     setNotice('')
 
@@ -112,14 +86,20 @@ export default function ExternalAssignmentsPage() {
 
     setSubmitting(true)
 
+    const cleanTitle = title.trim()
+    const cleanDescription = description.trim()
+    const cleanEmail = assignedEmail.trim().toLowerCase()
+    const cleanName = assignedName.trim()
+    const cleanCompany = assignedCompany.trim()
+
     const { error } = await supabase.from('external_tasks').insert({
       project_id: projectId,
       assigned_role: assignedRole,
-      assigned_company: assignedCompany.trim() || null,
-      assigned_to_name: assignedName.trim() || null,
-      assigned_to_email: assignedEmail.trim(),
-      title: title.trim(),
-      description: description.trim() || null,
+      assigned_company: cleanCompany || null,
+      assigned_to_name: cleanName || null,
+      assigned_to_email: cleanEmail,
+      title: cleanTitle,
+      description: cleanDescription || null,
       priority,
       due_date: dueDate || null,
       status: 'Open',
@@ -133,7 +113,42 @@ export default function ExternalAssignmentsPage() {
       return
     }
 
-    await sendTaskEmail()
+    await notifyUsers({
+      projectId,
+      recipientRole: assignedRole,
+      type: 'external_assignment',
+      title: 'New Task Assigned',
+      message: `${cleanTitle} has been assigned to ${
+        cleanName || cleanEmail
+      } for ${projectName || 'this project'}.`,
+      sendEmail: true,
+      emailPayload: {
+        to: [cleanEmail],
+        subject: `New Task Assigned: ${cleanTitle}`,
+        type: 'External Task Assignment',
+        projectName: projectName || 'PMOCorex Project',
+        submittedBy: user?.full_name || user?.email || 'PMOCorex Team',
+        submittedByEmail: user?.email || '',
+        message: [
+          `Task: ${cleanTitle}`,
+          cleanDescription ? `Description: ${cleanDescription}` : '',
+          `Priority: ${priority}`,
+          `Due Date: ${dueDate || 'Not set'}`,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        reviewUrl: `${window.location.origin}/external-project/tasks?project=${projectId}`,
+      },
+    })
+
+    await notifyUsers({
+      projectId,
+      recipientRole: 'pmo',
+      type: 'task_assignment',
+      title: 'External Task Created',
+      message: `${cleanName || cleanEmail} was assigned task "${cleanTitle}".`,
+      sendEmail: false,
+    })
 
     setTitle('')
     setDescription('')
@@ -143,6 +158,7 @@ export default function ExternalAssignmentsPage() {
     setAssignedEmail('')
     setPriority('Medium')
     setDueDate('')
+    setNotice('External task assigned successfully. Notification sent.')
     setSubmitting(false)
 
     await loadTasks()
@@ -160,8 +176,8 @@ export default function ExternalAssignmentsPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Assign tasks to consultants, contractors, vendors, and subcontractors.
-          Email notifications are sent immediately after assignment.
+          Assign project-specific tasks to consultants, contractors, vendors,
+          and subcontractors. Notifications are sent immediately.
         </p>
       </section>
 
@@ -273,7 +289,8 @@ export default function ExternalAssignmentsPage() {
               </div>
 
               <p className="text-sm text-slate-500 mt-2">
-                Tasks assigned here will appear in the external user portal.
+                Tasks assigned here will appear in the external user portal for
+                this project only.
               </p>
             </div>
           ) : (
@@ -291,7 +308,7 @@ function TaskCard({ task }: { task: any }) {
       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
       : task.status === 'In Progress'
       ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-      : task.status === 'Pending Review'
+      : task.status === 'Submitted'
       ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
       : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
 
