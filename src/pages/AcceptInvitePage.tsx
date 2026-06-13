@@ -213,12 +213,11 @@ export default function AcceptInvitePage() {
         }
 
         const teamRows = projectIds.map(projectId => ({
-          user_id: userId,
-          project_id: projectId,
-          email,
-          full_name: fullName,
-          role,
-        }))
+  project_id: projectId,
+  email,
+  full_name: fullName,
+  role,
+}))
 
         const { error: teamError } = await supabase
           .from('project_team_members')
