@@ -3,6 +3,10 @@ import { supabase } from '@/lib/supabase'
 import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import {
+  canViewInternalPages,
+  isExternalRole,
+} from '@/lib/permissions'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
@@ -44,18 +48,17 @@ const NAV = [
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
- 
   { to: '/app/reports', icon: FileText, label: 'Reports' },
-   {
-  to: '/app/internal-assignments',
-  icon: ClipboardList,
-  label: 'Internal Assignments',
-},
   {
-  to: '/app/external-assignments',
-  icon: Building2,
-  label: 'External Assignments',
-},
+    to: '/app/internal-assignments',
+    icon: ClipboardList,
+    label: 'Internal Assignments',
+  },
+  {
+    to: '/app/external-assignments',
+    icon: Building2,
+    label: 'External Assignments',
+  },
   {
     to: '/app/external-review',
     icon: Building2,
@@ -64,17 +67,11 @@ const NAV = [
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
-const FULL_VIEW_ROLES = [
-  'workspace_admin',
-  'admin',
-  'pmo',
-  'portfolio_manager',
-  'project_owner',
-  'design',
-  'housebuild',
-  'costing',
-  'infrastructure',
-  'mep',
+const VIEWER_NAV = [
+  '/app',
+  '/app/recovery',
+  '/app/team',
+  '/app/financial',
 ]
 
 function formatRoleLabel(role: string | null) {
@@ -172,8 +169,14 @@ export default function Layout() {
     ? differenceInDays(handoverDate, new Date())
     : null
 
-  const allowedNav = NAV.filter(() => {
-    return FULL_VIEW_ROLES.includes(role || '')
+  const allowedNav = NAV.filter(item => {
+    if (isExternalRole(role)) return false
+
+    if (role === 'viewer' || role === 'guest') {
+      return VIEWER_NAV.includes(item.to)
+    }
+
+    return canViewInternalPages(role)
   })
 
   const currentPage = allowedNav.find(n =>
