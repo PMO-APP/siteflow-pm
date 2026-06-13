@@ -16,12 +16,15 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMembershipStore } from '@/store/membership'
-import {
-  canManageUsers,
-  canManageWorkspace,
-} from '@/lib/permissions'
+import { canManageUsers, canManageWorkspace } from '@/lib/permissions'
+import ProjectAccessMatrix from '@/pages/admin/ProjectAccessMatrix'
 
-const baseAdminTabs = ['Overview', 'Security', 'Users & Roles']
+const baseAdminTabs = [
+  'Overview',
+  'Security',
+  'Users & Roles',
+  'Project Access Matrix',
+]
 
 type InviteScope = 'workspace' | 'project'
 
@@ -45,6 +48,8 @@ const PROJECT_ROLES = [
   { value: 'contractor', label: 'Contractor' },
   { value: 'vendor', label: 'Vendor' },
   { value: 'subcontractor', label: 'Subcontractor' },
+  { value: 'viewer', label: 'Viewer' },
+  { value: 'guest', label: 'Guest' },
 ]
 
 export default function WorkspaceAdminPage() {
@@ -58,7 +63,6 @@ export default function WorkspaceAdminPage() {
   const { theme, setTheme } = useThemeStore()
   const { user, signOut } = useAuthStore()
   const role = useMembershipStore(state => state.role)
-
   const navigate = useNavigate()
 
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -88,6 +92,7 @@ export default function WorkspaceAdminPage() {
 
   const adminTabs = baseAdminTabs.filter(tab => {
     if (tab === 'Users & Roles') return canManageUsers(role)
+    if (tab === 'Project Access Matrix') return canManageUsers(role)
     return true
   })
 
@@ -231,14 +236,11 @@ export default function WorkspaceAdminPage() {
           invite_scope: inviteScope,
           access_scope: inviteScope,
           organization_id: selectedOrganizationId,
-
           portfolio_id: null,
           portfolio_ids: null,
-
           project_id: null,
           project_ids:
             inviteScope === 'project' ? selectedProjectIds : null,
-
           status: 'pending',
           invited_by: user?.email || 'Admin',
         },
@@ -346,6 +348,9 @@ export default function WorkspaceAdminPage() {
               {tab === 'My Profile' && <User size={14} />}
               {tab === 'Security' && <Lock size={14} />}
               {tab === 'Users & Roles' && <Users size={14} />}
+              {tab === 'Project Access Matrix' && (
+                <FolderKanban size={14} />
+              )}
               {tab}
             </button>
           ))}
@@ -586,8 +591,8 @@ export default function WorkspaceAdminPage() {
 
                   <p className="text-xs text-[#6e7d8c]">
                     Workspace access is for internal users who can view all
-                    projects. Project access is for project owners or external
-                    partners assigned to selected projects.
+                    projects. Project access is for project owners, viewers,
+                    guests, or external partners assigned to selected projects.
                   </p>
                 </div>
 
@@ -717,6 +722,9 @@ export default function WorkspaceAdminPage() {
                 )}
               </div>
             )}
+
+            {activeTab === 'Project Access Matrix' &&
+              canManageUsers(role) && <ProjectAccessMatrix />}
           </div>
         )}
       </div>
