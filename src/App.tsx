@@ -43,7 +43,7 @@ import TeamPage from '@/pages/TeamPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
-import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
+
 
 const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
 
@@ -338,7 +338,6 @@ export default function App() {
           <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
           <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
         </Route>
 
