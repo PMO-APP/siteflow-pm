@@ -21,7 +21,7 @@ const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 
 export default function ExternalAssignmentsPage() {
   const { user } = useAuthStore()
-  const { projectId } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
 
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +32,8 @@ export default function ExternalAssignmentsPage() {
   const [description, setDescription] = useState('')
   const [assignedRole, setAssignedRole] = useState('contractor')
   const [assignedCompany, setAssignedCompany] = useState('')
+  const [assignedName, setAssignedName] = useState('')
+  const [assignedEmail, setAssignedEmail] = useState('')
   const [priority, setPriority] = useState('Medium')
   const [dueDate, setDueDate] = useState('')
 
@@ -63,6 +65,33 @@ export default function ExternalAssignmentsPage() {
     setLoading(false)
   }
 
+  async function sendTaskEmail() {
+    if (!assignedEmail.trim()) return
+
+    const { error } = await supabase.functions.invoke('send-task-email', {
+      body: {
+        to: assignedEmail.trim(),
+        assigneeName: assignedName || assignedCompany || 'External Partner',
+        taskTitle: title,
+        taskDescription: description,
+        projectName: projectName || 'PMOCorex Project',
+        dueDate: dueDate || 'Not set',
+        priority,
+        assignedBy: user?.full_name || user?.email || 'PMOCorex Team',
+        taskUrl: `${window.location.origin}/external-project/tasks`,
+      },
+    })
+
+    if (error) {
+      setNotice(
+        `External task created, but email notification failed: ${error.message}`
+      )
+      return
+    }
+
+    setNotice('External task assigned successfully. Email notification sent.')
+  }
+
   async function createTask() {
     setNotice('')
 
@@ -76,12 +105,19 @@ export default function ExternalAssignmentsPage() {
       return
     }
 
+    if (!assignedEmail.trim()) {
+      setNotice('Assigned email is required so the user can be notified.')
+      return
+    }
+
     setSubmitting(true)
 
     const { error } = await supabase.from('external_tasks').insert({
       project_id: projectId,
       assigned_role: assignedRole,
       assigned_company: assignedCompany.trim() || null,
+      assigned_to_name: assignedName.trim() || null,
+      assigned_to_email: assignedEmail.trim(),
       title: title.trim(),
       description: description.trim() || null,
       priority,
@@ -97,13 +133,16 @@ export default function ExternalAssignmentsPage() {
       return
     }
 
+    await sendTaskEmail()
+
     setTitle('')
     setDescription('')
     setAssignedRole('contractor')
     setAssignedCompany('')
+    setAssignedName('')
+    setAssignedEmail('')
     setPriority('Medium')
     setDueDate('')
-    setNotice('External task assigned successfully.')
     setSubmitting(false)
 
     await loadTasks()
@@ -122,7 +161,7 @@ export default function ExternalAssignmentsPage() {
 
         <p className="text-slate-400 mt-3 max-w-2xl">
           Assign tasks to consultants, contractors, vendors, and subcontractors.
-          Their assigned tasks will appear in the External Project Portal.
+          Email notifications are sent immediately after assignment.
         </p>
       </section>
 
@@ -173,6 +212,20 @@ export default function ExternalAssignmentsPage() {
               placeholder="Assigned company / vendor name"
               value={assignedCompany}
               onChange={e => setAssignedCompany(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Assigned person name"
+              value={assignedName}
+              onChange={e => setAssignedName(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Assigned person email"
+              value={assignedEmail}
+              onChange={e => setAssignedEmail(e.target.value)}
             />
 
             <select
@@ -255,9 +308,7 @@ function TaskCard({ task }: { task: any }) {
     <div className="card p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[#ede8de]">
-            {task.title}
-          </h2>
+          <h2 className="text-lg font-bold text-[#ede8de]">{task.title}</h2>
 
           <p className="text-sm text-slate-500 mt-1">
             {task.description || 'No description provided.'}
@@ -266,7 +317,10 @@ function TaskCard({ task }: { task: any }) {
           <div className="text-xs text-slate-500 mt-2">
             Assigned to:{' '}
             <span className="text-[#c49e48]">
-              {task.assigned_company || formatRole(task.assigned_role)}
+              {task.assigned_to_name ||
+                task.assigned_to_email ||
+                task.assigned_company ||
+                formatRole(task.assigned_role)}
             </span>
           </div>
         </div>
@@ -285,7 +339,9 @@ function TaskCard({ task }: { task: any }) {
           {task.status || 'Open'}
         </span>
 
-        <span className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}>
+        <span
+          className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}
+        >
           Priority: {task.priority || 'Medium'}
         </span>
 
