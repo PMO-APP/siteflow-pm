@@ -5,9 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
-import {
-  isExternalRole,
-} from '@/lib/permissions'
+import { isExternalRole } from '@/lib/permissions'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -75,16 +73,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function RequireProject({ children }: { children: React.ReactNode }) {
-  const { projectId } = useProjectStore()
-
-  if (!projectId) {
-    return <Navigate to="/projects" replace />
-  }
-
-  return <>{children}</>
-}
-
 function RequireInternal({ children }: { children: React.ReactNode }) {
   const role = useMembershipStore(state => state.role)
 
@@ -120,44 +108,49 @@ export default function App() {
   }, [theme])
 
   async function loadMembership(userId: string) {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const email = sessionData.session?.user?.email?.toLowerCase().trim()
+    const { data: sessionData } = await supabase.auth.getSession()
+    const email = sessionData.session?.user?.email?.toLowerCase().trim()
 
-  let query = supabase
-    .from('memberships')
-    .select('*')
-    .eq('user_id', userId)
-
-  if (email) {
-    query = supabase
+    let query = supabase
       .from('memberships')
       .select('*')
-      .or(`user_id.eq.${userId},email.eq.${email}`)
-  }
+      .eq('user_id', userId)
 
-  const { data: memberships, error } = await query
+    if (email) {
+      query = supabase
+        .from('memberships')
+        .select('*')
+        .or(`user_id.eq.${userId},email.eq.${email}`)
+    }
 
-  if (error || !memberships || memberships.length === 0) {
-    clearMembership()
-    return
-  }
+    const { data: memberships, error } = await query
 
-  const externalMembership = memberships.find(membership =>
-    ['consultant', 'contractor', 'vendor', 'subcontractor'].includes(
-      String(membership.role || '').toLowerCase().trim()
+    if (error || !memberships || memberships.length === 0) {
+      clearMembership()
+      return
+    }
+
+    const externalMembership = memberships.find(membership =>
+      ['consultant', 'contractor', 'vendor', 'subcontractor'].includes(
+        String(membership.role || '').toLowerCase().trim()
+      )
     )
-  )
 
-  const selectedMembership = externalMembership || memberships[0]
+    const workspaceMembership = memberships.find(
+      membership => membership.access_scope === 'workspace'
+    )
 
-  setMembership({
-    role: selectedMembership.role,
-    accessScope: selectedMembership.access_scope,
-    organizationId: selectedMembership.organization_id,
-    portfolioId: selectedMembership.portfolio_id,
-    projectId: selectedMembership.project_id,
-  })
-}
+    const selectedMembership =
+      externalMembership || workspaceMembership || memberships[0]
+
+    setMembership({
+      role: selectedMembership.role,
+      accessScope: selectedMembership.access_scope,
+      organizationId: selectedMembership.organization_id,
+      portfolioId: selectedMembership.portfolio_id,
+      projectId: selectedMembership.project_id,
+    })
+  }
 
   useEffect(() => {
     let mounted = true
@@ -349,11 +342,9 @@ export default function App() {
           element={
             <RequireAuth>
               <RequireInternal>
-                <RequireProject>
-                  <ViewerRoute>
-                    <Layout />
-                  </ViewerRoute>
-                </RequireProject>
+                <ViewerRoute>
+                  <Layout />
+                </ViewerRoute>
               </RequireInternal>
             </RequireAuth>
           }
