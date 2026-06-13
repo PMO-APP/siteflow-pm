@@ -819,6 +819,7 @@ setPhotoCaptions({})
 >
   {upsertReport.isPending || uploadingPhotos
     ? 'Saving
+    </button
           </div>
         </Modal>
       )}
