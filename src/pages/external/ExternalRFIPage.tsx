@@ -6,16 +6,25 @@ import {
   CheckCircle,
   Clock,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
-import { useMembershipStore } from '@/store/membership'
+import { useExternalProjectStore } from '@/store/externalProject'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 export default function ExternalRFIPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
-  const projectId = useMembershipStore(state => state.projectId)
+
+  const {
+    externalProjectId,
+    externalProjectName,
+    setExternalProject,
+  } = useExternalProjectStore()
+
+  const projectFromUrl = searchParams.get('project')
+  const activeProjectId = externalProjectId || Number(projectFromUrl) || null
 
   const [rfis, setRfis] = useState<any[]>([])
   const [subject, setSubject] = useState('')
@@ -25,11 +34,33 @@ export default function ExternalRFIPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    syncProjectFromUrl()
+  }, [projectFromUrl])
+
+  useEffect(() => {
     loadRFIs()
-  }, [projectId, user?.email])
+  }, [activeProjectId, user?.email])
+
+  async function syncProjectFromUrl() {
+    if (!projectFromUrl) return
+
+    const projectId = Number(projectFromUrl)
+
+    if (!projectId || externalProjectId === projectId) return
+
+    const { data } = await supabase
+      .from('projects')
+      .select('id, project_name')
+      .eq('id', projectId)
+      .maybeSingle()
+
+    if (data) {
+      setExternalProject(data.id, data.project_name)
+    }
+  }
 
   async function loadRFIs() {
-    if (!projectId || !user?.email) {
+    if (!activeProjectId || !user?.email) {
       setLoading(false)
       return
     }
@@ -39,7 +70,7 @@ export default function ExternalRFIPage() {
     const { data, error } = await supabase
       .from('external_rfis')
       .select('*')
-      .eq('project_id', projectId)
+      .eq('project_id', activeProjectId)
       .eq('submitted_by_email', user.email)
       .order('created_at', { ascending: false })
 
@@ -53,11 +84,41 @@ export default function ExternalRFIPage() {
     setLoading(false)
   }
 
+  async function notifyPMO(rfiSubject: string, rfiQuestion: string) {
+    if (!activeProjectId) return
+
+    await supabase.functions.invoke('send-external-submission-email', {
+      body: {
+        type: 'RFI / Comment',
+        projectId: activeProjectId,
+        projectName: externalProjectName || 'Selected Project',
+        submittedBy: user?.full_name || user?.email || 'External User',
+        submittedByEmail: user?.email || '',
+        subject: rfiSubject,
+        message: rfiQuestion,
+        reviewUrl: `${window.location.origin}/app/external-review`,
+      },
+    })
+  }
+
+  async function createInternalNotification(rfiSubject: string) {
+    if (!activeProjectId) return
+
+    await supabase.from('notifications').insert({
+      project_id: activeProjectId,
+      role: 'pmo',
+      type: 'rfi',
+      title: 'New RFI / Comment Submitted',
+      message: `${user?.full_name || user?.email || 'External user'} submitted: ${rfiSubject}`,
+      is_read: false,
+    })
+  }
+
   async function submitRFI() {
     setNotice('')
 
-    if (!projectId) {
-      setNotice('No project is assigned to your account.')
+    if (!activeProjectId) {
+      setNotice('Please select a project from the External Portal first.')
       return
     }
 
@@ -73,12 +134,15 @@ export default function ExternalRFIPage() {
 
     setSubmitting(true)
 
+    const cleanSubject = subject.trim()
+    const cleanQuestion = question.trim()
+
     const { error } = await supabase.from('external_rfis').insert({
-      project_id: projectId,
+      project_id: activeProjectId,
       submitted_by: user?.full_name || user?.email || 'External User',
       submitted_by_email: user?.email || '',
-      subject: subject.trim(),
-      question: question.trim(),
+      subject: cleanSubject,
+      question: cleanQuestion,
       status: 'Open',
     })
 
@@ -88,9 +152,12 @@ export default function ExternalRFIPage() {
       return
     }
 
+    await createInternalNotification(cleanSubject)
+    await notifyPMO(cleanSubject, cleanQuestion)
+
     setSubject('')
     setQuestion('')
-    setNotice('RFI submitted successfully.')
+    setNotice('RFI submitted successfully. The internal team has been notified.')
     setSubmitting(false)
 
     await loadRFIs()
@@ -121,8 +188,6 @@ export default function ExternalRFIPage() {
         </div>
 
         <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
-
           <div className="relative">
             <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
               RFIs & Comments
@@ -133,9 +198,15 @@ export default function ExternalRFIPage() {
             </h1>
 
             <p className="text-slate-400 mt-3 max-w-2xl">
-              Raise questions, submit clarifications, and track internal
-              responses from the PMOCorex project team.
+              Submit clarifications for the selected project only.
             </p>
+
+            <div className="mt-4 text-sm text-slate-500">
+              Current Project:{' '}
+              <span className="text-[#c49e48]">
+                {externalProjectName || 'No project selected'}
+              </span>
+            </div>
           </div>
         </section>
 
@@ -145,65 +216,82 @@ export default function ExternalRFIPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-          <div className="card p-6 xl:col-span-1">
-            <div className="flex items-center gap-2 mb-5">
-              <Send size={18} className="text-[#c49e48]" />
+        {!activeProjectId && (
+          <div className="card p-6 text-center">
+            <p className="text-slate-400">
+              Please select a project before submitting RFIs.
+            </p>
 
-              <h2 className="text-lg font-bold text-[#ede8de]">
-                Submit New RFI
-              </h2>
+            <button
+              onClick={() => navigate('/external-project')}
+              className="btn btn-gold mt-4"
+            >
+              Select Project
+            </button>
+          </div>
+        )}
+
+        {activeProjectId && (
+          <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            <div className="card p-6 xl:col-span-1">
+              <div className="flex items-center gap-2 mb-5">
+                <Send size={18} className="text-[#c49e48]" />
+
+                <h2 className="text-lg font-bold text-[#ede8de]">
+                  Submit New RFI
+                </h2>
+              </div>
+
+              <div className="space-y-3">
+                <input
+                  className="form-control"
+                  placeholder="Subject"
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                />
+
+                <textarea
+                  className="form-control min-h-[160px]"
+                  placeholder="Write your question, comment, or clarification request..."
+                  value={question}
+                  onChange={e => setQuestion(e.target.value)}
+                />
+
+                <button
+                  onClick={submitRFI}
+                  disabled={submitting}
+                  className="btn btn-gold w-full justify-center"
+                >
+                  {submitting ? 'Submitting…' : 'Submit RFI'}
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <input
-                className="form-control"
-                placeholder="Subject"
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-              />
+            <div className="xl:col-span-2 space-y-4">
+              {loading ? (
+                <div className="card p-6 text-slate-400">
+                  Loading RFIs…
+                </div>
+              ) : rfis.length === 0 ? (
+                <div className="card p-10 text-center">
+                  <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
+                    <MessageSquare size={24} className="text-[#c49e48]" />
+                  </div>
 
-              <textarea
-                className="form-control min-h-[160px]"
-                placeholder="Write your question, comment, or clarification request..."
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-              />
+                  <div className="text-xl font-bold text-white">
+                    No RFIs submitted yet
+                  </div>
 
-              <button
-                onClick={submitRFI}
-                disabled={submitting}
-                className="btn btn-gold w-full justify-center"
-              >
-                {submitting ? 'Submitting…' : 'Submit RFI'}
-              </button>
+                  <p className="text-sm text-slate-500 mt-2">
+                    RFIs for this selected project will appear here.
+                  </p>
+                </div>
+              ) : (
+                rfis.map(rfi => <RFICard key={rfi.id} rfi={rfi} />)
+              )}
             </div>
-          </div>
-
-          <div className="xl:col-span-2 space-y-4">
-            {loading ? (
-              <div className="card p-6 text-slate-400">
-                Loading RFIs…
-              </div>
-            ) : rfis.length === 0 ? (
-              <div className="card p-10 text-center">
-                <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-                  <MessageSquare size={24} className="text-[#c49e48]" />
-                </div>
-
-                <div className="text-xl font-bold text-white">
-                  No RFIs submitted yet
-                </div>
-
-                <p className="text-sm text-slate-500 mt-2">
-                  Your submitted RFIs and comments will appear here.
-                </p>
-              </div>
-            ) : (
-              rfis.map(rfi => <RFICard key={rfi.id} rfi={rfi} />)
-            )}
-          </div>
-        </section>
+          </section>
+        )}
       </div>
     </div>
   )
