@@ -8,6 +8,7 @@ import {
   CheckCircle,
   LogOut,
   FolderKanban,
+  Bell,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -15,6 +16,7 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useExternalProjectStore } from '@/store/externalProject'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import ExternalNotificationsPanel from '@/components/external/ExternalNotificationsPanel'
 
 export default function ExternalProjectPortal() {
   const navigate = useNavigate()
@@ -33,6 +35,7 @@ export default function ExternalProjectPortal() {
   const [organizationName, setOrganizationName] = useState('')
   const [assignedProjects, setAssignedProjects] = useState<any[]>([])
   const [loadingContext, setLoadingContext] = useState(true)
+  const [notifsOpen, setNotifsOpen] = useState(false)
 
   useEffect(() => {
     loadPortalContext()
@@ -57,7 +60,6 @@ export default function ExternalProjectPortal() {
       .or(`user_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
 
     const memberships = membershipRows || []
-
     const orgId = memberships[0]?.organization_id || organizationId || null
 
     if (orgId) {
@@ -135,7 +137,22 @@ export default function ExternalProjectPortal() {
         <div className="flex items-center justify-between">
           <PMOCorexLogo size={42} />
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
+            <button
+              onClick={() => setNotifsOpen(current => !current)}
+              className="btn btn-ghost relative"
+            >
+              <Bell size={15} />
+            </button>
+
+            {notifsOpen && (
+              <div className="absolute right-0 top-12 z-40 w-80">
+                <ExternalNotificationsPanel
+                  onClose={() => setNotifsOpen(false)}
+                />
+              </div>
+            )}
+
             <button
               onClick={() => navigate('/profile')}
               className="btn btn-ghost"
