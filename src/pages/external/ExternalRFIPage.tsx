@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useExternalProjectStore } from '@/store/externalProject'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import { notifyUsers } from '@/lib/notifications'
 
 export default function ExternalRFIPage() {
   const navigate = useNavigate()
@@ -84,36 +85,6 @@ export default function ExternalRFIPage() {
     setLoading(false)
   }
 
-  async function notifyPMO(rfiSubject: string, rfiQuestion: string) {
-    if (!activeProjectId) return
-
-    await supabase.functions.invoke('send-external-submission-email', {
-      body: {
-        type: 'RFI / Comment',
-        projectId: activeProjectId,
-        projectName: externalProjectName || 'Selected Project',
-        submittedBy: user?.full_name || user?.email || 'External User',
-        submittedByEmail: user?.email || '',
-        subject: rfiSubject,
-        message: rfiQuestion,
-        reviewUrl: `${window.location.origin}/app/external-review`,
-      },
-    })
-  }
-
-  async function createInternalNotification(rfiSubject: string) {
-    if (!activeProjectId) return
-
-    await supabase.from('notifications').insert({
-      project_id: activeProjectId,
-      role: 'pmo',
-      type: 'rfi',
-      title: 'New RFI / Comment Submitted',
-      message: `${user?.full_name || user?.email || 'External user'} submitted: ${rfiSubject}`,
-      is_read: false,
-    })
-  }
-
   async function submitRFI() {
     setNotice('')
 
@@ -152,8 +123,26 @@ export default function ExternalRFIPage() {
       return
     }
 
-    await createInternalNotification(cleanSubject)
-    await notifyPMO(cleanSubject, cleanQuestion)
+    await notifyUsers({
+      projectId: activeProjectId,
+      recipientRole: 'pmo',
+      type: 'rfi',
+      title: 'New RFI / Comment Submitted',
+      message: `${
+        user?.full_name || user?.email || 'External user'
+      } submitted: ${cleanSubject}`,
+      sendEmail: true,
+      emailPayload: {
+        to: ['e.bio-ibogomo@mixtafrica.com'],
+        subject: `New RFI Submitted: ${cleanSubject}`,
+        type: 'RFI / Comment',
+        projectName: externalProjectName || 'Selected Project',
+        submittedBy: user?.full_name || user?.email || 'External User',
+        submittedByEmail: user?.email || '',
+        message: cleanQuestion,
+        reviewUrl: `${window.location.origin}/app/external-review`,
+      },
+    })
 
     setSubject('')
     setQuestion('')
