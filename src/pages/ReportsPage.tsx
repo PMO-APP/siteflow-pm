@@ -104,7 +104,7 @@ export default function ReportsPage() {
       .from('report_photos')
       .select('*')
       .eq('report_id', selectedReport.id)
-      .order('uploaded_at', { ascending: true })
+     .order('created_at', { ascending: true })
 
     if (error) {
       console.error(error.message)
@@ -244,9 +244,10 @@ setPhotoCaptions({})
           uploaded_by: user?.full_name || user?.email || 'User',
         })
 
-      if (photoInsertError) {
-        console.error(photoInsertError.message)
-      }
+     if (photoInsertError) {
+  console.error(photoInsertError.message)
+  alert(photoInsertError.message)
+}
     }
 
     setUploadingPhotos(false)
