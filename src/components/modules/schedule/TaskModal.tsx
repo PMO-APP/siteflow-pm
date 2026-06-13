@@ -1,5 +1,4 @@
 import { useProjectStore } from '@/store/project'
-import { supabase } from '@/lib/supabase'
 import { getRole } from '@/lib/access'
 import { logAudit } from '@/lib/audit'
 import { useState } from 'react'
@@ -44,10 +43,7 @@ export default function TaskModal({ task, onClose }: Props) {
   ]
 
   const PHASES = Array.from(
-    new Set([
-      ...DEFAULT_PHASES,
-      task?.phase || '',
-    ].filter(Boolean))
+    new Set([...DEFAULT_PHASES, task?.phase || ''].filter(Boolean))
   )
 
   const isEditMode = !!task
@@ -70,18 +66,10 @@ export default function TaskModal({ task, onClose }: Props) {
 
   const updateField = (key: string, value: any) => {
     setForm(prev => {
-      const next = {
-        ...prev,
-        [key]: value,
-      }
+      const next = { ...prev, [key]: value }
 
-      if (key === 'status' && value === 'Completed') {
-        next.progress_pct = 100
-      }
-
-      if (key === 'status' && value === 'Not Started') {
-        next.progress_pct = 0
-      }
+      if (key === 'status' && value === 'Completed') next.progress_pct = 100
+      if (key === 'status' && value === 'Not Started') next.progress_pct = 0
 
       if (key === 'progress_pct') {
         const progress = Number(value)
@@ -124,6 +112,7 @@ export default function TaskModal({ task, onClose }: Props) {
       status: form.status,
       progress_pct: Number(form.progress_pct || 0),
       notes: form.notes || null,
+      is_milestone: form.is_milestone,
     }
   }
 
@@ -165,6 +154,14 @@ export default function TaskModal({ task, onClose }: Props) {
           changes.push('Notes updated')
         }
 
+        if (Boolean(task.is_milestone) !== Boolean(payload.is_milestone)) {
+          changes.push(
+            payload.is_milestone
+              ? 'Marked as milestone'
+              : 'Removed from milestones'
+          )
+        }
+
         await logAudit(
           user,
           'UPDATE',
@@ -181,13 +178,7 @@ export default function TaskModal({ task, onClose }: Props) {
           created_by: user?.id,
         } as any)
 
-        await logAudit(
-          user,
-          'CREATE',
-          'Schedule',
-          'new',
-          `${payload.name}`
-        )
+        await logAudit(user, 'CREATE', 'Schedule', 'new', `${payload.name}`)
       }
 
       onClose()
@@ -202,15 +193,7 @@ export default function TaskModal({ task, onClose }: Props) {
 
     try {
       await del.mutateAsync(task.id)
-
-      await logAudit(
-        user,
-        'DELETE',
-        'Schedule',
-        task.id,
-        task.name
-      )
-
+      await logAudit(user, 'DELETE', 'Schedule', task.id, task.name)
       onClose()
     } catch (err: any) {
       console.error('Task delete failed:', err)
@@ -233,15 +216,15 @@ export default function TaskModal({ task, onClose }: Props) {
             {task ? `Update Task #${task.task_number}` : 'New Task'}
           </div>
 
-         {task && role === 'admin' && (
-  <button
-    onClick={remove}
-    className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"
-    title="Delete Task"
-  >
-    <Trash2 size={14} />
-  </button>
-)}
+          {task && role === 'admin' && (
+            <button
+              onClick={remove}
+              className="text-[#6e7d8c] hover:text-red-400 transition-colors p-1"
+              title="Delete Task"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
 
           <button
             onClick={onClose}
@@ -260,27 +243,16 @@ export default function TaskModal({ task, onClose }: Props) {
         {task && (
           <div className="grid grid-cols-3 gap-2 px-5 py-3 bg-[#111820] border-b border-white/[0.06]">
             {[
-              {
-                k: 'Phase',
-                v: task.phase || '—',
-              },
-              {
-                k: 'Planned Start',
-                v: fdate(task.start_date),
-              },
-              {
-                k: 'Planned Finish',
-                v: fdate(task.finish_date),
-              },
+              { k: 'Phase', v: task.phase || '—' },
+              { k: 'Planned Start', v: fdate(task.start_date) },
+              { k: 'Planned Finish', v: fdate(task.finish_date) },
             ].map(item => (
               <div key={item.k} className="bg-[#1c2a36] rounded p-2">
                 <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase tracking-widest mb-0.5">
                   {item.k}
                 </div>
 
-                <div className="text-[12px] text-[#ede8de]">
-                  {item.v}
-                </div>
+                <div className="text-[12px] text-[#ede8de]">{item.v}</div>
               </div>
             ))}
           </div>
@@ -394,25 +366,6 @@ export default function TaskModal({ task, onClose }: Props) {
                   placeholder="e.g. 1, 3"
                 />
               </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="milestone"
-                  checked={form.is_milestone}
-                  onChange={e =>
-                    updateField('is_milestone', e.target.checked)
-                  }
-                  className="accent-[#c49e48]"
-                />
-
-                <label
-                  htmlFor="milestone"
-                  className="text-[12px] text-[#bfb9ae] cursor-pointer"
-                >
-                  Mark as Milestone ⬦
-                </label>
-              </div>
             </>
           )}
 
@@ -424,6 +377,27 @@ export default function TaskModal({ task, onClose }: Props) {
               </div>
             </div>
           )}
+
+          <div className="rounded-xl border border-white/10 p-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_milestone}
+                onChange={e => updateField('is_milestone', e.target.checked)}
+                className="h-4 w-4 accent-[#c49e48]"
+              />
+
+              <div>
+                <div className="font-medium text-[#ede8de]">
+                  Mark as Milestone ⬦
+                </div>
+
+                <div className="text-xs text-[#6e7d8c]">
+                  This task will automatically appear in the Milestone Tracker.
+                </div>
+              </div>
+            </label>
+          </div>
 
           <div>
             <label className="form-label">Status</label>
@@ -445,18 +419,14 @@ export default function TaskModal({ task, onClose }: Props) {
           </div>
 
           <div>
-            <label className="form-label">
-              Progress — {form.progress_pct}%
-            </label>
+            <label className="form-label">Progress — {form.progress_pct}%</label>
 
             <input
               type="range"
               min={0}
               max={100}
               value={form.progress_pct}
-              onChange={e =>
-                updateField('progress_pct', Number(e.target.value))
-              }
+              onChange={e => updateField('progress_pct', Number(e.target.value))}
               className="w-full accent-[#c49e48] bg-[#1c2a36] h-1.5 rounded-full"
             />
           </div>
@@ -478,10 +448,7 @@ export default function TaskModal({ task, onClose }: Props) {
         </div>
 
         <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
-          <button
-            className="btn-ghost btn-sm btn"
-            onClick={onClose}
-          >
+          <button className="btn-ghost btn-sm btn" onClick={onClose}>
             Cancel
           </button>
 
