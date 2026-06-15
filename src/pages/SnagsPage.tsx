@@ -1,4 +1,9 @@
 import { useProjectStore } from '@/store/project'
+import { useMembershipStore } from '@/store/membership'
+import {
+  canCreateSnags,
+  canEditOwnOrAdmin,
+} from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
 import { useAuthStore } from '@/store/auth'
 import { useState } from 'react'
@@ -44,7 +49,15 @@ function SnagModal({
 }) {
   const upsert = useUpsertSnag()
 const { user } = useAuthStore()
-  const canEdit = !item || item.created_by === user?.id
+  const role = useMembershipStore(state => state.role)
+
+const canEdit =
+  !item ||
+  canEditOwnOrAdmin(
+    role,
+    item.created_by,
+    user?.id
+  )
 const { projectId } = useProjectStore()
 
   const [form, setForm] = useState({
@@ -290,10 +303,14 @@ const { user } = useAuthStore()
   const [statFilter, setStatFilter] = useState('')
   const [view, setView] = useState<'list' | 'room'>('list')
 
-  const canCreate = !!user
+  const canCreate = canCreateSnags(role)
 
   const canEditSnag = (snag: Snag) => {
-  return !!user?.id && snag.created_by === user.id
+  return canEditOwnOrAdmin(
+    role,
+    snag.created_by,
+    user?.id
+  )
 }
 
   const filtered = snags.filter(snag => {
