@@ -87,6 +87,7 @@ const NAV = [
 
 const VIEWER_NAV = [
   '/app',
+  '/app/portfolio-dashboard',
   '/app/recovery',
   '/app/team',
   '/app/financial',
