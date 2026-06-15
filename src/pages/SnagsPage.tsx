@@ -48,17 +48,17 @@ function SnagModal({
   onClose: () => void
 }) {
   const upsert = useUpsertSnag()
-const { user } = useAuthStore()
+  const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
+  const { projectId } = useProjectStore()
 
-const canEdit =
-  !item ||
-  canEditOwnOrAdmin(
-    role,
-    item.created_by,
-    user?.id
-  )
-const { projectId } = useProjectStore()
+  const canEdit =
+    !item ||
+    canEditOwnOrAdmin(
+      role,
+      item.created_by,
+      user?.id
+    )
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -76,6 +76,8 @@ const { projectId } = useProjectStore()
   })
 
   const set = (key: string, value: any) => {
+    if (!canEdit) return
+
     setForm(prev => ({
       ...prev,
       [key]: value,
@@ -83,19 +85,20 @@ const { projectId } = useProjectStore()
   }
 
   const save = async () => {
+    if (!canEdit) return
     if (!form.title.trim()) return
 
     const payload = {
-  ...form,
-  project_id: item?.project_id || projectId,
-  closed_date:
-    form.status === 'Closed' && !form.closed_date
-      ? new Date().toISOString().slice(0, 10)
-      : form.closed_date || null,
-  target_close_date: form.target_close_date || null,
-  raised_date: form.raised_date || null,
-  created_by: item?.created_by || user?.id,
-}
+      ...form,
+      project_id: item?.project_id || projectId,
+      closed_date:
+        form.status === 'Closed' && !form.closed_date
+          ? new Date().toISOString().slice(0, 10)
+          : form.closed_date || null,
+      target_close_date: form.target_close_date || null,
+      raised_date: form.raised_date || null,
+      created_by: item?.created_by || user?.id,
+    }
 
     await upsert.mutateAsync({
       id: item?.id,
@@ -116,16 +119,19 @@ const { projectId } = useProjectStore()
   return (
     <div
       className="modal-overlay"
-      onClick={e => {
-        if (e.target === e.currentTarget) onClose()
+      onClick={event => {
+        if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="modal max-w-xl" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal max-w-xl"
+        onClick={event => event.stopPropagation()}
+      >
         <div className="gold-bar" />
 
         <div className="modal-head">
           <div className="modal-title">
-            {item ? `Edit Snag #${item.snag_number}` : 'New Snag'}
+            {item ? `Snag #${item.snag_number}` : 'New Snag'}
           </div>
 
           <button
@@ -136,13 +142,21 @@ const { projectId } = useProjectStore()
           </button>
         </div>
 
+        {!canEdit && (
+          <div className="mx-5 mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-[11px] text-amber-400">
+            View only — you can view this snag, but you cannot edit it because
+            it was created by another user.
+          </div>
+        )}
+
         <div className="p-5 space-y-4">
           <div>
             <label className="form-label">Title *</label>
             <input
               className="form-control"
               value={form.title}
-              onChange={e => set('title', e.target.value)}
+              disabled={!canEdit}
+              onChange={event => set('title', event.target.value)}
               placeholder="Brief description of defect…"
             />
           </div>
@@ -153,7 +167,8 @@ const { projectId } = useProjectStore()
               <select
                 className="form-control"
                 value={form.severity}
-                onChange={e => set('severity', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('severity', event.target.value)}
               >
                 {SEVERITIES.map(severity => (
                   <option key={severity}>{severity}</option>
@@ -166,7 +181,8 @@ const { projectId } = useProjectStore()
               <select
                 className="form-control"
                 value={form.status}
-                onChange={e => set('status', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('status', event.target.value)}
               >
                 {STATUSES.map(status => (
                   <option key={status}>{status}</option>
@@ -181,7 +197,8 @@ const { projectId } = useProjectStore()
               <select
                 className="form-control"
                 value={form.room}
-                onChange={e => set('room', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('room', event.target.value)}
               >
                 {ROOMS.map(room => (
                   <option key={room}>{room}</option>
@@ -194,7 +211,8 @@ const { projectId } = useProjectStore()
               <input
                 className="form-control"
                 value={form.location}
-                onChange={e => set('location', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('location', event.target.value)}
                 placeholder="e.g. North wall, column 3…"
               />
             </div>
@@ -205,7 +223,8 @@ const { projectId } = useProjectStore()
             <input
               className="form-control"
               value={form.assigned_contractor}
-              onChange={e => set('assigned_contractor', e.target.value)}
+              disabled={!canEdit}
+              onChange={event => set('assigned_contractor', event.target.value)}
               placeholder="Company responsible for fix…"
             />
           </div>
@@ -217,7 +236,8 @@ const { projectId } = useProjectStore()
                 type="date"
                 className="form-control"
                 value={form.raised_date}
-                onChange={e => set('raised_date', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('raised_date', event.target.value)}
               />
             </div>
 
@@ -227,7 +247,8 @@ const { projectId } = useProjectStore()
                 type="date"
                 className="form-control"
                 value={form.target_close_date}
-                onChange={e => set('target_close_date', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('target_close_date', event.target.value)}
               />
             </div>
 
@@ -237,7 +258,8 @@ const { projectId } = useProjectStore()
                 type="date"
                 className="form-control"
                 value={form.closed_date}
-                onChange={e => set('closed_date', e.target.value)}
+                disabled={!canEdit}
+                onChange={event => set('closed_date', event.target.value)}
               />
             </div>
           </div>
@@ -248,7 +270,8 @@ const { projectId } = useProjectStore()
               className="form-control"
               rows={3}
               value={form.description}
-              onChange={e => set('description', e.target.value)}
+              disabled={!canEdit}
+              onChange={event => set('description', event.target.value)}
             />
           </div>
 
@@ -258,29 +281,30 @@ const { projectId } = useProjectStore()
               className="form-control"
               rows={2}
               value={form.notes}
-              onChange={e => set('notes', e.target.value)}
+              disabled={!canEdit}
+              onChange={event => set('notes', event.target.value)}
             />
           </div>
         </div>
 
         <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
           <button className="btn-ghost btn-sm btn" onClick={onClose}>
-            Cancel
+            Close
           </button>
 
           {canEdit && (
-  <button
-    className="btn-gold btn-sm btn"
-    onClick={save}
-    disabled={upsert.isPending}
-  >
-    {upsert.isPending
-      ? 'Saving…'
-      : item
-      ? 'Save Changes'
-      : 'Log Snag'}
-  </button>
-)}
+            <button
+              className="btn-gold btn-sm btn"
+              onClick={save}
+              disabled={upsert.isPending}
+            >
+              {upsert.isPending
+                ? 'Saving…'
+                : item
+                ? 'Save Changes'
+                : 'Log Snag'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -290,11 +314,8 @@ const { projectId } = useProjectStore()
 export default function SnagsPage() {
   const { data: snags = [], isLoading } = useSnags()
   const { projectId } = useProjectStore()
-
-console.log('CURRENT PROJECT ID:', projectId)
-console.log('SNAGS:', snags)
-
-const { user } = useAuthStore()
+  const { user } = useAuthStore()
+  const role = useMembershipStore(state => state.role)
 
   const [modal, setModal] = useState<Snag | null | 'new'>(null)
   const [search, setSearch] = useState('')
@@ -306,12 +327,12 @@ const { user } = useAuthStore()
   const canCreate = canCreateSnags(role)
 
   const canEditSnag = (snag: Snag) => {
-  return canEditOwnOrAdmin(
-    role,
-    snag.created_by,
-    user?.id
-  )
-}
+    return canEditOwnOrAdmin(
+      role,
+      snag.created_by,
+      user?.id
+    )
+  }
 
   const filtered = snags.filter(snag => {
     if (
@@ -372,6 +393,13 @@ const { user } = useAuthStore()
 
   return (
     <div className="space-y-4">
+      {!canCreate && (
+        <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
+          Snag List View — you can view snags, but you cannot create or edit
+          snags.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {
@@ -434,14 +462,14 @@ const { user } = useAuthStore()
             className="form-control pl-7 text-[12px] py-1.5"
             placeholder="Search snags…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={event => setSearch(event.target.value)}
           />
         </div>
 
         <select
           className="form-control text-[12px] py-1.5 w-auto"
           value={roomFilter}
-          onChange={e => setRoomFilter(e.target.value)}
+          onChange={event => setRoomFilter(event.target.value)}
         >
           <option value="">All Rooms</option>
 
@@ -453,7 +481,7 @@ const { user } = useAuthStore()
         <select
           className="form-control text-[12px] py-1.5 w-auto"
           value={sevFilter}
-          onChange={e => setSevFilter(e.target.value)}
+          onChange={event => setSevFilter(event.target.value)}
         >
           <option value="">All Severity</option>
 
@@ -465,7 +493,7 @@ const { user } = useAuthStore()
         <select
           className="form-control text-[12px] py-1.5 w-auto"
           value={statFilter}
-          onChange={e => setStatFilter(e.target.value)}
+          onChange={event => setStatFilter(event.target.value)}
         >
           <option value="">All Status</option>
 
@@ -543,7 +571,7 @@ const { user } = useAuthStore()
                         : 'cursor-default'
                     }`}
                     onClick={() => {
-                      if (canEditSnag(snag)) setModal(snag)
+                      setModal(snag)
                     }}
                   >
                     <span
@@ -663,21 +691,12 @@ const { user } = useAuthStore()
                       </td>
 
                       <td>
-                        {canEditSnag(snag) ? (
-  <button
-    className="tbl-action"
-    onClick={() => setModal(snag)}
-  >
-    Edit
-  </button>
-) : (
-  <button
-    className="tbl-action"
-    onClick={() => setModal(snag)}
-  >
-    View
-  </button>
-)}
+                        <button
+                          className="tbl-action"
+                          onClick={() => setModal(snag)}
+                        >
+                          {canEditSnag(snag) ? 'Edit' : 'View'}
+                        </button>
                       </td>
                     </tr>
                   ))
