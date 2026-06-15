@@ -18,6 +18,7 @@ import ProjectsPage from '@/pages/ProjectsPage'
 import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
+import PortfolioDashboardPage from '@/pages/PortfolioDashboardPage'
 
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
@@ -249,7 +250,10 @@ export default function App() {
             </RequireAuth>
           }
         />
-
+<Route
+  path="/portfolio-dashboard"
+  element={<PortfolioDashboardPage />}
+/>
         <Route
           path="/external-project"
           element={
