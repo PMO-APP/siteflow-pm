@@ -600,3 +600,62 @@ html.light .sidebar-text {
 html.light .sidebar-muted {
   color: #64748b;
 }
+/* ==========================
+   PMOCorex Theme Components
+========================== */
+
+.projects-page {
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+.workspace-hero {
+  border: 1px solid var(--card-border);
+  background: var(--hero-bg);
+}
+
+.dashboard-hero {
+  border: 1px solid var(--card-border);
+  background: var(--hero-bg);
+}
+
+.portfolio-title {
+  color: var(--text-primary);
+}
+
+/* DARK */
+
+html.dark {
+  --page-bg: #0c1014;
+  --text-primary: #ede8de;
+  --card-border: rgba(196,158,72,.15);
+
+  --hero-bg:
+    linear-gradient(
+      135deg,
+      #111820,
+      #162230,
+      #0f151c
+    );
+}
+
+/* LIGHT */
+
+html.light {
+  --page-bg: #f5f7fa;
+  --text-primary: #111827;
+  --card-border: rgba(196,158,72,.18);
+
+  --hero-bg:
+    radial-gradient(
+      circle at top right,
+      rgba(196,158,72,.15),
+      transparent 30%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff,
+      #faf6ea,
+      #f3ead1
+    );
+}
