@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
-import { useProjectStore } from '@/store/project'
 import { useThemeStore } from '@/store/theme'
 import { isExternalRole } from '@/lib/permissions'
 
@@ -52,6 +51,7 @@ import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
+  '/app/portfolio-dashboard',
   '/app/recovery',
   '/app/team',
   '/app/financial',
@@ -250,10 +250,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/portfolio-dashboard"
-  element={<PortfolioDashboardPage />}
-/>
+
         <Route
           path="/external-project"
           element={
@@ -268,6 +265,15 @@ export default function App() {
           element={
             <RequireAuth>
               <ExternalTasksPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/external-project/tasks/:taskId"
+          element={
+            <RequireAuth>
+              <ExternalTaskDetailPage />
             </RequireAuth>
           }
         />
@@ -289,14 +295,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/external-project/tasks/:taskId"
-  element={
-    <RequireAuth>
-      <ExternalTaskDetailPage />
-    </RequireAuth>
-  }
-/>
+
         <Route
           path="/external-project/progress-report"
           element={
@@ -305,14 +304,16 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/external-project/communication"
-  element={
-    <RequireAuth>
-      <ExternalCommunicationPage />
-    </RequireAuth>
-  }
-/>
+
+        <Route
+          path="/external-project/communication"
+          element={
+            <RequireAuth>
+              <ExternalCommunicationPage />
+            </RequireAuth>
+          }
+        />
+
         <Route
           path="/external-project/rfis"
           element={
@@ -372,6 +373,7 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="portfolio-dashboard" element={<PortfolioDashboardPage />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
@@ -385,15 +387,24 @@ export default function App() {
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="external-review" element={<ExternalReviewDashboard />} />
           <Route
-  path="external-communication"
-  element={<ExternalCommunicationReviewPage />}
-/>
+            path="external-communication"
+            element={<ExternalCommunicationReviewPage />}
+          />
           <Route path="team" element={<TeamPage />} />
-          <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
+          <Route
+            path="internal-assignments"
+            element={<InternalAssignmentsPage />}
+          />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route path="external-task-review" element={<ExternalTaskReviewPage />} />
-          <Route path="external-assignments" element={<ExternalAssignmentsPage />} />
+          <Route
+            path="external-task-review"
+            element={<ExternalTaskReviewPage />}
+          />
+          <Route
+            path="external-assignments"
+            element={<ExternalAssignmentsPage />}
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
