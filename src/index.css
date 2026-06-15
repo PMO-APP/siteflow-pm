@@ -678,3 +678,63 @@ html.light .divide-white\/\[0\.04\] > * + * {
 html.light .hover\:bg-white\/\[0\.02\]:hover {
   background: rgba(196, 158, 72, 0.06) !important;
 }
+    /* =========================
+   FINAL LIGHT MODE DARK BLOCK FIXES
+========================= */
+
+html.light .bg-\[\#0a0e12\],
+html.light .bg-\[\#0f141a\],
+html.light .bg-\[\#111820\],
+html.light .bg-\[\#162230\],
+html.light .bg-\[\#0f151c\] {
+  background: #ffffff !important;
+}
+
+html.light .bg-\[\#0a0e12\]\/80,
+html.light .bg-\[\#0f141a\]\/80,
+html.light .bg-\[\#111820\]\/80,
+html.light .bg-\[\#161f28\]\/80,
+html.light .bg-\[\#1c2a36\]\/80 {
+  background: #ffffff !important;
+}
+
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/5,
+html.light .bg-white\/10 {
+  background: #ffffff !important;
+}
+
+html.light .border-white\/\[0\.03\],
+html.light .border-white\/\[0\.04\],
+html.light .border-white\/\[0\.05\],
+html.light .border-white\/\[0\.06\],
+html.light .border-white\/10 {
+  border-color: rgba(196, 158, 72, 0.18) !important;
+}
+
+html.light .divide-white\/\[0\.04\] > * + *,
+html.light .divide-white\/\[0\.05\] > * + *,
+html.light .divide-white\/10 > * + * {
+  border-color: rgba(196, 158, 72, 0.16) !important;
+}
+
+/* Dark insight/summary panels */
+html.light .ai-insight-card,
+html.light .executive-summary-card,
+html.light .project-card {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid rgba(196, 158, 72, 0.18) !important;
+}
+
+/* General text rescue */
+html.light .text-\[\#ede8de\],
+html.light .text-\[\#bfb9ae\],
+html.light .text-white {
+  color: #111827 !important;
+}
+
+html.light .text-\[\#6e7d8c\] {
+  color: #64748b !important;
+}
