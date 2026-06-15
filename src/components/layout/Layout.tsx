@@ -42,7 +42,7 @@ const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   {
     to: '/app/portfolio-dashboard',
-    icon: BriefcaseBusiness,
+    icon: Briefcase,
     label: 'Portfolio Dashboard',
   },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
