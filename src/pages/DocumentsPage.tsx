@@ -17,7 +17,10 @@ import {
   useDocuments,
   useUpsertDocument,
 } from '@/hooks/useData'
-import { uploadFile } from '@/lib/supabase'
+import {
+  uploadFile,
+  backupFileToGoogleDrive,
+} from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import type { Document } from '@/types'
@@ -92,7 +95,7 @@ function DocModal({
 }) {
   const upsert = useUpsertDocument()
   const { user } = useAuthStore()
-  const { projectId } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
   const [uploading, setUploading] = useState(false)
 
   const [form, setForm] = useState({
@@ -110,14 +113,11 @@ function DocModal({
     public_url: item?.public_url || '',
     file_size_kb: item?.file_size_kb || 0,
     file_type: item?.file_type || '',
-    google_drive_file_id:
-  item?.google_drive_file_id || '',
-
-google_drive_url:
-  item?.google_drive_url || '',
-
-google_drive_sync_status:
-  item?.google_drive_sync_status || 'pending',
+    google_drive_file_id: (item as any)?.google_drive_file_id || '',
+    google_drive_url: (item as any)?.google_drive_url || '',
+    google_drive_sync_status:
+      (item as any)?.google_drive_sync_status || 'pending',
+    google_drive_sync_error: (item as any)?.google_drive_sync_error || '',
   })
 
   const set = (key: string, value: any) =>
@@ -155,57 +155,35 @@ google_drive_sync_status:
       set('public_url', result.publicUrl)
       set('file_size_kb', Math.round(file.size / 1024))
       set('file_type', file.type || file.name.split('.').pop() || 'file')
+
       try {
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backup-to-google-drive`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${
-          import.meta.env.VITE_SUPABASE_ANON_KEY
-        }`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        projectId,
-        title: form.title || file.name,
-        filePath: result.path,
-        fileName: file.name,
-        discipline: form.discipline,
-        type: form.type,
-      }),
-    }
-  )
+        set('google_drive_sync_status', 'syncing')
+        set('google_drive_sync_error', '')
 
-  const driveResult = await response.json()
+        const driveResult = await backupFileToGoogleDrive({
+          bucket: 'project-files',
+          filePath: result.path,
+          fileName: file.name,
+          projectId,
+          projectName,
+          documentType: form.type,
+          discipline: form.discipline,
+          title: form.title || file.name,
+        })
 
-  if (driveResult.success) {
-    set(
-      'google_drive_url',
-      driveResult.googleDriveUrl
-    )
+        set('google_drive_file_id', driveResult.googleDriveFileId)
+        set('google_drive_url', driveResult.googleDriveUrl)
+        set('google_drive_sync_status', 'synced')
+        set('google_drive_sync_error', '')
+      } catch (driveError: any) {
+        console.error('Google Drive backup failed:', driveError)
 
-    set(
-      'google_drive_file_id',
-      driveResult.googleDriveFileId
-    )
-
-    set(
-      'google_drive_sync_status',
-      'synced'
-    )
-  }
-} catch (error) {
-  console.error(
-    'Google Drive backup failed',
-    error
-  )
-
-  set(
-    'google_drive_sync_status',
-    'failed'
-  )
-}
+        set('google_drive_sync_status', 'failed')
+        set(
+          'google_drive_sync_error',
+          driveError?.message || 'Google Drive backup failed'
+        )
+      }
 
       await logAudit(
         user,
@@ -227,7 +205,9 @@ google_drive_sync_status:
     if (!form.title.trim()) return
 
     if (!projectId) {
-      alert('No project selected. Please return to Workspace Hub and select a project.')
+      alert(
+        'No project selected. Please return to Workspace Hub and select a project.'
+      )
       return
     }
 
@@ -405,20 +385,43 @@ google_drive_sync_status:
             </label>
 
             {form.file_size_kb > 0 && (
-        {form.google_drive_sync_status === 'synced' && (
-  <div className="text-[10px] text-emerald-400 mt-1">
-    ✓ Backed up to Google Drive
-  </div>
-)}
+              <>
+                <div className="text-[10px] text-[#6e7d8c] mt-1">
+                  {form.file_size_kb} KB · {form.file_type || 'file'}
+                </div>
 
-{form.google_drive_sync_status === 'failed' && (
-  <div className="text-[10px] text-red-400 mt-1">
-    ⚠ Google Drive backup failed
-  </div>
-)}
-              <div className="text-[10px] text-[#6e7d8c] mt-1">
-                {form.file_size_kb} KB · {form.file_type || 'file'}
-              </div>
+                {form.google_drive_sync_status === 'syncing' && (
+                  <div className="text-[10px] text-amber-400 mt-1">
+                    Syncing to Google Drive…
+                  </div>
+                )}
+
+                {form.google_drive_sync_status === 'synced' && (
+                  <div className="text-[10px] text-emerald-400 mt-1">
+                    ✓ Backed up to Google Drive
+                  </div>
+                )}
+
+                {form.google_drive_sync_status === 'failed' && (
+                  <div className="text-[10px] text-red-400 mt-1">
+                    ⚠ Google Drive backup failed
+                    {form.google_drive_sync_error
+                      ? `: ${form.google_drive_sync_error}`
+                      : ''}
+                  </div>
+                )}
+
+                {form.google_drive_url && (
+                  <a
+                    href={form.google_drive_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-[#c49e48] underline mt-1 inline-block"
+                  >
+                    Open Google Drive backup
+                  </a>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -457,7 +460,9 @@ export default function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [discFilter, setDiscFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
-  const [viewMode, setViewMode] = useState<'register' | 'repository'>('register')
+  const [viewMode, setViewMode] = useState<'register' | 'repository'>(
+    'register'
+  )
 
   const filtered = docs.filter(document => {
     const searchText = search.toLowerCase()
@@ -539,7 +544,9 @@ export default function DocumentsPage() {
                       ? 'bg-[#c49e48] text-[#0c1014] border-[#c49e48]'
                       : 'bg-[#1c2a36] text-[#bfb9ae] border-white/[0.08] hover:border-[#c49e48]/30'
                   }`}
-                  onClick={() => setTypeFilter(typeFilter === type ? '' : type)}
+                  onClick={() =>
+                    setTypeFilter(typeFilter === type ? '' : type)
+                  }
                 >
                   <span>{typeIcon(type)}</span>
                   {type}
@@ -617,13 +624,19 @@ export default function DocumentsPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={10} className="text-center py-6 text-[#6e7d8c]">
+                      <td
+                        colSpan={10}
+                        className="text-center py-6 text-[#6e7d8c]"
+                      >
                         Loading…
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="text-center py-8 text-[#6e7d8c]">
+                      <td
+                        colSpan={10}
+                        className="text-center py-8 text-[#6e7d8c]"
+                      >
                         {docs.length === 0
                           ? 'No documents registered yet.'
                           : 'No documents match filters.'}
@@ -680,7 +693,11 @@ export default function DocumentsPage() {
                           <td>{fdate(document.revision_date)}</td>
 
                           <td>
-                            <span className={`badge ${statBadge(document.status)}`}>
+                            <span
+                              className={`badge ${statBadge(
+                                document.status
+                              )}`}
+                            >
                               {document.status}
                             </span>
                           </td>
@@ -706,6 +723,18 @@ export default function DocumentsPage() {
                                   title="Download"
                                 >
                                   <Download size={10} />
+                                </a>
+                              )}
+
+                              {(document as any).google_drive_url && (
+                                <a
+                                  href={(document as any).google_drive_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="tbl-action"
+                                  title="Google Drive Backup"
+                                >
+                                  Drive
                                 </a>
                               )}
 
