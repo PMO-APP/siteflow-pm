@@ -12,6 +12,7 @@ import {
   Filter,
   UserCircle,
   Pencil,
+  BarChart3,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -178,17 +179,13 @@ export default function ProjectsPage() {
 
       const visiblePortfolioIds = [
         ...new Set(
-          visibleProjects
-            .map(project => project.portfolio_id)
-            .filter(Boolean)
+          visibleProjects.map(project => project.portfolio_id).filter(Boolean)
         ),
       ]
 
       const visibleOrgIds = [
         ...new Set(
-          visibleProjects
-            .map(project => project.organization_id)
-            .filter(Boolean)
+          visibleProjects.map(project => project.organization_id).filter(Boolean)
         ),
       ]
 
@@ -317,8 +314,7 @@ export default function ProjectsPage() {
       String(project.status || 'Not set') === statusFilter
 
     const matchesPhase =
-      phaseFilter === 'All' ||
-      String(project.phase || 'Not set') === phaseFilter
+      phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter
 
     return matchesSearch && matchesPortfolio && matchesStatus && matchesPhase
   })
@@ -345,19 +341,18 @@ export default function ProjectsPage() {
               {workspaceName}
             </div>
 
-            <button
-              onClick={() => navigate('/profile')}
-              className="btn-ghost btn-sm btn justify-center"
-            >
+            <button onClick={() => navigate('/profile')} className="btn-ghost btn-sm btn justify-center">
               <UserCircle size={14} />
               My Profile
             </button>
 
+            <button onClick={() => navigate('/portfolio-dashboard')} className="btn-ghost btn-sm btn justify-center">
+              <BarChart3 size={14} />
+              Portfolio Dashboard
+            </button>
+
             {canAccessAdmin && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="btn-ghost btn-sm btn justify-center"
-              >
+              <button onClick={() => navigate('/admin')} className="btn-ghost btn-sm btn justify-center">
                 <Shield size={14} />
                 Admin Console
               </button>
@@ -409,11 +404,33 @@ export default function ProjectsPage() {
             </p>
           </div>
 
-          <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-5 gap-4">
             <MetricCard title={workspaceName} value="Workspace" icon={Building2} />
             <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
             <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
             <MetricCard title="Active" value={activeProjects} icon={Activity} />
+
+            <button
+              onClick={() => navigate('/portfolio-dashboard')}
+              className="group text-left rounded-2xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-4 sm:p-5 hover:border-[#c49e48]/50 hover:bg-[#c49e48]/15 transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-lg sm:text-xl font-black text-[#ede8de]">
+                    Portfolio
+                  </div>
+
+                  <div className="text-xs text-[#c49e48] mt-1">
+                    Executive Dashboard
+                  </div>
+                </div>
+
+                <BarChart3
+                  size={22}
+                  className="text-[#c49e48] group-hover:scale-110 transition"
+                />
+              </div>
+            </button>
           </div>
         </div>
 
@@ -424,10 +441,7 @@ export default function ProjectsPage() {
           </div>
 
           <div className="relative">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
-            />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]" />
 
             <input
               className="form-control pl-9"
@@ -446,11 +460,7 @@ export default function ProjectsPage() {
               <div className="mt-1 font-semibold">{workspaceName}</div>
             </div>
 
-            <select
-              className="form-control"
-              value={portfolioFilter}
-              onChange={e => setPortfolioFilter(e.target.value)}
-            >
+            <select className="form-control" value={portfolioFilter} onChange={e => setPortfolioFilter(e.target.value)}>
               <option value="All">All Portfolios</option>
               {portfolios.map(portfolio => (
                 <option key={portfolio.id} value={String(portfolio.id)}>
@@ -459,11 +469,7 @@ export default function ProjectsPage() {
               ))}
             </select>
 
-            <select
-              className="form-control"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
+            <select className="form-control" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
               <option value="All">All Statuses</option>
               {PROJECT_STATUSES.map(status => (
                 <option key={status} value={status}>
@@ -472,11 +478,7 @@ export default function ProjectsPage() {
               ))}
             </select>
 
-            <select
-              className="form-control"
-              value={phaseFilter}
-              onChange={e => setPhaseFilter(e.target.value)}
-            >
+            <select className="form-control" value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)}>
               <option value="All">All Phases</option>
               {PROJECT_PHASES.map(phase => (
                 <option key={phase} value={phase}>
@@ -527,11 +529,16 @@ export default function ProjectsPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => navigate('/portfolio-dashboard')}
+                          className="btn-ghost btn-sm btn w-fit"
+                        >
+                          <BarChart3 size={14} />
+                          Portfolio Dashboard
+                        </button>
+
                         {canAccessAdmin && (
-                          <button
-                            onClick={() => navigate('/admin')}
-                            className="btn-ghost btn-sm btn w-fit"
-                          >
+                          <button onClick={() => navigate('/admin')} className="btn-ghost btn-sm btn w-fit">
                             <Shield size={14} />
                             Manage Access
                           </button>
@@ -574,10 +581,7 @@ export default function ProjectsPage() {
                         if (portfolioProjects.length === 0 && searchTerm) return null
 
                         return (
-                          <div
-                            key={portfolio.id}
-                            className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5"
-                          >
+                          <div key={portfolio.id} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
@@ -687,19 +691,11 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          <select
-            className="form-control mb-4"
-            value={selectedPortfolioId}
-            onChange={e => setSelectedPortfolioId(Number(e.target.value))}
-          >
+          <select className="form-control mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(Number(e.target.value))}>
             <option value="">Select portfolio</option>
 
             {portfolios
-              .filter(
-                portfolio =>
-                  !selectedOrgId ||
-                  portfolio.organization_id === selectedOrgId
-              )
+              .filter(portfolio => !selectedOrgId || portfolio.organization_id === selectedOrgId)
               .map(portfolio => (
                 <option key={portfolio.id} value={portfolio.id}>
                   {portfolio.name}
@@ -707,18 +703,9 @@ export default function ProjectsPage() {
               ))}
           </select>
 
-          <input
-            className="form-control mb-4"
-            placeholder="Project name"
-            value={newProjectName}
-            onChange={e => setNewProjectName(e.target.value)}
-          />
+          <input className="form-control mb-4" placeholder="Project name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
 
-          <select
-            className="form-control mb-4"
-            value={newProjectStatus}
-            onChange={e => setNewProjectStatus(e.target.value)}
-          >
+          <select className="form-control mb-4" value={newProjectStatus} onChange={e => setNewProjectStatus(e.target.value)}>
             {PROJECT_STATUSES.map(status => (
               <option key={status} value={status}>
                 {status}
@@ -726,11 +713,7 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <select
-            className="form-control mb-4"
-            value={newProjectPhase}
-            onChange={e => setNewProjectPhase(e.target.value)}
-          >
+          <select className="form-control mb-4" value={newProjectPhase} onChange={e => setNewProjectPhase(e.target.value)}>
             {PROJECT_PHASES.map(phase => (
               <option key={phase} value={phase}>
                 {phase}
@@ -746,18 +729,9 @@ export default function ProjectsPage() {
 
       {showEditProjectModal && editingProject && canEditProjects && (
         <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
-          <input
-            className="form-control mb-4"
-            placeholder="Project name"
-            value={editProjectName}
-            onChange={e => setEditProjectName(e.target.value)}
-          />
+          <input className="form-control mb-4" placeholder="Project name" value={editProjectName} onChange={e => setEditProjectName(e.target.value)} />
 
-          <select
-            className="form-control mb-4"
-            value={editProjectStatus}
-            onChange={e => setEditProjectStatus(e.target.value)}
-          >
+          <select className="form-control mb-4" value={editProjectStatus} onChange={e => setEditProjectStatus(e.target.value)}>
             {PROJECT_STATUSES.map(status => (
               <option key={status} value={status}>
                 {status}
@@ -765,11 +739,7 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <select
-            className="form-control mb-4"
-            value={editProjectPhase}
-            onChange={e => setEditProjectPhase(e.target.value)}
-          >
+          <select className="form-control mb-4" value={editProjectPhase} onChange={e => setEditProjectPhase(e.target.value)}>
             {PROJECT_PHASES.map(phase => (
               <option key={phase} value={phase}>
                 {phase}
@@ -777,19 +747,9 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <input
-            className="form-control mb-4"
-            placeholder="Location"
-            value={editProjectLocation}
-            onChange={e => setEditProjectLocation(e.target.value)}
-          />
+          <input className="form-control mb-4" placeholder="Location" value={editProjectLocation} onChange={e => setEditProjectLocation(e.target.value)} />
 
-          <input
-            className="form-control mb-4"
-            type="date"
-            value={editProjectHandoverDate}
-            onChange={e => setEditProjectHandoverDate(e.target.value)}
-          />
+          <input className="form-control mb-4" type="date" value={editProjectHandoverDate} onChange={e => setEditProjectHandoverDate(e.target.value)} />
 
           <button className="btn-gold btn w-full justify-center" onClick={updateProject}>
             Save Project Changes
@@ -856,15 +816,14 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
   }
 
   return (
-    <div className="relative overflow-hidden group rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200">
-      <div
-        className={`absolute left-0 top-0 h-full w-1 ${
-          stripColors[status] || 'bg-slate-500'
-        }`}
-      />
+    <div
+      onClick={onClick}
+      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 cursor-pointer hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200"
+    >
+      <div className={`absolute left-0 top-0 h-full w-1 ${stripColors[status] || 'bg-slate-500'}`} />
 
       <div className="flex items-start justify-between gap-3">
-        <div onClick={onClick} className="min-w-0 flex-1 cursor-pointer">
+        <div className="min-w-0 pl-2">
           <div className="font-semibold text-white truncate">
             {project.project_name}
           </div>
@@ -872,51 +831,35 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
           <div className="text-xs text-slate-500 mt-1 truncate">
             {project.location || 'No location set'}
           </div>
-
-          <span
-            className={`inline-flex mt-3 text-xs px-2 py-1 rounded-full border ${
-              phaseBadgeStyles[phase] ||
-              'bg-slate-500/10 text-slate-400 border-slate-500/20'
-            }`}
-          >
-            Phase: {phase}
-          </span>
         </div>
 
         <div className="flex items-center gap-2">
           {canEdit && (
             <button
-              type="button"
-              onClick={e => {
-                e.stopPropagation()
+              onClick={event => {
+                event.stopPropagation()
                 onEdit()
               }}
               className="text-slate-500 hover:text-[#c49e48] transition"
-              title="Edit project"
             >
               <Pencil size={15} />
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onClick}
-            className="text-slate-500 group-hover:text-[#c49e48] transition"
-          >
-            <ArrowRight size={16} />
-          </button>
+          <ArrowRight size={16} className="text-slate-500 group-hover:text-[#c49e48] transition flex-shrink-0" />
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <span
-          className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
-            statusStyles[status] ||
-            'bg-slate-500/10 text-slate-400 border-slate-500/20'
-          }`}
-        >
-          Status: {status}
-        </span>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-2">
+        <div className="flex flex-wrap gap-2">
+          <span className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${phaseBadgeStyles[phase] || 'bg-white/5 text-slate-400 border-white/10'}`}>
+            Phase: {phase}
+          </span>
+
+          <span className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${statusStyles[status] || 'bg-white/5 text-slate-400 border-white/10'}`}>
+            Status: {status}
+          </span>
+        </div>
 
         <span className="text-xs text-slate-500 truncate">
           Target: {project.handover_date || 'Not set'}
@@ -934,6 +877,7 @@ function EmptyHub({ title, message, action }: any) {
       </div>
 
       <div className="text-xl font-bold text-white">{title}</div>
+
       <div className="text-sm text-slate-500 mt-2">{message}</div>
 
       <button onClick={action} className="btn-gold btn mt-5">
