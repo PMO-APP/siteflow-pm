@@ -70,3 +70,64 @@ export const uploadFile = async (
     publicUrl,
   }
 }
+export async function backupFileToGoogleDrive(params: {
+  bucket: string
+  filePath: string
+  fileName: string
+  projectId?: number | string | null
+  projectName?: string | null
+  documentType?: string | null
+  discipline?: string | null
+  title?: string | null
+}) {
+  const {
+    bucket,
+    filePath,
+    fileName,
+    projectId,
+    projectName,
+    documentType,
+    discipline,
+    title,
+  } = params
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/backup-to-google-drive`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session?.access_token || supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        bucket,
+        filePath,
+        fileName,
+        projectId,
+        projectName,
+        documentType,
+        discipline,
+        title,
+      }),
+    }
+  )
+
+  const result = await response.json()
+
+  if (!response.ok || !result.success) {
+    throw new Error(
+      result.error || 'Google Drive backup failed.'
+    )
+  }
+
+  return result as {
+    success: true
+    googleDriveFileId: string
+    googleDriveUrl: string
+    googleDriveFolderId?: string
+  }
+}
