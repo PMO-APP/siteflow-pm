@@ -51,7 +51,6 @@ import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
-  '/app/portfolio-dashboard',
   '/app/recovery',
   '/app/team',
   '/app/financial',
@@ -252,6 +251,17 @@ export default function App() {
         />
 
         <Route
+          path="/portfolio-dashboard"
+          element={
+            <RequireAuth>
+              <RequireInternal>
+                <PortfolioDashboardPage />
+              </RequireInternal>
+            </RequireAuth>
+          }
+        />
+
+        <Route
           path="/external-project"
           element={
             <RequireAuth>
@@ -373,7 +383,6 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="portfolio-dashboard" element={<PortfolioDashboardPage />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
