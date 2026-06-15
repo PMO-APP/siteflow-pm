@@ -115,10 +115,23 @@ export default function AcceptInvitePage() {
     try {
       setSubmitting(true)
 
-      const email = invite.email.trim().toLowerCase()
-      const role = cleanRole(invite.role)
-      const inviteScope = getInviteScope()
-      const projectIds = getProjectIds()
+     const email = invite.email.trim().toLowerCase()
+
+const invitedRole = cleanRole(invite.role)
+
+const profileRole = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'viewer',
+].includes(invitedRole)
+  ? invitedRole
+  : 'viewer'
+
+const role = invitedRole
+
+const inviteScope = getInviteScope()
+const projectIds = getProjectIds()
 
       const { data: signUpData, error: signUpError } =
         await supabase.auth.signUp({
@@ -154,13 +167,12 @@ export default function AcceptInvitePage() {
       }
 
       const { error: profileError } = await supabase.from('profiles').upsert({
-        id: userId,
-        email,
-        full_name: fullName,
-        role,
-        updated_at: new Date().toISOString(),
-      })
-
+  id: userId,
+  email,
+  full_name: fullName,
+  role: profileRole,
+  updated_at: new Date().toISOString(),
+})
       if (profileError) {
         setError(profileError.message)
         return
