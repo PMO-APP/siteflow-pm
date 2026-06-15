@@ -513,3 +513,90 @@ html.light .soft-divider {
 html.light ::-webkit-scrollbar-thumb {
   background: rgba(196, 158, 72, 0.38);
 }
+    /* =========================
+   PMOCorex Layout Theme Layer
+========================= */
+
+/* DARK */
+
+.layout-shell {
+  background: #0a0e12;
+  color: #ede8de;
+}
+
+.layout-sidebar {
+  background: rgba(15, 20, 26, 0.95);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.layout-header {
+  background: rgba(12, 16, 20, 0.82);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.layout-content {
+  background: #0c1014;
+}
+
+.sidebar-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-text {
+  color: #ede8de;
+}
+
+.sidebar-muted {
+  color: #6e7d8c;
+}
+
+/* LIGHT */
+
+html.light .layout-shell {
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(196, 158, 72, 0.12),
+      transparent 35%
+    ),
+    linear-gradient(
+      180deg,
+      #f8f4eb 0%,
+      #f3efe5 45%,
+      #ede7da 100%
+    );
+  color: #111827;
+}
+
+html.light .layout-sidebar {
+  background: rgba(255, 252, 246, 0.95);
+  border-color: rgba(196, 158, 72, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+html.light .layout-header {
+  background: rgba(255, 252, 246, 0.92);
+  border-color: rgba(196, 158, 72, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+html.light .layout-content {
+  background: transparent;
+}
+
+html.light .sidebar-panel {
+  background: #ffffff;
+  border: 1px solid rgba(196, 158, 72, 0.18);
+  box-shadow:
+    0 10px 25px rgba(100, 74, 18, 0.05),
+    0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+html.light .sidebar-text {
+  color: #111827;
+}
+
+html.light .sidebar-muted {
+  color: #64748b;
+}
