@@ -1,7 +1,10 @@
 import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
-import { canEditDocuments } from '@/lib/permissions'
+import {
+  canEditDocuments,
+  canEditOwnOrAdmin,
+} from '@/lib/permissions'
 import { useState } from 'react'
 import {
   Plus,
@@ -135,8 +138,6 @@ function DocModal({
         `projects/${projectId}/${folder}`
       )
 
-      console.log('DOCUMENT UPLOAD RESULT:', result)
-
       if (!result) {
         alert('Upload failed. No file path returned.')
         return
@@ -175,7 +176,7 @@ function DocModal({
       id: item?.id,
       project_id: projectId,
       ...form,
-      uploaded_by: user?.id,
+      uploaded_by: item?.uploaded_by || user?.id,
     } as any)
 
     await logAudit(
@@ -376,7 +377,9 @@ function DocModal({
 
 export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
-  const canEdit = canEditDocuments(role)
+  const { user } = useAuthStore()
+
+  const canCreateDocument = canEditDocuments(role)
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
@@ -426,7 +429,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-4">
-      {!canEdit && (
+      {!canCreateDocument && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           Document Library View — you can view and download documents, but you
           cannot register, edit, or upload documents.
@@ -512,7 +515,7 @@ export default function DocumentsPage() {
               ))}
             </select>
 
-            {canEdit && (
+            {canCreateDocument && (
               <button
                 className="btn-gold btn-sm btn ml-auto"
                 onClick={() => setModal('new')}
@@ -557,94 +560,102 @@ export default function DocumentsPage() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map(document => (
-                      <tr
-                        key={document.id}
-                        className={
-                          document.status === 'Superseded' ||
-                          document.status === 'Void'
-                            ? 'opacity-50'
-                            : ''
-                        }
-                      >
-                        <td className="font-mono text-[10px] text-[#c49e48]">
-                          {document.document_number || '—'}
-                        </td>
+                    filtered.map(document => {
+                      const canEditThisDocument = canEditOwnOrAdmin(
+                        role,
+                        document.uploaded_by,
+                        user?.id
+                      )
 
-                        <td
-                          className="font-medium text-[#ede8de] max-w-[200px] truncate"
-                          title={document.title}
+                      return (
+                        <tr
+                          key={document.id}
+                          className={
+                            document.status === 'Superseded' ||
+                            document.status === 'Void'
+                              ? 'opacity-50'
+                              : ''
+                          }
                         >
-                          {document.title}
-                        </td>
+                          <td className="font-mono text-[10px] text-[#c49e48]">
+                            {document.document_number || '—'}
+                          </td>
 
-                        <td>
-                          <span className="text-[9px]">
-                            {typeIcon(document.type)}
-                          </span>{' '}
-                          <span className="text-[10px] text-[#6e7d8c]">
-                            {document.type}
-                          </span>
-                        </td>
+                          <td
+                            className="font-medium text-[#ede8de] max-w-[200px] truncate"
+                            title={document.title}
+                          >
+                            {document.title}
+                          </td>
 
-                        <td className="hide-mobile">
-                          <span className="badge badge-muted">
-                            {document.discipline || '—'}
-                          </span>
-                        </td>
+                          <td>
+                            <span className="text-[9px]">
+                              {typeIcon(document.type)}
+                            </span>{' '}
+                            <span className="text-[10px] text-[#6e7d8c]">
+                              {document.type}
+                            </span>
+                          </td>
 
-                        <td className="font-mono text-[11px] text-[#6e7d8c]">
-                          Rev {document.revision}
-                        </td>
+                          <td className="hide-mobile">
+                            <span className="badge badge-muted">
+                              {document.discipline || '—'}
+                            </span>
+                          </td>
 
-                        <td>{fdate(document.revision_date)}</td>
+                          <td className="font-mono text-[11px] text-[#6e7d8c]">
+                            Rev {document.revision}
+                          </td>
 
-                        <td>
-                          <span className={`badge ${statBadge(document.status)}`}>
-                            {document.status}
-                          </span>
-                        </td>
+                          <td>{fdate(document.revision_date)}</td>
 
-                        <td className="hide-mobile text-[11px] text-[#6e7d8c]">
-                          {document.issued_by || '—'}
-                        </td>
+                          <td>
+                            <span className={`badge ${statBadge(document.status)}`}>
+                              {document.status}
+                            </span>
+                          </td>
 
-                        <td className="hide-mobile text-[10px] font-mono text-[#6e7d8c]">
-                          {document.file_size_kb
-                            ? `${document.file_size_kb}KB`
-                            : '—'}
-                        </td>
+                          <td className="hide-mobile text-[11px] text-[#6e7d8c]">
+                            {document.issued_by || '—'}
+                          </td>
 
-                        <td>
-                          <div className="flex gap-1">
-                            {document.public_url && (
-                              <a
-                                href={document.public_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="tbl-action"
-                                title="Download"
-                              >
-                                <Download size={10} />
-                              </a>
-                            )}
+                          <td className="hide-mobile text-[10px] font-mono text-[#6e7d8c]">
+                            {document.file_size_kb
+                              ? `${document.file_size_kb}KB`
+                              : '—'}
+                          </td>
 
-                            {canEdit ? (
-                              <button
-                                className="tbl-action"
-                                onClick={() => setModal(document)}
-                              >
-                                Edit
-                              </button>
-                            ) : (
-                              <span className="text-[#6e7d8c] text-[11px] px-2">
-                                View
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          <td>
+                            <div className="flex gap-1">
+                              {document.public_url && (
+                                <a
+                                  href={document.public_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="tbl-action"
+                                  title="Download"
+                                >
+                                  <Download size={10} />
+                                </a>
+                              )}
+
+                              {canEditThisDocument ? (
+                                <button
+                                  className="tbl-action"
+                                  onClick={() => setModal(document)}
+                                >
+                                  Edit
+                                </button>
+                              ) : (
+                                <span className="text-[#6e7d8c] text-[11px] px-2">
+                                  View
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -655,7 +666,7 @@ export default function DocumentsPage() {
         <DocumentRepository />
       )}
 
-      {modal !== null && canEdit && (
+      {modal !== null && canCreateDocument && (
         <DocModal
           item={modal === 'new' ? null : (modal as Document)}
           onClose={() => setModal(null)}
