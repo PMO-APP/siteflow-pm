@@ -472,7 +472,7 @@ const finalAccountForecast =
 
   return (
     <div className="space-y-5">
-      <div className="relative bg-gradient-to-r from-[#161f28] via-[#1c2a36] to-[#161f28] border border-[#c49e48]/15 rounded-xl p-5 overflow-hidden">
+     <div className="dashboard-hero relative rounded-xl p-5 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
 
         <div className="relative flex items-center gap-8">
