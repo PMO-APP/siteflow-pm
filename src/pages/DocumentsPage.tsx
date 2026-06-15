@@ -110,6 +110,14 @@ function DocModal({
     public_url: item?.public_url || '',
     file_size_kb: item?.file_size_kb || 0,
     file_type: item?.file_type || '',
+    google_drive_file_id:
+  item?.google_drive_file_id || '',
+
+google_drive_url:
+  item?.google_drive_url || '',
+
+google_drive_sync_status:
+  item?.google_drive_sync_status || 'pending',
   })
 
   const set = (key: string, value: any) =>
@@ -147,6 +155,57 @@ function DocModal({
       set('public_url', result.publicUrl)
       set('file_size_kb', Math.round(file.size / 1024))
       set('file_type', file.type || file.name.split('.').pop() || 'file')
+      try {
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/backup-to-google-drive`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${
+          import.meta.env.VITE_SUPABASE_ANON_KEY
+        }`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        projectId,
+        title: form.title || file.name,
+        filePath: result.path,
+        fileName: file.name,
+        discipline: form.discipline,
+        type: form.type,
+      }),
+    }
+  )
+
+  const driveResult = await response.json()
+
+  if (driveResult.success) {
+    set(
+      'google_drive_url',
+      driveResult.googleDriveUrl
+    )
+
+    set(
+      'google_drive_file_id',
+      driveResult.googleDriveFileId
+    )
+
+    set(
+      'google_drive_sync_status',
+      'synced'
+    )
+  }
+} catch (error) {
+  console.error(
+    'Google Drive backup failed',
+    error
+  )
+
+  set(
+    'google_drive_sync_status',
+    'failed'
+  )
+}
 
       await logAudit(
         user,
@@ -346,6 +405,17 @@ function DocModal({
             </label>
 
             {form.file_size_kb > 0 && (
+        {form.google_drive_sync_status === 'synced' && (
+  <div className="text-[10px] text-emerald-400 mt-1">
+    ✓ Backed up to Google Drive
+  </div>
+)}
+
+{form.google_drive_sync_status === 'failed' && (
+  <div className="text-[10px] text-red-400 mt-1">
+    ⚠ Google Drive backup failed
+  </div>
+)}
               <div className="text-[10px] text-[#6e7d8c] mt-1">
                 {form.file_size_kb} KB · {form.file_type || 'file'}
               </div>
