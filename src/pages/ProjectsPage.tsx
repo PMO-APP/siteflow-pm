@@ -328,7 +328,7 @@ export default function ProjectsPage() {
   const workspaceName = organizations[0]?.name || 'Workspace'
 
   return (
-    <div className="min-h-dvh bg-[#0c1014] text-white overflow-x-hidden overflow-y-auto">
+    <div className="projects-page min-h-dvh overflow-x-hidden overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-[calc(10rem+env(safe-area-inset-bottom))] space-y-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <button type="button" onClick={() => navigate('/')} className="text-left w-fit">
@@ -386,7 +386,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8 lg:p-10">
+       <div className="workspace-hero relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 lg:p-10">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
           <div className="relative max-w-3xl">
@@ -586,7 +586,7 @@ export default function ProjectsPage() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Layers size={16} className="text-[#c49e48]" />
-                                  <div className="font-semibold text-white">
+                                  <div className="portfolio-title font-semibold">
                                     {portfolio.name}
                                   </div>
                                 </div>
