@@ -344,8 +344,8 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
                   isActive
-                    ? 'bg-[#c49e48]/12 text-[#c49e48] border-[#c49e48]/20'
-                    : 'sidebar-muted border-transparent hover:text-[#c49e48] hover:bg-[#c49e48]/8'
+                    ? 'nav-active'
+                    : 'nav-inactive'
                 }`
               }
             >
