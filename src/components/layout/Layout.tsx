@@ -83,7 +83,6 @@ const VIEWER_NAV = [
   '/app',
   '/app/recovery',
   '/app/team',
-  '/app/financial',
 ]
 
 function formatRoleLabel(role: string | null) {
@@ -252,7 +251,7 @@ export default function Layout() {
   const pageTitle = currentPage?.label || 'Dashboard'
 
   return (
-    <div className="flex h-screen bg-[#0a0e12] text-white overflow-hidden">
+    <div className="layout-shell flex h-screen overflow-hidden">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
@@ -261,7 +260,7 @@ export default function Layout() {
       )}
 
       <aside
-        className={`fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r border-white/[0.06] bg-[#0f141a]/95 backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
+        className={`layout-sidebar fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -276,17 +275,21 @@ export default function Layout() {
             <PMOCorexLogo size={34} />
           </button>
 
-          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 space-y-2">
+          <div className="sidebar-panel mt-4 rounded-xl p-3 space-y-2">
             <InfoBlock
               label="Organization"
               value={organizationName || 'No organization'}
             />
+
             <div className="h-px bg-white/[0.06]" />
+
             <InfoBlock
               label="Portfolio"
               value={portfolioName || 'No portfolio'}
             />
+
             <div className="h-px bg-white/[0.06]" />
+
             <InfoBlock
               label="Project"
               value={projectName || 'No project selected'}
@@ -296,7 +299,7 @@ export default function Layout() {
         </div>
 
         <div className="px-4 py-3 border-b border-white/[0.06] flex-shrink-0">
-          <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#111820] px-3 py-3">
+          <div className="sidebar-panel flex items-center gap-3 rounded-xl px-3 py-3">
             <div
               className={`font-display text-3xl font-black leading-none ${
                 daysLeft !== null && daysLeft < 60
@@ -318,7 +321,7 @@ export default function Layout() {
                 DAYS LEFT
               </div>
 
-              <div className="text-[9px] text-[#6e7d8c]">
+              <div className="sidebar-muted text-[9px]">
                 {handoverDate
                   ? handoverDate.toLocaleDateString('en-GB', {
                       day: '2-digit',
@@ -342,7 +345,7 @@ export default function Layout() {
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
                   isActive
                     ? 'bg-[#c49e48]/12 text-[#c49e48] border-[#c49e48]/20'
-                    : 'text-slate-400 border-transparent hover:text-white hover:bg-white/[0.04]'
+                    : 'sidebar-muted border-transparent hover:text-[#c49e48] hover:bg-[#c49e48]/8'
                 }`
               }
             >
@@ -356,18 +359,18 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="w-full flex items-center gap-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05] p-2.5 hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all text-left"
+            className="sidebar-panel w-full flex items-center gap-2.5 rounded-xl p-2.5 hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all text-left"
           >
             <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
               {user ? getInitials(user.full_name || user.email || 'User') : 'U'}
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-[#ede8de] truncate">
+              <div className="sidebar-text text-[11px] font-medium truncate">
                 {user?.full_name || user?.email || 'User'}
               </div>
 
-              <div className="text-[9px] text-[#6e7d8c] capitalize">
+              <div className="sidebar-muted text-[9px] capitalize">
                 {formatRoleLabel(role)}
               </div>
             </div>
@@ -377,11 +380,11 @@ export default function Layout() {
 
               <button
                 type="button"
-                onClick={e => {
-                  e.stopPropagation()
+                onClick={event => {
+                  event.stopPropagation()
                   signOut()
                 }}
-                className="text-[#6e7d8c] hover:text-red-400 transition-colors"
+                className="sidebar-muted hover:text-red-400 transition-colors"
                 title="Sign out"
               >
                 <LogOut size={14} />
@@ -392,9 +395,9 @@ export default function Layout() {
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[#0c1014]/80 backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
+        <header className="layout-header sticky top-0 z-20 border-b backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
           <button
-            className="lg:hidden text-[#6e7d8c] hover:text-[#ede8de] transition-colors"
+            className="lg:hidden sidebar-muted hover:text-[#c49e48] transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={18} />
@@ -416,11 +419,11 @@ export default function Layout() {
             </button>
 
             <div className="ml-2 min-w-0">
-              <div className="font-display text-[18px] lg:text-[20px] font-semibold text-[#ede8de]">
+              <div className="sidebar-text font-display text-[18px] lg:text-[20px] font-semibold">
                 {pageTitle}
               </div>
 
-              <div className="hidden md:flex items-center gap-1 text-[10px] text-[#6e7d8c] mt-0.5 truncate">
+              <div className="hidden md:flex items-center gap-1 sidebar-muted text-[10px] mt-0.5 truncate">
                 <span>{organizationName || 'Organization'}</span>
                 <span>/</span>
                 <span>{portfolioName || 'Portfolio'}</span>
@@ -437,7 +440,7 @@ export default function Layout() {
             <span className="text-[11px] text-emerald-400">Live</span>
           </div>
 
-          <div className="text-[10px] text-[#6e7d8c] font-mono hidden sm:block">
+          <div className="sidebar-muted text-[10px] font-mono hidden sm:block">
             {new Date().toLocaleDateString('en-GB', {
               weekday: 'short',
               day: '2-digit',
@@ -447,7 +450,7 @@ export default function Layout() {
           </div>
 
           <button
-            className="relative text-[#6e7d8c] hover:text-[#c49e48] transition-colors p-1"
+            className="relative sidebar-muted hover:text-[#c49e48] transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
           >
             <Bell size={16} />
@@ -466,7 +469,7 @@ export default function Layout() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6 animate-in bg-[#0c1014]">
+        <div className="layout-content flex-1 overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
         </div>
       </main>
@@ -485,7 +488,7 @@ function InfoBlock({
 }) {
   return (
     <div>
-      <div className="text-[9px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+      <div className="sidebar-muted text-[9px] uppercase tracking-[0.25em]">
         {label}
       </div>
 
@@ -493,7 +496,7 @@ function InfoBlock({
         className={`mt-1 truncate ${
           highlight
             ? 'text-sm font-bold text-[#c49e48]'
-            : 'text-xs font-semibold text-[#ede8de]'
+            : 'sidebar-text text-xs font-semibold'
         }`}
       >
         {value}
