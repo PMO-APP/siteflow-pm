@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
+  BriefcaseBusiness,
   CalendarDays,
   ShoppingCart,
   CheckSquare,
@@ -39,6 +40,11 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+  {
+    to: '/app/portfolio-dashboard',
+    icon: BriefcaseBusiness,
+    label: 'Portfolio Dashboard',
+  },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
@@ -57,10 +63,10 @@ const NAV = [
     label: 'Internal Assignments',
   },
   {
-  to: '/app/external-task-review',
-  icon: ClipboardList,
-  label: 'Task Review',
-},
+    to: '/app/external-task-review',
+    icon: ClipboardList,
+    label: 'Task Review',
+  },
   {
     to: '/app/external-assignments',
     icon: Building2,
@@ -72,10 +78,10 @@ const NAV = [
     label: 'External Review',
   },
   {
-  to: '/app/external-communication',
-  icon: MessageSquare,
-  label: 'Communications',
-},
+    to: '/app/external-communication',
+    icon: MessageSquare,
+    label: 'Communications',
+  },
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
