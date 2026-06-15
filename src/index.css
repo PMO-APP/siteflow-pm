@@ -8,6 +8,22 @@
     --gold2: #e3c06a;
   }
 
+  html.dark {
+    --page-bg: #0c1014;
+    --text-primary: #ede8de;
+    --card-border: rgba(196, 158, 72, 0.15);
+    --hero-bg: linear-gradient(135deg, #111820, #162230, #0f151c);
+  }
+
+  html.light {
+    --page-bg: #f8f4eb;
+    --text-primary: #111827;
+    --card-border: rgba(196, 158, 72, 0.18);
+    --hero-bg:
+      radial-gradient(circle at top right, rgba(196, 158, 72, 0.15), transparent 30%),
+      linear-gradient(135deg, #ffffff, #faf6ea, #f3ead1);
+  }
+
   * {
     @apply box-border;
   }
@@ -19,9 +35,26 @@
   }
 
   body {
-    @apply bg-[#0c1014] text-[#ede8de] font-sans antialiased;
+    @apply font-sans antialiased;
+    background: #0c1014;
+    color: #ede8de;
     overflow-x: hidden;
     overflow-y: auto;
+  }
+
+  html.light body {
+    background:
+      radial-gradient(circle at top right, rgba(196, 158, 72, 0.14), transparent 34%),
+      linear-gradient(180deg, #f8f4eb 0%, #f3efe5 42%, #ede7da 100%);
+    color: #111827;
+  }
+
+  input[type='date'] {
+    color-scheme: dark;
+  }
+
+  html.light input[type='date'] {
+    color-scheme: light;
   }
 
   ::-webkit-scrollbar {
@@ -38,12 +71,8 @@
     border-radius: 2px;
   }
 
-  input[type='date'] {
-    color-scheme: dark;
-  }
-
-  html.light input[type='date'] {
-    color-scheme: light;
+  html.light ::-webkit-scrollbar-thumb {
+    background: rgba(196, 158, 72, 0.38);
   }
 }
 
@@ -70,7 +99,7 @@
 
   .btn {
     @apply inline-flex items-center gap-2 px-4 py-2 rounded-md font-sans text-[13px]
-           font-semibold cursor-pointer transition-all duration-150 border-none outline-none;
+      font-semibold cursor-pointer transition-all duration-150 border-none outline-none;
   }
 
   .btn:hover {
@@ -96,18 +125,18 @@
 
   .form-label {
     @apply block text-[10px] font-mono font-semibold text-[#6e7d8c]
-           uppercase tracking-widest mb-1.5;
+      uppercase tracking-widest mb-1.5;
   }
 
   .form-control {
     @apply w-full px-3 py-2 bg-[#1c2a36] border border-white/[0.08] rounded-md
-           text-[#ede8de] text-[13px] font-sans outline-none
-           focus:border-[#c49e48] transition-colors placeholder:text-[#6e7d8c];
+      text-[#ede8de] text-[13px] font-sans outline-none
+      focus:border-[#c49e48] transition-colors placeholder:text-[#6e7d8c];
   }
 
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full
-           text-[9px] font-mono font-bold uppercase tracking-wider;
+      text-[9px] font-mono font-bold uppercase tracking-wider;
   }
 
   .badge-red {
@@ -140,13 +169,13 @@
 
   .tbl th {
     @apply bg-[#1c2a36] text-[#6e7d8c] px-3 py-2 text-left
-           text-[9px] font-mono uppercase tracking-widest
-           border-b border-white/[0.06] whitespace-nowrap font-normal;
+      text-[9px] font-mono uppercase tracking-widest
+      border-b border-white/[0.06] whitespace-nowrap font-normal;
   }
 
   .tbl td {
     @apply px-3 py-2 border-b border-white/[0.03] text-[12px] text-[#bfb9ae]
-           align-middle;
+      align-middle;
   }
 
   .tbl tr:hover td {
@@ -155,9 +184,9 @@
 
   .tbl-action {
     @apply px-2 py-1 rounded text-[10px] font-mono text-[#6e7d8c]
-           border border-white/[0.06] bg-transparent cursor-pointer
-           hover:bg-[#c49e48]/10 hover:text-[#c49e48] hover:border-[#c49e48]/20
-           transition-all;
+      border border-white/[0.06] bg-transparent cursor-pointer
+      hover:bg-[#c49e48]/10 hover:text-[#c49e48] hover:border-[#c49e48]/20
+      transition-all;
   }
 
   .input-search {
@@ -199,31 +228,19 @@
     @apply text-[11px] text-[#6e7d8c] mt-1;
   }
 
-  .nav-item {
-    @apply flex items-center gap-2.5 px-4 py-2 cursor-pointer
-           text-[#6e7d8c] text-[12px] font-medium
-           transition-all duration-150 border-l-2 border-transparent
-           hover:text-[#bfb9ae] hover:bg-white/[0.025];
-  }
-
-  .nav-item.active {
-    @apply text-[#c49e48] border-l-[#c49e48] bg-[#c49e48]/10;
-  }
-
   .modal-overlay {
     @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-50
-           flex items-center justify-center p-4;
+      flex items-center justify-center p-4;
   }
 
   .modal {
     @apply bg-[#161f28] border border-[#c49e48]/20 rounded-xl
-           w-full max-w-xl max-h-[90vh] overflow-y-auto
-           shadow-2xl;
+      w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl;
   }
 
   .modal-head {
     @apply px-5 py-4 border-b border-white/[0.06]
-           flex items-start gap-3 sticky top-0 bg-[#161f28] z-10;
+      flex items-start gap-3 sticky top-0 bg-[#161f28] z-10;
   }
 
   .modal-title {
@@ -298,17 +315,9 @@
 }
 
 /* =========================
-   LIGHT MODE — PMOCorex Ivory
+   LIGHT MODE — GENERAL
 ========================= */
 
-html.light body {
-  background:
-    radial-gradient(circle at top right, rgba(196, 158, 72, 0.14), transparent 34%),
-    linear-gradient(180deg, #f8f4eb 0%, #f3efe5 42%, #ede7da 100%);
-  color: #111827;
-}
-
-/* Main dark backgrounds converted to ivory/navy-light */
 html.light .bg-\[\#0c1014\] {
   background: #f8f4eb !important;
 }
@@ -321,26 +330,15 @@ html.light .bg-\[\#1c2a36\] {
   background: #f1eadc !important;
 }
 
-/* Premium hero/gradient sections */
-html.light .bg-gradient-to-br {
-  background:
-    radial-gradient(circle at top right, rgba(196, 158, 72, 0.22), transparent 32%),
-    linear-gradient(135deg, #ffffff 0%, #f8f1df 52%, #efe1bd 100%) !important;
+html.light .bg-gradient-to-br,
+html.light .bg-gradient-to-r {
+  background: var(--hero-bg) !important;
   border-color: rgba(196, 158, 72, 0.34) !important;
 }
 
-/* Sidebar / top navigation */
-html.light aside,
-html.light nav {
-  background: rgba(255, 252, 246, 0.92);
-  border-color: rgba(196, 158, 72, 0.18);
-  color: #111827;
-}
-
-/* Cards */
 html.light .card,
 html.light .stat-card {
-  background: rgba(255, 252, 246, 0.92);
+  background: rgba(255, 252, 246, 0.94);
   border: 1px solid rgba(196, 158, 72, 0.22);
   color: #111827;
   box-shadow:
@@ -356,12 +354,10 @@ html.light .stat-card:hover {
     0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
-/* Card header */
 html.light .card-head {
   border-bottom-color: rgba(196, 158, 72, 0.18);
 }
 
-/* Typography */
 html.light .page-title,
 html.light .card-title,
 html.light .section-title,
@@ -389,7 +385,6 @@ html.light .text-\[\#c49e48\] {
   color: #9a711f !important;
 }
 
-/* Forms */
 html.light .form-label {
   color: #64748b;
 }
@@ -409,7 +404,6 @@ html.light .form-control:focus {
   box-shadow: 0 0 0 3px rgba(196, 158, 72, 0.16);
 }
 
-/* Buttons */
 html.light .btn-gold {
   background: #c49e48;
   color: #111827;
@@ -431,23 +425,6 @@ html.light .btn-ghost:hover {
   border-color: rgba(196, 158, 72, 0.42);
 }
 
-/* Navigation */
-html.light .nav-item {
-  color: #475569;
-}
-
-html.light .nav-item:hover {
-  background: rgba(196, 158, 72, 0.08);
-  color: #111827;
-}
-
-html.light .nav-item.active {
-  background: rgba(196, 158, 72, 0.14);
-  color: #9a711f;
-  border-left-color: #c49e48;
-}
-
-/* Tables */
 html.light .tbl th {
   background: #efe6d2;
   color: #475569;
@@ -474,7 +451,6 @@ html.light .tbl-action:hover {
   border-color: rgba(196, 158, 72, 0.4);
 }
 
-/* Badges */
 html.light .badge-muted {
   background: #f3ead7;
   color: #64748b;
@@ -487,7 +463,6 @@ html.light .badge-gold {
   border-color: rgba(196, 158, 72, 0.28);
 }
 
-/* Modals */
 html.light .modal {
   background: #fffaf0;
   border-color: rgba(196, 158, 72, 0.34);
@@ -498,26 +473,18 @@ html.light .modal-head {
   border-bottom-color: rgba(196, 158, 72, 0.2);
 }
 
-/* Red session box */
 html.light .btn-danger,
 html.light .bg-red-500\/10 {
   background: rgba(239, 68, 68, 0.08) !important;
 }
 
-/* Soft dividers */
 html.light .soft-divider {
   border-color: rgba(196, 158, 72, 0.18);
 }
 
-/* Scrollbar */
-html.light ::-webkit-scrollbar-thumb {
-  background: rgba(196, 158, 72, 0.38);
-}
-    /* =========================
-   PMOCorex Layout Theme Layer
+/* =========================
+   LAYOUT THEME LAYER
 ========================= */
-
-/* DARK */
 
 .layout-shell {
   background: #0a0e12;
@@ -551,21 +518,10 @@ html.light ::-webkit-scrollbar-thumb {
   color: #6e7d8c;
 }
 
-/* LIGHT */
-
 html.light .layout-shell {
   background:
-    radial-gradient(
-      circle at top right,
-      rgba(196, 158, 72, 0.12),
-      transparent 35%
-    ),
-    linear-gradient(
-      180deg,
-      #f8f4eb 0%,
-      #f3efe5 45%,
-      #ede7da 100%
-    );
+    radial-gradient(circle at top right, rgba(196, 158, 72, 0.12), transparent 35%),
+    linear-gradient(180deg, #f8f4eb 0%, #f3efe5 45%, #ede7da 100%);
   color: #111827;
 }
 
@@ -600,20 +556,52 @@ html.light .sidebar-text {
 html.light .sidebar-muted {
   color: #64748b;
 }
-/* ==========================
-   PMOCorex Theme Components
-========================== */
+
+/* =========================
+   NAV THEME LAYER
+========================= */
+
+.nav-active {
+  background: rgba(196, 158, 72, 0.12);
+  color: #c49e48;
+  border-color: rgba(196, 158, 72, 0.2);
+}
+
+.nav-inactive {
+  color: #6e7d8c;
+  border-color: transparent;
+}
+
+.nav-inactive:hover {
+  color: #c49e48;
+  background: rgba(196, 158, 72, 0.08);
+}
+
+html.light .nav-active {
+  background: rgba(196, 158, 72, 0.12);
+  color: #9a711f;
+  border-color: rgba(196, 158, 72, 0.25);
+}
+
+html.light .nav-inactive {
+  color: #475569;
+}
+
+html.light .nav-inactive:hover {
+  color: #9a711f;
+  background: rgba(196, 158, 72, 0.08);
+}
+
+/* =========================
+   PAGE THEME COMPONENTS
+========================= */
 
 .projects-page {
   background: var(--page-bg);
   color: var(--text-primary);
 }
 
-.workspace-hero {
-  border: 1px solid var(--card-border);
-  background: var(--hero-bg);
-}
-
+.workspace-hero,
 .dashboard-hero {
   border: 1px solid var(--card-border);
   background: var(--hero-bg);
@@ -621,41 +609,4 @@ html.light .sidebar-muted {
 
 .portfolio-title {
   color: var(--text-primary);
-}
-
-/* DARK */
-
-html.dark {
-  --page-bg: #0c1014;
-  --text-primary: #ede8de;
-  --card-border: rgba(196,158,72,.15);
-
-  --hero-bg:
-    linear-gradient(
-      135deg,
-      #111820,
-      #162230,
-      #0f151c
-    );
-}
-
-/* LIGHT */
-
-html.light {
-  --page-bg: #f5f7fa;
-  --text-primary: #111827;
-  --card-border: rgba(196,158,72,.18);
-
-  --hero-bg:
-    radial-gradient(
-      circle at top right,
-      rgba(196,158,72,.15),
-      transparent 30%
-    ),
-    linear-gradient(
-      135deg,
-      #ffffff,
-      #faf6ea,
-      #f3ead1
-    );
 }
