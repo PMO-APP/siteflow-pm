@@ -647,3 +647,34 @@ html.light .bg-\[\#0c1014\] {
 html.light .hover\:border-\[\#c49e48\]\/20:hover {
   border-color: rgba(196, 158, 72, 0.3) !important;
 }
+    /* =========================
+   DASHBOARD LIGHT MODE FIXES
+========================= */
+
+html.light .text-\[\#ede8de\] {
+  color: #111827 !important;
+}
+
+html.light .text-\[\#bfb9ae\] {
+  color: #334155 !important;
+}
+
+html.light .text-\[\#6e7d8c\] {
+  color: #64748b !important;
+}
+
+html.light .bg-white\/5 {
+  background: rgba(15, 23, 42, 0.06) !important;
+}
+
+html.light .border-white\/\[0\.04\] {
+  border-color: rgba(196, 158, 72, 0.14) !important;
+}
+
+html.light .divide-white\/\[0\.04\] > * + * {
+  border-color: rgba(196, 158, 72, 0.14) !important;
+}
+
+html.light .hover\:bg-white\/\[0\.02\]:hover {
+  background: rgba(196, 158, 72, 0.06) !important;
+}
