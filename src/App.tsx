@@ -36,6 +36,7 @@ import ExternalTaskReviewPage from '@/pages/ExternalTaskReviewPage'
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
 import QualityPage from '@/pages/QualityPage'
+import HSEPage from '@/pages/HSEPage'
 import ProcurementPage from '@/pages/ProcurementPage'
 import ApprovalsPage from '@/pages/ApprovalsPage'
 import SitePage from '@/pages/SitePage'
@@ -145,24 +146,23 @@ export default function App() {
     )
 
     const selectedMembership =
-  externalMembership || workspaceMembership || memberships[0]
+      externalMembership || workspaceMembership || memberships[0]
 
-const projectIds = memberships
-  .filter(
-    membership =>
-      membership.access_scope === 'project' &&
-      membership.project_id
-  )
-  .map(membership => membership.project_id)
+    const projectIds = memberships
+      .filter(
+        membership =>
+          membership.access_scope === 'project' && membership.project_id
+      )
+      .map(membership => membership.project_id)
 
-setMembership({
-  role: selectedMembership.role,
-  accessScope: selectedMembership.access_scope,
-  organizationId: selectedMembership.organization_id,
-  portfolioId: selectedMembership.portfolio_id,
-  projectId: selectedMembership.project_id,
-  projectIds,
-})
+    setMembership({
+      role: selectedMembership.role,
+      accessScope: selectedMembership.access_scope,
+      organizationId: selectedMembership.organization_id,
+      portfolioId: selectedMembership.portfolio_id,
+      projectId: selectedMembership.project_id,
+      projectIds,
+    })
   }
 
   useEffect(() => {
@@ -395,6 +395,7 @@ setMembership({
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
+          <Route path="hse" element={<HSEPage />} />
           <Route path="procurement" element={<ProcurementPage />} />
           <Route path="approvals" element={<ApprovalsPage />} />
           <Route path="site" element={<SitePage />} />
