@@ -661,18 +661,169 @@ export default function Dashboard() {
         handoverConfidence={handoverConfidence ?? 0}
       />
 
-      <ExecutiveSummary
-        projectName={projectName}
-        progress={progressPct}
-        variance={variancePct}
-        overdueTasks={overdue}
-        openRisks={openRisks}
-        highRisks={highRisks}
-        pendingApprovals={pendingApprovals}
-        procurementRisks={procRisks}
-      />
+     <ExecutiveSummary
+  projectName={projectName}
+  progress={progressPct}
+  variance={variancePct}
+  overdueTasks={overdue}
+  openRisks={openRisks}
+  highRisks={highRisks}
+  pendingApprovals={pendingApprovals}
+  procurementRisks={procRisks}
+/>
 
-      {/* Keep the rest of your dashboard cards below this point unchanged */}
+{/* Financial Summary */}
+
+<div className="grid md:grid-cols-4 gap-4">
+  <div className="card p-4">
+    <div className="text-xs text-slate-500">Contract Sum</div>
+    <div className="text-2xl font-bold">
+      {formatCurrency(contractSum)}
     </div>
-  )
+  </div>
+
+  <div className="card p-4">
+    <div className="text-xs text-slate-500">
+      Approved Variations
+    </div>
+    <div className="text-2xl font-bold">
+      {formatCurrency(variationsTotal)}
+    </div>
+  </div>
+
+  <div className="card p-4">
+    <div className="text-xs text-slate-500">
+      Paid To Date
+    </div>
+    <div className="text-2xl font-bold">
+      {formatCurrency(paidTotal)}
+    </div>
+  </div>
+
+  <div className="card p-4">
+    <div className="text-xs text-slate-500">
+      Final Forecast
+    </div>
+    <div className="text-2xl font-bold">
+      {formatCurrency(projectedFinalContractSum)}
+    </div>
+  </div>
+</div>
+
+{/* Activities + Deadlines */}
+
+<div className="grid lg:grid-cols-2 gap-5">
+
+  <div className="card">
+    <div className="card-head">
+      <div className="card-title">
+        Current Activities
+      </div>
+    </div>
+
+    <div className="p-4 space-y-2">
+      {tasks
+        .filter(t => t.status === 'In Progress')
+        .slice(0, 8)
+        .map(task => (
+          <div
+            key={task.id}
+            className="flex justify-between text-sm"
+          >
+            <span>{task.name}</span>
+            <span>{task.progress_pct || 0}%</span>
+          </div>
+        ))}
+    </div>
+  </div>
+
+  <div className="card">
+    <div className="card-head">
+      <div className="card-title">
+        Upcoming Deadlines
+      </div>
+    </div>
+
+    <div className="p-4 space-y-2">
+      {deadlines.slice(0, 10).map(item => (
+        <div
+          key={`${item.name}-${item.date}`}
+          className="flex justify-between text-sm"
+        >
+          <span>{item.name}</span>
+
+          <span className={urgencyColor(item.days)}>
+            {item.days}d
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+
+</div>
+
+{/* Phase Progress */}
+
+<div className="card">
+  <div className="card-head">
+    <div className="card-title">
+      Phase Progress
+    </div>
+  </div>
+
+  <div className="p-4 space-y-3">
+    {phaseData.map(phase => (
+      <div key={phase.name}>
+        <div className="flex justify-between text-sm mb-1">
+          <span>{phase.name}</span>
+          <span>{phase.pct}%</span>
+        </div>
+
+        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+          <div
+            className="h-full"
+            style={{
+              width: `${phase.pct}%`,
+              background: phase.color,
+            }}
+          />
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+{/* Task Status */}
+
+<div className="card">
+  <div className="card-head">
+    <div className="card-title">
+      Task Status Breakdown
+    </div>
+  </div>
+
+  <div className="h-[320px]">
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={statusPie}
+          dataKey="value"
+          nameKey="name"
+          innerRadius={60}
+          outerRadius={90}
+        >
+          {statusPie.map((entry, index) => (
+            <Cell
+              key={index}
+              fill={entry.color}
+            />
+          ))}
+        </Pie>
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
+</div>
+)
 }
