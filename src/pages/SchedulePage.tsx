@@ -51,8 +51,8 @@ export default function SchedulePage() {
 } = useProjectStore()
 
  const role = useMembershipStore(state => state.role)
-const assignedProjectId = useMembershipStore(
-  state => state.projectId
+const assignedProjectIds = useMembershipStore(
+  state => state.projectIds
 )
   const { user } = useAuthStore()
 
@@ -94,8 +94,9 @@ const assignedProjectId = useMembershipStore(
     disciplineTab === 'Overall'
       ? undefined
       : (disciplineTab as ScheduleDiscipline)
-  const isAssignedProjectOwner =
-  assignedProjectId === projectId
+ const isAssignedProjectOwner =
+  !!projectId &&
+  assignedProjectIds.includes(projectId)
 
  const canEditDisciplineSchedule =
   disciplineTab !== 'Overall' &&
