@@ -41,13 +41,14 @@ const DISCIPLINE_TABS: DisciplineTab[] = [
 ]
 
 export default function SchedulePage() {
-  const {
-    projectId,
-    projectName,
-    housebuildOwnerEmail,
-    mepOwnerEmail,
-    infrastructureOwnerEmail,
-  } = useProjectStore()
+ const {
+  projectId,
+  projectName,
+  projectOwnerEmail,
+  housebuildOwnerEmail,
+  mepOwnerEmail,
+  infrastructureOwnerEmail,
+} = useProjectStore()
 
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
@@ -69,18 +70,22 @@ export default function SchedulePage() {
   const currentEmail = user?.email?.toLowerCase().trim() || ''
 
   const permissionContext = {
-    isHousebuildOwner:
-      !!currentEmail &&
-      currentEmail === housebuildOwnerEmail?.toLowerCase().trim(),
+  isOverallProjectOwner:
+    !!currentEmail &&
+    currentEmail === projectOwnerEmail?.toLowerCase().trim(),
 
-    isMEPOwner:
-      !!currentEmail &&
-      currentEmail === mepOwnerEmail?.toLowerCase().trim(),
+  isHousebuildOwner:
+    !!currentEmail &&
+    currentEmail === housebuildOwnerEmail?.toLowerCase().trim(),
 
-    isInfrastructureOwner:
-      !!currentEmail &&
-      currentEmail === infrastructureOwnerEmail?.toLowerCase().trim(),
-  }
+  isMEPOwner:
+    !!currentEmail &&
+    currentEmail === mepOwnerEmail?.toLowerCase().trim(),
+
+  isInfrastructureOwner:
+    !!currentEmail &&
+    currentEmail === infrastructureOwnerEmail?.toLowerCase().trim(),
+}
 
   const activeDiscipline =
     disciplineTab === 'Overall'
