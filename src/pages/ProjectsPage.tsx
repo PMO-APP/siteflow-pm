@@ -72,11 +72,23 @@ export default function ProjectsPage() {
   const [selectedOrgId, setSelectedOrgId] = useState<number | ''>('')
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('')
 
+  const [newOverallOwnerEmail, setNewOverallOwnerEmail] = useState('')
+  const [newHousebuildOwnerEmail, setNewHousebuildOwnerEmail] = useState('')
+  const [newMepOwnerEmail, setNewMepOwnerEmail] = useState('')
+  const [newInfrastructureOwnerEmail, setNewInfrastructureOwnerEmail] =
+    useState('')
+
   const [editProjectName, setEditProjectName] = useState('')
   const [editProjectStatus, setEditProjectStatus] = useState('Planning')
   const [editProjectPhase, setEditProjectPhase] = useState('Concept')
   const [editProjectLocation, setEditProjectLocation] = useState('')
   const [editProjectHandoverDate, setEditProjectHandoverDate] = useState('')
+
+  const [editOverallOwnerEmail, setEditOverallOwnerEmail] = useState('')
+  const [editHousebuildOwnerEmail, setEditHousebuildOwnerEmail] = useState('')
+  const [editMepOwnerEmail, setEditMepOwnerEmail] = useState('')
+  const [editInfrastructureOwnerEmail, setEditInfrastructureOwnerEmail] =
+    useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [portfolioFilter, setPortfolioFilter] = useState('All')
@@ -212,7 +224,10 @@ export default function ProjectsPage() {
       project.project_name,
       project.organization_id ?? null,
       project.portfolio_id ?? null,
-      null
+      project.overall_owner_email ?? null,
+      project.housebuild_owner_email ?? null,
+      project.mep_owner_email ?? null,
+      project.infrastructure_owner_email ?? null
     )
 
     navigate('/app')
@@ -220,11 +235,18 @@ export default function ProjectsPage() {
 
   function openEditProject(project: any) {
     setEditingProject(project)
+
     setEditProjectName(project.project_name || '')
     setEditProjectStatus(project.status || 'Planning')
     setEditProjectPhase(project.phase || 'Concept')
     setEditProjectLocation(project.location || '')
     setEditProjectHandoverDate(project.handover_date || '')
+
+    setEditOverallOwnerEmail(project.overall_owner_email || '')
+    setEditHousebuildOwnerEmail(project.housebuild_owner_email || '')
+    setEditMepOwnerEmail(project.mep_owner_email || '')
+    setEditInfrastructureOwnerEmail(project.infrastructure_owner_email || '')
+
     setShowEditProjectModal(true)
   }
 
@@ -240,6 +262,17 @@ export default function ProjectsPage() {
         phase: editProjectPhase,
         location: editProjectLocation.trim() || null,
         handover_date: editProjectHandoverDate || null,
+
+        overall_owner_email:
+          editOverallOwnerEmail.trim().toLowerCase() || null,
+
+        housebuild_owner_email:
+          editHousebuildOwnerEmail.trim().toLowerCase() || null,
+
+        mep_owner_email: editMepOwnerEmail.trim().toLowerCase() || null,
+
+        infrastructure_owner_email:
+          editInfrastructureOwnerEmail.trim().toLowerCase() || null,
       })
       .eq('id', editingProject.id)
 
@@ -279,8 +312,22 @@ export default function ProjectsPage() {
       project_name: newProjectName.trim(),
       status: newProjectStatus,
       phase: newProjectPhase,
+
       organization_id: selectedOrgId || organizations[0]?.id || null,
+
       portfolio_id: selectedPortfolioId || null,
+
+      overall_owner_email:
+        newOverallOwnerEmail.trim().toLowerCase() || null,
+
+      housebuild_owner_email:
+        newHousebuildOwnerEmail.trim().toLowerCase() || null,
+
+      mep_owner_email:
+        newMepOwnerEmail.trim().toLowerCase() || null,
+
+      infrastructure_owner_email:
+        newInfrastructureOwnerEmail.trim().toLowerCase() || null,
     })
 
     if (error) {
@@ -293,6 +340,12 @@ export default function ProjectsPage() {
     setNewProjectPhase('Concept')
     setSelectedOrgId('')
     setSelectedPortfolioId('')
+
+    setNewOverallOwnerEmail('')
+    setNewHousebuildOwnerEmail('')
+    setNewMepOwnerEmail('')
+    setNewInfrastructureOwnerEmail('')
+
     setShowProjectModal(false)
     loadHub()
   }
@@ -331,7 +384,11 @@ export default function ProjectsPage() {
     <div className="projects-page min-h-dvh overflow-x-hidden overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-[calc(10rem+env(safe-area-inset-bottom))] space-y-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <button type="button" onClick={() => navigate('/')} className="text-left w-fit">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-left w-fit"
+          >
             <PMOCorexLogo size={42} />
           </button>
 
@@ -341,18 +398,27 @@ export default function ProjectsPage() {
               {workspaceName}
             </div>
 
-            <button onClick={() => navigate('/profile')} className="btn-ghost btn-sm btn justify-center">
+            <button
+              onClick={() => navigate('/profile')}
+              className="btn-ghost btn-sm btn justify-center"
+            >
               <UserCircle size={14} />
               My Profile
             </button>
 
-            <button onClick={() => navigate('/portfolio-dashboard')} className="btn-ghost btn-sm btn justify-center">
+            <button
+              onClick={() => navigate('/portfolio-dashboard')}
+              className="btn-ghost btn-sm btn justify-center"
+            >
               <BarChart3 size={14} />
               Portfolio Dashboard
             </button>
 
             {canAccessAdmin && (
-              <button onClick={() => navigate('/admin')} className="btn-ghost btn-sm btn justify-center">
+              <button
+                onClick={() => navigate('/admin')}
+                className="btn-ghost btn-sm btn justify-center"
+              >
                 <Shield size={14} />
                 Admin Console
               </button>
@@ -386,7 +452,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-       <div className="workspace-hero relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 lg:p-10">
+        <div className="workspace-hero relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 lg:p-10">
           <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
 
           <div className="relative max-w-3xl">
@@ -441,7 +507,10 @@ export default function ProjectsPage() {
           </div>
 
           <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]" />
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
+            />
 
             <input
               className="form-control pl-9"
@@ -460,8 +529,13 @@ export default function ProjectsPage() {
               <div className="mt-1 font-semibold">{workspaceName}</div>
             </div>
 
-            <select className="form-control" value={portfolioFilter} onChange={e => setPortfolioFilter(e.target.value)}>
+            <select
+              className="form-control"
+              value={portfolioFilter}
+              onChange={e => setPortfolioFilter(e.target.value)}
+            >
               <option value="All">All Portfolios</option>
+
               {portfolios.map(portfolio => (
                 <option key={portfolio.id} value={String(portfolio.id)}>
                   {portfolio.name}
@@ -469,8 +543,13 @@ export default function ProjectsPage() {
               ))}
             </select>
 
-            <select className="form-control" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <select
+              className="form-control"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
               <option value="All">All Statuses</option>
+
               {PROJECT_STATUSES.map(status => (
                 <option key={status} value={status}>
                   {status}
@@ -478,8 +557,13 @@ export default function ProjectsPage() {
               ))}
             </select>
 
-            <select className="form-control" value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)}>
+            <select
+              className="form-control"
+              value={phaseFilter}
+              onChange={e => setPhaseFilter(e.target.value)}
+            >
               <option value="All">All Phases</option>
+
               {PROJECT_PHASES.map(phase => (
                 <option key={phase} value={phase}>
                   {phase}
@@ -517,6 +601,7 @@ export default function ProjectsPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <Building2 size={18} className="text-[#c49e48]" />
+
                           <h2 className="text-xl font-bold text-[#ede8de]">
                             {org.name}
                           </h2>
@@ -538,7 +623,10 @@ export default function ProjectsPage() {
                         </button>
 
                         {canAccessAdmin && (
-                          <button onClick={() => navigate('/admin')} className="btn-ghost btn-sm btn w-fit">
+                          <button
+                            onClick={() => navigate('/admin')}
+                            className="btn-ghost btn-sm btn w-fit"
+                          >
                             <Shield size={14} />
                             Manage Access
                           </button>
@@ -578,21 +666,28 @@ export default function ProjectsPage() {
                           project => project.portfolio_id === portfolio.id
                         )
 
-                        if (portfolioProjects.length === 0 && searchTerm) return null
+                        if (portfolioProjects.length === 0 && searchTerm) {
+                          return null
+                        }
 
                         return (
-                          <div key={portfolio.id} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5">
+                          <div
+                            key={portfolio.id}
+                            className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5"
+                          >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <Layers size={16} className="text-[#c49e48]" />
+
                                   <div className="portfolio-title font-semibold">
                                     {portfolio.name}
                                   </div>
                                 </div>
 
                                 <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description || 'Project delivery portfolio'}
+                                  {portfolio.description ||
+                                    'Project delivery portfolio'}
                                 </div>
                               </div>
 
@@ -623,7 +718,8 @@ export default function ProjectsPage() {
                       })}
                     </div>
 
-                    {orgProjects.filter(project => !project.portfolio_id).length > 0 && (
+                    {orgProjects.filter(project => !project.portfolio_id).length >
+                      0 && (
                       <div className="mt-6">
                         <div className="text-sm font-semibold text-[#ede8de] mb-3">
                           Projects not assigned to a portfolio
@@ -655,7 +751,10 @@ export default function ProjectsPage() {
       </div>
 
       {showPortfolioModal && canCreateItems && (
-        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
+        <Modal
+          title="Create Portfolio"
+          onClose={() => setShowPortfolioModal(false)}
+        >
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
             <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
               Organization
@@ -673,7 +772,10 @@ export default function ProjectsPage() {
             onChange={e => setNewPortfolioName(e.target.value)}
           />
 
-          <button className="btn-gold btn w-full justify-center" onClick={createPortfolio}>
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createPortfolio}
+          >
             Create Portfolio
           </button>
         </Modal>
@@ -691,11 +793,18 @@ export default function ProjectsPage() {
             </div>
           </div>
 
-          <select className="form-control mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(Number(e.target.value))}>
+          <select
+            className="form-control mb-4"
+            value={selectedPortfolioId}
+            onChange={e => setSelectedPortfolioId(Number(e.target.value))}
+          >
             <option value="">Select portfolio</option>
 
             {portfolios
-              .filter(portfolio => !selectedOrgId || portfolio.organization_id === selectedOrgId)
+              .filter(
+                portfolio =>
+                  !selectedOrgId || portfolio.organization_id === selectedOrgId
+              )
               .map(portfolio => (
                 <option key={portfolio.id} value={portfolio.id}>
                   {portfolio.name}
@@ -703,9 +812,18 @@ export default function ProjectsPage() {
               ))}
           </select>
 
-          <input className="form-control mb-4" placeholder="Project name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
+          <input
+            className="form-control mb-4"
+            placeholder="Project name"
+            value={newProjectName}
+            onChange={e => setNewProjectName(e.target.value)}
+          />
 
-          <select className="form-control mb-4" value={newProjectStatus} onChange={e => setNewProjectStatus(e.target.value)}>
+          <select
+            className="form-control mb-4"
+            value={newProjectStatus}
+            onChange={e => setNewProjectStatus(e.target.value)}
+          >
             {PROJECT_STATUSES.map(status => (
               <option key={status} value={status}>
                 {status}
@@ -713,7 +831,11 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <select className="form-control mb-4" value={newProjectPhase} onChange={e => setNewProjectPhase(e.target.value)}>
+          <select
+            className="form-control mb-4"
+            value={newProjectPhase}
+            onChange={e => setNewProjectPhase(e.target.value)}
+          >
             {PROJECT_PHASES.map(phase => (
               <option key={phase} value={phase}>
                 {phase}
@@ -721,7 +843,50 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <button className="btn-gold btn w-full justify-center" onClick={createProject}>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4 space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-[#ede8de]">
+                Project Ownership
+              </div>
+
+              <div className="text-xs text-[#6e7d8c] mt-1">
+                Assign owners who will control their project sections.
+              </div>
+            </div>
+
+            <input
+              className="form-control"
+              placeholder="Overall Project Owner Email"
+              value={newOverallOwnerEmail}
+              onChange={e => setNewOverallOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Housebuild Owner Email"
+              value={newHousebuildOwnerEmail}
+              onChange={e => setNewHousebuildOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="MEP Owner Email"
+              value={newMepOwnerEmail}
+              onChange={e => setNewMepOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Infrastructure Owner Email"
+              value={newInfrastructureOwnerEmail}
+              onChange={e => setNewInfrastructureOwnerEmail(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={createProject}
+          >
             Create Project
           </button>
         </Modal>
@@ -729,9 +894,18 @@ export default function ProjectsPage() {
 
       {showEditProjectModal && editingProject && canEditProjects && (
         <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
-          <input className="form-control mb-4" placeholder="Project name" value={editProjectName} onChange={e => setEditProjectName(e.target.value)} />
+          <input
+            className="form-control mb-4"
+            placeholder="Project name"
+            value={editProjectName}
+            onChange={e => setEditProjectName(e.target.value)}
+          />
 
-          <select className="form-control mb-4" value={editProjectStatus} onChange={e => setEditProjectStatus(e.target.value)}>
+          <select
+            className="form-control mb-4"
+            value={editProjectStatus}
+            onChange={e => setEditProjectStatus(e.target.value)}
+          >
             {PROJECT_STATUSES.map(status => (
               <option key={status} value={status}>
                 {status}
@@ -739,7 +913,11 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <select className="form-control mb-4" value={editProjectPhase} onChange={e => setEditProjectPhase(e.target.value)}>
+          <select
+            className="form-control mb-4"
+            value={editProjectPhase}
+            onChange={e => setEditProjectPhase(e.target.value)}
+          >
             {PROJECT_PHASES.map(phase => (
               <option key={phase} value={phase}>
                 {phase}
@@ -747,11 +925,64 @@ export default function ProjectsPage() {
             ))}
           </select>
 
-          <input className="form-control mb-4" placeholder="Location" value={editProjectLocation} onChange={e => setEditProjectLocation(e.target.value)} />
+          <input
+            className="form-control mb-4"
+            placeholder="Location"
+            value={editProjectLocation}
+            onChange={e => setEditProjectLocation(e.target.value)}
+          />
 
-          <input className="form-control mb-4" type="date" value={editProjectHandoverDate} onChange={e => setEditProjectHandoverDate(e.target.value)} />
+          <input
+            className="form-control mb-4"
+            type="date"
+            value={editProjectHandoverDate}
+            onChange={e => setEditProjectHandoverDate(e.target.value)}
+          />
 
-          <button className="btn-gold btn w-full justify-center" onClick={updateProject}>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4 space-y-3">
+            <div>
+              <div className="text-sm font-semibold text-[#ede8de]">
+                Project Ownership
+              </div>
+
+              <div className="text-xs text-[#6e7d8c] mt-1">
+                These users can update only their assigned schedule discipline.
+              </div>
+            </div>
+
+            <input
+              className="form-control"
+              placeholder="Overall Project Owner Email"
+              value={editOverallOwnerEmail}
+              onChange={e => setEditOverallOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Housebuild Owner Email"
+              value={editHousebuildOwnerEmail}
+              onChange={e => setEditHousebuildOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="MEP Owner Email"
+              value={editMepOwnerEmail}
+              onChange={e => setEditMepOwnerEmail(e.target.value)}
+            />
+
+            <input
+              className="form-control"
+              placeholder="Infrastructure Owner Email"
+              value={editInfrastructureOwnerEmail}
+              onChange={e => setEditInfrastructureOwnerEmail(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="btn-gold btn w-full justify-center"
+            onClick={updateProject}
+          >
             Save Project Changes
           </button>
         </Modal>
@@ -799,9 +1030,11 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
     Mobilization: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
     Execution: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
     Finishing: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    'Testing & Commissioning': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    'Testing & Commissioning':
+      'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
     Handover: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-    'Defects Liability': 'bg-stone-500/10 text-stone-400 border-stone-500/20',
+    'Defects Liability':
+      'bg-stone-500/10 text-stone-400 border-stone-500/20',
     'Closed Out': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
   }
 
@@ -820,7 +1053,11 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
       onClick={onClick}
       className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 cursor-pointer hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200"
     >
-      <div className={`absolute left-0 top-0 h-full w-1 ${stripColors[status] || 'bg-slate-500'}`} />
+      <div
+        className={`absolute left-0 top-0 h-full w-1 ${
+          stripColors[status] || 'bg-slate-500'
+        }`}
+      />
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pl-2">
@@ -846,17 +1083,30 @@ function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
             </button>
           )}
 
-          <ArrowRight size={16} className="text-slate-500 group-hover:text-[#c49e48] transition flex-shrink-0" />
+          <ArrowRight
+            size={16}
+            className="text-slate-500 group-hover:text-[#c49e48] transition flex-shrink-0"
+          />
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-2">
         <div className="flex flex-wrap gap-2">
-          <span className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${phaseBadgeStyles[phase] || 'bg-white/5 text-slate-400 border-white/10'}`}>
+          <span
+            className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
+              phaseBadgeStyles[phase] ||
+              'bg-white/5 text-slate-400 border-white/10'
+            }`}
+          >
             Phase: {phase}
           </span>
 
-          <span className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${statusStyles[status] || 'bg-white/5 text-slate-400 border-white/10'}`}>
+          <span
+            className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
+              statusStyles[status] ||
+              'bg-white/5 text-slate-400 border-white/10'
+            }`}
+          >
             Status: {status}
           </span>
         </div>
@@ -890,7 +1140,7 @@ function EmptyHub({ title, message, action }: any) {
 function Modal({ title, children, onClose }: any) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="card w-full max-w-md p-6">
+      <div className="card w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-white">{title}</h2>
 
