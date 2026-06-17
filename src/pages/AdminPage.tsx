@@ -43,7 +43,23 @@ const WORKSPACE_ROLES = [
 ]
 
 const PROJECT_ROLES = [
-  { value: 'project_owner', label: 'Project Owner' },
+  {
+    value: 'overall_project_owner',
+    label: 'Overall Project Owner',
+  },
+  {
+    value: 'housebuild_project_owner',
+    label: 'Housebuild Project Owner',
+  },
+  {
+    value: 'mep_project_owner',
+    label: 'MEP Project Owner',
+  },
+  {
+    value: 'infrastructure_project_owner',
+    label: 'Infrastructure Project Owner',
+  },
+
   { value: 'consultant', label: 'Consultant' },
   { value: 'contractor', label: 'Contractor' },
   { value: 'vendor', label: 'Vendor' },
@@ -51,7 +67,6 @@ const PROJECT_ROLES = [
   { value: 'viewer', label: 'Viewer' },
   { value: 'guest', label: 'Guest' },
 ]
-
 export default function WorkspaceAdminPage() {
   const [searchParams] = useSearchParams()
   const profileTab = searchParams.get('tab')
@@ -205,6 +220,23 @@ export default function WorkspaceAdminPage() {
     setInviteLink('')
 
     const cleanEmail = inviteEmail.trim().toLowerCase()
+    const ownerUpdate: any = {}
+
+if (inviteRole === 'overall_project_owner') {
+  ownerUpdate.project_owner_email = cleanEmail
+}
+
+if (inviteRole === 'housebuild_project_owner') {
+  ownerUpdate.housebuild_owner_email = cleanEmail
+}
+
+if (inviteRole === 'mep_project_owner') {
+  ownerUpdate.mep_owner_email = cleanEmail
+}
+
+if (inviteRole === 'infrastructure_project_owner') {
+  ownerUpdate.infrastructure_owner_email = cleanEmail
+}
 
     if (!cleanEmail) {
       setNotice('Email address is required.')
@@ -252,6 +284,19 @@ export default function WorkspaceAdminPage() {
       setNotice(error.message)
       return
     }
+    if (
+  inviteScope === 'project' &&
+  Object.keys(ownerUpdate).length > 0
+) {
+  await Promise.all(
+    selectedProjectIds.map(projectId =>
+      supabase
+        .from('projects')
+        .update(ownerUpdate)
+        .eq('id', projectId)
+    )
+  )
+}
 
     const selectedProjectNames = projects
       .filter(project => selectedProjectIds.includes(project.id))
