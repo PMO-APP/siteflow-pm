@@ -9,7 +9,11 @@ export interface DisciplinePermissionContext {
   isMEPOwner?: boolean
   isInfrastructureOwner?: boolean
 }
-
+export const HSE_ROLES = [
+  'hse',
+  'hse_lead',
+  'hse_manager',
+]
 export const PROJECT_OWNER_ROLES = [
   'overall_project_owner',
   'housebuild_project_owner',
@@ -22,6 +26,7 @@ export const INTERNAL_VIEW_ROLES = [
   'admin',
   'pmo',
   'portfolio_manager',
+  ...HSE_ROLES,
   ...PROJECT_OWNER_ROLES,
   'project_owner',
   'design',
@@ -51,6 +56,7 @@ export const INTERNAL_CONTRIBUTOR_ROLES = [
   'admin',
   'pmo',
   'portfolio_manager',
+  ...HSE_ROLES,
   ...PROJECT_OWNER_ROLES,
   'project_owner',
   'design',
@@ -62,6 +68,7 @@ export const INTERNAL_CONTRIBUTOR_ROLES = [
 
 export const PROJECT_ROLES = [
   ...PROJECT_OWNER_ROLES,
+  ...HSE_ROLES,
   'project_owner',
   'consultant',
   'contractor',
@@ -75,7 +82,25 @@ export const PROJECT_ROLES = [
   'viewer',
   'guest',
 ]
+export function isHSERole(role?: string | null) {
+  return HSE_ROLES.includes(role || '')
+}
 
+export function canViewHSE(role?: string | null) {
+  return (
+    isProjectAdmin(role) ||
+    isHSERole(role) ||
+    [...PROJECT_OWNER_ROLES, 'project_owner'].includes(role || '')
+  )
+}
+
+export function canCreateHSE(role?: string | null) {
+  return isProjectAdmin(role) || isHSERole(role)
+}
+
+export function canCloseHSE(role?: string | null) {
+  return isProjectAdmin(role) || ['hse_lead', 'hse_manager'].includes(role || '')
+}
 export function canViewInternalPages(role?: string | null) {
   return INTERNAL_VIEW_ROLES.includes(role || '')
 }
@@ -382,6 +407,7 @@ export function canEditPage(
   if (page === 'reports') return canEditReports(role, isAssignedProjectOwner)
   if (page === 'documents') return canUploadDocuments(role)
   if (page === 'snags') return canCreateSnags(role)
+  if (page === 'hse') return canCreateHSE(role)
 
   if (page === 'external-assignments') {
     return canCreateExternalAssignments(role)
