@@ -59,12 +59,13 @@ export default function ProfilePage() {
   const organizationId = useMembershipStore(state => state.organizationId)
   const portfolioId = useMembershipStore(state => state.portfolioId)
   const projectId = useMembershipStore(state => state.projectId)
+const projectIds = useMembershipStore(state => state.projectIds)
 
   const isExternalUser = EXTERNAL_ROLES.includes(role || '')
 
   const [organizationName, setOrganizationName] = useState('—')
   const [portfolioName, setPortfolioName] = useState('—')
-  const [projectName, setProjectName] = useState('—')
+ const [projectNames, setProjectNames] = useState<string[]>([])
   const [assignedProjects, setAssignedProjects] = useState<any[]>([])
 
   const [newPassword, setNewPassword] = useState('')
@@ -104,17 +105,18 @@ export default function ProfilePage() {
       setPortfolioName('—')
     }
 
-    if (!isExternalUser && projectId) {
-      const { data } = await supabase
-        .from('projects')
-        .select('project_name')
-        .eq('id', projectId)
-        .maybeSingle()
+ if (!isExternalUser && projectIds.length > 0) {
+  const { data } = await supabase
+    .from('projects')
+    .select('project_name')
+    .in('id', projectIds)
 
-      setProjectName(data?.project_name || '—')
-    } else {
-      setProjectName('—')
-    }
+  setProjectNames(
+    (data || []).map(project => project.project_name)
+  )
+} else {
+  setProjectNames([])
+}
 
     if (isExternalUser && user?.email) {
       const cleanEmail = user.email.toLowerCase().trim()
@@ -364,11 +366,15 @@ export default function ProfilePage() {
                     label="Portfolio"
                     value={portfolioName}
                   />
-                  <InfoCard
-                    icon={FolderKanban}
-                    label="Project"
-                    value={projectName}
-                  />
+                 <InfoCard
+  icon={FolderKanban}
+  label="Projects"
+  value={
+    projectNames.length > 0
+      ? projectNames.join(', ')
+      : '—'
+  }
+/>
                 </div>
               </section>
             )}
