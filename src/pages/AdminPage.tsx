@@ -167,7 +167,9 @@ export default function WorkspaceAdminPage() {
     setSelectedProjectIds([])
 
     if (scope === 'workspace') setInviteRole('pmo')
-    if (scope === 'project') setInviteRole('contractor')
+   if (scope === 'project') {
+  setInviteRole('overall_project_owner')
+}
   }
 
   function toggleProjectSelection(projectId: number) {
