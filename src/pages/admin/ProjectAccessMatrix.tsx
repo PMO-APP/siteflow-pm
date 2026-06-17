@@ -36,6 +36,11 @@ function formatRole(role?: string | null) {
     mep: 'MEP',
     viewer: 'Viewer',
     guest: 'Guest',
+    overall_project_owner: 'Overall Project Owner',
+    housebuild_project_owner: 'Housebuild Project Owner',
+    mep_project_owner: 'MEP Project Owner',
+    infrastructure_project_owner: 'Infrastructure Project Owner',
+    hse_project_owner: 'HSE Project Owner',
   }
 
   return labels[role] || role.replace(/_/g, ' ')
