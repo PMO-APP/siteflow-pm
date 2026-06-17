@@ -1,8 +1,10 @@
 import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
+import { logAudit } from '@/lib/audit'
+import { useMembershipStore } from '@/store/membership'
+import { useProjectStore } from '@/store/project'
 import {
- import {
   canUploadDocuments,
   canEditDocument,
 } from '@/lib/permissions'
