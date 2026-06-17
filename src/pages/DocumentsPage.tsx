@@ -2,8 +2,9 @@ import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import {
-  canEditDocuments,
-  canEditOwnOrAdmin,
+ import {
+  canUploadDocuments,
+  canEditDocument,
 } from '@/lib/permissions'
 import { useState } from 'react'
 import {
@@ -452,7 +453,7 @@ export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
 
-  const canCreateDocument = canEditDocuments(role)
+const canCreateDocument = canUploadDocuments(role)
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
@@ -644,11 +645,11 @@ export default function DocumentsPage() {
                     </tr>
                   ) : (
                     filtered.map(document => {
-                      const canEditThisDocument = canEditOwnOrAdmin(
-                        role,
-                        document.uploaded_by,
-                        user?.id
-                      )
+                     const canEditThisDocument = canEditDocument(
+  role,
+  document.uploaded_by,
+  user?.id
+)
 
                       return (
                         <tr
