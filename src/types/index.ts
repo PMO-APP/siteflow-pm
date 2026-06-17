@@ -11,7 +11,52 @@ export interface Profile {
   created_at: string
   updated_at: string
 }
+export type ProjectDiscipline =
+  | 'Overall'
+  | 'Housebuild'
+  | 'MEP'
+  | 'Infrastructure'
+  | 'General'
 
+export type ScheduleDiscipline =
+  | 'Housebuild'
+  | 'MEP'
+  | 'Infrastructure'
+
+export interface ProjectDisciplineOwners {
+  id: string
+
+  project_id: number
+
+  overall_owner_id?: string
+
+  housebuild_owner_id?: string
+
+  mep_owner_id?: string
+
+  infrastructure_owner_id?: string
+
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ScheduleImportBatch {
+  id: string
+
+  project_id: number
+
+  discipline: ScheduleDiscipline
+
+  file_name?: string
+
+  imported_by?: string
+
+  imported_at?: string
+
+  activity_count?: number
+
+  created_at?: string
+}
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Completed' | 'On Hold' | 'Blocked'
 export type RAG = 'RED' | 'AMBER' | 'GREEN' | ''
 
@@ -21,6 +66,13 @@ export interface Task {
   task_number?: number
   name: string
   phase: string
+  discipline: ScheduleDiscipline
+
+weight_pct?: number
+
+schedule_source?: 'Manual' | 'Imported'
+
+imported_batch_id?: string
   category?: string
   start_date?: string
   finish_date?: string
@@ -143,6 +195,7 @@ export type SnagStatus = 'Open' | 'In Progress' | 'Pending Verification' | 'Clos
 export interface Snag {
   id: string
   project_id?: number
+  discipline?: ProjectDiscipline
   snag_number?: number
   title: string
   description?: string
@@ -172,7 +225,7 @@ export interface Document {
   title: string
   document_number?: string
   type: DocumentType
-  discipline?: string
+  discipline?: ProjectDiscipline
   revision: string
   revision_date?: string
   status: 'Draft' | 'For Review' | 'Current' | 'Superseded' | 'Void'
@@ -211,6 +264,7 @@ export interface FinancialItem {
 
 export interface Risk {
   id: string
+  discipline?: ProjectDiscipline
   risk_number?: number
   title: string
   description?: string
@@ -363,6 +417,7 @@ export interface WeeklyReport {
   id: string
 
   project_id: number
+  discipline?: ProjectDiscipline
 
   reporting_officer?: string
   report_date: string
