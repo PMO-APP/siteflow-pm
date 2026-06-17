@@ -536,116 +536,103 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="space-y-5">
-      <div className="dashboard-hero relative rounded-xl p-5 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
+  <div className="space-y-6">
+    {/* HERO */}
+    <div className="dashboard-hero relative rounded-xl p-5 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
 
-        <div className="relative flex items-center gap-8">
-          <div>
+      <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
+        <div>
+          <div
+            className={`font-display text-7xl font-black leading-none ${
+              daysLeft !== null && daysLeft < 60
+                ? 'text-red-400'
+                : 'text-[#c49e48]'
+            }`}
+          >
+            {daysLeft ?? '-'}
+          </div>
+
+          <div className="text-[10px] font-mono uppercase tracking-widest text-[#6e7d8c] mt-1">
+            Days Remaining
+          </div>
+        </div>
+
+        <div className="flex-1">
+          <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
+            {projectName}
+          </div>
+
+          <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
+            Formal Handover Target
+          </div>
+
+          <div className="font-display text-xl font-semibold text-[#ede8de]">
+            {targetDate
+              ? targetDate.toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })
+              : 'No handover date set'}
+          </div>
+
+          <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
             <div
-              className={`font-display text-7xl font-black leading-none ${
-                daysLeft !== null && daysLeft < 60
-                  ? 'text-red-400'
-                  : 'text-[#c49e48]'
-              }`}
-            >
-              {daysLeft ?? '-'}
-            </div>
-
-            <div className="text-[10px] font-mono uppercase tracking-widest text-[#6e7d8c] mt-1">
-              Days Remaining
-            </div>
+              className="h-full rounded-full bg-gradient-to-r from-[#c49e48] to-[#e3c06a]"
+              style={{ width: `${timelinePct}%` }}
+            />
           </div>
 
-          <div className="flex-1">
-            <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
-              {projectName}
-            </div>
-
-            <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
-              Formal Handover Target
-            </div>
-
-            <div className="font-display text-xl font-semibold text-[#ede8de]">
-              {targetDate
-                ? targetDate.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                  })
-                : 'No handover date set'}
-            </div>
-
-            <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#c49e48] to-[#e3c06a]"
-                style={{ width: `${timelinePct}%` }}
-              />
-            </div>
-
-            <div className="text-[10px] text-[#6e7d8c] mt-1">
-              {timelinePct}% of timeline elapsed
-            </div>
-          </div>
-
-          <div className="hidden lg:flex flex-col gap-2">
-            {alerts.slice(0, 2).map((a, i) => (
-              <div
-                key={`${a.msg}-${i}`}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium cursor-pointer ${
-                  a.level === 'red'
-                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }`}
-                onClick={() => navigate(a.action)}
-              >
-                <AlertTriangle size={11} />
-                {a.msg.length > 45 ? `${a.msg.slice(0, 45)}…` : a.msg}
-              </div>
-            ))}
+          <div className="text-[10px] text-[#6e7d8c] mt-1">
+            {timelinePct}% of timeline elapsed
           </div>
         </div>
       </div>
+    </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {kpiCards.map((k: any) => {
-          const Icon = k.icon
+    {/* KPI CARDS */}
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+      {kpiCards.map((k: any) => {
+        const Icon = k.icon
 
-          return (
+        return (
+          <div
+            key={k.label}
+            className="stat-card cursor-pointer hover:border-[#c49e48]/20 transition-colors group"
+            onClick={() => navigate(k.link)}
+          >
             <div
-              key={k.label}
-              className="stat-card cursor-pointer hover:border-[#c49e48]/20 transition-colors group"
-              onClick={() => navigate(k.link)}
-            >
-              <div
-                className={`gold-bar ${
-                  k.color === 'c-red'
-                    ? '!bg-red-500'
-                    : k.color === 'c-amr'
-                    ? '!bg-amber-500'
-                    : k.color === 'c-grn'
-                    ? '!bg-emerald-500'
-                    : ''
-                }`}
-              />
+              className={`gold-bar ${
+                k.color === 'c-red'
+                  ? '!bg-red-500'
+                  : k.color === 'c-amr'
+                  ? '!bg-amber-500'
+                  : k.color === 'c-grn'
+                  ? '!bg-emerald-500'
+                  : ''
+              }`}
+            />
 
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="stat-number text-3xl">{k.value}</div>
-                  <div className="stat-label">{k.label}</div>
-                  <div className="stat-sub">{k.sub}</div>
-                </div>
-
-                <Icon
-                  size={16}
-                  className="text-[#6e7d8c] group-hover:text-[#c49e48] transition-colors mt-1"
-                />
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="stat-number text-3xl">{k.value}</div>
+                <div className="stat-label">{k.label}</div>
+                <div className="stat-sub">{k.sub}</div>
               </div>
-            </div>
-          )
-        })}
-      </div>
 
+              <Icon
+                size={16}
+                className="text-[#6e7d8c] group-hover:text-[#c49e48] transition-colors mt-1"
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+
+    {/* INTELLIGENCE ROW */}
+    <div className="grid xl:grid-cols-2 gap-5">
       <DeliveryPulse
         progress={progressPct}
         variance={variancePct}
@@ -660,170 +647,215 @@ export default function Dashboard() {
         variance={variancePct ?? 0}
         handoverConfidence={handoverConfidence ?? 0}
       />
-
-     <ExecutiveSummary
-  projectName={projectName}
-  progress={progressPct}
-  variance={variancePct}
-  overdueTasks={overdue}
-  openRisks={openRisks}
-  highRisks={highRisks}
-  pendingApprovals={pendingApprovals}
-  procurementRisks={procRisks}
-/>
-
-{/* Financial Summary */}
-
-<div className="grid md:grid-cols-4 gap-4">
-  <div className="card p-4">
-    <div className="text-xs text-slate-500">Contract Sum</div>
-    <div className="text-2xl font-bold">
-      {formatCurrency(contractSum)}
-    </div>
-  </div>
-
-  <div className="card p-4">
-    <div className="text-xs text-slate-500">
-      Approved Variations
-    </div>
-    <div className="text-2xl font-bold">
-      {formatCurrency(variationsTotal)}
-    </div>
-  </div>
-
-  <div className="card p-4">
-    <div className="text-xs text-slate-500">
-      Paid To Date
-    </div>
-    <div className="text-2xl font-bold">
-      {formatCurrency(paidTotal)}
-    </div>
-  </div>
-
-  <div className="card p-4">
-    <div className="text-xs text-slate-500">
-      Final Forecast
-    </div>
-    <div className="text-2xl font-bold">
-      {formatCurrency(projectedFinalContractSum)}
-    </div>
-  </div>
-</div>
-
-{/* Activities + Deadlines */}
-
-<div className="grid lg:grid-cols-2 gap-5">
-
-  <div className="card">
-    <div className="card-head">
-      <div className="card-title">
-        Current Activities
-      </div>
     </div>
 
-    <div className="p-4 space-y-2">
-      {tasks
-        .filter(t => t.status === 'In Progress')
-        .slice(0, 8)
-        .map(task => (
-          <div
-            key={task.id}
-            className="flex justify-between text-sm"
-          >
-            <span>{task.name}</span>
-            <span>{task.progress_pct || 0}%</span>
-          </div>
-        ))}
-    </div>
-  </div>
+    <ExecutiveSummary
+      projectName={projectName}
+      progress={progressPct}
+      variance={variancePct}
+      overdueTasks={overdue}
+      openRisks={openRisks}
+      highRisks={highRisks}
+      pendingApprovals={pendingApprovals}
+      procurementRisks={procRisks}
+    />
 
-  <div className="card">
-    <div className="card-head">
-      <div className="card-title">
-        Upcoming Deadlines
-      </div>
-    </div>
-
-    <div className="p-4 space-y-2">
-      {deadlines.slice(0, 10).map(item => (
-        <div
-          key={`${item.name}-${item.date}`}
-          className="flex justify-between text-sm"
-        >
-          <span>{item.name}</span>
-
-          <span className={urgencyColor(item.days)}>
-            {item.days}d
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-
-</div>
-
-{/* Phase Progress */}
-
-<div className="card">
-  <div className="card-head">
-    <div className="card-title">
-      Phase Progress
-    </div>
-  </div>
-
-  <div className="p-4 space-y-3">
-    {phaseData.map(phase => (
-      <div key={phase.name}>
-        <div className="flex justify-between text-sm mb-1">
-          <span>{phase.name}</span>
-          <span>{phase.pct}%</span>
-        </div>
-
-        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className="h-full"
-            style={{
-              width: `${phase.pct}%`,
-              background: phase.color,
-            }}
-          />
+    {/* FINANCIAL SUMMARY */}
+    <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="card p-4">
+        <div className="text-xs text-slate-500">Contract Sum</div>
+        <div className="text-2xl font-bold text-[#ede8de]">
+          {formatCurrency(contractSum)}
         </div>
       </div>
-    ))}
-  </div>
-</div>
 
-{/* Task Status */}
+      <div className="card p-4">
+        <div className="text-xs text-slate-500">Approved Variations</div>
+        <div className="text-2xl font-bold text-[#ede8de]">
+          {formatCurrency(variationsTotal)}
+        </div>
+      </div>
 
-<div className="card">
-  <div className="card-head">
-    <div className="card-title">
-      Task Status Breakdown
+      <div className="card p-4">
+        <div className="text-xs text-slate-500">Paid To Date</div>
+        <div className="text-2xl font-bold text-[#ede8de]">
+          {formatCurrency(paidTotal)}
+        </div>
+      </div>
+
+      <div className="card p-4">
+        <div className="text-xs text-slate-500">Final Forecast</div>
+        <div className="text-2xl font-bold text-[#ede8de]">
+          {formatCurrency(projectedFinalContractSum)}
+        </div>
+      </div>
+    </div>
+
+    {/* ACTIVITIES + DEADLINES */}
+    <div className="grid xl:grid-cols-2 gap-5">
+      <div className="card overflow-hidden">
+        <div className="card-head">
+          <div className="card-title">Current Activities</div>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {tasks.filter(t => t.status === 'In Progress').length === 0 ? (
+            <div className="text-sm text-slate-500">
+              No current activities in progress.
+            </div>
+          ) : (
+            tasks
+              .filter(t => t.status === 'In Progress')
+              .slice(0, 8)
+              .map(task => (
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between gap-4 text-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[#ede8de] font-medium truncate">
+                      {task.name}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {task.phase || 'No phase'}
+                    </div>
+                  </div>
+
+                  <div className="text-[#c49e48] font-semibold">
+                    {getTaskProgress(task)}%
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="card-head">
+          <div className="card-title">Upcoming Deadlines</div>
+        </div>
+
+        <div className="p-4 space-y-3">
+          {deadlines.length === 0 ? (
+            <div className="text-sm text-slate-500">
+              No deadlines due within the next 21 days.
+            </div>
+          ) : (
+            deadlines.slice(0, 10).map(item => (
+              <div
+                key={`${item.name}-${item.date}-${item.type}`}
+                className="flex items-center justify-between gap-4 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="text-[#ede8de] font-medium truncate">
+                    {item.name}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    {item.type} • {fdate(item.date)}
+                  </div>
+                </div>
+
+                <span className={urgencyColor(item.days)}>
+                  {item.days}d
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* PHASE + STATUS */}
+    <div className="grid xl:grid-cols-3 gap-5">
+      <div className="card xl:col-span-2 overflow-hidden">
+        <div className="card-head">
+          <div className="card-title">Phase Progress</div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {phaseData.length === 0 ? (
+            <div className="text-sm text-slate-500">
+              No phase data available.
+            </div>
+          ) : (
+            phaseData.map(phase => (
+              <div key={phase.name}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-[#ede8de]">{phase.name}</span>
+                  <span className="text-[#ede8de]">{phase.pct}%</span>
+                </div>
+
+                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${phase.pct}%`,
+                      background: phase.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="card-head">
+          <div className="card-title">Task Status Breakdown</div>
+        </div>
+
+        <div className="p-4">
+          {statusPie.length === 0 ? (
+            <div className="h-[260px] flex items-center justify-center text-sm text-slate-500">
+              No task status data available.
+            </div>
+          ) : (
+            <>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusPie}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                    >
+                      {statusPie.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="space-y-2 mt-3">
+                {statusPie.map(item => (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: item.color }}
+                      />
+                      <span className="text-slate-400">{item.name}</span>
+                    </div>
+
+                    <span className="text-[#ede8de] font-semibold">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   </div>
-
-  <div className="h-[320px]">
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={statusPie}
-          dataKey="value"
-          nameKey="name"
-          innerRadius={60}
-          outerRadius={90}
-        >
-          {statusPie.map((entry, index) => (
-            <Cell
-              key={index}
-              fill={entry.color}
-            />
-          ))}
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
-  </div>
-</div>
-
-</div>
 )
 }
