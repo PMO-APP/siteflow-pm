@@ -1,3 +1,16 @@
+export type Discipline =
+  | 'Housebuild'
+  | 'MEP'
+  | 'Infrastructure'
+export interface DisciplinePermissionContext {
+  isOverallProjectOwner?: boolean
+
+  isHousebuildOwner?: boolean
+
+  isMEPOwner?: boolean
+
+  isInfrastructureOwner?: boolean
+}
 export const INTERNAL_VIEW_ROLES = [
   'workspace_admin',
   'admin',
@@ -117,16 +130,62 @@ export function canDeleteOwnOrAdmin(
 ) {
   return canEditOwnOrAdmin(role, createdBy, userId)
 }
-
+export function isProjectAdmin(role?: string | null) {
+  return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+}
 export function canEditAssignedProject(
   role?: string | null,
   isAssignedProjectOwner?: boolean
 ) {
   if (['workspace_admin', 'admin', 'pmo'].includes(role || '')) return true
+
   if (role === 'project_owner' && isAssignedProjectOwner) return true
 
   return false
 }
+
+export function canEditDiscipline(
+  role?: string | null,
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
+) {
+  if (isProjectAdmin(role)) return true
+
+  if (discipline === 'Housebuild') {
+    return !!permissions?.isHousebuildOwner
+  }
+
+  if (discipline === 'MEP') {
+    return !!permissions?.isMEPOwner
+  }
+
+  if (discipline === 'Infrastructure') {
+    return !!permissions?.isInfrastructureOwner
+  }
+
+  return false
+}
+  role?: string | null,
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
+) {
+  if (isProjectAdmin(role)) return true
+
+  if (discipline === 'Housebuild') {
+    return !!permissions?.isHousebuildOwner
+  }
+
+  if (discipline === 'MEP') {
+    return !!permissions?.isMEPOwner
+  }
+
+  if (discipline === 'Infrastructure') {
+    return !!permissions?.isInfrastructureOwner
+  }
+
+  return false
+}
+
 
 export function canEditProjectInfo(
   role?: string | null,
@@ -137,20 +196,65 @@ export function canEditProjectInfo(
 
 export function canEditSchedule(
   role?: string | null,
-  isAssignedProjectOwner?: boolean
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
 ) {
-  return canEditAssignedProject(role, isAssignedProjectOwner)
+  return canEditDiscipline(
+    role,
+    discipline,
+    permissions
+  )
+}
+export function canImportSchedule(
+  role?: string | null,
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
+) {
+  return canEditDiscipline(
+    role,
+    discipline,
+    permissions
+  )
 }
 
-export function canEditDocuments(role?: string | null) {
+export function canUploadDocuments(
+  role?: string | null
+) {
   return canCreateInternalContribution(role)
 }
+export function canEditDocument(
+  role?: string | null,
+  uploadedBy?: string | null,
+  userId?: string | null,
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
+) {
+  if (isProjectAdmin(role)) return true
 
+  if (
+    uploadedBy &&
+    userId &&
+    uploadedBy === userId
+  ) {
+    return true
+  }
+
+  return canEditDiscipline(
+    role,
+    discipline,
+    permissions
+  )
+}
 export function canEditRisk(
   role?: string | null,
-  isAssignedProjectOwner?: boolean
+  discipline?: Discipline,
+  permissions?: DisciplinePermissionContext
 ) {
-  return canEditAssignedProject(role, isAssignedProjectOwner)
+  return canEditDiscipline(
+    role,
+    discipline,
+    permissions
+  )
 }
 
 export function canEditProcurement(
@@ -251,6 +355,17 @@ export function canEditExternalReview(
 export function canCreateSnags(role?: string | null) {
   return canCreateInternalContribution(role)
 }
+export function canEditSnag(
+  role?: string | null,
+  createdBy?: string | null,
+  userId?: string | null
+) {
+  return canEditOwnOrAdmin(
+    role,
+    createdBy,
+    userId
+  )
+}
 
 export function canCreateExternalAssignments(role?: string | null) {
   return canCreateInternalContribution(role)
@@ -267,7 +382,7 @@ export function canEditPage(
   if (page === 'financial') return canManageFinancials(role)
   if (page === 'costing') return canEditCosting(role)
   if (page === 'reports') return canEditReports(role, isAssignedProjectOwner)
-  if (page === 'documents') return canEditDocuments(role)
+  if (page === 'documents') return canUploadDocuments(role)
   if (page === 'snags') return canCreateSnags(role)
   if (page === 'external-assignments') {
     return canCreateExternalAssignments(role)
