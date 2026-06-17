@@ -12,34 +12,97 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { canEditSchedule } from '@/lib/permissions'
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useQualityGates } from '@/hooks/useData'
-import {
-  fdate,
-  urgencyColor,
-  computeRAG,
-} from '@/lib/utils'
+import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { Task } from '@/types'
 import TaskModal from '@/components/modules/schedule/TaskModal'
 import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
+import { useAuthStore } from '@/store/auth'
 
 type View = 'list' | 'gantt' | 'milestones'
 
+type DisciplineTab =
+  | 'Overall'
+  | 'Housebuild'
+  | 'MEP'
+  | 'Infrastructure'
+
+type ScheduleDiscipline = Exclude<DisciplineTab, 'Overall'>
+
+const DISCIPLINE_TABS: DisciplineTab[] = [
+  'Overall',
+  'Housebuild',
+  'MEP',
+  'Infrastructure',
+]
+
 export default function SchedulePage() {
-  const { projectId, projectName } = useProjectStore()
+  const {
+    projectId,
+    projectName,
+    housebuildOwnerEmail,
+    mepOwnerEmail,
+    infrastructureOwnerEmail,
+  } = useProjectStore()
+
   const role = useMembershipStore(state => state.role)
-  const canEdit = canEditSchedule(role)
+  const { user } = useAuthStore()
+
+  const [disciplineTab, setDisciplineTab] =
+    useState<DisciplineTab>('Overall')
+
+  const [view, setView] = useState<View>('list')
+  const [search, setSearch] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState('All')
+  const [ragFilter, setRagFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
 
   const queryClient = useQueryClient()
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
 
-  const tasks: Task[] = allTasks.filter(
+  const currentEmail = user?.email?.toLowerCase().trim() || ''
+
+  const permissionContext = {
+    isHousebuildOwner:
+      !!currentEmail &&
+      currentEmail === housebuildOwnerEmail?.toLowerCase().trim(),
+
+    isMEPOwner:
+      !!currentEmail &&
+      currentEmail === mepOwnerEmail?.toLowerCase().trim(),
+
+    isInfrastructureOwner:
+      !!currentEmail &&
+      currentEmail === infrastructureOwnerEmail?.toLowerCase().trim(),
+  }
+
+  const activeDiscipline =
+    disciplineTab === 'Overall'
+      ? undefined
+      : (disciplineTab as ScheduleDiscipline)
+
+  const canEditDisciplineSchedule =
+    disciplineTab !== 'Overall' &&
+    canEditSchedule(role, activeDiscipline, permissionContext)
+
+  const today = new Date()
+
+  const projectTasks: Task[] = allTasks.filter(
     (task: Task) => task.project_id === projectId
   )
+
+  const tasks: Task[] =
+    disciplineTab === 'Overall'
+      ? projectTasks
+      : projectTasks.filter(
+          task => ((task as any).discipline || 'Housebuild') === disciplineTab
+        )
 
   const PHASES: string[] = [
     'All',
@@ -52,14 +115,12 @@ export default function SchedulePage() {
     ) as string[]),
   ]
 
-  const [view, setView] = useState<View>('list')
-  const [search, setSearch] = useState('')
-  const [phaseFilter, setPhaseFilter] = useState('All')
-  const [ragFilter, setRagFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
-
-  const today = new Date()
+  useEffect(() => {
+    setPhaseFilter('All')
+    setRagFilter('')
+    setStatusFilter('')
+    setSearch('')
+  }, [disciplineTab])
 
   const excelDateToISO = (value: any) => {
     if (!value) return null
@@ -79,26 +140,10 @@ export default function SchedulePage() {
     return parsed.toISOString().slice(0, 10)
   }
 
-  const msProjectDurationToDays = (duration: string) => {
-    if (!duration) return null
-
-    const dayMatch = duration.match(/(\d+)D/)
-    const hourMatch = duration.match(/(\d+)H/)
-    const minuteMatch = duration.match(/(\d+)M/)
-
-    const days = dayMatch ? Number(dayMatch[1]) : 0
-    const hours = hourMatch ? Number(hourMatch[1]) : 0
-    const minutes = minuteMatch ? Number(minuteMatch[1]) : 0
-
-    const totalDays = days + hours / 8 + minutes / 480
-
-    return totalDays > 0 ? Math.ceil(totalDays) : null
-  }
-
   const handleBackupUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEdit) {
+    if (!canEditDisciplineSchedule || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -110,7 +155,7 @@ export default function SchedulePage() {
       return
     }
 
-    const fileName = `${projectId}/schedule-backups/${Date.now()}-${file.name}`
+    const fileName = `${projectId}/schedule-backups/${activeDiscipline}/${Date.now()}-${file.name}`
 
     const { error } = await supabase.storage
       .from('project-files')
@@ -121,14 +166,14 @@ export default function SchedulePage() {
       return
     }
 
-    alert('Schedule backup uploaded successfully.')
+    alert(`${activeDiscipline} schedule backup uploaded successfully.`)
     event.target.value = ''
   }
 
   const handleScheduleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEdit) {
+    if (!canEditDisciplineSchedule || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -160,9 +205,11 @@ export default function SchedulePage() {
         .filter(row => row['Task Name'] || row['Name'])
         .map((row, index) => ({
           project_id: projectId,
+          discipline: activeDiscipline,
+          schedule_source: 'Imported',
           task_number: Number(row['Task Number'] || index + 1),
           name: row['Task Name'] || row['Name'],
-          phase: row['Phase'] || 'Imported Excel Schedule',
+          phase: row['Phase'] || `Imported ${activeDiscipline} Schedule`,
           start_date: excelDateToISO(row['Start Date']),
           finish_date: excelDateToISO(row['Finish Date']),
           dependencies: row['Dependencies'] || null,
@@ -197,7 +244,9 @@ export default function SchedulePage() {
         queryKey: ['tasks', projectId],
       })
 
-      alert(`${tasksToInsert.length} Excel tasks imported successfully.`)
+      alert(
+        `${tasksToInsert.length} ${activeDiscipline} Excel tasks imported successfully.`
+      )
 
       event.target.value = ''
     }
@@ -208,7 +257,7 @@ export default function SchedulePage() {
   const handleXmlScheduleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEdit) {
+    if (!canEditDisciplineSchedule || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -225,6 +274,7 @@ export default function SchedulePage() {
     const xml = parser.parseFromString(text, 'text/xml')
 
     const parseError = xml.getElementsByTagName('parsererror')[0]
+
     if (parseError) {
       alert('Invalid XML file. Please export again from MS Project as XML.')
       event.target.value = ''
@@ -244,7 +294,6 @@ export default function SchedulePage() {
         const outlineLevel = getText('OutlineLevel')
         const start = getText('Start')
         const finish = getText('Finish')
-        const duration = getText('Duration')
         const milestone = getText('Milestone')
         const percentComplete = Number(getText('PercentComplete') || 0)
 
@@ -252,12 +301,14 @@ export default function SchedulePage() {
 
         return {
           project_id: projectId,
+          discipline: activeDiscipline,
+          schedule_source: 'Imported',
           task_number: Number(id || uid || index + 1),
           name,
           phase:
             outlineLevel === '1'
               ? name
-              : 'Imported MS Project Schedule',
+              : `Imported ${activeDiscipline} MS Project Schedule`,
           start_date: start ? start.slice(0, 10) : null,
           finish_date: finish ? finish.slice(0, 10) : null,
           dependencies: null,
@@ -274,8 +325,7 @@ export default function SchedulePage() {
           approval_deadline: null,
           notes: `Imported from MS Project XML. UID: ${uid || 'N/A'}`,
           is_milestone:
-            milestone === '1' ||
-            milestone?.toLowerCase() === 'true',
+            milestone === '1' || milestone?.toLowerCase() === 'true',
         }
       })
       .filter(Boolean)
@@ -299,7 +349,9 @@ export default function SchedulePage() {
       queryKey: ['tasks', projectId],
     })
 
-    alert(`${tasksToInsert.length} MS Project XML tasks imported successfully.`)
+    alert(
+      `${tasksToInsert.length} ${activeDiscipline} MS Project XML tasks imported successfully.`
+    )
 
     event.target.value = ''
   }
@@ -319,13 +371,8 @@ export default function SchedulePage() {
 
     const daysLeft = differenceInDays(finish, today)
 
-    if (today > finish && getTaskProgress(task) < 100) {
-      return 'RED'
-    }
-
-    if (daysLeft <= 3) {
-      return 'AMBER'
-    }
+    if (today > finish && getTaskProgress(task) < 100) return 'RED'
+    if (daysLeft <= 3) return 'AMBER'
 
     return 'GREEN'
   }
@@ -345,10 +392,8 @@ export default function SchedulePage() {
 
       if (phaseFilter !== 'All' && task.phase !== phaseFilter) return false
       if (ragFilter && getRag(task) !== ragFilter) return false
-      if (
-        statusFilter &&
-        (task.status || 'Not Started') !== statusFilter
-      ) {
+
+      if (statusFilter && (task.status || 'Not Started') !== statusFilter) {
         return false
       }
 
@@ -361,9 +406,7 @@ export default function SchedulePage() {
 
   const grouped: Record<string, Task[]> = PHASES.slice(1).reduce(
     (acc: Record<string, Task[]>, phase: string) => {
-      const phaseTasks = filtered.filter(
-        (task: Task) => task.phase === phase
-      )
+      const phaseTasks = filtered.filter((task: Task) => task.phase === phase)
 
       if (phaseTasks.length) acc[phase] = phaseTasks
 
@@ -399,26 +442,41 @@ export default function SchedulePage() {
   }
 
   const openTaskModal = (task: Task | 'new') => {
-    if (!canEdit) return
+    if (!canEditDisciplineSchedule) return
     setModalTask(task)
   }
 
   return (
     <div className="space-y-4">
-      {!canEdit && (
+      {!canEditDisciplineSchedule && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
-          Schedule View Only — you can view the master schedule, but you cannot
-          upload, add, or edit tasks.
+          {disciplineTab === 'Overall'
+            ? 'Overall schedule is auto-generated from Housebuild, MEP, and Infrastructure schedules. It cannot be edited directly.'
+            : 'Schedule View Only — you can view this discipline schedule, but you cannot upload, add, or edit tasks.'}
         </div>
       )}
 
       <div>
         <div className="text-xl font-semibold text-[#ede8de]">
-          Master Schedule
+          {disciplineTab === 'Overall'
+            ? 'Master Schedule'
+            : `${disciplineTab} Schedule`}
         </div>
 
-        <div className="text-[11px] text-[#6e7d8c] mt-1">
-          {projectName}
+        <div className="text-[11px] text-[#6e7d8c] mt-1">{projectName}</div>
+
+        <div className="flex gap-2 mt-3 flex-wrap">
+          {DISCIPLINE_TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setDisciplineTab(tab)}
+              className={`btn-sm btn ${
+                disciplineTab === tab ? 'btn-gold' : 'btn-ghost'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -507,6 +565,7 @@ export default function SchedulePage() {
           onChange={event => setStatusFilter(event.target.value)}
         >
           <option value="">All Status</option>
+
           {[
             'Not Started',
             'In Progress',
@@ -518,7 +577,7 @@ export default function SchedulePage() {
           ))}
         </select>
 
-        {canEdit && (
+        {canEditDisciplineSchedule && (
           <div className="flex gap-2 ml-auto">
             <label className="btn-ghost btn-sm btn cursor-pointer">
               <Upload size={13} />
@@ -568,7 +627,7 @@ export default function SchedulePage() {
         <GanttView
           tasks={filtered}
           onTaskClick={(task: Task) => {
-            if (canEdit) openTaskModal(task)
+            if (canEditDisciplineSchedule) openTaskModal(task)
           }}
         />
       )}
@@ -583,6 +642,7 @@ export default function SchedulePage() {
                 <tr>
                   <th>#</th>
                   <th>Task Name</th>
+                  {disciplineTab === 'Overall' && <th>Discipline</th>}
                   <th className="hide-mobile">Deps</th>
                   <th>Start</th>
                   <th>Finish</th>
@@ -600,13 +660,19 @@ export default function SchedulePage() {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={13} className="text-center py-8 text-[#6e7d8c]">
+                    <td
+                      colSpan={disciplineTab === 'Overall' ? 14 : 13}
+                      className="text-center py-8 text-[#6e7d8c]"
+                    >
                       Loading…
                     </td>
                   </tr>
                 ) : Object.entries(grouped).length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="text-center py-8 text-[#6e7d8c]">
+                    <td
+                      colSpan={disciplineTab === 'Overall' ? 14 : 13}
+                      className="text-center py-8 text-[#6e7d8c]"
+                    >
                       No tasks found.
                     </td>
                   </tr>
@@ -615,7 +681,7 @@ export default function SchedulePage() {
                     <Fragment key={phase}>
                       <tr className="bg-[#1c2a36]">
                         <td
-                          colSpan={13}
+                          colSpan={disciplineTab === 'Overall' ? 14 : 13}
                           className="font-display text-[12px] font-semibold text-[#ede8de] py-2"
                         >
                           {phase}
@@ -650,10 +716,19 @@ export default function SchedulePage() {
 
                             <td className="font-medium text-[#ede8de] max-w-[200px]">
                               {task.name}
+
                               {task.is_milestone && (
                                 <span className="ml-1 text-[#c49e48]">⬦</span>
                               )}
                             </td>
+
+                            {disciplineTab === 'Overall' && (
+                              <td>
+                                <span className="badge badge-gold">
+                                  {(task as any).discipline || 'Housebuild'}
+                                </span>
+                              </td>
+                            )}
 
                             <td className="hide-mobile font-mono text-[10px] text-[#6e7d8c]">
                               {task.dependencies || '—'}
@@ -754,7 +829,7 @@ export default function SchedulePage() {
                                       'Quality Gate'}
                                   </span>
                                 </div>
-                              ) : canEdit ? (
+                              ) : canEditDisciplineSchedule ? (
                                 <button
                                   className="tbl-action"
                                   onClick={() => openTaskModal(task)}
@@ -779,7 +854,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {modalTask !== null && canEdit && (
+      {modalTask !== null && canEditDisciplineSchedule && (
         <TaskModal
           task={modalTask === 'new' ? null : modalTask}
           onClose={() => setModalTask(null)}
