@@ -37,6 +37,14 @@ type ProjectHealth =
   | 'Stuck'
   | 'Critical'
 
+type ChartProject = {
+  id: number
+  name: string
+  score?: number
+  status?: string
+  health?: ProjectHealth
+}
+
 const HEALTH_COLORS: Record<ProjectHealth, string> = {
   Healthy: '#10b981',
   'Minor Attention': '#3b82f6',
@@ -318,22 +326,46 @@ export default function PortfolioDashboardPage() {
       'Critical',
     ]
 
-    return labels.map(label => ({
-      name: label,
-      value: projectRows.filter(row => row.health === label).length,
-      fill: HEALTH_COLORS[label],
-    }))
+    return labels.map(label => {
+      const rows = projectRows.filter(row => row.health === label)
+
+      return {
+        name: label,
+        value: rows.length,
+        fill: HEALTH_COLORS[label],
+        projects: rows.map(row => ({
+          id: row.project.id,
+          name: projectName(row.project),
+          score: row.score,
+          health: row.health,
+          status: row.project.status || 'Not Set',
+        })),
+      }
+    })
   }, [projectRows])
 
   const statusChartData = useMemo(() => {
-    const grouped: Record<string, number> = {}
+    const grouped: Record<string, ChartProject[]> = {}
 
     projectRows.forEach(row => {
       const status = row.project.status || 'Not Set'
-      grouped[status] = (grouped[status] || 0) + 1
+
+      if (!grouped[status]) grouped[status] = []
+
+      grouped[status].push({
+        id: row.project.id,
+        name: projectName(row.project),
+        score: row.score,
+        health: row.health,
+        status,
+      })
     })
 
-    return Object.entries(grouped).map(([name, value]) => ({ name, value }))
+    return Object.entries(grouped).map(([name, projects]) => ({
+      name,
+      value: projects.length,
+      projects,
+    }))
   }, [projectRows])
 
   const riskChartData = projectRows
@@ -461,7 +493,7 @@ export default function PortfolioDashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
                 <XAxis dataKey="name" stroke="#6e7d8c" fontSize={11} />
                 <YAxis stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
-                <Tooltip content={<DarkTooltip />} />
+                <Tooltip content={<ProjectListTooltip />} />
                 <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                   {healthChartData.map(entry => (
                     <Cell key={entry.name} fill={entry.fill} />
@@ -469,6 +501,12 @@ export default function PortfolioDashboardPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+
+            <ProjectGroupDetails
+              title="Health Status Details"
+              groups={healthChartData}
+              showScore
+            />
           </ChartCard>
 
           <ChartCard title="Project Status Distribution">
@@ -486,10 +524,16 @@ export default function PortfolioDashboardPage() {
                     <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<DarkTooltip />} />
+                <Tooltip content={<ProjectListTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
+
+            <ProjectGroupDetails
+              title="Status Distribution Details"
+              groups={statusChartData}
+              showHealth
+            />
           </ChartCard>
         </div>
 
@@ -835,6 +879,67 @@ function EmptyChart({ message }: { message: string }) {
   )
 }
 
+function ProjectGroupDetails({
+  title,
+  groups,
+  showScore,
+  showHealth,
+}: {
+  title: string
+  groups: any[]
+  showScore?: boolean
+  showHealth?: boolean
+}) {
+  return (
+    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="text-xs font-bold uppercase tracking-widest text-[#6e7d8c] mb-3">
+        {title}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {groups.map(group => (
+          <div key={group.name} className="rounded-xl border border-white/10 bg-[#0c1014]/50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-bold text-[#ede8de]">
+                {group.name}
+              </div>
+
+              <span className="rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 px-2 py-1 text-[10px] font-bold text-[#c49e48]">
+                {group.value}
+              </span>
+            </div>
+
+            {group.projects?.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {group.projects.map((project: ChartProject) => (
+                  <div
+                    key={`${group.name}-${project.id}`}
+                    className="flex items-center justify-between gap-3 text-xs"
+                  >
+                    <span className="text-slate-300 truncate">
+                      {project.name}
+                    </span>
+
+                    <span className="text-[#6e7d8c] flex-shrink-0">
+                      {showScore && typeof project.score === 'number'
+                        ? `${project.score}%`
+                        : showHealth && project.health
+                        ? project.health
+                        : project.status || ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-slate-500">No projects</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function HealthBadge({ health }: { health: ProjectHealth }) {
   const style =
     health === 'Healthy'
@@ -868,6 +973,48 @@ function HeatCell({ value }: { value: 1 | 2 | 3 }) {
     <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${style}`}>
       {label}
     </span>
+  )
+}
+
+function ProjectListTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+
+  const data = payload[0]?.payload
+  const projects: ChartProject[] = data?.projects || []
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-[#0c1014] p-3 shadow-xl max-w-[320px]">
+      <div className="text-xs font-bold text-[#ede8de] mb-1">
+        {label || data?.name}
+      </div>
+
+      <div className="text-xs text-slate-400 mb-2">
+        {data?.value || 0} project{data?.value === 1 ? '' : 's'}
+      </div>
+
+      {projects.length > 0 ? (
+        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+          {projects.map(project => (
+            <div
+              key={project.id}
+              className="flex items-center justify-between gap-3 text-xs"
+            >
+              <span className="text-[#c49e48] truncate">
+                • {project.name}
+              </span>
+
+              <span className="text-slate-500 flex-shrink-0">
+                {typeof project.score === 'number'
+                  ? `${project.score}%`
+                  : project.health || project.status || ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-slate-500">No projects</div>
+      )}
+    </div>
   )
 }
 
