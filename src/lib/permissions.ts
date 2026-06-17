@@ -10,11 +10,19 @@ export interface DisciplinePermissionContext {
   isInfrastructureOwner?: boolean
 }
 
+export const PROJECT_OWNER_ROLES = [
+  'overall_project_owner',
+  'housebuild_project_owner',
+  'mep_project_owner',
+  'infrastructure_project_owner',
+]
+
 export const INTERNAL_VIEW_ROLES = [
   'workspace_admin',
   'admin',
   'pmo',
   'portfolio_manager',
+  ...PROJECT_OWNER_ROLES,
   'project_owner',
   'design',
   'housebuild',
@@ -43,6 +51,7 @@ export const INTERNAL_CONTRIBUTOR_ROLES = [
   'admin',
   'pmo',
   'portfolio_manager',
+  ...PROJECT_OWNER_ROLES,
   'project_owner',
   'design',
   'housebuild',
@@ -52,11 +61,12 @@ export const INTERNAL_CONTRIBUTOR_ROLES = [
 ]
 
 export const PROJECT_ROLES = [
+  ...PROJECT_OWNER_ROLES,
+  'project_owner',
   'consultant',
   'contractor',
   'vendor',
   'subcontractor',
-  'project_owner',
   'design',
   'housebuild',
   'mep',
@@ -139,7 +149,13 @@ export function canEditAssignedProject(
   isAssignedProjectOwner?: boolean
 ) {
   if (isProjectAdmin(role)) return true
-  if (role === 'project_owner' && isAssignedProjectOwner) return true
+
+  if (
+    [...PROJECT_OWNER_ROLES, 'project_owner'].includes(role || '') &&
+    isAssignedProjectOwner
+  ) {
+    return true
+  }
 
   return false
 }
@@ -151,18 +167,32 @@ export function canEditDiscipline(
 ) {
   if (isProjectAdmin(role)) return true
 
-  if (permissions?.isOverallProjectOwner) return true
+  if (
+    role === 'overall_project_owner' ||
+    permissions?.isOverallProjectOwner
+  ) {
+    return true
+  }
 
   if (discipline === 'Housebuild') {
-    return !!permissions?.isHousebuildOwner
+    return (
+      role === 'housebuild_project_owner' ||
+      !!permissions?.isHousebuildOwner
+    )
   }
 
   if (discipline === 'MEP') {
-    return !!permissions?.isMEPOwner
+    return (
+      role === 'mep_project_owner' ||
+      !!permissions?.isMEPOwner
+    )
   }
 
   if (discipline === 'Infrastructure') {
-    return !!permissions?.isInfrastructureOwner
+    return (
+      role === 'infrastructure_project_owner' ||
+      !!permissions?.isInfrastructureOwner
+    )
   }
 
   return false
@@ -264,6 +294,8 @@ export function canEditReports(
       'admin',
       'pmo',
       'portfolio_manager',
+      ...PROJECT_OWNER_ROLES,
+      'project_owner',
       'design',
       'housebuild',
       'infrastructure',
@@ -295,6 +327,7 @@ export function canExportReports(role?: string | null) {
     'admin',
     'pmo',
     'portfolio_manager',
+    ...PROJECT_OWNER_ROLES,
     'project_owner',
     'design',
     'housebuild',
@@ -309,9 +342,14 @@ export function canEditExternalReview(
   isAssignedProjectOwner?: boolean
 ) {
   return (
-    ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'].includes(
-      role || ''
-    ) || canEditAssignedProject(role, isAssignedProjectOwner)
+    [
+      'workspace_admin',
+      'admin',
+      'pmo',
+      'portfolio_manager',
+      ...PROJECT_OWNER_ROLES,
+      'project_owner',
+    ].includes(role || '') || canEditAssignedProject(role, isAssignedProjectOwner)
   )
 }
 
@@ -369,7 +407,13 @@ export function isReadOnly(
 
   if (isProjectAdmin(role)) return false
   if (role === 'costing') return false
-  if (role === 'project_owner' && isAssignedProjectOwner) return false
+
+  if (
+    [...PROJECT_OWNER_ROLES, 'project_owner'].includes(role || '') &&
+    isAssignedProjectOwner
+  ) {
+    return false
+  }
 
   return true
 }
