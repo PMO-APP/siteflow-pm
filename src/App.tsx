@@ -145,15 +145,24 @@ export default function App() {
     )
 
     const selectedMembership =
-      externalMembership || workspaceMembership || memberships[0]
+  externalMembership || workspaceMembership || memberships[0]
 
-    setMembership({
-      role: selectedMembership.role,
-      accessScope: selectedMembership.access_scope,
-      organizationId: selectedMembership.organization_id,
-      portfolioId: selectedMembership.portfolio_id,
-      projectId: selectedMembership.project_id,
-    })
+const projectIds = memberships
+  .filter(
+    membership =>
+      membership.access_scope === 'project' &&
+      membership.project_id
+  )
+  .map(membership => membership.project_id)
+
+setMembership({
+  role: selectedMembership.role,
+  accessScope: selectedMembership.access_scope,
+  organizationId: selectedMembership.organization_id,
+  portfolioId: selectedMembership.portfolio_id,
+  projectId: selectedMembership.project_id,
+  projectIds,
+})
   }
 
   useEffect(() => {
