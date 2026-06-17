@@ -50,7 +50,10 @@ export default function SchedulePage() {
   infrastructureOwnerEmail,
 } = useProjectStore()
 
-  const role = useMembershipStore(state => state.role)
+ const role = useMembershipStore(state => state.role)
+const assignedProjectId = useMembershipStore(
+  state => state.projectId
+)
   const { user } = useAuthStore()
 
   const [disciplineTab, setDisciplineTab] =
@@ -91,10 +94,17 @@ export default function SchedulePage() {
     disciplineTab === 'Overall'
       ? undefined
       : (disciplineTab as ScheduleDiscipline)
+  const isAssignedProjectOwner =
+  assignedProjectId === projectId
 
-  const canEditDisciplineSchedule =
-    disciplineTab !== 'Overall' &&
-    canEditSchedule(role, activeDiscipline, permissionContext)
+ const canEditDisciplineSchedule =
+  disciplineTab !== 'Overall' &&
+  isAssignedProjectOwner &&
+  canEditSchedule(
+    role,
+    activeDiscipline,
+    permissionContext
+  )
 
   const today = new Date()
 
