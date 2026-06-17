@@ -45,6 +45,7 @@ const NAV = [
   { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
   { to: '/app/site', icon: HardHat, label: 'Site Progress' },
   { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates' },
+  { to: '/app/hse', icon: HardHat, label: 'HSE', },
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
