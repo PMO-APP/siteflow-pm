@@ -151,6 +151,8 @@ export function canEditDiscipline(
 ) {
   if (isProjectAdmin(role)) return true
 
+  if (permissions?.isOverallProjectOwner) return true
+
   if (discipline === 'Housebuild') {
     return !!permissions?.isHousebuildOwner
   }
