@@ -60,6 +60,15 @@ const PROJECT_ROLES = [
     label: 'Infrastructure Project Owner',
   },
 
+  {
+    value: 'hse_manager',
+    label: 'HSE Manager',
+  },
+  {
+    value: 'hse_officer',
+    label: 'HSE Officer',
+  },
+
   { value: 'consultant', label: 'Consultant' },
   { value: 'contractor', label: 'Contractor' },
   { value: 'vendor', label: 'Vendor' },
@@ -235,7 +244,13 @@ if (inviteRole === 'housebuild_project_owner') {
 if (inviteRole === 'mep_project_owner') {
   ownerUpdate.mep_owner_email = cleanEmail
 }
+if (inviteRole === 'hse_manager') {
+  ownerUpdate.hse_manager_email = cleanEmail
+}
 
+if (inviteRole === 'hse_officer') {
+  ownerUpdate.hse_officer_email = cleanEmail
+}
 if (inviteRole === 'infrastructure_project_owner') {
   ownerUpdate.infrastructure_owner_email = cleanEmail
 }
