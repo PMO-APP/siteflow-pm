@@ -142,7 +142,27 @@ export default function Dashboard() {
   const housebuildProgress = calcDisciplineProgress(housebuildTasks)
   const mepProgress = calcDisciplineProgress(mepTasks)
   const infrastructureProgress = calcDisciplineProgress(infrastructureTasks)
+  const phaseWeights: Record<string, number> = {
+  Foundations: 20,
+  Superstructure: 35,
+  'Internal "Wet works" (Contractor)': 15,
+  'Internal works & Interior Design': 20,
+  'External Works Phase': 10,
+}
+const calcPhaseProgress = (phaseName: string) => {
+  const phaseTasks = tasks.filter(
+    t => t.phase === phaseName
+  )
 
+  if (!phaseTasks.length) return 0
+
+  return (
+    phaseTasks.reduce(
+      (sum, task) => sum + getTaskProgress(task),
+      0
+    ) / phaseTasks.length
+  )
+}
   const disciplineWeights = {
     Housebuild: 60,
     MEP: 25,
@@ -152,14 +172,14 @@ export default function Dashboard() {
   const hasDisciplineTasks =
     housebuildTasks.length + mepTasks.length + infrastructureTasks.length > 0
 
-  const progressPct = hasDisciplineTasks
-    ? Math.round(
-        housebuildProgress * (disciplineWeights.Housebuild / 100) +
-          mepProgress * (disciplineWeights.MEP / 100) +
-          infrastructureProgress *
-            (disciplineWeights.Infrastructure / 100)
-      )
-    : 0
+ const progressPct = Math.round(
+  Object.entries(phaseWeights).reduce(
+    (sum, [phaseName, weight]) =>
+      sum +
+      (calcPhaseProgress(phaseName) * weight) / 100,
+    0
+  )
+)
 
   const variancePct =
     hasTimeline && tasks.length > 0 ? progressPct - plannedPct : null
