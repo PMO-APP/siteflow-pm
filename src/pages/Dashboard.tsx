@@ -110,8 +110,8 @@ export default function Dashboard() {
   }
 
   const housebuildTasks = tasks.filter(
-    t => (t.discipline || 'Housebuild') === 'Housebuild'
-  )
+  t => t.discipline === 'Housebuild'
+)
 
   const mepTasks = tasks.filter(t => t.discipline === 'MEP')
 
