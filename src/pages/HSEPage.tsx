@@ -1298,7 +1298,7 @@ function DocumentModal({
       const result = await uploadFile(
         'project-files',
         file,
-        `projects/${projectId}/hse/${cleanType}`
+        `projects/${projectId}/documents/${cleanType}`
       )
 
       if (!result) {
