@@ -12,21 +12,38 @@ type StorageItem = {
   metadata: any
 }
 
-export default function DocumentRepository() {
+type DocumentRepositoryProps = {
+  rootFolder?: string
+  title?: string
+}
+
+export default function DocumentRepository({
+  rootFolder = 'documents',
+  title = 'Document Repository',
+}: DocumentRepositoryProps) {
   const { projectId } = useProjectStore()
   const [path, setPath] = useState('')
   const [items, setItems] = useState<StorageItem[]>([])
   const [loading, setLoading] = useState(false)
 
-  const basePath = `projects/${projectId}`
+  const basePath = projectId
+    ? `projects/${projectId}/${rootFolder}`
+    : ''
+
   const currentPath = path ? `${basePath}/${path}` : basePath
+
+  useEffect(() => {
+    setPath('')
+  }, [projectId, rootFolder])
 
   useEffect(() => {
     if (!projectId) return
     loadFiles()
-  }, [projectId, path])
+  }, [projectId, path, rootFolder])
 
   async function loadFiles() {
+    if (!currentPath) return
+
     setLoading(true)
 
     const { data, error } = await supabase.storage
@@ -69,16 +86,20 @@ export default function DocumentRepository() {
     return data.publicUrl
   }
 
+  const displayPath = path
+    ? `/${rootFolder}/${path}`
+    : `/${rootFolder}`
+
   return (
     <div className="card p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold text-[#ede8de]">
-            Document Repository
+            {title}
           </div>
 
           <div className="text-[11px] text-[#6e7d8c] font-mono">
-            /{path || 'project root'}
+            {displayPath}
           </div>
         </div>
 
