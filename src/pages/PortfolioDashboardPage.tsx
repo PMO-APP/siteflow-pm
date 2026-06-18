@@ -79,6 +79,11 @@ export default function PortfolioDashboardPage() {
   const [internalTasks, setInternalTasks] = useState<any[]>([])
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [siteReports, setSiteReports] = useState<any[]>([])
+
+  const [hseObservations, setHseObservations] = useState<any[]>([])
+  const [hseIncidents, setHseIncidents] = useState<any[]>([])
+  const [hseToolboxTalks, setHseToolboxTalks] = useState<any[]>([])
+
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -102,6 +107,9 @@ export default function PortfolioDashboardPage() {
       internalTasksRes,
       qualityGatesRes,
       siteReportsRes,
+      hseObservationsRes,
+      hseIncidentsRes,
+      hseToolboxTalksRes,
     ] = await Promise.all([
       supabase.from('organizations').select('*'),
       supabase.from('projects').select('*'),
@@ -116,6 +124,9 @@ export default function PortfolioDashboardPage() {
       supabase.from('internal_tasks').select('*'),
       supabase.from('quality_gates').select('*'),
       supabase.from('site_reports').select('*'),
+      supabase.from('hse_observations').select('*'),
+      supabase.from('hse_incidents').select('*'),
+      supabase.from('hse_toolbox_talks').select('*'),
     ])
 
     setOrganizations(organizationsRes.data || [])
@@ -131,6 +142,9 @@ export default function PortfolioDashboardPage() {
     setInternalTasks(internalTasksRes.data || [])
     setQualityGates(qualityGatesRes.data || [])
     setSiteReports(siteReportsRes.data || [])
+    setHseObservations(hseObservationsRes.data || [])
+    setHseIncidents(hseIncidentsRes.data || [])
+    setHseToolboxTalks(hseToolboxTalksRes.data || [])
 
     setLoading(false)
   }
@@ -150,6 +164,30 @@ export default function PortfolioDashboardPage() {
       const projectInternalTasks = internalTasks.filter(item => item.project_id === projectId)
       const projectQualityGates = qualityGates.filter(item => item.project_id === projectId)
       const projectSiteReports = siteReports.filter(item => item.project_id === projectId)
+
+      const projectObservations = hseObservations.filter(item => item.project_id === projectId)
+      const projectIncidents = hseIncidents.filter(item => item.project_id === projectId)
+      const projectToolboxTalks = hseToolboxTalks.filter(item => item.project_id === projectId)
+
+      const openObservations = projectObservations.filter(item => !isClosedStatus(item.status))
+
+      const criticalObservations = openObservations.filter(item =>
+        String(item.severity || '').toLowerCase().includes('critical')
+      )
+
+      const openIncidents = projectIncidents.filter(item => !isClosedStatus(item.status))
+
+      const toolboxTalksThisMonth = projectToolboxTalks.filter(item => {
+        if (!item.talk_date) return false
+
+        const date = new Date(item.talk_date)
+        const now = new Date()
+
+        return (
+          date.getMonth() === now.getMonth() &&
+          date.getFullYear() === now.getFullYear()
+        )
+      })
 
       const openRisks = projectRisks.filter(item => !isClosedStatus(item.status))
       const highRisks = openRisks.filter(item => {
@@ -249,6 +287,9 @@ export default function PortfolioDashboardPage() {
         failedQualityGates: failedQualityGates.length,
         budgetConsumption,
         daysSinceReport,
+        openObservations: openObservations.length,
+        criticalObservations: criticalObservations.length,
+        openIncidents: openIncidents.length,
       })
 
       const health = getHealth(score)
@@ -268,6 +309,11 @@ export default function PortfolioDashboardPage() {
         delayedProcurement: delayedProcurement.length,
         overdueTasks: overdueTasks.length,
         failedQualityGates: failedQualityGates.length,
+        openObservations: openObservations.length,
+        criticalObservations: criticalObservations.length,
+        openIncidents: openIncidents.length,
+        toolboxTalks: projectToolboxTalks.length,
+        toolboxTalksThisMonth: toolboxTalksThisMonth.length,
         contractSum,
         paidToDate,
         variations,
@@ -290,6 +336,9 @@ export default function PortfolioDashboardPage() {
     internalTasks,
     qualityGates,
     siteReports,
+    hseObservations,
+    hseIncidents,
+    hseToolboxTalks,
   ])
 
   const summary = useMemo(() => {
@@ -314,6 +363,12 @@ export default function PortfolioDashboardPage() {
       totalPendingApprovals: projectRows.reduce((sum, row) => sum + row.pendingApprovals, 0),
       totalPendingProcurement: projectRows.reduce((sum, row) => sum + row.pendingProcurement, 0),
       overdueTasks: projectRows.reduce((sum, row) => sum + row.overdueTasks, 0),
+
+      totalOpenObservations: projectRows.reduce((sum, row) => sum + row.openObservations, 0),
+      totalCriticalObservations: projectRows.reduce((sum, row) => sum + row.criticalObservations, 0),
+      totalOpenIncidents: projectRows.reduce((sum, row) => sum + row.openIncidents, 0),
+      totalToolboxTalks: projectRows.reduce((sum, row) => sum + row.toolboxTalks, 0),
+      totalToolboxTalksThisMonth: projectRows.reduce((sum, row) => sum + row.toolboxTalksThisMonth, 0),
     }
   }, [projectRows])
 
@@ -386,6 +441,17 @@ export default function PortfolioDashboardPage() {
     .sort((a, b) => b.snags - a.snags)
     .slice(0, 10)
 
+  const hseChartData = projectRows
+    .map(row => ({
+      name: projectName(row.project),
+      observations: row.openObservations,
+      critical: row.criticalObservations,
+      incidents: row.openIncidents,
+    }))
+    .filter(row => row.observations > 0 || row.critical > 0 || row.incidents > 0)
+    .sort((a, b) => b.incidents + b.critical + b.observations - (a.incidents + a.critical + a.observations))
+    .slice(0, 10)
+
   const financeChartData = projectRows
     .filter(row => row.contractSum > 0 || row.paidToDate > 0)
     .map(row => ({
@@ -397,7 +463,14 @@ export default function PortfolioDashboardPage() {
     .slice(0, 10)
 
   const executiveAlerts = projectRows
-    .filter(row => row.health === 'Critical' || row.score < 65 || row.highRisks > 0)
+    .filter(
+      row =>
+        row.health === 'Critical' ||
+        row.score < 65 ||
+        row.highRisks > 0 ||
+        row.criticalObservations > 0 ||
+        row.openIncidents > 0
+    )
     .sort((a, b) => a.score - b.score)
     .slice(0, 6)
 
@@ -441,8 +514,8 @@ export default function PortfolioDashboardPage() {
 
             <p className="text-slate-400 mt-4 max-w-3xl">
               Workspace-level view of project delivery, financial exposure,
-              risks, snags, approvals, procurement, reporting compliance, and
-              intervention priorities across all projects.
+              risks, snags, HSE performance, approvals, procurement, reporting
+              compliance, and intervention priorities across all projects.
             </p>
 
             <div className="mt-5 text-xs text-[#6e7d8c]">
@@ -463,7 +536,7 @@ export default function PortfolioDashboardPage() {
           <Metric icon={Clock} title="Overdue Tasks" value={summary.overdueTasks} danger={summary.overdueTasks > 0} />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
           <div className="card p-5 xl:col-span-3">
             <SectionTitle icon={Wallet} title="Financial Overview" />
 
@@ -483,6 +556,16 @@ export default function PortfolioDashboardPage() {
             <PressureRow label="Open Snags" value={summary.totalOpenSnags} />
             <PressureRow label="Pending Approvals" value={summary.totalPendingApprovals} />
             <PressureRow label="Procurement Issues" value={summary.totalPendingProcurement} />
+          </div>
+
+          <div className="card p-5">
+            <SectionTitle icon={ShieldAlert} title="Portfolio Safety" />
+
+            <PressureRow label="Open Observations" value={summary.totalOpenObservations} />
+            <PressureRow label="Critical Observations" value={summary.totalCriticalObservations} danger />
+            <PressureRow label="Open Incidents" value={summary.totalOpenIncidents} danger />
+            <PressureRow label="Toolbox Talks" value={summary.totalToolboxTalks} />
+            <PressureRow label="Talks This Month" value={summary.totalToolboxTalksThisMonth} />
           </div>
         </div>
 
@@ -537,7 +620,7 @@ export default function PortfolioDashboardPage() {
           </ChartCard>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <ChartCard title="Top Projects by Open Risks">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={riskChartData} layout="vertical">
@@ -564,6 +647,25 @@ export default function PortfolioDashboardPage() {
                 <Bar dataKey="critical" fill="#ef4444" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Top Projects by HSE Pressure">
+            {hseChartData.length === 0 ? (
+              <EmptyChart message="No open HSE pressure recorded yet." />
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={hseChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                  <XAxis type="number" stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" stroke="#6e7d8c" fontSize={11} width={120} />
+                  <Tooltip content={<DarkTooltip />} />
+                  <Legend />
+                  <Bar dataKey="observations" fill="#c49e48" radius={[0, 8, 8, 0]} />
+                  <Bar dataKey="critical" fill="#f59e0b" radius={[0, 8, 8, 0]} />
+                  <Bar dataKey="incidents" fill="#ef4444" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </ChartCard>
         </div>
 
@@ -608,6 +710,8 @@ export default function PortfolioDashboardPage() {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
                       <span>Risks: {row.openRisks}</span>
                       <span>Snags: {row.openSnags}</span>
+                      <span>HSE Obs: {row.openObservations}</span>
+                      <span>Incidents: {row.openIncidents}</span>
                       <span>Approvals: {row.pendingApprovals}</span>
                       <span>Procurement: {row.pendingProcurement}</span>
                     </div>
@@ -628,6 +732,7 @@ export default function PortfolioDashboardPage() {
                     <th>Schedule</th>
                     <th>Risk</th>
                     <th>Snags</th>
+                    <th>HSE</th>
                     <th>Approvals</th>
                     <th>Procurement</th>
                     <th>Finance</th>
@@ -644,6 +749,7 @@ export default function PortfolioDashboardPage() {
                       <td><HeatCell value={row.scheduleVariance < -10 ? 3 : row.scheduleVariance < -5 ? 2 : 1} /></td>
                       <td><HeatCell value={row.highRisks > 0 ? 3 : row.openRisks > 3 ? 2 : 1} /></td>
                       <td><HeatCell value={row.criticalSnags > 0 ? 3 : row.openSnags > 5 ? 2 : 1} /></td>
+                      <td><HeatCell value={row.openIncidents > 0 ? 3 : row.criticalObservations > 0 ? 2 : 1} /></td>
                       <td><HeatCell value={row.pendingApprovals > 5 ? 3 : row.pendingApprovals > 0 ? 2 : 1} /></td>
                       <td><HeatCell value={row.delayedProcurement > 0 ? 3 : row.pendingProcurement > 3 ? 2 : 1} /></td>
                       <td><HeatCell value={row.budgetConsumption > 100 ? 3 : row.budgetConsumption > 85 ? 2 : 1} /></td>
@@ -673,6 +779,8 @@ export default function PortfolioDashboardPage() {
                   <th>Paid</th>
                   <th>Risks</th>
                   <th>Snags</th>
+                  <th>HSE Obs</th>
+                  <th>Incidents</th>
                   <th>Approvals</th>
                   <th>Procurement</th>
                   <th>Last Report</th>
@@ -697,6 +805,8 @@ export default function PortfolioDashboardPage() {
                       <td>{formatCurrency(row.paidToDate || 0)}</td>
                       <td>{row.openRisks}</td>
                       <td>{row.openSnags}</td>
+                      <td>{row.openObservations}</td>
+                      <td>{row.openIncidents}</td>
                       <td>{row.pendingApprovals}</td>
                       <td>{row.pendingProcurement}</td>
                       <td>
@@ -734,6 +844,10 @@ function calculateHealthScore(input: any) {
   score -= input.delayedProcurement * 6
   score -= input.overdueTasks * 3
   score -= input.failedQualityGates * 4
+
+  score -= (input.openObservations || 0) * 1
+  score -= (input.criticalObservations || 0) * 8
+  score -= (input.openIncidents || 0) * 10
 
   if (input.budgetConsumption > 100) score -= 18
   else if (input.budgetConsumption > 85) score -= 8
