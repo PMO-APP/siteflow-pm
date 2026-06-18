@@ -101,15 +101,17 @@ const isAssignedProjectOwner =
 
 const canEditDisciplineSchedule =
   disciplineTab !== 'Overall' &&
-  canEditSchedule(
-    role,
-    activeDiscipline,
-    {
-      ...permissionContext,
-      isAssignedProjectOwner,
-    }
+  (
+    ['workspace_admin', 'admin', 'pmo'].includes(role || '') ||
+    (
+      isAssignedProjectOwner &&
+      canEditSchedule(
+        role,
+        activeDiscipline,
+        permissionContext
+      )
+    )
   )
-
   const today = new Date()
 
   const projectTasks: Task[] = allTasks.filter(
