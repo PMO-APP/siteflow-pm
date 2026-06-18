@@ -16,6 +16,7 @@ import {
 } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import DocumentRepository from '@/components/DocumentRepository'
 import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import {
@@ -24,7 +25,12 @@ import {
   canEditOwnOrAdmin,
 } from '@/lib/permissions'
 
-type Tab = 'observations' | 'incidents' | 'toolbox' | 'documents'
+type Tab =
+  | 'observations'
+  | 'incidents'
+  | 'toolbox'
+  | 'documents'
+  | 'repository'
 
 type HSEObservation = {
   id: string
@@ -325,12 +331,13 @@ export default function HSEPage() {
 
       <div className="flex flex-wrap gap-2 items-center">
         <div className="flex rounded-md overflow-hidden border border-white/[0.08]">
-          {[
-            ['observations', 'Observations'],
-            ['incidents', 'Incidents'],
-            ['toolbox', 'Toolbox Talks'],
-            ['documents', 'Documents'],
-          ].map(([value, label]) => (
+        {[
+  ['observations', 'Observations'],
+  ['incidents', 'Incidents'],
+  ['toolbox', 'Toolbox Talks'],
+  ['documents', 'Documents'],
+  ['repository', 'Repository'],
+].map(([value, label]) => (
             <button
               key={value}
               onClick={() => {
@@ -711,6 +718,12 @@ export default function HSEPage() {
           </div>
         </div>
       )}
+      {activeTab === 'repository' && (
+  <DocumentRepository
+    rootFolder="hse"
+    title="HSE Repository"
+  />
+)}
 
       {modal?.type === 'observation' && (
         <ObservationModal
@@ -1295,11 +1308,11 @@ function DocumentModal({
         .toLowerCase()
         .replace(/\s+/g, '-')
 
-      const result = await uploadFile(
-        'project-files',
-        file,
-        `projects/${projectId}/${cleanType}`
-      )
+     const result = await uploadFile(
+  'project-files',
+  file,
+  `projects/${projectId}/hse/${cleanType}`
+)
 
       if (!result) {
         alert('Upload failed. No file path returned.')
