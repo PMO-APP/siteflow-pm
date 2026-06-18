@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  CheckCircle,
-  FileText,
   HardHat,
   Plus,
   Search,
   ShieldAlert,
+  Upload,
   Users,
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import {
+  uploadFile,
+  backupFileToGoogleDrive,
+} from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
@@ -77,6 +80,13 @@ type HSEDocument = {
   title: string
   document_type?: string | null
   file_url?: string | null
+  storage_path?: string | null
+  file_size_kb?: number | null
+  file_type?: string | null
+  google_drive_file_id?: string | null
+  google_drive_url?: string | null
+  google_drive_sync_status?: string | null
+  google_drive_sync_error?: string | null
   uploaded_by?: string | null
   created_at?: string | null
 }
@@ -126,7 +136,6 @@ const DOCUMENT_TYPES = [
 export default function HSEPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
-  const { user } = useAuthStore()
 
   const [activeTab, setActiveTab] = useState<Tab>('observations')
   const [observations, setObservations] = useState<HSEObservation[]>([])
@@ -138,6 +147,7 @@ export default function HSEPage() {
   const [search, setSearch] = useState('')
   const [severityFilter, setSeverityFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+
   const [modal, setModal] = useState<
     | null
     | { type: 'observation'; item: HSEObservation | null }
@@ -237,8 +247,8 @@ export default function HSEPage() {
   const criticalObservations = observations.filter(
     item => item.status !== 'Closed' && item.severity === 'Critical'
   )
-
   const openIncidents = incidents.filter(item => item.status !== 'Closed')
+
   const talksThisMonth = toolboxTalks.filter(item => {
     if (!item.talk_date) return false
 
@@ -290,18 +300,21 @@ export default function HSEPage() {
           value={openObservations.length}
           color={openObservations.length > 0 ? 'text-amber-400' : 'text-emerald-400'}
         />
+
         <MetricCard
           icon={AlertTriangle}
           label="Critical Issues"
           value={criticalObservations.length}
           color={criticalObservations.length > 0 ? 'text-red-400' : 'text-emerald-400'}
         />
+
         <MetricCard
           icon={HardHat}
           label="Open Incidents"
           value={openIncidents.length}
           color={openIncidents.length > 0 ? 'text-red-400' : 'text-emerald-400'}
         />
+
         <MetricCard
           icon={Users}
           label="Toolbox This Month"
@@ -484,9 +497,7 @@ export default function HSEPage() {
                             setModal({ type: 'observation', item })
                           }
                         >
-                          {canEditOwnOrAdmin(role, item.created_by, user?.id)
-                            ? 'Edit'
-                            : 'View'}
+                          View
                         </button>
                       </td>
                     </tr>
@@ -631,6 +642,7 @@ export default function HSEPage() {
                   <th>Title</th>
                   <th>Type</th>
                   <th>Uploaded</th>
+                  <th>Size</th>
                   <th>File</th>
                 </tr>
               </thead>
@@ -638,7 +650,7 @@ export default function HSEPage() {
               <tbody>
                 {documents.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-[#6e7d8c]">
+                    <td colSpan={5} className="text-center py-8 text-[#6e7d8c]">
                       No HSE documents uploaded.
                     </td>
                   </tr>
@@ -648,21 +660,48 @@ export default function HSEPage() {
                       <td className="font-medium text-[#ede8de]">
                         {item.title}
                       </td>
+
                       <td>{item.document_type || 'Other'}</td>
+
                       <td>{fdate(item.created_at)}</td>
+
+                      <td className="text-[10px] text-[#6e7d8c]">
+                        {item.file_size_kb ? `${item.file_size_kb} KB` : '—'}
+                      </td>
+
                       <td>
-                        {item.file_url ? (
-                          <a
-                            href={item.file_url}
-                            target="_blank"
-                            rel="noreferrer"
+                        <div className="flex gap-2">
+                          {item.file_url ? (
+                            <a
+                              href={item.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="tbl-action"
+                            >
+                              Open
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+
+                          {item.google_drive_url && (
+                            <a
+                              href={item.google_drive_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="tbl-action"
+                            >
+                              Drive
+                            </a>
+                          )}
+
+                          <button
                             className="tbl-action"
+                            onClick={() => setModal({ type: 'document', item })}
                           >
-                            Open
-                          </a>
-                        ) : (
-                          '—'
-                        )}
+                            View
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1214,9 +1253,10 @@ function DocumentModal({
   onClose: () => void
   onSaved: () => void
 }) {
-  const { projectId } = useProjectStore()
+  const { projectId, projectName } = useProjectStore()
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
+  const [uploading, setUploading] = useState(false)
 
   const canEdit = !item || canEditOwnOrAdmin(role, item.uploaded_by, user?.id)
 
@@ -1224,6 +1264,14 @@ function DocumentModal({
     title: item?.title || '',
     document_type: item?.document_type || 'Other',
     file_url: item?.file_url || '',
+    storage_path: item?.storage_path || '',
+    file_size_kb: item?.file_size_kb || 0,
+    file_type: item?.file_type || '',
+    google_drive_file_id: item?.google_drive_file_id || '',
+    google_drive_url: item?.google_drive_url || '',
+    google_drive_sync_status:
+      item?.google_drive_sync_status || 'pending',
+    google_drive_sync_error: item?.google_drive_sync_error || '',
   })
 
   const set = (key: string, value: any) => {
@@ -1231,8 +1279,82 @@ function DocumentModal({
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!projectId) {
+      alert('No project selected.')
+      return
+    }
+
+    try {
+      setUploading(true)
+
+      const cleanType = form.document_type
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+
+      const result = await uploadFile(
+        'project-files',
+        file,
+        `projects/${projectId}/hse/${cleanType}`
+      )
+
+      if (!result) {
+        alert('Upload failed. No file path returned.')
+        return
+      }
+
+      set('storage_path', result.path)
+      set('file_url', result.publicUrl)
+      set('file_size_kb', Math.round(file.size / 1024))
+      set('file_type', file.type || file.name.split('.').pop() || 'file')
+
+      try {
+        set('google_drive_sync_status', 'syncing')
+        set('google_drive_sync_error', '')
+
+        const driveResult = await backupFileToGoogleDrive({
+          bucket: 'project-files',
+          filePath: result.path,
+          fileName: file.name,
+          projectId,
+          projectName,
+          documentType: `HSE - ${form.document_type}`,
+          discipline: 'HSE',
+          title: form.title || file.name,
+        })
+
+        set('google_drive_file_id', driveResult.googleDriveFileId)
+        set('google_drive_url', driveResult.googleDriveUrl)
+        set('google_drive_sync_status', 'synced')
+        set('google_drive_sync_error', '')
+      } catch (driveError: any) {
+        console.error('Google Drive backup failed:', driveError)
+
+        set('google_drive_sync_status', 'failed')
+        set(
+          'google_drive_sync_error',
+          driveError?.message || 'Google Drive backup failed'
+        )
+      }
+    } catch (error: any) {
+      console.error('HSE document upload failed:', error)
+      alert(error?.message || 'HSE document upload failed')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
   async function save() {
     if (!form.title.trim()) return
+
+    if (!projectId) {
+      alert('No project selected.')
+      return
+    }
 
     const payload = {
       ...form,
@@ -1259,7 +1381,7 @@ function DocumentModal({
     <BaseModal
       title={item ? 'HSE Document' : 'New HSE Document'}
       onClose={onClose}
-      onSave={canEdit ? save : undefined}
+      onSave={canEdit && !uploading ? save : undefined}
     >
       {!canEdit && <ViewOnlyNotice />}
 
@@ -1285,14 +1407,72 @@ function DocumentModal({
         </select>
       </Field>
 
-      <Field label="File URL">
-        <input
-          className="form-control"
-          value={form.file_url}
-          disabled={!canEdit}
-          onChange={event => set('file_url', event.target.value)}
-          placeholder="Paste uploaded file URL…"
-        />
+      <Field label="Upload File">
+        <label className="btn-ghost btn-sm btn cursor-pointer w-full justify-center border-dashed">
+          <Upload size={13} />
+          {uploading
+            ? 'Uploading…'
+            : form.storage_path
+            ? 'File uploaded ✓'
+            : 'Click to upload HSE document'}
+
+          <input
+            type="file"
+            hidden
+            disabled={!canEdit || uploading}
+            onChange={handleFile}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+          />
+        </label>
+
+        {form.file_size_kb > 0 && (
+          <div className="text-[10px] text-[#6e7d8c] mt-1">
+            {form.file_size_kb} KB · {form.file_type || 'file'}
+          </div>
+        )}
+
+        {form.google_drive_sync_status === 'syncing' && (
+          <div className="text-[10px] text-amber-400 mt-1">
+            Syncing to Google Drive…
+          </div>
+        )}
+
+        {form.google_drive_sync_status === 'synced' && (
+          <div className="text-[10px] text-emerald-400 mt-1">
+            ✓ Backed up to Google Drive
+          </div>
+        )}
+
+        {form.google_drive_sync_status === 'failed' && (
+          <div className="text-[10px] text-red-400 mt-1">
+            ⚠ Google Drive backup failed
+            {form.google_drive_sync_error
+              ? `: ${form.google_drive_sync_error}`
+              : ''}
+          </div>
+        )}
+
+        {form.google_drive_url && (
+          <a
+            href={form.google_drive_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] text-[#c49e48] underline mt-1 inline-block"
+          >
+            Open Google Drive backup
+          </a>
+        )}
+
+        {form.file_url && (
+          <a
+            href={form.file_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[10px] text-[#c49e48] underline mt-1 inline-block"
+          >
+            Open uploaded file
+          </a>
+        )}
       </Field>
     </BaseModal>
   )
