@@ -120,67 +120,51 @@ export default function Dashboard() {
   )
 
   const calcDisciplineProgress = (disciplineTasks: any[]) => {
-    if (disciplineTasks.length === 0) return 0
+  if (disciplineTasks.length === 0) return 0
 
-    const totalWeight = disciplineTasks.reduce(
-      (sum, task) => sum + Number(task.weight_pct || 1),
-      0
-    )
+  const totalWeight = disciplineTasks.reduce(
+    (sum, task) => sum + Number(task.weight_pct || 0),
+    0
+  )
 
-    if (totalWeight === 0) return 0
+  if (totalWeight === 0) return 0
 
-    const earnedWeight = disciplineTasks.reduce(
-      (sum, task) =>
-        sum +
-        (Number(task.weight_pct || 1) * getTaskProgress(task)) / 100,
-      0
-    )
+  const earnedWeight = disciplineTasks.reduce(
+    (sum, task) =>
+      sum +
+      (Number(task.weight_pct || 0) * getTaskProgress(task)) / 100,
+    0
+  )
 
-    return Math.round((earnedWeight / totalWeight) * 100)
-  }
+  return Math.round((earnedWeight / totalWeight) * 100)
+}
 
   const housebuildProgress = calcDisciplineProgress(housebuildTasks)
   const mepProgress = calcDisciplineProgress(mepTasks)
   const infrastructureProgress = calcDisciplineProgress(infrastructureTasks)
-  const phaseWeights: Record<string, number> = {
-  Foundations: 20,
-  Superstructure: 35,
-  'Internal "Wet works" (Contractor)': 15,
-  'Internal works & Interior Design': 20,
-  'External Works Phase': 10,
-}
-const calcPhaseProgress = (phaseName: string) => {
-  const phaseTasks = tasks.filter(
-    t => t.phase === phaseName
-  )
-
-  if (!phaseTasks.length) return 0
-
-  return (
-    phaseTasks.reduce(
-      (sum, task) => sum + getTaskProgress(task),
-      0
-    ) / phaseTasks.length
-  )
-}
-  const disciplineWeights = {
-    Housebuild: 60,
-    MEP: 25,
-    Infrastructure: 15,
-  }
-
-  const hasDisciplineTasks =
-    housebuildTasks.length + mepTasks.length + infrastructureTasks.length > 0
-
- const progressPct = Math.round(
-  Object.entries(phaseWeights).reduce(
-    (sum, [phaseName, weight]) =>
-      sum +
-      (calcPhaseProgress(phaseName) * weight) / 100,
-    0
-  )
+  const totalProjectWeight = tasks.reduce(
+  (sum, task) => sum + Number(task.weight_pct || 0),
+  0
 )
 
+const earnedProjectWeight = tasks.reduce(
+  (sum, task) =>
+    sum +
+    (
+      Number(task.weight_pct || 0) *
+      getTaskProgress(task)
+    ) /
+      100,
+  0
+)
+
+const progressPct =
+  totalProjectWeight === 0
+    ? 0
+    : Math.round(
+        (earnedProjectWeight / totalProjectWeight) *
+          100
+      )
   const variancePct =
     hasTimeline && tasks.length > 0 ? progressPct - plannedPct : null
 
