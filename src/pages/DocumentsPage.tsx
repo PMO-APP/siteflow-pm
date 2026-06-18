@@ -141,10 +141,10 @@ function DocModal({
       const folder = getDocumentFolder(form.type, form.discipline)
 
       const result = await uploadFile(
-        'project-files',
-        file,
-        `projects/${projectId}/${folder}`
-      )
+  'project-files',
+  file,
+  `projects/${projectId}/documents/${folder}`
+)
 
       if (!result) {
         alert('Upload failed. No file path returned.')
