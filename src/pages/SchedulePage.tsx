@@ -23,6 +23,7 @@ import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
 import { useAuthStore } from '@/store/auth'
 
+
 type View = 'list' | 'gantt' | 'milestones'
 
 type DisciplineTab =
@@ -94,17 +95,19 @@ const assignedProjectIds = useMembershipStore(
     disciplineTab === 'Overall'
       ? undefined
       : (disciplineTab as ScheduleDiscipline)
- const isAssignedProjectOwner =
+const isAssignedProjectOwner =
   !!projectId &&
   assignedProjectIds.includes(projectId)
 
- const canEditDisciplineSchedule =
+const canEditDisciplineSchedule =
   disciplineTab !== 'Overall' &&
-  isAssignedProjectOwner &&
   canEditSchedule(
     role,
     activeDiscipline,
-    permissionContext
+    {
+      ...permissionContext,
+      isAssignedProjectOwner,
+    }
   )
 
   const today = new Date()
