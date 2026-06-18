@@ -10,7 +10,7 @@ export interface DisciplinePermissionContext {
   isInfrastructureOwner?: boolean
 }
 export const HSE_ROLES = [
-  'hse',
+  'hse_officer',
   'hse_lead',
   'hse_manager',
 ]
@@ -99,7 +99,7 @@ export function canCreateHSE(role?: string | null) {
 }
 
 export function canCloseHSE(role?: string | null) {
-  return isProjectAdmin(role) || ['hse_lead', 'hse_manager'].includes(role || '')
+  return isProjectAdmin(role) || ['hse_lead', 'hse_officer', 'hse_manager'].includes(role || '')
 }
 export function canViewInternalPages(role?: string | null) {
   return INTERNAL_VIEW_ROLES.includes(role || '')
@@ -401,6 +401,10 @@ export function canEditPage(
 ) {
   if (isExternalRole(role)) return false
   if (isViewerRole(role)) return false
+
+   if (page === 'hse') return canCreateHSE(role)
+
+  if (isHSERole(role)) return false
 
   if (page === 'financial') return canManageFinancials(role)
   if (page === 'costing') return canEditCosting(role)
