@@ -154,10 +154,6 @@ const earnedProjectWeight = tasks.reduce(
   0
 )
 
-const progressPct =
-  totalProjectWeight === 0
-    ? 0
-    : Math.round((earnedProjectWeight / totalProjectWeight) * 100)
 
 const progressPct =
   totalProjectWeight === 0
@@ -267,26 +263,44 @@ const progressPct =
     )
   )
 
-  const phaseData = phaseList.map((ph: string, i: number) => {
-    const pts = tasks.filter((t: any) => t.phase === ph)
+ const phaseData = phaseList.map((ph: string, i: number) => {
+  const pts = tasks.filter(
+    (t: any) => t.phase === ph
+  )
 
-    const completedWeight = pts.reduce((sum: number, t: any) => {
-      if (t.status === 'Completed') return sum + 100
-      if (t.status === 'In Progress') return sum + Number(t.progress_pct || 0)
-      return sum
-    }, 0)
+  const phaseWeight = pts.reduce(
+    (sum, t) =>
+      sum + Number(t.weight_pct || 0),
+    0
+  )
 
-    const pct = pts.length === 0 ? 0 : Math.round(completedWeight / pts.length)
-    const completed = pts.filter((t: any) => t.status === 'Completed').length
+  const earnedWeight = pts.reduce(
+    (sum, t) =>
+      sum +
+      (Number(t.weight_pct || 0) *
+        getTaskProgress(t)) /
+        100,
+    0
+  )
 
-    return {
-      name: ph,
-      pct,
-      total: pts.length,
-      done: completed,
-      color: colorPool[i % colorPool.length],
-    }
-  })
+  const pct =
+    phaseWeight === 0
+      ? 0
+      : Math.round(
+          (earnedWeight / phaseWeight) * 100
+        )
+
+  return {
+    name: ph,
+    pct,
+    total: pts.length,
+    done: pts.filter(
+      (t: any) => t.status === 'Completed'
+    ).length,
+    color:
+      colorPool[i % colorPool.length],
+  }
+})
 
   const statusPie = [
     { name: 'Completed', value: done, color: '#3fad78' },
