@@ -142,7 +142,7 @@ export default function Dashboard() {
   const housebuildProgress = calcDisciplineProgress(housebuildTasks)
   const mepProgress = calcDisciplineProgress(mepTasks)
   const infrastructureProgress = calcDisciplineProgress(infrastructureTasks)
-  const totalProjectWeight = tasks.reduce(
+ const totalProjectWeight = tasks.reduce(
   (sum, task) => sum + Number(task.weight_pct || 0),
   0
 )
@@ -150,13 +150,14 @@ export default function Dashboard() {
 const earnedProjectWeight = tasks.reduce(
   (sum, task) =>
     sum +
-    (
-      Number(task.weight_pct || 0) *
-      getTaskProgress(task)
-    ) /
-      100,
+    (Number(task.weight_pct || 0) * getTaskProgress(task)) / 100,
   0
 )
+
+const progressPct =
+  totalProjectWeight === 0
+    ? 0
+    : Math.round((earnedProjectWeight / totalProjectWeight) * 100)
 
 const progressPct =
   totalProjectWeight === 0
