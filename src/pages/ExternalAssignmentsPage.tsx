@@ -92,20 +92,31 @@ export default function ExternalAssignmentsPage() {
     const cleanName = assignedName.trim()
     const cleanCompany = assignedCompany.trim()
 
-    const { error } = await supabase.from('external_tasks').insert({
+    const payload = {
       project_id: projectId,
+
       assigned_role: assignedRole,
       assigned_company: cleanCompany || null,
+
       assigned_to_name: cleanName || null,
       assigned_to_email: cleanEmail,
+
+      assigned_person_name: cleanName || null,
+      assigned_person_email: cleanEmail,
+      assigned_email: cleanEmail,
+
       title: cleanTitle,
       description: cleanDescription || null,
       priority,
       due_date: dueDate || null,
       status: 'Open',
       progress: 0,
-      created_by: user?.email || 'Internal Team',
-    })
+
+      created_by: user?.id || null,
+      submitted_by: user?.full_name || user?.email || 'Internal Team',
+    }
+
+    const { error } = await supabase.from('external_tasks').insert(payload)
 
     if (error) {
       setNotice(error.message)
@@ -280,14 +291,10 @@ export default function ExternalAssignmentsPage() {
             </div>
           ) : tasks.length === 0 ? (
             <div className="card p-10 text-center">
-              <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-                <ClipboardList size={24} className="text-[#c49e48]" />
-              </div>
-
+              <ClipboardList size={24} className="mx-auto mb-4 text-[#c49e48]" />
               <div className="text-xl font-bold text-white">
                 No external tasks assigned yet
               </div>
-
               <p className="text-sm text-slate-500 mt-2">
                 Tasks assigned here will appear in the external user portal for
                 this project only.
@@ -312,21 +319,11 @@ function TaskCard({ task }: { task: any }) {
       ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
       : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
 
-  const priorityStyle =
-    task.priority === 'Critical'
-      ? 'text-red-400'
-      : task.priority === 'High'
-      ? 'text-orange-400'
-      : task.priority === 'Low'
-      ? 'text-slate-400'
-      : 'text-[#c49e48]'
-
   return (
     <div className="card p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-[#ede8de]">{task.title}</h2>
-
           <p className="text-sm text-slate-500 mt-1">
             {task.description || 'No description provided.'}
           </p>
@@ -334,8 +331,11 @@ function TaskCard({ task }: { task: any }) {
           <div className="text-xs text-slate-500 mt-2">
             Assigned to:{' '}
             <span className="text-[#c49e48]">
-              {task.assigned_to_name ||
+              {task.assigned_person_name ||
+                task.assigned_to_name ||
+                task.assigned_person_email ||
                 task.assigned_to_email ||
+                task.assigned_email ||
                 task.assigned_company ||
                 formatRole(task.assigned_role)}
             </span>
@@ -356,9 +356,7 @@ function TaskCard({ task }: { task: any }) {
           {task.status || 'Open'}
         </span>
 
-        <span
-          className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}
-        >
+        <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[#c49e48]">
           Priority: {task.priority || 'Medium'}
         </span>
 
