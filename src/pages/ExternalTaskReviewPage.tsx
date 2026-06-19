@@ -6,6 +6,7 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
+  UploadCloud,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
@@ -24,7 +25,7 @@ export default function ExternalTaskReviewPage() {
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [comments, setComments] = useState<any[]>([])
   const [reply, setReply] = useState('')
-  const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadingComments, setLoadingComments] = useState(false)
@@ -91,6 +92,29 @@ export default function ExternalTaskReviewPage() {
     setLoadingComments(false)
   }
 
+  async function openEvidence(storagePath: string) {
+    const { data, error } = await supabase.storage
+      .from('external-task-evidence')
+      .createSignedUrl(storagePath, 3600)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank')
+    }
+  }
+
+  async function addHistory(taskId: number, action: string) {
+    await supabase.from('external_task_history').insert({
+      task_id: taskId,
+      action,
+      performed_by: user?.full_name || user?.email || 'Internal User',
+    })
+  }
+
   async function sendReply() {
     setNotice('')
 
@@ -99,14 +123,35 @@ export default function ExternalTaskReviewPage() {
       return
     }
 
-    if (!reply.trim()) {
-      setNotice('Reply message is required.')
+    if (!reply.trim() && !evidenceFile) {
+      setNotice('Reply message or evidence upload is required.')
       return
     }
 
     setSubmitting(true)
 
     const cleanReply = reply.trim()
+    let uploadedFileUrl: string | null = null
+
+    if (evidenceFile) {
+      const safeFileName = evidenceFile.name.replace(/\s+/g, '-')
+      const filePath = `${projectId}/${selectedTask.id}/${Date.now()}-${safeFileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('external-task-evidence')
+        .upload(filePath, evidenceFile, {
+          cacheControl: '3600',
+          upsert: false,
+        })
+
+      if (uploadError) {
+        setNotice(uploadError.message)
+        setSubmitting(false)
+        return
+      }
+
+      uploadedFileUrl = filePath
+    }
 
     const { error } = await supabase.from('external_task_comments').insert({
       task_id: selectedTask.id,
@@ -114,8 +159,8 @@ export default function ExternalTaskReviewPage() {
       sender_name: user?.full_name || user?.email || 'Internal User',
       sender_email: user?.email || '',
       sender_role: role || 'internal',
-      comment: cleanReply,
-      attachment_url: attachmentUrl.trim() || null,
+      comment: cleanReply || 'Evidence uploaded.',
+      attachment_url: uploadedFileUrl,
     })
 
     if (error) {
@@ -123,6 +168,11 @@ export default function ExternalTaskReviewPage() {
       setSubmitting(false)
       return
     }
+
+    await addHistory(
+      selectedTask.id,
+      uploadedFileUrl ? 'Internal reply added with evidence' : 'Internal reply added'
+    )
 
     await supabase
       .from('external_tasks')
@@ -149,15 +199,15 @@ export default function ExternalTaskReviewPage() {
           projectName: projectName || 'PMOCorex Project',
           submittedBy: user?.full_name || user?.email || 'Internal Team',
           submittedByEmail: user?.email || '',
-          message: cleanReply,
+          message: cleanReply || 'Evidence uploaded.',
           reviewUrl: `${window.location.origin}/external-project/tasks/${selectedTask.id}?project=${projectId}`,
         },
       })
     }
 
     setReply('')
-    setAttachmentUrl('')
-    setNotice('Reply sent. External assignee has been notified.')
+    setEvidenceFile(null)
+    setNotice('Reply/evidence sent. External assignee has been notified.')
     setSubmitting(false)
 
     await loadComments(selectedTask.id)
@@ -180,6 +230,8 @@ export default function ExternalTaskReviewPage() {
       setNotice(error.message)
       return
     }
+
+    await addHistory(selectedTask.id, `Internal status changed to ${status}`)
 
     const updatedTask = {
       ...selectedTask,
@@ -224,8 +276,9 @@ export default function ExternalTaskReviewPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Review external assignments, reply to task comments, update statuses,
-          and keep project-specific task communication in one place.
+          Review external assignments, reply to task comments, view uploaded
+          evidence, update statuses, and keep project-specific task communication
+          in one place.
         </p>
 
         <div className="mt-4 text-sm text-slate-500">
@@ -397,15 +450,14 @@ export default function ExternalTaskReviewPage() {
                         </p>
 
                         {item.attachment_url && (
-                          <a
-                            href={item.attachment_url}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => openEvidence(item.attachment_url)}
                             className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline mt-3"
                           >
                             <Paperclip size={13} />
-                            Open attachment/link
-                          </a>
+                            View Evidence
+                          </button>
                         )}
                       </div>
                     ))
@@ -420,12 +472,26 @@ export default function ExternalTaskReviewPage() {
                     onChange={e => setReply(e.target.value)}
                   />
 
-                  <input
-                    className="form-control"
-                    placeholder="Attachment URL / file link"
-                    value={attachmentUrl}
-                    onChange={e => setAttachmentUrl(e.target.value)}
-                  />
+                  <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4">
+                    <label className="form-label flex items-center gap-2">
+                      <UploadCloud size={15} />
+                      Upload Reply Evidence
+                    </label>
+
+                    <input
+                      type="file"
+                      className="form-control"
+                      onChange={e =>
+                        setEvidenceFile(e.target.files?.[0] || null)
+                      }
+                    />
+
+                    {evidenceFile && (
+                      <div className="text-xs text-slate-400 mt-2">
+                        Selected: {evidenceFile.name}
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     onClick={sendReply}
@@ -433,7 +499,7 @@ export default function ExternalTaskReviewPage() {
                     className="btn btn-gold"
                   >
                     <Send size={15} />
-                    {submitting ? 'Sending…' : 'Send Reply'}
+                    {submitting ? 'Sending…' : 'Send Reply / Evidence'}
                   </button>
                 </div>
               </>
@@ -444,4 +510,3 @@ export default function ExternalTaskReviewPage() {
     </div>
   )
 }
-
