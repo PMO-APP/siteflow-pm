@@ -6,6 +6,7 @@ import {
   Clock,
   Paperclip,
   Send,
+  UploadCloud,
 } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -36,8 +37,11 @@ export default function ExternalTaskDetailPage() {
 
   const [task, setTask] = useState<any | null>(null)
   const [comments, setComments] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
+
   const [comment, setComment] = useState('')
-  const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
+
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -75,6 +79,7 @@ export default function ExternalTaskDetailPage() {
     }
 
     setLoading(true)
+    setNotice('')
 
     const { data: taskRow, error: taskError } = await supabase
       .from('external_tasks')
@@ -110,9 +115,26 @@ export default function ExternalTaskDetailPage() {
       return
     }
 
+    const { data: historyRows } = await supabase
+      .from('external_task_history')
+      .select('*')
+      .eq('task_id', Number(taskId))
+      .order('created_at', { ascending: false })
+
     setTask(taskRow)
     setComments(commentRows || [])
+    setHistory(historyRows || [])
     setLoading(false)
+  }
+
+  async function addHistory(action: string) {
+    if (!task) return
+
+    await supabase.from('external_task_history').insert({
+      task_id: task.id,
+      action,
+      performed_by: user?.full_name || user?.email || 'External User',
+    })
   }
 
   async function updateTaskStatus(status: string) {
@@ -133,6 +155,8 @@ export default function ExternalTaskDetailPage() {
       setNotice(error.message)
       return
     }
+
+    await addHistory(`Status changed to ${status}`)
 
     await notifyUsers({
       projectId: activeProjectId,
@@ -156,6 +180,22 @@ export default function ExternalTaskDetailPage() {
     })
 
     setTask({ ...task, status })
+    await loadTaskDetail()
+  }
+
+  async function openEvidence(storagePath: string) {
+    const { data, error } = await supabase.storage
+      .from('external-task-evidence')
+      .createSignedUrl(storagePath, 3600)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank')
+    }
   }
 
   async function sendComment() {
@@ -166,14 +206,35 @@ export default function ExternalTaskDetailPage() {
       return
     }
 
-    if (!comment.trim()) {
-      setNotice('Comment is required.')
+    if (!comment.trim() && !evidenceFile) {
+      setNotice('Please add a comment or upload evidence.')
       return
     }
 
     setSubmitting(true)
 
     const cleanComment = comment.trim()
+    let uploadedFileUrl: string | null = null
+
+    if (evidenceFile) {
+      const safeFileName = evidenceFile.name.replace(/\s+/g, '-')
+      const filePath = `${activeProjectId}/${task.id}/${Date.now()}-${safeFileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('external-task-evidence')
+        .upload(filePath, evidenceFile, {
+          cacheControl: '3600',
+          upsert: false,
+        })
+
+      if (uploadError) {
+        setNotice(uploadError.message)
+        setSubmitting(false)
+        return
+      }
+
+      uploadedFileUrl = filePath
+    }
 
     const { error } = await supabase.from('external_task_comments').insert({
       task_id: task.id,
@@ -181,8 +242,8 @@ export default function ExternalTaskDetailPage() {
       sender_name: user?.full_name || user?.email || 'External User',
       sender_email: user?.email || '',
       sender_role: role || 'external',
-      comment: cleanComment,
-      attachment_url: attachmentUrl.trim() || null,
+      comment: cleanComment || 'Evidence uploaded.',
+      attachment_url: uploadedFileUrl,
     })
 
     if (error) {
@@ -190,6 +251,8 @@ export default function ExternalTaskDetailPage() {
       setSubmitting(false)
       return
     }
+
+    await addHistory(uploadedFileUrl ? 'Comment added with evidence' : 'Comment added')
 
     await notifyUsers({
       projectId: activeProjectId,
@@ -207,14 +270,14 @@ export default function ExternalTaskDetailPage() {
         projectName: externalProjectName || 'Selected Project',
         submittedBy: user?.full_name || user?.email || 'External User',
         submittedByEmail: user?.email || '',
-        message: cleanComment,
+        message: cleanComment || 'Evidence uploaded.',
         reviewUrl: `${window.location.origin}/app/external-communication`,
       },
     })
 
     setComment('')
-    setAttachmentUrl('')
-    setNotice('Comment sent. The internal team has been notified.')
+    setEvidenceFile(null)
+    setNotice('Comment/evidence sent. The internal team has been notified.')
     setSubmitting(false)
 
     await loadTaskDetail()
@@ -256,8 +319,8 @@ export default function ExternalTaskDetailPage() {
           </h1>
 
           <p className="text-slate-400 mt-3 max-w-2xl">
-            View task details, update task status, ask questions, add comments,
-            and attach supporting links.
+            View task details, update task status, add comments, and upload
+            supporting evidence for internal review.
           </p>
 
           <div className="mt-4 text-sm text-slate-500">
@@ -362,6 +425,35 @@ export default function ExternalTaskDetailPage() {
                     'External Partner'}
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
+                <div className="text-xs uppercase tracking-wider text-slate-500 mb-3">
+                  Assignment History
+                </div>
+
+                {history.length === 0 ? (
+                  <div className="text-slate-500 text-xs">
+                    No history yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {history.map(item => (
+                      <div key={item.id} className="border-l border-[#c49e48]/40 pl-3">
+                        <div className="text-[#ede8de] text-xs">
+                          {item.action}
+                        </div>
+
+                        <div className="text-slate-500 text-[11px] mt-1">
+                          {item.performed_by || 'User'} •{' '}
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleString('en-GB')
+                            : '—'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
 
             <section className="card p-6 xl:col-span-2 space-y-5">
@@ -369,7 +461,7 @@ export default function ExternalTaskDetailPage() {
                 <Send size={18} className="text-[#c49e48]" />
 
                 <h2 className="text-lg font-bold text-[#ede8de]">
-                  Task Conversation
+                  Task Conversation & Evidence
                 </h2>
               </div>
 
@@ -384,20 +476,16 @@ export default function ExternalTaskDetailPage() {
                       key={item.id}
                       className="rounded-2xl border border-white/10 bg-white/5 p-4"
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-bold text-[#ede8de]">
-                            {item.sender_name || item.sender_email}
-                          </div>
+                      <div>
+                        <div className="text-sm font-bold text-[#ede8de]">
+                          {item.sender_name || item.sender_email}
+                        </div>
 
-                          <div className="text-xs text-slate-500">
-                            {item.sender_role || 'User'} •{' '}
-                            {item.created_at
-                              ? new Date(item.created_at).toLocaleString(
-                                  'en-GB'
-                                )
-                              : '—'}
-                          </div>
+                        <div className="text-xs text-slate-500">
+                          {item.sender_role || 'User'} •{' '}
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleString('en-GB')
+                            : '—'}
                         </div>
                       </div>
 
@@ -406,15 +494,13 @@ export default function ExternalTaskDetailPage() {
                       </p>
 
                       {item.attachment_url && (
-                        <a
-                          href={item.attachment_url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          onClick={() => openEvidence(item.attachment_url)}
                           className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline mt-3"
                         >
                           <Paperclip size={13} />
-                          Open attachment/link
-                        </a>
+                          View Evidence
+                        </button>
                       )}
                     </div>
                   ))
@@ -429,12 +515,26 @@ export default function ExternalTaskDetailPage() {
                   onChange={e => setComment(e.target.value)}
                 />
 
-                <input
-                  className="form-control"
-                  placeholder="Attachment URL / file link"
-                  value={attachmentUrl}
-                  onChange={e => setAttachmentUrl(e.target.value)}
-                />
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4">
+                  <label className="form-label flex items-center gap-2">
+                    <UploadCloud size={15} />
+                    Upload Evidence
+                  </label>
+
+                  <input
+                    type="file"
+                    className="form-control"
+                    onChange={e =>
+                      setEvidenceFile(e.target.files?.[0] || null)
+                    }
+                  />
+
+                  {evidenceFile && (
+                    <div className="text-xs text-slate-400 mt-2">
+                      Selected: {evidenceFile.name}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={sendComment}
@@ -442,7 +542,7 @@ export default function ExternalTaskDetailPage() {
                   className="btn btn-gold"
                 >
                   <Send size={15} />
-                  {submitting ? 'Sending…' : 'Send Comment'}
+                  {submitting ? 'Sending…' : 'Send Comment / Evidence'}
                 </button>
               </div>
             </section>
@@ -466,7 +566,9 @@ function StatusBadge({ status }: { status: string }) {
       : 'border-amber-500/20 bg-amber-500/10 text-amber-400'
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs rounded-full border px-2 py-1 ${style}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs rounded-full border px-2 py-1 ${style}`}
+    >
       {isDone ? <CheckCircle size={13} /> : <Clock size={13} />}
       {status}
     </span>
