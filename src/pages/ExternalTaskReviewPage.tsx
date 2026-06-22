@@ -7,6 +7,10 @@ import {
   Clock,
   RefreshCw,
   UploadCloud,
+  XCircle,
+  RotateCcw,
+  ShieldCheck,
+  History,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
@@ -14,7 +18,17 @@ import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { notifyUsers } from '@/lib/notifications'
 
-const STATUS_OPTIONS = ['Open', 'Pending', 'In Progress', 'Submitted', 'Completed']
+const STATUS_OPTIONS = [
+  'Open',
+  'Pending',
+  'In Progress',
+  'Submitted',
+  'Under Review',
+  'Approved',
+  'Rejected',
+  'Revision Required',
+  'Completed',
+]
 
 export default function ExternalTaskReviewPage() {
   const { user } = useAuthStore()
@@ -24,11 +38,15 @@ export default function ExternalTaskReviewPage() {
   const [tasks, setTasks] = useState<any[]>([])
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [comments, setComments] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
+
   const [reply, setReply] = useState('')
+  const [reviewComment, setReviewComment] = useState('')
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
+
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
-  const [loadingComments, setLoadingComments] = useState(false)
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -36,9 +54,7 @@ export default function ExternalTaskReviewPage() {
   }, [projectId])
 
   useEffect(() => {
-    if (selectedTask?.id) {
-      loadComments(selectedTask.id)
-    }
+    if (selectedTask?.id) loadTaskDetails(selectedTask.id)
   }, [selectedTask?.id])
 
   async function loadTasks() {
@@ -70,26 +86,36 @@ export default function ExternalTaskReviewPage() {
     setLoading(false)
   }
 
-  async function loadComments(taskId: number) {
+  async function loadTaskDetails(taskId: number) {
     if (!projectId) return
 
-    setLoadingComments(true)
+    setLoadingDetails(true)
 
-    const { data, error } = await supabase
-      .from('external_task_comments')
-      .select('*')
-      .eq('task_id', taskId)
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: true })
+    const [{ data: commentRows, error: commentError }, { data: historyRows }] =
+      await Promise.all([
+        supabase
+          .from('external_task_comments')
+          .select('*')
+          .eq('task_id', taskId)
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: true }),
 
-    if (error) {
-      setNotice(error.message)
-      setLoadingComments(false)
+        supabase
+          .from('external_task_history')
+          .select('*')
+          .eq('task_id', taskId)
+          .order('created_at', { ascending: false }),
+      ])
+
+    if (commentError) {
+      setNotice(commentError.message)
+      setLoadingDetails(false)
       return
     }
 
-    setComments(data || [])
-    setLoadingComments(false)
+    setComments(commentRows || [])
+    setHistory(historyRows || [])
+    setLoadingDetails(false)
   }
 
   async function openEvidence(storagePath: string) {
@@ -102,17 +128,37 @@ export default function ExternalTaskReviewPage() {
       return
     }
 
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank')
-    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
 
-  async function addHistory(taskId: number, action: string) {
+  async function addHistory(taskId: number, action: string, metadata: any = {}) {
     await supabase.from('external_task_history').insert({
       task_id: taskId,
+      project_id: projectId,
       action,
       performed_by: user?.full_name || user?.email || 'Internal User',
+      performed_by_email: user?.email || '',
+      performed_by_role: role || 'internal',
+      metadata,
     })
+  }
+
+  async function uploadEvidence(taskId: number) {
+    if (!evidenceFile || !projectId) return null
+
+    const safeFileName = evidenceFile.name.replace(/\s+/g, '-')
+    const filePath = `${projectId}/${taskId}/${Date.now()}-${safeFileName}`
+
+    const { error } = await supabase.storage
+      .from('external-task-evidence')
+      .upload(filePath, evidenceFile, {
+        cacheControl: '3600',
+        upsert: false,
+      })
+
+    if (error) throw error
+
+    return filePath
   }
 
   async function sendReply() {
@@ -130,88 +176,71 @@ export default function ExternalTaskReviewPage() {
 
     setSubmitting(true)
 
-    const cleanReply = reply.trim()
-    let uploadedFileUrl: string | null = null
+    try {
+      const cleanReply = reply.trim()
+      const uploadedFileUrl = await uploadEvidence(selectedTask.id)
 
-    if (evidenceFile) {
-      const safeFileName = evidenceFile.name.replace(/\s+/g, '-')
-      const filePath = `${projectId}/${selectedTask.id}/${Date.now()}-${safeFileName}`
+      const { error } = await supabase.from('external_task_comments').insert({
+        task_id: selectedTask.id,
+        project_id: projectId,
+        sender_name: user?.full_name || user?.email || 'Internal User',
+        sender_email: user?.email || '',
+        sender_role: role || 'internal',
+        comment: cleanReply || 'Evidence uploaded.',
+        attachment_url: uploadedFileUrl,
+        evidence_status: uploadedFileUrl ? 'Submitted' : null,
+      })
 
-      const { error: uploadError } = await supabase.storage
-        .from('external-task-evidence')
-        .upload(filePath, evidenceFile, {
-          cacheControl: '3600',
-          upsert: false,
+      if (error) throw error
+
+      await addHistory(
+        selectedTask.id,
+        uploadedFileUrl
+          ? 'Internal reply added with evidence'
+          : 'Internal reply added',
+        { hasEvidence: !!uploadedFileUrl }
+      )
+
+      await supabase
+        .from('external_tasks')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', selectedTask.id)
+        .eq('project_id', projectId)
+
+      if (selectedTask.assigned_to_email) {
+        await notifyUsers({
+          projectId,
+          recipientRole: selectedTask.assigned_role,
+          type: 'external_task_comment_reply',
+          title: `Reply on Task: ${selectedTask.title}`,
+          message: `${
+            user?.full_name || user?.email || 'Internal team'
+          } replied to your task conversation.`,
+          sendEmail: true,
+          emailPayload: {
+            to: [selectedTask.assigned_to_email],
+            subject: `Reply on Task: ${selectedTask.title}`,
+            type: 'Task Conversation Reply',
+            projectName: projectName || 'PMOCorex Project',
+            submittedBy: user?.full_name || user?.email || 'Internal Team',
+            submittedByEmail: user?.email || '',
+            message: cleanReply || 'Evidence uploaded.',
+            reviewUrl: `${window.location.origin}/external-project/tasks/${selectedTask.id}?project=${projectId}`,
+          },
         })
-
-      if (uploadError) {
-        setNotice(uploadError.message)
-        setSubmitting(false)
-        return
       }
 
-      uploadedFileUrl = filePath
-    }
+      setReply('')
+      setEvidenceFile(null)
+      setNotice('Reply/evidence sent. External assignee has been notified.')
 
-    const { error } = await supabase.from('external_task_comments').insert({
-      task_id: selectedTask.id,
-      project_id: projectId,
-      sender_name: user?.full_name || user?.email || 'Internal User',
-      sender_email: user?.email || '',
-      sender_role: role || 'internal',
-      comment: cleanReply || 'Evidence uploaded.',
-      attachment_url: uploadedFileUrl,
-    })
-
-    if (error) {
-      setNotice(error.message)
+      await loadTaskDetails(selectedTask.id)
+      await loadTasks()
+    } catch (error: any) {
+      setNotice(error.message || 'Unable to send reply.')
+    } finally {
       setSubmitting(false)
-      return
     }
-
-    await addHistory(
-      selectedTask.id,
-      uploadedFileUrl ? 'Internal reply added with evidence' : 'Internal reply added'
-    )
-
-    await supabase
-      .from('external_tasks')
-      .update({
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', selectedTask.id)
-      .eq('project_id', projectId)
-
-    if (selectedTask.assigned_to_email) {
-      await notifyUsers({
-        projectId,
-        recipientRole: selectedTask.assigned_role,
-        type: 'external_task_comment_reply',
-        title: `Reply on Task: ${selectedTask.title}`,
-        message: `${
-          user?.full_name || user?.email || 'Internal team'
-        } replied to your task conversation.`,
-        sendEmail: true,
-        emailPayload: {
-          to: [selectedTask.assigned_to_email],
-          subject: `Reply on Task: ${selectedTask.title}`,
-          type: 'Task Conversation Reply',
-          projectName: projectName || 'PMOCorex Project',
-          submittedBy: user?.full_name || user?.email || 'Internal Team',
-          submittedByEmail: user?.email || '',
-          message: cleanReply || 'Evidence uploaded.',
-          reviewUrl: `${window.location.origin}/external-project/tasks/${selectedTask.id}?project=${projectId}`,
-        },
-      })
-    }
-
-    setReply('')
-    setEvidenceFile(null)
-    setNotice('Reply/evidence sent. External assignee has been notified.')
-    setSubmitting(false)
-
-    await loadComments(selectedTask.id)
-    await loadTasks()
   }
 
   async function updateTaskStatus(status: string) {
@@ -231,37 +260,99 @@ export default function ExternalTaskReviewPage() {
       return
     }
 
-    await addHistory(selectedTask.id, `Internal status changed to ${status}`)
+    await addHistory(selectedTask.id, `Internal status changed to ${status}`, {
+      status,
+    })
+
+    const updatedTask = { ...selectedTask, status }
+    setSelectedTask(updatedTask)
+
+    await notifyExternalUser(
+      `Task Status Updated: ${selectedTask.title}`,
+      `Your task status has been updated to ${status}.`
+    )
+
+    await loadTasks()
+    await loadTaskDetails(selectedTask.id)
+  }
+
+  async function reviewDecision(
+    decision: 'Approved' | 'Rejected' | 'Revision Required'
+  ) {
+    if (!selectedTask || !projectId) return
+
+    setSubmitting(true)
+    setNotice('')
+
+    const finalStatus = decision === 'Approved' ? 'Approved' : decision
+
+    const { error } = await supabase
+      .from('external_tasks')
+      .update({
+        status: finalStatus,
+        review_status: decision,
+        review_comment: reviewComment.trim() || null,
+        reviewed_by: user?.email || 'Internal Team',
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', selectedTask.id)
+      .eq('project_id', projectId)
+
+    if (error) {
+      setNotice(error.message)
+      setSubmitting(false)
+      return
+    }
+
+    await addHistory(selectedTask.id, `Submission ${decision}`, {
+      decision,
+      reviewComment: reviewComment.trim() || null,
+    })
+
+    await notifyExternalUser(
+      `Task ${decision}: ${selectedTask.title}`,
+      reviewComment.trim() ||
+        `Your task submission has been marked as ${decision}.`
+    )
 
     const updatedTask = {
       ...selectedTask,
-      status,
+      status: finalStatus,
+      review_status: decision,
+      review_comment: reviewComment.trim() || null,
     }
 
     setSelectedTask(updatedTask)
-
-    if (selectedTask.assigned_to_email) {
-      await notifyUsers({
-        projectId,
-        recipientRole: selectedTask.assigned_role,
-        type: 'external_task_status_review',
-        title: `Task Status Updated: ${selectedTask.title}`,
-        message: `Your task status has been updated to ${status}.`,
-        sendEmail: true,
-        emailPayload: {
-          to: [selectedTask.assigned_to_email],
-          subject: `Task Status Updated: ${selectedTask.title}`,
-          type: 'Task Status Update',
-          projectName: projectName || 'PMOCorex Project',
-          submittedBy: user?.full_name || user?.email || 'Internal Team',
-          submittedByEmail: user?.email || '',
-          message: `Task: ${selectedTask.title}\nStatus: ${status}`,
-          reviewUrl: `${window.location.origin}/external-project/tasks/${selectedTask.id}?project=${projectId}`,
-        },
-      })
-    }
+    setReviewComment('')
+    setNotice(`Task marked as ${decision}.`)
+    setSubmitting(false)
 
     await loadTasks()
+    await loadTaskDetails(selectedTask.id)
+  }
+
+  async function notifyExternalUser(title: string, message: string) {
+    if (!selectedTask?.assigned_to_email || !projectId) return
+
+    await notifyUsers({
+      projectId,
+      recipientRole: selectedTask.assigned_role,
+      type: 'external_task_review',
+      title,
+      message,
+      sendEmail: true,
+      emailPayload: {
+        to: [selectedTask.assigned_to_email],
+        subject: title,
+        type: 'External Task Review',
+        projectName: projectName || 'PMOCorex Project',
+        submittedBy: user?.full_name || user?.email || 'Internal Team',
+        submittedByEmail: user?.email || '',
+        message,
+        reviewUrl: `${window.location.origin}/external-project/tasks/${selectedTask.id}?project=${projectId}`,
+      },
+    })
   }
 
   return (
@@ -276,9 +367,8 @@ export default function ExternalTaskReviewPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Review external assignments, reply to task comments, view uploaded
-          evidence, update statuses, and keep project-specific task communication
-          in one place.
+          Review external assignments, evidence, approval decisions, comments,
+          and full assignment history.
         </p>
 
         <div className="mt-4 text-sm text-slate-500">
@@ -305,7 +395,6 @@ export default function ExternalTaskReviewPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <ClipboardList size={18} className="text-[#c49e48]" />
-
                 <h2 className="text-lg font-bold text-[#ede8de]">
                   External Tasks
                 </h2>
@@ -340,7 +429,8 @@ export default function ExternalTaskReviewPage() {
                         {task.title}
                       </div>
 
-                      {task.status === 'Completed' ? (
+                      {task.status === 'Completed' ||
+                      task.status === 'Approved' ? (
                         <CheckCircle size={14} className="text-emerald-400" />
                       ) : (
                         <Clock size={14} className="text-amber-400" />
@@ -364,17 +454,15 @@ export default function ExternalTaskReviewPage() {
             )}
           </section>
 
-          <section className="card p-5 xl:col-span-3 space-y-4">
+          <section className="card p-5 xl:col-span-3 space-y-5">
             {!selectedTask ? (
               <div className="text-center py-20">
                 <ClipboardList size={38} className="mx-auto text-[#c49e48]" />
-
                 <div className="text-lg font-bold text-white mt-4">
                   Select a task
                 </div>
-
                 <p className="text-sm text-slate-500 mt-2">
-                  Choose an external task to review comments and respond.
+                  Choose an external task to review comments and evidence.
                 </p>
               </div>
             ) : (
@@ -396,11 +484,16 @@ export default function ExternalTaskReviewPage() {
                         selectedTask.assigned_company ||
                         'External Partner'}
                     </div>
+
+                    {selectedTask.review_status && (
+                      <div className="text-xs text-[#c49e48] mt-2">
+                        Review Status: {selectedTask.review_status}
+                      </div>
+                    )}
                   </div>
 
                   <div className="min-w-[220px]">
                     <label className="form-label">Status</label>
-
                     <select
                       className="form-control"
                       value={selectedTask.status || 'Open'}
@@ -415,53 +508,146 @@ export default function ExternalTaskReviewPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                  {loadingComments ? (
-                    <div className="text-sm text-slate-500">
-                      Loading comments…
-                    </div>
-                  ) : comments.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
-                      No comments yet.
-                    </div>
-                  ) : (
-                    comments.map(item => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                      >
-                        <div>
-                          <div className="text-sm font-bold text-[#ede8de]">
-                            {item.sender_name || item.sender_email}
-                          </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-[#c49e48]" />
+                    <h3 className="font-bold text-[#ede8de]">
+                      PMO Review Decision
+                    </h3>
+                  </div>
 
-                          <div className="text-xs text-slate-500">
-                            {item.sender_role || 'User'} •{' '}
-                            {item.created_at
-                              ? new Date(item.created_at).toLocaleString(
-                                  'en-GB'
-                                )
-                              : '—'}
-                          </div>
+                  <textarea
+                    className="form-control min-h-[80px]"
+                    placeholder="Add review comment or reason..."
+                    value={reviewComment}
+                    onChange={e => setReviewComment(e.target.value)}
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => reviewDecision('Approved')}
+                      disabled={submitting}
+                      className="btn btn-sm btn-gold"
+                    >
+                      <CheckCircle size={14} />
+                      Approve
+                    </button>
+
+                    <button
+                      onClick={() => reviewDecision('Revision Required')}
+                      disabled={submitting}
+                      className="btn btn-sm btn-ghost"
+                    >
+                      <RotateCcw size={14} />
+                      Request Revision
+                    </button>
+
+                    <button
+                      onClick={() => reviewDecision('Rejected')}
+                      disabled={submitting}
+                      className="btn btn-sm btn-ghost"
+                    >
+                      <XCircle size={14} />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Send size={16} className="text-[#c49e48]" />
+                      <h3 className="font-bold text-[#ede8de]">
+                        Conversation & Evidence
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                      {loadingDetails ? (
+                        <div className="text-sm text-slate-500">
+                          Loading details…
                         </div>
-
-                        <p className="text-sm text-slate-300 mt-3 whitespace-pre-wrap">
-                          {item.comment}
-                        </p>
-
-                        {item.attachment_url && (
-                          <button
-                            type="button"
-                            onClick={() => openEvidence(item.attachment_url)}
-                            className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline mt-3"
+                      ) : comments.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
+                          No comments yet.
+                        </div>
+                      ) : (
+                        comments.map(item => (
+                          <div
+                            key={item.id}
+                            className="rounded-2xl border border-white/10 bg-white/5 p-4"
                           >
-                            <Paperclip size={13} />
-                            View Evidence
-                          </button>
-                        )}
+                            <div className="text-sm font-bold text-[#ede8de]">
+                              {item.sender_name || item.sender_email}
+                            </div>
+
+                            <div className="text-xs text-slate-500">
+                              {item.sender_role || 'User'} •{' '}
+                              {item.created_at
+                                ? new Date(item.created_at).toLocaleString(
+                                    'en-GB'
+                                  )
+                                : '—'}
+                            </div>
+
+                            <p className="text-sm text-slate-300 mt-3 whitespace-pre-wrap">
+                              {item.comment}
+                            </p>
+
+                            {item.attachment_url && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openEvidence(item.attachment_url)
+                                }
+                                className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline mt-3"
+                              >
+                                <Paperclip size={13} />
+                                View Evidence
+                              </button>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <History size={16} className="text-[#c49e48]" />
+                      <h3 className="font-bold text-[#ede8de]">
+                        Assignment History
+                      </h3>
+                    </div>
+
+                    {history.length === 0 ? (
+                      <div className="text-sm text-slate-500">
+                        No history yet.
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      <div className="space-y-3 max-h-[420px] overflow-y-auto">
+                        {history.map(item => (
+                          <div
+                            key={item.id}
+                            className="border-l border-[#c49e48]/40 pl-3"
+                          >
+                            <div className="text-sm text-[#ede8de]">
+                              {item.action}
+                            </div>
+
+                            <div className="text-[11px] text-slate-500 mt-1">
+                              {item.performed_by || 'User'} •{' '}
+                              {item.created_at
+                                ? new Date(item.created_at).toLocaleString(
+                                    'en-GB'
+                                  )
+                                : '—'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="border-t border-white/10 pt-4 space-y-3">
