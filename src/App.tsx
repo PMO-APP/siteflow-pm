@@ -18,6 +18,7 @@ import ProfilePage from '@/pages/ProfilePage'
 import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
 import PortfolioDashboardPage from '@/pages/PortfolioDashboardPage'
+import PlannerPage from '@/pages/PlannerPage'
 
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
@@ -393,6 +394,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
+          <Route path="planner" element={<PlannerPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
           <Route path="hse" element={<HSEPage />} />
