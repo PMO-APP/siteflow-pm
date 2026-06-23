@@ -11,7 +11,24 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 
-const PMO_ASSIGNMENT_ROLES = ['workspace_admin', 'admin', 'pmo']
+const TASK_ASSIGNER_ROLES = [
+  'workspace_admin',
+  'admin',
+  'pmo',
+  'portfolio_manager',
+  'project_owner',
+  'overall_project_owner',
+  'housebuild_project_owner',
+  'mep_project_owner',
+  'infrastructure_project_owner',
+  'hse_manager',
+  'hse_lead',
+  'design',
+  'housebuild',
+  'infrastructure',
+  'mep',
+  'costing',
+]
 
 const INTERNAL_DEPARTMENTS = [
   'PMO',
@@ -21,11 +38,18 @@ const INTERNAL_DEPARTMENTS = [
   'Infrastructure',
   'MEP',
   'Costing',
+  'HSE',
 ]
 
 const INTERNAL_ROLES = [
   'pmo',
   'project_owner',
+  'overall_project_owner',
+  'housebuild_project_owner',
+  'mep_project_owner',
+  'infrastructure_project_owner',
+  'hse_manager',
+  'hse_lead',
   'design',
   'housebuild',
   'infrastructure',
@@ -35,13 +59,14 @@ const INTERNAL_ROLES = [
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Pending Review', 'Completed']
+const VISIBILITY_OPTIONS = ['Private', 'Team', 'Project']
 
 export default function InternalAssignmentsPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
   const { projectId, projectName } = useProjectStore()
 
-  const canAssign = PMO_ASSIGNMENT_ROLES.includes(role || '')
+  const canAssign = TASK_ASSIGNER_ROLES.includes(role || '')
 
   const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,10 +81,11 @@ export default function InternalAssignmentsPage() {
   const [assignedName, setAssignedName] = useState('')
   const [priority, setPriority] = useState('Medium')
   const [dueDate, setDueDate] = useState('')
+  const [visibility, setVisibility] = useState('Private')
 
   useEffect(() => {
     loadTasks()
-  }, [projectId, user?.email, role])
+  }, [projectId, user?.email, user?.id, role])
 
   async function loadTasks() {
     if (!projectId) {
@@ -77,7 +103,12 @@ export default function InternalAssignmentsPage() {
 
     if (!canAssign) {
       query = query.or(
-        `assigned_to_email.eq.${user?.email || ''},assigned_role.eq.${role || ''}`
+        [
+          `assigned_person_email.eq.${user?.email || ''}`,
+          `assigned_email.eq.${user?.email || ''}`,
+          `assigned_role.eq.${role || ''}`,
+          `visibility.eq.Project`,
+        ].join(',')
       )
     }
 
@@ -119,7 +150,7 @@ export default function InternalAssignmentsPage() {
         projectName: projectName || 'PMOCorex Project',
         dueDate: dueDateValue || 'Not set',
         priority: priorityValue,
-        assignedBy: user?.full_name || user?.email || 'PMO Team',
+        assignedBy: user?.full_name || user?.email || 'PMOCorex Team',
         taskUrl: `${window.location.origin}/app/internal-assignments`,
       },
     })
@@ -138,7 +169,7 @@ export default function InternalAssignmentsPage() {
     setNotice('')
 
     if (!canAssign) {
-      setNotice('Only PMO/Admin users can assign internal tasks.')
+      setNotice('You do not have permission to assign internal tasks.')
       return
     }
 
@@ -152,21 +183,39 @@ export default function InternalAssignmentsPage() {
       return
     }
 
+    if (!assignedEmail.trim()) {
+      setNotice('Assigned person email is required.')
+      return
+    }
+
     setSubmitting(true)
+
+    const cleanTitle = title.trim()
+    const cleanDescription = description.trim()
+    const cleanEmail = assignedEmail.trim().toLowerCase()
+    const cleanName = assignedName.trim()
 
     const taskPayload = {
       project_id: projectId,
+
       assigned_department: assignedDepartment,
       assigned_role: assignedRole,
-      assigned_to_email: assignedEmail.trim() || null,
-      assigned_to_name: assignedName.trim() || null,
-      title: title.trim(),
-      description: description.trim() || null,
+
+      assigned_person_name: cleanName || null,
+      assigned_person_email: cleanEmail,
+      assigned_email: cleanEmail,
+
+      title: cleanTitle,
+      description: cleanDescription || null,
+
       priority,
       due_date: dueDate || null,
       status: 'Open',
       progress: 0,
-      created_by: user?.email || 'PMO',
+      visibility,
+
+      created_by: user?.id || null,
+      submitted_by: user?.full_name || user?.email || 'PMOCorex Team',
     }
 
     const { error } = await supabase.from('internal_tasks').insert(taskPayload)
@@ -178,10 +227,10 @@ export default function InternalAssignmentsPage() {
     }
 
     await sendTaskEmail({
-      to: assignedEmail,
-      assigneeName: assignedName,
-      taskTitle: title,
-      taskDescription: description,
+      to: cleanEmail,
+      assigneeName: cleanName,
+      taskTitle: cleanTitle,
+      taskDescription: cleanDescription,
       dueDateValue: dueDate,
       priorityValue: priority,
     })
@@ -194,6 +243,7 @@ export default function InternalAssignmentsPage() {
     setAssignedName('')
     setPriority('Medium')
     setDueDate('')
+    setVisibility('Private')
     setSubmitting(false)
 
     await loadTasks()
@@ -247,8 +297,8 @@ export default function InternalAssignmentsPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          PMO assigns internal tasks to project teams. Assigned team members can
-          update progress and task status.
+          Team leads can assign tasks, track progress, and reduce follow-up
+          emails through structured internal communication.
         </p>
       </section>
 
@@ -333,6 +383,22 @@ export default function InternalAssignmentsPage() {
                 ))}
               </select>
 
+              <select
+                className="form-control"
+                value={visibility}
+                onChange={e => setVisibility(e.target.value)}
+              >
+                {VISIBILITY_OPTIONS.map(item => (
+                  <option key={item} value={item}>
+                    {item === 'Private'
+                      ? 'Private'
+                      : item === 'Team'
+                      ? 'Team Visible'
+                      : 'Project Visible'}
+                  </option>
+                ))}
+              </select>
+
               <input
                 type="date"
                 className="form-control"
@@ -372,7 +438,7 @@ export default function InternalAssignmentsPage() {
 
               <p className="text-sm text-slate-500 mt-2">
                 {canAssign
-                  ? 'Tasks assigned by PMO will appear here.'
+                  ? 'Tasks assigned by team leads will appear here.'
                   : 'Tasks assigned to your role or email will appear here.'}
               </p>
             </div>
@@ -432,8 +498,9 @@ function TaskCard({
           <div className="text-xs text-slate-500 mt-2">
             Assigned to:{' '}
             <span className="text-[#c49e48]">
-              {task.assigned_to_name ||
-                task.assigned_to_email ||
+              {task.assigned_person_name ||
+                task.assigned_person_email ||
+                task.assigned_email ||
                 formatRole(task.assigned_role)}
             </span>
           </div>
@@ -442,6 +509,13 @@ function TaskCard({
             Department:{' '}
             <span className="text-[#ede8de]">
               {task.assigned_department || '—'}
+            </span>
+          </div>
+
+          <div className="text-xs text-slate-500 mt-1">
+            Visibility:{' '}
+            <span className="text-[#ede8de]">
+              {task.visibility || 'Private'}
             </span>
           </div>
         </div>
@@ -460,7 +534,9 @@ function TaskCard({
           {task.status || 'Open'}
         </span>
 
-        <span className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}>
+        <span
+          className={`text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 ${priorityStyle}`}
+        >
           Priority: {task.priority || 'Medium'}
         </span>
 
@@ -505,6 +581,12 @@ function formatRole(role?: string | null) {
   const labels: Record<string, string> = {
     pmo: 'PMO',
     project_owner: 'Project Owner',
+    overall_project_owner: 'Overall Project Owner',
+    housebuild_project_owner: 'Housebuild Project Owner',
+    mep_project_owner: 'MEP Project Owner',
+    infrastructure_project_owner: 'Infrastructure Project Owner',
+    hse_manager: 'HSE Manager',
+    hse_lead: 'HSE Lead',
     design: 'Design',
     housebuild: 'Housebuild',
     infrastructure: 'Infrastructure',
