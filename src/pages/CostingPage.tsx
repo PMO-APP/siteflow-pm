@@ -40,6 +40,23 @@ const CONTRACT_STATUSES = [
   'On Hold',
 ]
 
+const PAYMENT_CATEGORIES = [
+  'Contract Payment',
+  'Consultant Payment',
+  'Supplier Payment',
+  'Variation Payment',
+  'Procurement Payment',
+  'Retention',
+]
+
+const PAYMENT_STATUSES = [
+  'Pending',
+  'Approved',
+  'Paid',
+  'Rejected',
+  'On Hold',
+]
+
 const TABS = [
   ['weekly', 'Weekly Report'],
   ['contracts', 'Contracts'],
@@ -56,8 +73,11 @@ export default function CostingPage() {
   const [activeTab, setActiveTab] = useState('weekly')
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
+
   const [loading, setLoading] = useState(true)
   const [contractsLoading, setContractsLoading] = useState(true)
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [notice, setNotice] = useState('')
 
   const [reportWeek, setReportWeek] = useState(
@@ -84,9 +104,22 @@ export default function CostingPage() {
     remarks: '',
   })
 
+  const [paymentForm, setPaymentForm] = useState({
+    payment_title: '',
+    vendor_name: '',
+    payment_category: 'Contract Payment',
+    amount: '',
+    payment_status: 'Pending',
+    request_date: '',
+    due_date: '',
+    paid_date: '',
+    remarks: '',
+  })
+
   useEffect(() => {
     loadCostReports()
     loadContracts()
+    loadPayments()
   }, [projectId, reportWeek])
 
   async function loadCostReports() {
@@ -137,6 +170,30 @@ export default function CostingPage() {
 
     setContracts(data || [])
     setContractsLoading(false)
+  }
+
+  async function loadPayments() {
+    if (!projectId) {
+      setPaymentsLoading(false)
+      return
+    }
+
+    setPaymentsLoading(true)
+
+    const { data, error } = await supabase
+      .from('cost_payments')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      setPaymentsLoading(false)
+      return
+    }
+
+    setPayments(data || [])
+    setPaymentsLoading(false)
   }
 
   async function addItem() {
@@ -230,6 +287,55 @@ export default function CostingPage() {
     await loadContracts()
   }
 
+  async function addPayment() {
+    setNotice('')
+
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    if (!paymentForm.payment_title.trim()) {
+      setNotice('Payment title is required.')
+      return
+    }
+
+    const { error } = await supabase.from('cost_payments').insert({
+      organization_id: organizationId,
+      portfolio_id: portfolioId,
+      project_id: projectId,
+      payment_title: paymentForm.payment_title.trim(),
+      vendor_name: paymentForm.vendor_name.trim() || null,
+      payment_category: paymentForm.payment_category,
+      amount: Number(paymentForm.amount || 0),
+      payment_status: paymentForm.payment_status,
+      request_date: paymentForm.request_date || null,
+      due_date: paymentForm.due_date || null,
+      paid_date: paymentForm.paid_date || null,
+      remarks: paymentForm.remarks.trim() || null,
+      created_by: user?.id || null,
+    })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setPaymentForm({
+      payment_title: '',
+      vendor_name: '',
+      payment_category: 'Contract Payment',
+      amount: '',
+      payment_status: 'Pending',
+      request_date: '',
+      due_date: '',
+      paid_date: '',
+      remarks: '',
+    })
+
+    await loadPayments()
+  }
+
   async function deleteItem(id: string) {
     const confirmed = window.confirm('Delete this cost report item?')
     if (!confirmed) return
@@ -256,6 +362,20 @@ export default function CostingPage() {
     }
 
     await loadContracts()
+  }
+
+  async function deletePayment(id: string) {
+    const confirmed = window.confirm('Delete this payment record?')
+    if (!confirmed) return
+
+    const { error } = await supabase.from('cost_payments').delete().eq('id', id)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    await loadPayments()
   }
 
   async function submitReport() {
@@ -313,6 +433,19 @@ export default function CostingPage() {
 
   const outstandingContractValue = totalContractValue - totalPaidOnContracts
 
+  const totalPayments = payments.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
+  const pendingPayments = payments
+    .filter(item => item.payment_status === 'Pending')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const paidPayments = payments
+    .filter(item => item.payment_status === 'Paid')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
@@ -344,36 +477,36 @@ export default function CostingPage() {
       )}
 
       {activeTab === 'weekly' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Metric title="Total Items" value={items.length} />
-          <Metric
-            title="Total Amount"
-            value={`₦${totalAmount.toLocaleString()}`}
-          />
-          <Metric
-            title="Pending Amount"
-            value={`₦${pendingAmount.toLocaleString()}`}
-          />
-          <Metric title="Paid Amount" value={`₦${paidAmount.toLocaleString()}`} />
-        </div>
+        <MetricGrid
+          values={[
+            ['Total Items', items.length],
+            ['Total Amount', `₦${totalAmount.toLocaleString()}`],
+            ['Pending Amount', `₦${pendingAmount.toLocaleString()}`],
+            ['Paid Amount', `₦${paidAmount.toLocaleString()}`],
+          ]}
+        />
       )}
 
       {activeTab === 'contracts' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <Metric title="Contracts" value={contracts.length} />
-          <Metric
-            title="Contract Value"
-            value={`₦${totalContractValue.toLocaleString()}`}
-          />
-          <Metric
-            title="Amount Paid"
-            value={`₦${totalPaidOnContracts.toLocaleString()}`}
-          />
-          <Metric
-            title="Outstanding"
-            value={`₦${outstandingContractValue.toLocaleString()}`}
-          />
-        </div>
+        <MetricGrid
+          values={[
+            ['Contracts', contracts.length],
+            ['Contract Value', `₦${totalContractValue.toLocaleString()}`],
+            ['Amount Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
+            ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
+          ]}
+        />
+      )}
+
+      {activeTab === 'payments' && (
+        <MetricGrid
+          values={[
+            ['Payments', payments.length],
+            ['Total Value', `₦${totalPayments.toLocaleString()}`],
+            ['Pending', `₦${pendingPayments.toLocaleString()}`],
+            ['Paid', `₦${paidPayments.toLocaleString()}`],
+          ]}
+        />
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -391,152 +524,17 @@ export default function CostingPage() {
       </div>
 
       {activeTab === 'weekly' && (
-        <>
-          <div className="card p-4 flex flex-wrap gap-3 items-center">
-            <div>
-              <label className="form-label">Report Week</label>
-              <input
-                type="date"
-                className="form-control"
-                value={reportWeek}
-                onChange={e => setReportWeek(e.target.value)}
-              />
-            </div>
-
-            <button className="btn btn-gold ml-auto" onClick={submitReport}>
-              Submit Weekly Report
-            </button>
-          </div>
-
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Plus size={17} className="text-[#c49e48]" />
-              <h2 className="font-bold text-[#ede8de]">Add Cost Report Item</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-              <select
-                className="form-control"
-                value={form.section}
-                onChange={e => setForm({ ...form, section: e.target.value })}
-              >
-                {SECTIONS.map(section => (
-                  <option key={section}>{section}</option>
-                ))}
-              </select>
-
-              <input
-                className="form-control"
-                placeholder="Item title"
-                value={form.item_title}
-                onChange={e => setForm({ ...form, item_title: e.target.value })}
-              />
-
-              <input
-                className="form-control"
-                placeholder="Amount"
-                type="number"
-                value={form.amount}
-                onChange={e => setForm({ ...form, amount: e.target.value })}
-              />
-
-              <select
-                className="form-control"
-                value={form.status}
-                onChange={e => setForm({ ...form, status: e.target.value })}
-              >
-                {STATUSES.map(status => (
-                  <option key={status}>{status}</option>
-                ))}
-              </select>
-
-              <button className="btn btn-gold" onClick={addItem}>
-                Add Item
-              </button>
-            </div>
-
-            <textarea
-              className="form-control mt-3"
-              rows={2}
-              placeholder="Description / update"
-              value={form.description}
-              onChange={e => setForm({ ...form, description: e.target.value })}
-            />
-          </div>
-
-          {loading ? (
-            <div className="card p-6 text-slate-400">Loading cost report…</div>
-          ) : (
-            <div className="space-y-5">
-              {groupedItems.map(group => (
-                <div key={group.section} className="card overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-                    <div className="font-bold text-[#ede8de]">
-                      {group.section}
-                    </div>
-
-                    <div className="text-xs text-[#6e7d8c]">
-                      {group.items.length} item(s)
-                    </div>
-                  </div>
-
-                  {group.items.length === 0 ? (
-                    <div className="p-5 text-sm text-[#6e7d8c]">
-                      No entries for this section.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="tbl">
-                        <thead>
-                          <tr>
-                            <th>Item</th>
-                            <th>Description</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {group.items.map(item => (
-                            <tr key={item.id}>
-                              <td className="font-medium text-[#ede8de]">
-                                {item.item_title}
-                              </td>
-
-                              <td className="max-w-[360px] text-slate-400">
-                                {item.description || '—'}
-                              </td>
-
-                              <td className="text-[#c49e48] font-semibold">
-                                ₦{Number(item.amount || 0).toLocaleString()}
-                              </td>
-
-                              <td>
-                                <span className="badge badge-muted">
-                                  {item.status || 'Open'}
-                                </span>
-                              </td>
-
-                              <td>
-                                <button
-                                  className="tbl-action text-red-400"
-                                  onClick={() => deleteItem(item.id)}
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        <WeeklyReportTab
+          reportWeek={reportWeek}
+          setReportWeek={setReportWeek}
+          form={form}
+          setForm={setForm}
+          groupedItems={groupedItems}
+          loading={loading}
+          onAdd={addItem}
+          onDelete={deleteItem}
+          onSubmit={submitReport}
+        />
       )}
 
       {activeTab === 'contracts' && (
@@ -550,9 +548,192 @@ export default function CostingPage() {
         />
       )}
 
-      {activeTab === 'payments' && <EmptyCostingTab title="Payments" />}
+      {activeTab === 'payments' && (
+        <PaymentsTab
+          payments={payments}
+          loading={paymentsLoading}
+          form={paymentForm}
+          setForm={setPaymentForm}
+          onAdd={addPayment}
+          onDelete={deletePayment}
+        />
+      )}
+
       {activeTab === 'variations' && <EmptyCostingTab title="Variations" />}
       {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
+    </div>
+  )
+}
+
+function WeeklyReportTab({
+  reportWeek,
+  setReportWeek,
+  form,
+  setForm,
+  groupedItems,
+  loading,
+  onAdd,
+  onDelete,
+  onSubmit,
+}: any) {
+  return (
+    <>
+      <div className="card p-4 flex flex-wrap gap-3 items-center">
+        <div>
+          <label className="form-label">Report Week</label>
+          <input
+            type="date"
+            className="form-control"
+            value={reportWeek}
+            onChange={e => setReportWeek(e.target.value)}
+          />
+        </div>
+
+        <button className="btn btn-gold ml-auto" onClick={onSubmit}>
+          Submit Weekly Report
+        </button>
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Plus size={17} className="text-[#c49e48]" />
+          <h2 className="font-bold text-[#ede8de]">Add Cost Report Item</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <select
+            className="form-control"
+            value={form.section}
+            onChange={e => setForm({ ...form, section: e.target.value })}
+          >
+            {SECTIONS.map(section => (
+              <option key={section}>{section}</option>
+            ))}
+          </select>
+
+          <input
+            className="form-control"
+            placeholder="Item title"
+            value={form.item_title}
+            onChange={e => setForm({ ...form, item_title: e.target.value })}
+          />
+
+          <input
+            className="form-control"
+            placeholder="Amount"
+            type="number"
+            value={form.amount}
+            onChange={e => setForm({ ...form, amount: e.target.value })}
+          />
+
+          <select
+            className="form-control"
+            value={form.status}
+            onChange={e => setForm({ ...form, status: e.target.value })}
+          >
+            {STATUSES.map(status => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+
+          <button className="btn btn-gold" onClick={onAdd}>
+            Add Item
+          </button>
+        </div>
+
+        <textarea
+          className="form-control mt-3"
+          rows={2}
+          placeholder="Description / update"
+          value={form.description}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+        />
+      </div>
+
+      {loading ? (
+        <div className="card p-6 text-slate-400">Loading cost report…</div>
+      ) : (
+        <div className="space-y-5">
+          {groupedItems.map((group: any) => (
+            <div key={group.section} className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                <div className="font-bold text-[#ede8de]">
+                  {group.section}
+                </div>
+
+                <div className="text-xs text-[#6e7d8c]">
+                  {group.items.length} item(s)
+                </div>
+              </div>
+
+              {group.items.length === 0 ? (
+                <div className="p-5 text-sm text-[#6e7d8c]">
+                  No entries for this section.
+                </div>
+              ) : (
+                <ReportTable items={group.items} onDelete={onDelete} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function ReportTable({
+  items,
+  onDelete,
+}: {
+  items: any[]
+  onDelete: (id: string) => void
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="tbl">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Description</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {items.map(item => (
+            <tr key={item.id}>
+              <td className="font-medium text-[#ede8de]">
+                {item.item_title}
+              </td>
+
+              <td className="max-w-[360px] text-slate-400">
+                {item.description || '—'}
+              </td>
+
+              <td className="text-[#c49e48] font-semibold">
+                ₦{Number(item.amount || 0).toLocaleString()}
+              </td>
+
+              <td>
+                <span className="badge badge-muted">
+                  {item.status || 'Open'}
+                </span>
+              </td>
+
+              <td>
+                <button
+                  className="tbl-action text-red-400"
+                  onClick={() => onDelete(item.id)}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -564,14 +745,7 @@ function ContractsTab({
   setForm,
   onAdd,
   onDelete,
-}: {
-  contracts: any[]
-  loading: boolean
-  form: any
-  setForm: (form: any) => void
-  onAdd: () => void
-  onDelete: (id: string) => void
-}) {
+}: any) {
   return (
     <div className="space-y-5">
       <div className="card p-5">
@@ -683,7 +857,7 @@ function ContractsTab({
             </thead>
 
             <tbody>
-              {contracts.map(contract => (
+              {contracts.map((contract: any) => (
                 <tr key={contract.id}>
                   <td className="font-medium text-[#ede8de]">
                     {contract.contract_title}
@@ -715,6 +889,172 @@ function ContractsTab({
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function PaymentsTab({
+  payments,
+  loading,
+  form,
+  setForm,
+  onAdd,
+  onDelete,
+}: any) {
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Plus size={17} className="text-[#c49e48]" />
+          <h2 className="font-bold text-[#ede8de]">Add Payment</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            className="form-control"
+            placeholder="Payment title"
+            value={form.payment_title}
+            onChange={e => setForm({ ...form, payment_title: e.target.value })}
+          />
+
+          <input
+            className="form-control"
+            placeholder="Vendor / contractor"
+            value={form.vendor_name}
+            onChange={e => setForm({ ...form, vendor_name: e.target.value })}
+          />
+
+          <select
+            className="form-control"
+            value={form.payment_category}
+            onChange={e =>
+              setForm({ ...form, payment_category: e.target.value })
+            }
+          >
+            {PAYMENT_CATEGORIES.map(category => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+
+          <select
+            className="form-control"
+            value={form.payment_status}
+            onChange={e =>
+              setForm({ ...form, payment_status: e.target.value })
+            }
+          >
+            {PAYMENT_STATUSES.map(status => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+          <input
+            className="form-control"
+            placeholder="Amount"
+            type="number"
+            value={form.amount}
+            onChange={e => setForm({ ...form, amount: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.request_date}
+            onChange={e => setForm({ ...form, request_date: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.due_date}
+            onChange={e => setForm({ ...form, due_date: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.paid_date}
+            onChange={e => setForm({ ...form, paid_date: e.target.value })}
+          />
+        </div>
+
+        <textarea
+          className="form-control mt-3"
+          rows={2}
+          placeholder="Remarks"
+          value={form.remarks}
+          onChange={e => setForm({ ...form, remarks: e.target.value })}
+        />
+
+        <button className="btn btn-gold mt-3" onClick={onAdd}>
+          Add Payment
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="card p-6 text-slate-400">Loading payments…</div>
+      ) : payments.length === 0 ? (
+        <div className="card p-6 text-slate-400">
+          No payments recorded for this project.
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Payment</th>
+                <th>Vendor</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Due</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {payments.map((payment: any) => (
+                <tr key={payment.id}>
+                  <td className="font-medium text-[#ede8de]">
+                    {payment.payment_title}
+                  </td>
+                  <td>{payment.vendor_name || '—'}</td>
+                  <td>{payment.payment_category || '—'}</td>
+                  <td className="text-[#c49e48] font-semibold">
+                    ₦{Number(payment.amount || 0).toLocaleString()}
+                  </td>
+                  <td>
+                    <span className="badge badge-muted">
+                      {payment.payment_status || 'Pending'}
+                    </span>
+                  </td>
+                  <td>{payment.due_date || '—'}</td>
+                  <td>
+                    <button
+                      className="tbl-action text-red-400"
+                      onClick={() => onDelete(payment.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MetricGrid({ values }: { values: [string, string | number][] }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {values.map(([title, value]) => (
+        <Metric key={title} title={title} value={value} />
+      ))}
     </div>
   )
 }
