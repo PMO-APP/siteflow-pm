@@ -29,7 +29,17 @@ const STATUS_OPTIONS = [
   'Revision Required',
   'Completed',
 ]
+function getReviewerLabel(task: any) {
+  if (task.review_discipline) return task.review_discipline
 
+  if (task.review_role) {
+    return task.review_role
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+  }
+
+  return 'Internal Team'
+}
 export default function ExternalTaskReviewPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
@@ -305,7 +315,10 @@ export default function ExternalTaskReviewPage() {
       return
     }
 
-    await addHistory(selectedTask.id, `Submission ${decision}`, {
+   await addHistory(
+  selectedTask.id,
+  `${getReviewerLabel(selectedTask)} review marked as ${decision}`,
+  {
       decision,
       reviewComment: reviewComment.trim() || null,
     })
@@ -345,7 +358,7 @@ export default function ExternalTaskReviewPage() {
       emailPayload: {
         to: [selectedTask.assigned_to_email],
         subject: title,
-        type: 'External Task Review',
+        type: `${getReviewerLabel(selectedTask)} Review`,
         projectName: projectName || 'PMOCorex Project',
         submittedBy: user?.full_name || user?.email || 'Internal Team',
         submittedByEmail: user?.email || '',
@@ -488,6 +501,9 @@ export default function ExternalTaskReviewPage() {
                     {selectedTask.review_status && (
                       <div className="text-xs text-[#c49e48] mt-2">
                         Review Status: {selectedTask.review_status}
+                        <div className="text-xs text-slate-500 mt-1">
+  Review By: {getReviewerLabel(selectedTask)}
+</div>
                       </div>
                     )}
                   </div>
@@ -512,7 +528,7 @@ export default function ExternalTaskReviewPage() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck size={16} className="text-[#c49e48]" />
                     <h3 className="font-bold text-[#ede8de]">
-                      PMO Review Decision
+                      Internal Review Decision
                     </h3>
                   </div>
 
