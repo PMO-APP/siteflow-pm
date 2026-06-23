@@ -23,11 +23,20 @@ const STATUSES = [
   'Delayed',
 ]
 
+const TABS = [
+  ['weekly', 'Weekly Report'],
+  ['contracts', 'Contracts'],
+  ['payments', 'Payments'],
+  ['variations', 'Variations'],
+  ['procurement', 'Procurement'],
+]
+
 export default function CostingPage() {
   const { user } = useAuthStore()
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
+  const [activeTab, setActiveTab] = useState('weekly')
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
@@ -210,148 +219,173 @@ export default function CostingPage() {
         <Metric title="Paid Amount" value={`₦${paidAmount.toLocaleString()}`} />
       </div>
 
-      <div className="card p-4 flex flex-wrap gap-3 items-center">
-        <div>
-          <label className="form-label">Report Week</label>
-          <input
-            type="date"
-            className="form-control"
-            value={reportWeek}
-            onChange={e => setReportWeek(e.target.value)}
-          />
-        </div>
-
-        <button className="btn btn-gold ml-auto" onClick={submitReport}>
-          Submit Weekly Report
-        </button>
-      </div>
-
-      <div className="card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
-          <h2 className="font-bold text-[#ede8de]">Add Cost Report Item</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <select
-            className="form-control"
-            value={form.section}
-            onChange={e => setForm({ ...form, section: e.target.value })}
+      <div className="flex flex-wrap gap-2">
+        {TABS.map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setActiveTab(value)}
+            className={`btn btn-sm ${
+              activeTab === value ? 'btn-gold' : 'btn-ghost'
+            }`}
           >
-            {SECTIONS.map(section => (
-              <option key={section}>{section}</option>
-            ))}
-          </select>
-
-          <input
-            className="form-control"
-            placeholder="Item title"
-            value={form.item_title}
-            onChange={e => setForm({ ...form, item_title: e.target.value })}
-          />
-
-          <input
-            className="form-control"
-            placeholder="Amount"
-            type="number"
-            value={form.amount}
-            onChange={e => setForm({ ...form, amount: e.target.value })}
-          />
-
-          <select
-            className="form-control"
-            value={form.status}
-            onChange={e => setForm({ ...form, status: e.target.value })}
-          >
-            {STATUSES.map(status => (
-              <option key={status}>{status}</option>
-            ))}
-          </select>
-
-          <button className="btn btn-gold" onClick={addItem}>
-            Add Item
+            {label}
           </button>
-        </div>
-
-        <textarea
-          className="form-control mt-3"
-          rows={2}
-          placeholder="Description / update"
-          value={form.description}
-          onChange={e => setForm({ ...form, description: e.target.value })}
-        />
+        ))}
       </div>
 
-      {loading ? (
-        <div className="card p-6 text-slate-400">Loading cost report…</div>
-      ) : (
-        <div className="space-y-5">
-          {groupedItems.map(group => (
-            <div key={group.section} className="card overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-                <div className="font-bold text-[#ede8de]">{group.section}</div>
-
-                <div className="text-xs text-[#6e7d8c]">
-                  {group.items.length} item(s)
-                </div>
-              </div>
-
-              {group.items.length === 0 ? (
-                <div className="p-5 text-sm text-[#6e7d8c]">
-                  No entries for this section.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Item</th>
-                        <th>Description</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {group.items.map(item => (
-                        <tr key={item.id}>
-                          <td className="font-medium text-[#ede8de]">
-                            {item.item_title}
-                          </td>
-
-                          <td className="max-w-[360px] text-slate-400">
-                            {item.description || '—'}
-                          </td>
-
-                          <td className="text-[#c49e48] font-semibold">
-                            ₦{Number(item.amount || 0).toLocaleString()}
-                          </td>
-
-                          <td>
-                            <span className="badge badge-muted">
-                              {item.status || 'Open'}
-                            </span>
-                          </td>
-
-                          <td>
-                            <button
-                              className="tbl-action text-red-400"
-                              onClick={() => deleteItem(item.id)}
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+      {activeTab === 'weekly' && (
+        <>
+          <div className="card p-4 flex flex-wrap gap-3 items-center">
+            <div>
+              <label className="form-label">Report Week</label>
+              <input
+                type="date"
+                className="form-control"
+                value={reportWeek}
+                onChange={e => setReportWeek(e.target.value)}
+              />
             </div>
-          ))}
-        </div>
+
+            <button className="btn btn-gold ml-auto" onClick={submitReport}>
+              Submit Weekly Report
+            </button>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Plus size={17} className="text-[#c49e48]" />
+              <h2 className="font-bold text-[#ede8de]">Add Cost Report Item</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <select
+                className="form-control"
+                value={form.section}
+                onChange={e => setForm({ ...form, section: e.target.value })}
+              >
+                {SECTIONS.map(section => (
+                  <option key={section}>{section}</option>
+                ))}
+              </select>
+
+              <input
+                className="form-control"
+                placeholder="Item title"
+                value={form.item_title}
+                onChange={e => setForm({ ...form, item_title: e.target.value })}
+              />
+
+              <input
+                className="form-control"
+                placeholder="Amount"
+                type="number"
+                value={form.amount}
+                onChange={e => setForm({ ...form, amount: e.target.value })}
+              />
+
+              <select
+                className="form-control"
+                value={form.status}
+                onChange={e => setForm({ ...form, status: e.target.value })}
+              >
+                {STATUSES.map(status => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+
+              <button className="btn btn-gold" onClick={addItem}>
+                Add Item
+              </button>
+            </div>
+
+            <textarea
+              className="form-control mt-3"
+              rows={2}
+              placeholder="Description / update"
+              value={form.description}
+              onChange={e => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
+
+          {loading ? (
+            <div className="card p-6 text-slate-400">Loading cost report…</div>
+          ) : (
+            <div className="space-y-5">
+              {groupedItems.map(group => (
+                <div key={group.section} className="card overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+                    <div className="font-bold text-[#ede8de]">
+                      {group.section}
+                    </div>
+
+                    <div className="text-xs text-[#6e7d8c]">
+                      {group.items.length} item(s)
+                    </div>
+                  </div>
+
+                  {group.items.length === 0 ? (
+                    <div className="p-5 text-sm text-[#6e7d8c]">
+                      No entries for this section.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="tbl">
+                        <thead>
+                          <tr>
+                            <th>Item</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {group.items.map(item => (
+                            <tr key={item.id}>
+                              <td className="font-medium text-[#ede8de]">
+                                {item.item_title}
+                              </td>
+
+                              <td className="max-w-[360px] text-slate-400">
+                                {item.description || '—'}
+                              </td>
+
+                              <td className="text-[#c49e48] font-semibold">
+                                ₦{Number(item.amount || 0).toLocaleString()}
+                              </td>
+
+                              <td>
+                                <span className="badge badge-muted">
+                                  {item.status || 'Open'}
+                                </span>
+                              </td>
+
+                              <td>
+                                <button
+                                  className="tbl-action text-red-400"
+                                  onClick={() => deleteItem(item.id)}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
+
+      {activeTab === 'contracts' && <EmptyCostingTab title="Contracts" />}
+      {activeTab === 'payments' && <EmptyCostingTab title="Payments" />}
+      {activeTab === 'variations' && <EmptyCostingTab title="Variations" />}
+      {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
     </div>
   )
 }
@@ -365,6 +399,18 @@ function Metric({ title, value }: { title: string; value: string | number }) {
 
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
+      </div>
+    </div>
+  )
+}
+
+function EmptyCostingTab({ title }: { title: string }) {
+  return (
+    <div className="card p-10 text-center">
+      <Wallet size={36} className="mx-auto text-[#c49e48] mb-3" />
+      <div className="text-lg font-bold text-white">{title}</div>
+      <div className="text-sm text-slate-500 mt-1">
+        This section will be connected to the costing report workflow.
       </div>
     </div>
   )
