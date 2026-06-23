@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   CalendarDays,
+  CalendarCheck,
   ShoppingCart,
   CheckSquare,
   HardHat,
@@ -41,6 +42,7 @@ const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
   { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
+  { to: '/app/planner', icon: CalendarCheck, label: 'Planner', },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
   { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
   { to: '/app/site', icon: HardHat, label: 'Site Progress' },
@@ -83,6 +85,7 @@ const NAV = [
 const VIEWER_NAV = [
   '/app',
   '/app/recovery',
+  '/app/planner',
   '/app/team',
 ]
 
