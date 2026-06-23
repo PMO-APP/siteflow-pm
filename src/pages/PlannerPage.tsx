@@ -534,7 +534,7 @@ function ReminderModal({
 function downloadCalendarFile(item: Reminder) {
   const cleanTitle = cleanIcsText(item.title || 'PMOCorex Reminder')
   const cleanDescription = cleanIcsText(item.description || '')
-  const date = item.reminder_date.replaceAll('-', '')
+  const date = item.reminder_date.replace(/-/g, '')
   const time = (item.reminder_time || '09:00').replace(':', '')
   const interval = item.recurrence_interval || 1
   const recurrenceType = item.recurrence_type || item.frequency || 'Once'
@@ -565,7 +565,7 @@ function downloadCalendarFile(item: Reminder) {
   }
 
   if (rrule && item.recurrence_end_date) {
-    rrule += `;UNTIL=${item.recurrence_end_date.replaceAll('-', '')}T235959`
+    rrule += `;UNTIL=${item.recurrence_end_date.replace(/-/g, '')}T235959`
   }
 
   const ics = [
@@ -598,10 +598,10 @@ function downloadCalendarFile(item: Reminder) {
 
 function cleanIcsText(value: string) {
   return value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('\n', '\\n')
-    .replaceAll(',', '\\,')
-    .replaceAll(';', '\\;')
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
 }
 
 function ReminderCard({
