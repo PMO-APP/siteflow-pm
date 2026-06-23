@@ -23,6 +23,23 @@ const STATUSES = [
   'Delayed',
 ]
 
+const CONTRACT_TYPES = [
+  'Main Contract',
+  'Subcontract',
+  'Consultancy',
+  'Supply',
+  'Service',
+  'Variation',
+]
+
+const CONTRACT_STATUSES = [
+  'Active',
+  'Pending',
+  'Completed',
+  'Terminated',
+  'On Hold',
+]
+
 const TABS = [
   ['weekly', 'Weekly Report'],
   ['contracts', 'Contracts'],
@@ -38,7 +55,9 @@ export default function CostingPage() {
 
   const [activeTab, setActiveTab] = useState('weekly')
   const [items, setItems] = useState<any[]>([])
+  const [contracts, setContracts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [contractsLoading, setContractsLoading] = useState(true)
   const [notice, setNotice] = useState('')
 
   const [reportWeek, setReportWeek] = useState(
@@ -53,8 +72,21 @@ export default function CostingPage() {
     status: 'Open',
   })
 
+  const [contractForm, setContractForm] = useState({
+    contract_title: '',
+    contractor_name: '',
+    contract_type: 'Main Contract',
+    contract_value: '',
+    amount_paid: '',
+    start_date: '',
+    end_date: '',
+    status: 'Active',
+    remarks: '',
+  })
+
   useEffect(() => {
     loadCostReports()
+    loadContracts()
   }, [projectId, reportWeek])
 
   async function loadCostReports() {
@@ -81,6 +113,30 @@ export default function CostingPage() {
 
     setItems(data || [])
     setLoading(false)
+  }
+
+  async function loadContracts() {
+    if (!projectId) {
+      setContractsLoading(false)
+      return
+    }
+
+    setContractsLoading(true)
+
+    const { data, error } = await supabase
+      .from('cost_contracts')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      setContractsLoading(false)
+      return
+    }
+
+    setContracts(data || [])
+    setContractsLoading(false)
   }
 
   async function addItem() {
@@ -125,6 +181,55 @@ export default function CostingPage() {
     await loadCostReports()
   }
 
+  async function addContract() {
+    setNotice('')
+
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    if (!contractForm.contract_title.trim()) {
+      setNotice('Contract title is required.')
+      return
+    }
+
+    const { error } = await supabase.from('cost_contracts').insert({
+      organization_id: organizationId,
+      portfolio_id: portfolioId,
+      project_id: projectId,
+      contract_title: contractForm.contract_title.trim(),
+      contractor_name: contractForm.contractor_name.trim() || null,
+      contract_type: contractForm.contract_type,
+      contract_value: Number(contractForm.contract_value || 0),
+      amount_paid: Number(contractForm.amount_paid || 0),
+      start_date: contractForm.start_date || null,
+      end_date: contractForm.end_date || null,
+      status: contractForm.status,
+      remarks: contractForm.remarks.trim() || null,
+      created_by: user?.id || null,
+    })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setContractForm({
+      contract_title: '',
+      contractor_name: '',
+      contract_type: 'Main Contract',
+      contract_value: '',
+      amount_paid: '',
+      start_date: '',
+      end_date: '',
+      status: 'Active',
+      remarks: '',
+    })
+
+    await loadContracts()
+  }
+
   async function deleteItem(id: string) {
     const confirmed = window.confirm('Delete this cost report item?')
     if (!confirmed) return
@@ -137,6 +242,20 @@ export default function CostingPage() {
     }
 
     await loadCostReports()
+  }
+
+  async function deleteContract(id: string) {
+    const confirmed = window.confirm('Delete this contract?')
+    if (!confirmed) return
+
+    const { error } = await supabase.from('cost_contracts').delete().eq('id', id)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    await loadContracts()
   }
 
   async function submitReport() {
@@ -182,6 +301,18 @@ export default function CostingPage() {
     .filter(item => item.status === 'Paid')
     .reduce((sum, item) => sum + Number(item.amount || 0), 0)
 
+  const totalContractValue = contracts.reduce(
+    (sum, item) => sum + Number(item.contract_value || 0),
+    0
+  )
+
+  const totalPaidOnContracts = contracts.reduce(
+    (sum, item) => sum + Number(item.amount_paid || 0),
+    0
+  )
+
+  const outstandingContractValue = totalContractValue - totalPaidOnContracts
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
@@ -212,12 +343,38 @@ export default function CostingPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <Metric title="Total Items" value={items.length} />
-        <Metric title="Total Amount" value={`₦${totalAmount.toLocaleString()}`} />
-        <Metric title="Pending Amount" value={`₦${pendingAmount.toLocaleString()}`} />
-        <Metric title="Paid Amount" value={`₦${paidAmount.toLocaleString()}`} />
-      </div>
+      {activeTab === 'weekly' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Metric title="Total Items" value={items.length} />
+          <Metric
+            title="Total Amount"
+            value={`₦${totalAmount.toLocaleString()}`}
+          />
+          <Metric
+            title="Pending Amount"
+            value={`₦${pendingAmount.toLocaleString()}`}
+          />
+          <Metric title="Paid Amount" value={`₦${paidAmount.toLocaleString()}`} />
+        </div>
+      )}
+
+      {activeTab === 'contracts' && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Metric title="Contracts" value={contracts.length} />
+          <Metric
+            title="Contract Value"
+            value={`₦${totalContractValue.toLocaleString()}`}
+          />
+          <Metric
+            title="Amount Paid"
+            value={`₦${totalPaidOnContracts.toLocaleString()}`}
+          />
+          <Metric
+            title="Outstanding"
+            value={`₦${outstandingContractValue.toLocaleString()}`}
+          />
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {TABS.map(([value, label]) => (
@@ -382,10 +539,182 @@ export default function CostingPage() {
         </>
       )}
 
-      {activeTab === 'contracts' && <EmptyCostingTab title="Contracts" />}
+      {activeTab === 'contracts' && (
+        <ContractsTab
+          contracts={contracts}
+          loading={contractsLoading}
+          form={contractForm}
+          setForm={setContractForm}
+          onAdd={addContract}
+          onDelete={deleteContract}
+        />
+      )}
+
       {activeTab === 'payments' && <EmptyCostingTab title="Payments" />}
       {activeTab === 'variations' && <EmptyCostingTab title="Variations" />}
       {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
+    </div>
+  )
+}
+
+function ContractsTab({
+  contracts,
+  loading,
+  form,
+  setForm,
+  onAdd,
+  onDelete,
+}: {
+  contracts: any[]
+  loading: boolean
+  form: any
+  setForm: (form: any) => void
+  onAdd: () => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Plus size={17} className="text-[#c49e48]" />
+          <h2 className="font-bold text-[#ede8de]">Add Contract</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            className="form-control"
+            placeholder="Contract title"
+            value={form.contract_title}
+            onChange={e => setForm({ ...form, contract_title: e.target.value })}
+          />
+
+          <input
+            className="form-control"
+            placeholder="Contractor / consultant"
+            value={form.contractor_name}
+            onChange={e => setForm({ ...form, contractor_name: e.target.value })}
+          />
+
+          <select
+            className="form-control"
+            value={form.contract_type}
+            onChange={e => setForm({ ...form, contract_type: e.target.value })}
+          >
+            {CONTRACT_TYPES.map(type => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+
+          <select
+            className="form-control"
+            value={form.status}
+            onChange={e => setForm({ ...form, status: e.target.value })}
+          >
+            {CONTRACT_STATUSES.map(status => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+          <input
+            className="form-control"
+            placeholder="Contract value"
+            type="number"
+            value={form.contract_value}
+            onChange={e => setForm({ ...form, contract_value: e.target.value })}
+          />
+
+          <input
+            className="form-control"
+            placeholder="Amount paid"
+            type="number"
+            value={form.amount_paid}
+            onChange={e => setForm({ ...form, amount_paid: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.start_date}
+            onChange={e => setForm({ ...form, start_date: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.end_date}
+            onChange={e => setForm({ ...form, end_date: e.target.value })}
+          />
+        </div>
+
+        <textarea
+          className="form-control mt-3"
+          rows={2}
+          placeholder="Remarks"
+          value={form.remarks}
+          onChange={e => setForm({ ...form, remarks: e.target.value })}
+        />
+
+        <button className="btn btn-gold mt-3" onClick={onAdd}>
+          Add Contract
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="card p-6 text-slate-400">Loading contracts…</div>
+      ) : contracts.length === 0 ? (
+        <div className="card p-6 text-slate-400">
+          No contracts recorded for this project.
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Contract</th>
+                <th>Contractor</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {contracts.map(contract => (
+                <tr key={contract.id}>
+                  <td className="font-medium text-[#ede8de]">
+                    {contract.contract_title}
+                  </td>
+                  <td>{contract.contractor_name || '—'}</td>
+                  <td>{contract.contract_type || '—'}</td>
+                  <td className="text-[#c49e48] font-semibold">
+                    ₦{Number(contract.contract_value || 0).toLocaleString()}
+                  </td>
+                  <td>
+                    ₦{Number(contract.amount_paid || 0).toLocaleString()}
+                  </td>
+                  <td>
+                    <span className="badge badge-muted">
+                      {contract.status || 'Active'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="tbl-action text-red-400"
+                      onClick={() => onDelete(contract.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -394,9 +723,7 @@ function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
       <Wallet size={18} className="text-[#c49e48]" />
-
       <div className="text-2xl font-black text-white mt-3">{value}</div>
-
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
       </div>
