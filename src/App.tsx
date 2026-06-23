@@ -19,6 +19,7 @@ import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
 import AuditPage from '@/pages/AuditPage'
 import PortfolioDashboardPage from '@/pages/PortfolioDashboardPage'
 import PlannerPage from '@/pages/PlannerPage'
+import CostingPage from '@/pages/CostingPage'
 
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
@@ -250,6 +251,7 @@ export default function App() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+       
 
         <Route
           path="/profile"
@@ -395,6 +397,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
+           <Route path="costing" element={<CostingPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
           <Route path="hse" element={<HSEPage />} />
