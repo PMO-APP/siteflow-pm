@@ -29,13 +29,18 @@ const STATUS_OPTIONS = [
   'Revision Required',
   'Completed',
 ]
-function getReviewerLabel(task: any) {
-  if (task.review_discipline) return task.review_discipline
+function getReviewerLabel(task: any): string {
+  if (task.review_discipline) {
+    return task.review_discipline
+  }
 
   if (task.review_role) {
     return task.review_role
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
+      .split('_')
+      .map((word: string) =>
+        word.charAt(0).toUpperCase() + word.slice(1)
+      )
+      .join(' ')
   }
 
   return 'Internal Team'
