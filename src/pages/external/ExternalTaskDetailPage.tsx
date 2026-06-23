@@ -38,13 +38,16 @@ export default function ExternalTaskDetailPage() {
   const [task, setTask] = useState<any | null>(null)
   const [comments, setComments] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
-
   const [comment, setComment] = useState('')
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
-
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  const isLocked =
+    task?.review_status === 'Approved' ||
+    task?.status === 'Approved' ||
+    task?.status === 'Completed'
 
   useEffect(() => {
     syncProjectFromUrl()
@@ -58,7 +61,6 @@ export default function ExternalTaskDetailPage() {
     if (!projectFromUrl) return
 
     const projectId = Number(projectFromUrl)
-
     if (!projectId || externalProjectId === projectId) return
 
     const { data } = await supabase
@@ -132,13 +134,21 @@ export default function ExternalTaskDetailPage() {
 
     await supabase.from('external_task_history').insert({
       task_id: task.id,
+      project_id: activeProjectId,
       action,
       performed_by: user?.full_name || user?.email || 'External User',
+      performed_by_email: user?.email || '',
+      performed_by_role: role || 'external',
     })
   }
 
   async function updateTaskStatus(status: string) {
     if (!task || !activeProjectId) return
+
+    if (isLocked) {
+      setNotice('This task has already been approved and locked.')
+      return
+    }
 
     setNotice('')
 
@@ -175,7 +185,7 @@ export default function ExternalTaskDetailPage() {
         submittedBy: user?.full_name || user?.email || 'External User',
         submittedByEmail: user?.email || '',
         message: `Task: ${task.title}\nStatus: ${status}`,
-        reviewUrl: `${window.location.origin}/app/external-communication`,
+        reviewUrl: `${window.location.origin}/app/external-task-review`,
       },
     })
 
@@ -200,6 +210,11 @@ export default function ExternalTaskDetailPage() {
 
   async function sendComment() {
     setNotice('')
+
+    if (isLocked) {
+      setNotice('This task has already been approved and locked.')
+      return
+    }
 
     if (!task || !activeProjectId) {
       setNotice('Task or project not found.')
@@ -244,6 +259,10 @@ export default function ExternalTaskDetailPage() {
       sender_role: role || 'external',
       comment: cleanComment || 'Evidence uploaded.',
       attachment_url: uploadedFileUrl,
+      file_name: evidenceFile?.name || null,
+      file_type: evidenceFile?.type || null,
+      file_size: evidenceFile?.size || null,
+      evidence_status: uploadedFileUrl ? 'Submitted' : null,
     })
 
     if (error) {
@@ -252,7 +271,9 @@ export default function ExternalTaskDetailPage() {
       return
     }
 
-    await addHistory(uploadedFileUrl ? 'Comment added with evidence' : 'Comment added')
+    await addHistory(
+      uploadedFileUrl ? 'Comment added with evidence' : 'Comment added'
+    )
 
     await notifyUsers({
       projectId: activeProjectId,
@@ -271,7 +292,7 @@ export default function ExternalTaskDetailPage() {
         submittedBy: user?.full_name || user?.email || 'External User',
         submittedByEmail: user?.email || '',
         message: cleanComment || 'Evidence uploaded.',
-        reviewUrl: `${window.location.origin}/app/external-communication`,
+        reviewUrl: `${window.location.origin}/app/external-task-review`,
       },
     })
 
@@ -403,6 +424,7 @@ export default function ExternalTaskDetailPage() {
                 <select
                   className="form-control"
                   value={task.status || 'Pending'}
+                  disabled={isLocked}
                   onChange={e => updateTaskStatus(e.target.value)}
                 >
                   {STATUS_OPTIONS.map(status => (
@@ -438,7 +460,10 @@ export default function ExternalTaskDetailPage() {
                 ) : (
                   <div className="space-y-3">
                     {history.map(item => (
-                      <div key={item.id} className="border-l border-[#c49e48]/40 pl-3">
+                      <div
+                        key={item.id}
+                        className="border-l border-[#c49e48]/40 pl-3"
+                      >
                         <div className="text-[#ede8de] text-xs">
                           {item.action}
                         </div>
@@ -457,6 +482,12 @@ export default function ExternalTaskDetailPage() {
             </section>
 
             <section className="card p-6 xl:col-span-2 space-y-5">
+              {isLocked && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-400">
+                  This submission has been approved by PMO and is now locked.
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <Send size={18} className="text-[#c49e48]" />
 
@@ -494,13 +525,31 @@ export default function ExternalTaskDetailPage() {
                       </p>
 
                       {item.attachment_url && (
-                        <button
-                          onClick={() => openEvidence(item.attachment_url)}
-                          className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline mt-3"
-                        >
-                          <Paperclip size={13} />
-                          View Evidence
-                        </button>
+                        <div className="mt-3 space-y-2">
+                          <button
+                            onClick={() => openEvidence(item.attachment_url)}
+                            className="inline-flex items-center gap-1 text-sm text-[#c49e48] hover:underline"
+                          >
+                            <Paperclip size={13} />
+                            View Evidence
+                          </button>
+
+                          <div className="text-xs text-slate-500">
+                            {item.file_name || 'Uploaded File'}
+                          </div>
+
+                          {item.file_size && (
+                            <div className="text-xs text-slate-500">
+                              {(item.file_size / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                          )}
+
+                          {item.evidence_status && (
+                            <span className="inline-flex rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 px-2 py-1 text-xs text-[#c49e48]">
+                              {item.evidence_status}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))
@@ -509,8 +558,13 @@ export default function ExternalTaskDetailPage() {
 
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <textarea
+                  disabled={isLocked}
                   className="form-control min-h-[110px]"
-                  placeholder="Write a comment, question, or update..."
+                  placeholder={
+                    isLocked
+                      ? 'Task has been approved and locked.'
+                      : 'Write a comment, question, or update...'
+                  }
                   value={comment}
                   onChange={e => setComment(e.target.value)}
                 />
@@ -523,6 +577,7 @@ export default function ExternalTaskDetailPage() {
 
                   <input
                     type="file"
+                    disabled={isLocked}
                     className="form-control"
                     onChange={e =>
                       setEvidenceFile(e.target.files?.[0] || null)
@@ -538,7 +593,7 @@ export default function ExternalTaskDetailPage() {
 
                 <button
                   onClick={sendComment}
-                  disabled={submitting}
+                  disabled={submitting || isLocked}
                   className="btn btn-gold"
                 >
                   <Send size={15} />
@@ -554,10 +609,10 @@ export default function ExternalTaskDetailPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const isDone = ['Completed', 'Submitted'].includes(status)
+  const isDone = ['Completed', 'Submitted', 'Approved'].includes(status)
 
   const style =
-    status === 'Completed'
+    status === 'Completed' || status === 'Approved'
       ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
       : status === 'Submitted'
       ? 'border-purple-500/20 bg-purple-500/10 text-purple-400'
