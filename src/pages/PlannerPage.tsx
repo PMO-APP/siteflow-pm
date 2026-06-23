@@ -13,7 +13,16 @@ import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { fdate } from '@/lib/utils'
 
-const FREQUENCIES = ['Once', 'Daily', 'Weekly', 'Monthly']
+const RECURRENCE_TYPES = ['Once', 'Daily', 'Weekly', 'Monthly']
+const WEEK_DAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+]
 const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 const STATUSES = ['Pending', 'Completed', 'Skipped']
 
@@ -27,6 +36,10 @@ type Reminder = {
   reminder_date: string
   reminder_time?: string | null
   frequency?: string | null
+  recurrence_type?: string | null
+  recurrence_interval?: number | null
+  recurrence_day?: string | null
+  recurrence_end_date?: string | null
   priority?: string | null
   status?: string | null
   email_reminder?: boolean | null
@@ -169,11 +182,7 @@ export default function PlannerPage() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard
-          icon={CalendarCheck}
-          title="Pending"
-          value={pending.length}
-        />
+        <MetricCard icon={CalendarCheck} title="Pending" value={pending.length} />
         <MetricCard icon={Clock} title="Due Today" value={dueToday.length} />
         <MetricCard icon={Clock} title="Overdue" value={overdue.length} danger />
         <MetricCard
@@ -290,7 +299,10 @@ function ReminderModal({
     description: item?.description || '',
     reminder_date: item?.reminder_date || new Date().toISOString().slice(0, 10),
     reminder_time: item?.reminder_time || '09:00',
-    frequency: item?.frequency || 'Once',
+    recurrence_type: item?.recurrence_type || item?.frequency || 'Once',
+    recurrence_interval: item?.recurrence_interval || 1,
+    recurrence_day: item?.recurrence_day || 'Friday',
+    recurrence_end_date: item?.recurrence_end_date || '',
     priority: item?.priority || 'Medium',
     status: item?.status || 'Pending',
     email_reminder: item?.email_reminder ?? true,
@@ -318,7 +330,12 @@ function ReminderModal({
       description: form.description.trim() || null,
       reminder_date: form.reminder_date,
       reminder_time: form.reminder_time || null,
-      frequency: form.frequency,
+      frequency: form.recurrence_type,
+      recurrence_type: form.recurrence_type,
+      recurrence_interval: Number(form.recurrence_interval) || 1,
+      recurrence_day:
+        form.recurrence_type === 'Weekly' ? form.recurrence_day : null,
+      recurrence_end_date: form.recurrence_end_date || null,
       priority: form.priority,
       status: form.status,
       email_reminder: form.email_reminder,
@@ -389,7 +406,7 @@ function ReminderModal({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date">
+            <Field label="Start Date">
               <input
                 type="date"
                 className="form-control"
@@ -409,18 +426,58 @@ function ReminderModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Frequency">
+            <Field label="Repeat">
               <select
                 className="form-control"
-                value={form.frequency}
-                onChange={e => set('frequency', e.target.value)}
+                value={form.recurrence_type}
+                onChange={e => set('recurrence_type', e.target.value)}
               >
-                {FREQUENCIES.map(item => (
+                {RECURRENCE_TYPES.map(item => (
                   <option key={item}>{item}</option>
                 ))}
               </select>
             </Field>
 
+            <Field label="Every">
+              <input
+                type="number"
+                min={1}
+                className="form-control"
+                value={form.recurrence_interval}
+                disabled={form.recurrence_type === 'Once'}
+                onChange={e =>
+                  set('recurrence_interval', Number(e.target.value))
+                }
+              />
+            </Field>
+          </div>
+
+          {form.recurrence_type === 'Weekly' && (
+            <Field label="Day of Week">
+              <select
+                className="form-control"
+                value={form.recurrence_day}
+                onChange={e => set('recurrence_day', e.target.value)}
+              >
+                {WEEK_DAYS.map(day => (
+                  <option key={day}>{day}</option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {form.recurrence_type !== 'Once' && (
+            <Field label="Repeat Until">
+              <input
+                type="date"
+                className="form-control"
+                value={form.recurrence_end_date}
+                onChange={e => set('recurrence_end_date', e.target.value)}
+              />
+            </Field>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Priority">
               <select
                 className="form-control"
@@ -432,19 +489,19 @@ function ReminderModal({
                 ))}
               </select>
             </Field>
-          </div>
 
-          <Field label="Status">
-            <select
-              className="form-control"
-              value={form.status}
-              onChange={e => set('status', e.target.value)}
-            >
-              {STATUSES.map(item => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </Field>
+            <Field label="Status">
+              <select
+                className="form-control"
+                value={form.status}
+                onChange={e => set('status', e.target.value)}
+              >
+                {STATUSES.map(item => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
 
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input
@@ -474,6 +531,79 @@ function ReminderModal({
   )
 }
 
+function downloadCalendarFile(item: Reminder) {
+  const cleanTitle = cleanIcsText(item.title || 'PMOCorex Reminder')
+  const cleanDescription = cleanIcsText(item.description || '')
+  const date = item.reminder_date.replaceAll('-', '')
+  const time = (item.reminder_time || '09:00').replace(':', '')
+  const interval = item.recurrence_interval || 1
+  const recurrenceType = item.recurrence_type || item.frequency || 'Once'
+
+  const dayMap: Record<string, string> = {
+    Monday: 'MO',
+    Tuesday: 'TU',
+    Wednesday: 'WE',
+    Thursday: 'TH',
+    Friday: 'FR',
+    Saturday: 'SA',
+    Sunday: 'SU',
+  }
+
+  let rrule = ''
+
+  if (recurrenceType === 'Daily') {
+    rrule = `RRULE:FREQ=DAILY;INTERVAL=${interval}`
+  }
+
+  if (recurrenceType === 'Weekly') {
+    const day = dayMap[item.recurrence_day || 'Friday'] || 'FR'
+    rrule = `RRULE:FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${day}`
+  }
+
+  if (recurrenceType === 'Monthly') {
+    rrule = `RRULE:FREQ=MONTHLY;INTERVAL=${interval}`
+  }
+
+  if (rrule && item.recurrence_end_date) {
+    rrule += `;UNTIL=${item.recurrence_end_date.replaceAll('-', '')}T235959`
+  }
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//PMOCorex//Planner//EN',
+    'BEGIN:VEVENT',
+    `UID:${item.id || crypto.randomUUID()}@pmocorex.com`,
+    `SUMMARY:${cleanTitle}`,
+    cleanDescription ? `DESCRIPTION:${cleanDescription}` : '',
+    `DTSTART:${date}T${time}00`,
+    `DTEND:${date}T${time}00`,
+    rrule,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+    .filter(Boolean)
+    .join('\r\n')
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = `${item.title || 'reminder'}.ics`
+  link.click()
+
+  URL.revokeObjectURL(url)
+}
+
+function cleanIcsText(value: string) {
+  return value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\n', '\\n')
+    .replaceAll(',', '\\,')
+    .replaceAll(';', '\\;')
+}
+
 function ReminderCard({
   item,
   onEdit,
@@ -500,6 +630,8 @@ function ReminderCard({
       ? 'text-slate-400'
       : 'text-[#c49e48]'
 
+  const recurrenceLabel = getRecurrenceLabel(item)
+
   return (
     <div className="p-4 flex flex-col lg:flex-row lg:items-center gap-4">
       <div className="flex-1">
@@ -508,17 +640,10 @@ function ReminderCard({
             {item.title}
           </h2>
 
-          {isOverdue && (
-            <span className="badge badge-red">Overdue</span>
-          )}
+          {isOverdue && <span className="badge badge-red">Overdue</span>}
+          {isDueToday && <span className="badge badge-amber">Due Today</span>}
 
-          {isDueToday && (
-            <span className="badge badge-amber">Due Today</span>
-          )}
-
-          <span className="badge badge-muted">
-            {item.frequency || 'Once'}
-          </span>
+          <span className="badge badge-muted">{recurrenceLabel}</span>
         </div>
 
         {item.description && (
@@ -546,6 +671,13 @@ function ReminderCard({
           ))}
         </select>
 
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => downloadCalendarFile(item)}
+        >
+          Calendar
+        </button>
+
         <button className="btn btn-ghost btn-sm" onClick={onEdit}>
           Edit
         </button>
@@ -556,6 +688,25 @@ function ReminderCard({
       </div>
     </div>
   )
+}
+
+function getRecurrenceLabel(item: Reminder) {
+  const type = item.recurrence_type || item.frequency || 'Once'
+  const interval = item.recurrence_interval || 1
+
+  if (type === 'Once') return 'Once'
+  if (type === 'Daily') return interval === 1 ? 'Daily' : `Every ${interval} days`
+  if (type === 'Weekly') {
+    const day = item.recurrence_day || 'Friday'
+    return interval === 1
+      ? `Every ${day}`
+      : `Every ${interval} weeks on ${day}`
+  }
+  if (type === 'Monthly') {
+    return interval === 1 ? 'Monthly' : `Every ${interval} months`
+  }
+
+  return type
 }
 
 function MetricCard({
