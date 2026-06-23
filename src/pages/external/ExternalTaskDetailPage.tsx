@@ -39,7 +39,8 @@ export default function ExternalTaskDetailPage() {
   const [comments, setComments] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [comment, setComment] = useState('')
-  const [evidenceFile, setEvidenceFile] = useState<File | null>(null)
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([])
+const [evidence, setEvidence] = useState<any[]>([])
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -126,6 +127,7 @@ export default function ExternalTaskDetailPage() {
     setTask(taskRow)
     setComments(commentRows || [])
     setHistory(historyRows || [])
+    await loadEvidence(Number(taskId))
     setLoading(false)
   }
 
@@ -207,72 +209,120 @@ export default function ExternalTaskDetailPage() {
       window.open(data.signedUrl, '_blank')
     }
   }
+  async function uploadEvidenceFiles(taskId: number) {
+  if (!activeProjectId) return []
 
-  async function sendComment() {
-    setNotice('')
+  const uploadedFiles: {
+  storagePath: string
+  fileName: string
+  fileType: string
+  fileSize: number
+}[] = []
 
-    if (isLocked) {
-      setNotice('This task has already been approved and locked.')
-      return
-    }
+  for (const file of evidenceFiles) {
+    const safeName =
+      file.name.replace(/\s+/g, '-')
 
-    if (!task || !activeProjectId) {
-      setNotice('Task or project not found.')
-      return
-    }
+    const storagePath =
+      `${activeProjectId}/${taskId}/${Date.now()}-${safeName}`
 
-    if (!comment.trim() && !evidenceFile) {
-      setNotice('Please add a comment or upload evidence.')
-      return
-    }
+    const { error } = await supabase.storage
+      .from('external-task-evidence')
+      .upload(storagePath, file)
 
-    setSubmitting(true)
+    if (error) throw error
 
-    const cleanComment = comment.trim()
-    let uploadedFileUrl: string | null = null
+    uploadedFiles.push({
+      storagePath,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+    })
+  }
 
-    if (evidenceFile) {
-      const safeFileName = evidenceFile.name.replace(/\s+/g, '-')
-      const filePath = `${activeProjectId}/${task.id}/${Date.now()}-${safeFileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('external-task-evidence')
-        .upload(filePath, evidenceFile, {
-          cacheControl: '3600',
-          upsert: false,
-        })
-
-      if (uploadError) {
-        setNotice(uploadError.message)
-        setSubmitting(false)
-        return
-      }
-
-      uploadedFileUrl = filePath
-    }
-
-    const { error } = await supabase.from('external_task_comments').insert({
-      task_id: task.id,
-      project_id: activeProjectId,
-      sender_name: user?.full_name || user?.email || 'External User',
-      sender_email: user?.email || '',
-      sender_role: role || 'external',
-      comment: cleanComment || 'Evidence uploaded.',
-      attachment_url: uploadedFileUrl,
-      file_name: evidenceFile?.name || null,
-      file_type: evidenceFile?.type || null,
-      file_size: evidenceFile?.size || null,
-      evidence_status: uploadedFileUrl ? 'Submitted' : null,
+  return uploadedFiles
+}
+  async function loadEvidence(taskId: number) {
+  const { data } = await supabase
+    .from('external_task_evidence')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', {
+      ascending: false,
     })
 
-    if (error) {
-      setNotice(error.message)
-      setSubmitting(false)
-      return
+  setEvidence(data || [])
+}
+
+ async function sendComment() {
+  setNotice('')
+
+  if (isLocked) {
+    setNotice('This task has already been approved and locked.')
+    return
+  }
+
+  if (!task || !activeProjectId) {
+    setNotice('Task or project not found.')
+    return
+  }
+
+  if (!comment.trim() && evidenceFiles.length === 0) {
+    setNotice('Please add a comment or upload evidence.')
+    return
+  }
+
+  setSubmitting(true)
+
+  try {
+    const cleanComment = comment.trim()
+    const uploadedFiles = await uploadEvidenceFiles(task.id)
+
+    const { data: commentRow, error: commentError } = await supabase
+      .from('external_task_comments')
+      .insert({
+        task_id: task.id,
+        project_id: activeProjectId,
+        sender_name: user?.full_name || user?.email || 'External User',
+        sender_email: user?.email || '',
+        sender_role: role || 'external',
+        comment:
+          cleanComment ||
+          `${uploadedFiles.length} evidence file(s) uploaded.`,
+        evidence_status:
+          uploadedFiles.length > 0 ? 'Submitted' : null,
+      })
+      .select('id')
+      .single()
+
+    if (commentError) throw commentError
+
+    if (uploadedFiles.length > 0) {
+      const evidenceRows = uploadedFiles.map(file => ({
+        task_id: task.id,
+        project_id: activeProjectId,
+        comment_id: commentRow.id,
+        storage_path: file.storagePath,
+        file_name: file.fileName,
+        file_type: file.fileType,
+        file_size: file.fileSize,
+        evidence_status: 'Submitted',
+        uploaded_by: user?.full_name || user?.email || 'External User',
+        uploaded_by_email: user?.email || '',
+        uploaded_by_role: role || 'external',
+      }))
+
+      const { error: evidenceError } = await supabase
+        .from('external_task_evidence')
+        .insert(evidenceRows)
+
+      if (evidenceError) throw evidenceError
     }
 
     await addHistory(
-      uploadedFileUrl ? 'Comment added with evidence' : 'Comment added'
+      uploadedFiles.length > 0
+        ? `${uploadedFiles.length} evidence file(s) uploaded`
+        : 'Comment added'
     )
 
     await notifyUsers({
@@ -291,18 +341,24 @@ export default function ExternalTaskDetailPage() {
         projectName: externalProjectName || 'Selected Project',
         submittedBy: user?.full_name || user?.email || 'External User',
         submittedByEmail: user?.email || '',
-        message: cleanComment || 'Evidence uploaded.',
+        message:
+          cleanComment ||
+          `${uploadedFiles.length} evidence file(s) uploaded.`,
         reviewUrl: `${window.location.origin}/app/external-task-review`,
       },
     })
 
     setComment('')
-    setEvidenceFile(null)
+    setEvidenceFiles([])
     setNotice('Comment/evidence sent. The internal team has been notified.')
-    setSubmitting(false)
 
     await loadTaskDetail()
+  } catch (error: any) {
+    setNotice(error.message || 'Unable to send comment/evidence.')
+  } finally {
+    setSubmitting(false)
   }
+}
 
   return (
     <div className="min-h-dvh bg-[#0c1014] text-white">
@@ -489,13 +545,51 @@ export default function ExternalTaskDetailPage() {
               )}
 
               <div className="flex items-center gap-2">
-                <Send size={18} className="text-[#c49e48]" />
+  <Send size={18} className="text-[#c49e48]" />
 
-                <h2 className="text-lg font-bold text-[#ede8de]">
-                  Task Conversation & Evidence
-                </h2>
-              </div>
+  <h2 className="text-lg font-bold text-[#ede8de]">
+    Task Conversation & Evidence
+  </h2>
+</div>
 
+{evidence.length > 0 && (
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+    <div className="font-bold text-[#ede8de]">
+      Evidence Gallery
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {evidence.map(file => (
+        <div
+          key={file.id}
+          className="rounded-xl border border-white/10 bg-[#0c1014]/60 p-3"
+        >
+          <div className="text-sm font-semibold text-[#ede8de] truncate">
+            {file.file_name || 'Evidence File'}
+          </div>
+
+          <div className="text-xs text-slate-500 mt-1">
+            {file.file_size
+              ? `${(file.file_size / 1024 / 1024).toFixed(2)} MB`
+              : 'Size unavailable'}
+          </div>
+
+          <div className="text-xs text-slate-500 mt-1">
+            {file.evidence_status || 'Submitted'}
+          </div>
+
+          <button
+            onClick={() => openEvidence(file.storage_path)}
+            className="btn btn-sm btn-ghost mt-3"
+          >
+            <Paperclip size={13} />
+            View
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
               <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                 {comments.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">
@@ -576,19 +670,29 @@ export default function ExternalTaskDetailPage() {
                   </label>
 
                   <input
-                    type="file"
-                    disabled={isLocked}
-                    className="form-control"
-                    onChange={e =>
-                      setEvidenceFile(e.target.files?.[0] || null)
-                    }
-                  />
+  type="file"
+  multiple
+  disabled={isLocked}
+  className="form-control"
+  onChange={e =>
+    setEvidenceFiles(
+      Array.from(e.target.files || [])
+    )
+  }
+/>
 
-                  {evidenceFile && (
-                    <div className="text-xs text-slate-400 mt-2">
-                      Selected: {evidenceFile.name}
-                    </div>
-                  )}
+                {evidenceFiles.length > 0 && (
+  <div className="space-y-1 mt-2">
+    {evidenceFiles.map(file => (
+      <div
+        key={file.name}
+        className="text-xs text-slate-400"
+      >
+        {file.name}
+      </div>
+    ))}
+  </div>
+)}
                 </div>
 
                 <button
