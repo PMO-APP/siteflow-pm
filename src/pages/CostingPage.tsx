@@ -58,6 +58,7 @@ const PAYMENT_STATUSES = [
 ]
 
 const TABS = [
+  ['overview', 'Overview'],
   ['weekly', 'Weekly Report'],
   ['contracts', 'Contracts'],
   ['payments', 'Payments'],
@@ -70,7 +71,7 @@ export default function CostingPage() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
-  const [activeTab, setActiveTab] = useState('weekly')
+  const [activeTab, setActiveTab] = useState('overview')
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
@@ -476,39 +477,6 @@ export default function CostingPage() {
         </div>
       )}
 
-      {activeTab === 'weekly' && (
-        <MetricGrid
-          values={[
-            ['Total Items', items.length],
-            ['Total Amount', `₦${totalAmount.toLocaleString()}`],
-            ['Pending Amount', `₦${pendingAmount.toLocaleString()}`],
-            ['Paid Amount', `₦${paidAmount.toLocaleString()}`],
-          ]}
-        />
-      )}
-
-      {activeTab === 'contracts' && (
-        <MetricGrid
-          values={[
-            ['Contracts', contracts.length],
-            ['Contract Value', `₦${totalContractValue.toLocaleString()}`],
-            ['Amount Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
-            ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
-          ]}
-        />
-      )}
-
-      {activeTab === 'payments' && (
-        <MetricGrid
-          values={[
-            ['Payments', payments.length],
-            ['Total Value', `₦${totalPayments.toLocaleString()}`],
-            ['Pending', `₦${pendingPayments.toLocaleString()}`],
-            ['Paid', `₦${paidPayments.toLocaleString()}`],
-          ]}
-        />
-      )}
-
       <div className="flex flex-wrap gap-2">
         {TABS.map(([value, label]) => (
           <button
@@ -523,44 +491,172 @@ export default function CostingPage() {
         ))}
       </div>
 
-      {activeTab === 'weekly' && (
-        <WeeklyReportTab
-          reportWeek={reportWeek}
-          setReportWeek={setReportWeek}
-          form={form}
-          setForm={setForm}
-          groupedItems={groupedItems}
-          loading={loading}
-          onAdd={addItem}
-          onDelete={deleteItem}
-          onSubmit={submitReport}
+      {activeTab === 'overview' && (
+        <CostOverviewTab
+          totalContractValue={totalContractValue}
+          totalPaidOnContracts={totalPaidOnContracts}
+          outstandingContractValue={outstandingContractValue}
+          pendingPayments={pendingPayments}
+          paidPayments={paidPayments}
+          contracts={contracts}
+          payments={payments}
         />
+      )}
+
+      {activeTab === 'weekly' && (
+        <>
+          <MetricGrid
+            values={[
+              ['Total Items', items.length],
+              ['Total Amount', `₦${totalAmount.toLocaleString()}`],
+              ['Pending Amount', `₦${pendingAmount.toLocaleString()}`],
+              ['Paid Amount', `₦${paidAmount.toLocaleString()}`],
+            ]}
+          />
+
+          <WeeklyReportTab
+            reportWeek={reportWeek}
+            setReportWeek={setReportWeek}
+            form={form}
+            setForm={setForm}
+            groupedItems={groupedItems}
+            loading={loading}
+            onAdd={addItem}
+            onDelete={deleteItem}
+            onSubmit={submitReport}
+          />
+        </>
       )}
 
       {activeTab === 'contracts' && (
-        <ContractsTab
-          contracts={contracts}
-          loading={contractsLoading}
-          form={contractForm}
-          setForm={setContractForm}
-          onAdd={addContract}
-          onDelete={deleteContract}
-        />
+        <>
+          <MetricGrid
+            values={[
+              ['Contracts', contracts.length],
+              ['Contract Value', `₦${totalContractValue.toLocaleString()}`],
+              ['Amount Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
+              ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
+            ]}
+          />
+
+          <ContractsTab
+            contracts={contracts}
+            loading={contractsLoading}
+            form={contractForm}
+            setForm={setContractForm}
+            onAdd={addContract}
+            onDelete={deleteContract}
+          />
+        </>
       )}
 
       {activeTab === 'payments' && (
-        <PaymentsTab
-          payments={payments}
-          loading={paymentsLoading}
-          form={paymentForm}
-          setForm={setPaymentForm}
-          onAdd={addPayment}
-          onDelete={deletePayment}
-        />
+        <>
+          <MetricGrid
+            values={[
+              ['Payments', payments.length],
+              ['Total Value', `₦${totalPayments.toLocaleString()}`],
+              ['Pending', `₦${pendingPayments.toLocaleString()}`],
+              ['Paid', `₦${paidPayments.toLocaleString()}`],
+            ]}
+          />
+
+          <PaymentsTab
+            payments={payments}
+            loading={paymentsLoading}
+            form={paymentForm}
+            setForm={setPaymentForm}
+            onAdd={addPayment}
+            onDelete={deletePayment}
+          />
+        </>
       )}
 
       {activeTab === 'variations' && <EmptyCostingTab title="Variations" />}
       {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
+    </div>
+  )
+}
+
+function CostOverviewTab({
+  totalContractValue,
+  totalPaidOnContracts,
+  outstandingContractValue,
+  pendingPayments,
+  paidPayments,
+  contracts,
+  payments,
+}: any) {
+  const activeContracts = contracts.filter(
+    (item: any) => item.status === 'Active'
+  ).length
+
+  const pendingPaymentCount = payments.filter(
+    (item: any) => item.payment_status === 'Pending'
+  ).length
+
+  return (
+    <div className="space-y-6">
+      <MetricGrid
+        values={[
+          ['Total Contract Value', `₦${totalContractValue.toLocaleString()}`],
+          ['Total Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
+          ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
+          ['Pending Payments', `₦${pendingPayments.toLocaleString()}`],
+        ]}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="card p-5">
+          <h2 className="font-bold text-[#ede8de] mb-4">
+            Costing Executive Summary
+          </h2>
+
+          <div className="space-y-3 text-sm text-slate-400">
+            <p>
+              Total contract exposure is{' '}
+              <span className="text-[#c49e48] font-semibold">
+                ₦{totalContractValue.toLocaleString()}
+              </span>.
+            </p>
+
+            <p>
+              Total paid to date is{' '}
+              <span className="text-emerald-400 font-semibold">
+                ₦{totalPaidOnContracts.toLocaleString()}
+              </span>.
+            </p>
+
+            <p>
+              Outstanding contractual balance is{' '}
+              <span className="text-amber-400 font-semibold">
+                ₦{outstandingContractValue.toLocaleString()}
+              </span>.
+            </p>
+
+            <p>
+              Pending payment requests currently stand at{' '}
+              <span className="text-red-400 font-semibold">
+                ₦{pendingPayments.toLocaleString()}
+              </span>.
+            </p>
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <h2 className="font-bold text-[#ede8de] mb-4">Costing Workload</h2>
+
+          <div className="grid grid-cols-2 gap-3">
+            <MiniMetric title="Active Contracts" value={activeContracts} />
+            <MiniMetric title="Payment Records" value={payments.length} />
+            <MiniMetric title="Pending Payments" value={pendingPaymentCount} />
+            <MiniMetric
+              title="Paid Payments"
+              value={`₦${paidPayments.toLocaleString()}`}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1065,6 +1161,17 @@ function Metric({ title, value }: { title: string; value: string | number }) {
       <Wallet size={18} className="text-[#c49e48]" />
       <div className="text-2xl font-black text-white mt-3">{value}</div>
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
+        {title}
+      </div>
+    </div>
+  )
+}
+
+function MiniMetric({ title, value }: { title: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+      <div className="text-xl font-black text-white">{value}</div>
+      <div className="text-[10px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
       </div>
     </div>
