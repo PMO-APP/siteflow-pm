@@ -62,6 +62,24 @@ const VARIATION_TYPES = [
 
 const VARIATION_STATUSES = ['Pending', 'Approved', 'Rejected', 'Implemented']
 
+const PROCUREMENT_CATEGORIES = [
+  'Materials',
+  'Equipment',
+  'Furniture',
+  'Finishes',
+  'MEP',
+  'Infrastructure',
+  'Consultancy',
+]
+
+const PROCUREMENT_STATUSES = [
+  'Pending',
+  'Ordered',
+  'Delivered',
+  'Installed',
+  'Cancelled',
+]
+
 const TABS = [
   ['overview', 'Overview'],
   ['weekly', 'Weekly Report'],
@@ -81,6 +99,7 @@ export default function CostingPage() {
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
   const [variations, setVariations] = useState<any[]>([])
+  const [procurements, setProcurements] = useState<any[]>([])
 
   const [loading, setLoading] = useState(true)
   const [contractsLoading, setContractsLoading] = useState(true)
@@ -135,11 +154,25 @@ export default function CostingPage() {
     remarks: '',
   })
 
+  const [procurementForm, setProcurementForm] = useState({
+    item_name: '',
+    vendor_name: '',
+    procurement_category: 'Materials',
+    estimated_cost: '',
+    actual_cost: '',
+    status: 'Pending',
+    request_date: '',
+    expected_delivery_date: '',
+    actual_delivery_date: '',
+    remarks: '',
+  })
+
   useEffect(() => {
     loadCostReports()
     loadContracts()
     loadPayments()
     loadVariations()
+    loadProcurements()
   }, [projectId, reportWeek])
 
   async function loadCostReports() {
@@ -231,6 +264,23 @@ export default function CostingPage() {
     }
 
     setVariations(data || [])
+  }
+
+  async function loadProcurements() {
+    if (!projectId) return
+
+    const { data, error } = await supabase
+      .from('cost_procurements')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setProcurements(data || [])
   }
 
   async function addItem() {
@@ -422,6 +472,58 @@ export default function CostingPage() {
     await loadVariations()
   }
 
+  async function addProcurement() {
+    setNotice('')
+
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    if (!procurementForm.item_name.trim()) {
+      setNotice('Procurement item name is required.')
+      return
+    }
+
+    const { error } = await supabase.from('cost_procurements').insert({
+      organization_id: organizationId,
+      portfolio_id: portfolioId,
+      project_id: projectId,
+      item_name: procurementForm.item_name.trim(),
+      vendor_name: procurementForm.vendor_name.trim() || null,
+      procurement_category: procurementForm.procurement_category,
+      estimated_cost: Number(procurementForm.estimated_cost || 0),
+      actual_cost: Number(procurementForm.actual_cost || 0),
+      status: procurementForm.status,
+      request_date: procurementForm.request_date || null,
+      expected_delivery_date:
+        procurementForm.expected_delivery_date || null,
+      actual_delivery_date: procurementForm.actual_delivery_date || null,
+      remarks: procurementForm.remarks.trim() || null,
+      created_by: user?.id || null,
+    })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setProcurementForm({
+      item_name: '',
+      vendor_name: '',
+      procurement_category: 'Materials',
+      estimated_cost: '',
+      actual_cost: '',
+      status: 'Pending',
+      request_date: '',
+      expected_delivery_date: '',
+      actual_delivery_date: '',
+      remarks: '',
+    })
+
+    await loadProcurements()
+  }
+
   async function deleteItem(id: string) {
     const confirmed = window.confirm('Delete this cost report item?')
     if (!confirmed) return
@@ -462,6 +564,37 @@ export default function CostingPage() {
     }
 
     await loadPayments()
+  }
+
+  async function deleteVariation(id: string) {
+    const confirmed = window.confirm('Delete this variation?')
+    if (!confirmed) return
+
+    const { error } = await supabase.from('cost_variations').delete().eq('id', id)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    await loadVariations()
+  }
+
+  async function deleteProcurement(id: string) {
+    const confirmed = window.confirm('Delete this procurement item?')
+    if (!confirmed) return
+
+    const { error } = await supabase
+      .from('cost_procurements')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    await loadProcurements()
   }
 
   async function submitReport() {
@@ -677,10 +810,19 @@ export default function CostingPage() {
           form={variationForm}
           setForm={setVariationForm}
           onAdd={addVariation}
+          onDelete={deleteVariation}
         />
       )}
 
-      {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
+      {activeTab === 'procurement' && (
+        <ProcurementTab
+          procurements={procurements}
+          form={procurementForm}
+          setForm={setProcurementForm}
+          onAdd={addProcurement}
+          onDelete={deleteProcurement}
+        />
+      )}
     </div>
   )
 }
@@ -910,7 +1052,9 @@ function ReportTable({
         <tbody>
           {items.map(item => (
             <tr key={item.id}>
-              <td className="font-medium text-[#ede8de]">{item.item_title}</td>
+              <td className="font-medium text-[#ede8de]">
+                {item.item_title}
+              </td>
 
               <td className="max-w-[360px] text-slate-400">
                 {item.description || '—'}
@@ -1249,7 +1393,13 @@ function PaymentsTab({
   )
 }
 
-function VariationsTab({ variations, form, setForm, onAdd }: any) {
+function VariationsTab({
+  variations,
+  form,
+  setForm,
+  onAdd,
+  onDelete,
+}: any) {
   return (
     <div className="space-y-5">
       <MetricGrid
@@ -1383,6 +1533,7 @@ function VariationsTab({ variations, form, setForm, onAdd }: any) {
                 <th>Contractor</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
 
@@ -1401,6 +1552,192 @@ function VariationsTab({ variations, form, setForm, onAdd }: any) {
                     <span className="badge badge-muted">
                       {variation.status}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      className="tbl-action text-red-400"
+                      onClick={() => onDelete(variation.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProcurementTab({
+  procurements,
+  form,
+  setForm,
+  onAdd,
+  onDelete,
+}: any) {
+  return (
+    <div className="space-y-5">
+      <MetricGrid
+        values={[
+          ['Items', procurements.length],
+          [
+            'Delivered',
+            procurements.filter((item: any) => item.status === 'Delivered')
+              .length,
+          ],
+          [
+            'Ordered',
+            procurements.filter((item: any) => item.status === 'Ordered')
+              .length,
+          ],
+          [
+            'Pending',
+            procurements.filter((item: any) => item.status === 'Pending')
+              .length,
+          ],
+        ]}
+      />
+
+      <div className="card p-5">
+        <h2 className="font-bold text-white mb-4">Add Procurement Item</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            className="form-control"
+            placeholder="Item name"
+            value={form.item_name}
+            onChange={e => setForm({ ...form, item_name: e.target.value })}
+          />
+
+          <input
+            className="form-control"
+            placeholder="Vendor"
+            value={form.vendor_name}
+            onChange={e => setForm({ ...form, vendor_name: e.target.value })}
+          />
+
+          <select
+            className="form-control"
+            value={form.procurement_category}
+            onChange={e =>
+              setForm({ ...form, procurement_category: e.target.value })
+            }
+          >
+            {PROCUREMENT_CATEGORIES.map(category => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+
+          <select
+            className="form-control"
+            value={form.status}
+            onChange={e => setForm({ ...form, status: e.target.value })}
+          >
+            {PROCUREMENT_STATUSES.map(status => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+          <input
+            type="number"
+            className="form-control"
+            placeholder="Estimated cost"
+            value={form.estimated_cost}
+            onChange={e =>
+              setForm({ ...form, estimated_cost: e.target.value })
+            }
+          />
+
+          <input
+            type="number"
+            className="form-control"
+            placeholder="Actual cost"
+            value={form.actual_cost}
+            onChange={e => setForm({ ...form, actual_cost: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.expected_delivery_date}
+            onChange={e =>
+              setForm({
+                ...form,
+                expected_delivery_date: e.target.value,
+              })
+            }
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.actual_delivery_date}
+            onChange={e =>
+              setForm({
+                ...form,
+                actual_delivery_date: e.target.value,
+              })
+            }
+          />
+        </div>
+
+        <textarea
+          className="form-control mt-3"
+          rows={2}
+          placeholder="Remarks"
+          value={form.remarks}
+          onChange={e => setForm({ ...form, remarks: e.target.value })}
+        />
+
+        <button onClick={onAdd} className="btn btn-gold mt-4">
+          Save Procurement
+        </button>
+      </div>
+
+      {procurements.length > 0 && (
+        <div className="card overflow-hidden">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Vendor</th>
+                <th>Category</th>
+                <th>Estimated</th>
+                <th>Actual</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {procurements.map((item: any) => (
+                <tr key={item.id}>
+                  <td className="font-medium text-[#ede8de]">
+                    {item.item_name}
+                  </td>
+                  <td>{item.vendor_name || '—'}</td>
+                  <td>{item.procurement_category || '—'}</td>
+                  <td className="text-[#c49e48] font-semibold">
+                    ₦{Number(item.estimated_cost || 0).toLocaleString()}
+                  </td>
+                  <td>₦{Number(item.actual_cost || 0).toLocaleString()}</td>
+                  <td>
+                    <span className="badge badge-muted">
+                      {item.status || 'Pending'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="tbl-action text-red-400"
+                      onClick={() => onDelete(item.id)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </td>
                 </tr>
               ))}
