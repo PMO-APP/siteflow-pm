@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+
 import {
   canViewInternalPages,
   isExternalRole,
@@ -25,6 +26,7 @@ import {
   ClipboardList,
   Users,
   FileText,
+  PenTool,
   Bell,
   LogOut,
   Menu,
@@ -53,6 +55,7 @@ const NAV = [
   { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
   { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/costing', icon: Wallet, label: 'Costing' },
+  { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
