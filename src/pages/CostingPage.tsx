@@ -49,13 +49,18 @@ const PAYMENT_CATEGORIES = [
   'Retention',
 ]
 
-const PAYMENT_STATUSES = [
-  'Pending',
-  'Approved',
-  'Paid',
-  'Rejected',
-  'On Hold',
+const PAYMENT_STATUSES = ['Pending', 'Approved', 'Paid', 'Rejected', 'On Hold']
+
+const VARIATION_TYPES = [
+  'Client Change',
+  'Design Change',
+  'Site Condition',
+  'Regulatory Requirement',
+  'Value Engineering',
+  'Contractor Claim',
 ]
+
+const VARIATION_STATUSES = ['Pending', 'Approved', 'Rejected', 'Implemented']
 
 const TABS = [
   ['overview', 'Overview'],
@@ -75,6 +80,7 @@ export default function CostingPage() {
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
+  const [variations, setVariations] = useState<any[]>([])
 
   const [loading, setLoading] = useState(true)
   const [contractsLoading, setContractsLoading] = useState(true)
@@ -117,10 +123,23 @@ export default function CostingPage() {
     remarks: '',
   })
 
+  const [variationForm, setVariationForm] = useState({
+    variation_title: '',
+    contractor_name: '',
+    variation_type: 'Client Change',
+    amount: '',
+    status: 'Pending',
+    request_date: '',
+    approval_date: '',
+    reason: '',
+    remarks: '',
+  })
+
   useEffect(() => {
     loadCostReports()
     loadContracts()
     loadPayments()
+    loadVariations()
   }, [projectId, reportWeek])
 
   async function loadCostReports() {
@@ -195,6 +214,23 @@ export default function CostingPage() {
 
     setPayments(data || [])
     setPaymentsLoading(false)
+  }
+
+  async function loadVariations() {
+    if (!projectId) return
+
+    const { data, error } = await supabase
+      .from('cost_variations')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setVariations(data || [])
   }
 
   async function addItem() {
@@ -337,6 +373,55 @@ export default function CostingPage() {
     await loadPayments()
   }
 
+  async function addVariation() {
+    setNotice('')
+
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    if (!variationForm.variation_title.trim()) {
+      setNotice('Variation title is required.')
+      return
+    }
+
+    const { error } = await supabase.from('cost_variations').insert({
+      organization_id: organizationId,
+      portfolio_id: portfolioId,
+      project_id: projectId,
+      variation_title: variationForm.variation_title.trim(),
+      contractor_name: variationForm.contractor_name.trim() || null,
+      variation_type: variationForm.variation_type,
+      amount: Number(variationForm.amount || 0),
+      status: variationForm.status,
+      request_date: variationForm.request_date || null,
+      approval_date: variationForm.approval_date || null,
+      reason: variationForm.reason.trim() || null,
+      remarks: variationForm.remarks.trim() || null,
+      created_by: user?.id || null,
+    })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setVariationForm({
+      variation_title: '',
+      contractor_name: '',
+      variation_type: 'Client Change',
+      amount: '',
+      status: 'Pending',
+      request_date: '',
+      approval_date: '',
+      reason: '',
+      remarks: '',
+    })
+
+    await loadVariations()
+  }
+
   async function deleteItem(id: string) {
     const confirmed = window.confirm('Delete this cost report item?')
     if (!confirmed) return
@@ -447,6 +532,17 @@ export default function CostingPage() {
     .filter(item => item.payment_status === 'Paid')
     .reduce((sum, item) => sum + Number(item.amount || 0), 0)
 
+  const approvedVariationValue = variations
+    .filter(item => item.status === 'Approved')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const pendingVariationValue = variations
+    .filter(item => item.status === 'Pending')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const forecastFinalCost =
+    totalContractValue + approvedVariationValue + pendingVariationValue
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
@@ -500,6 +596,9 @@ export default function CostingPage() {
           paidPayments={paidPayments}
           contracts={contracts}
           payments={payments}
+          approvedVariationValue={approvedVariationValue}
+          pendingVariationValue={pendingVariationValue}
+          forecastFinalCost={forecastFinalCost}
         />
       )}
 
@@ -572,7 +671,15 @@ export default function CostingPage() {
         </>
       )}
 
-      {activeTab === 'variations' && <EmptyCostingTab title="Variations" />}
+      {activeTab === 'variations' && (
+        <VariationsTab
+          variations={variations}
+          form={variationForm}
+          setForm={setVariationForm}
+          onAdd={addVariation}
+        />
+      )}
+
       {activeTab === 'procurement' && <EmptyCostingTab title="Procurement" />}
     </div>
   )
@@ -586,6 +693,9 @@ function CostOverviewTab({
   paidPayments,
   contracts,
   payments,
+  approvedVariationValue,
+  pendingVariationValue,
+  forecastFinalCost,
 }: any) {
   const activeContracts = contracts.filter(
     (item: any) => item.status === 'Active'
@@ -599,10 +709,10 @@ function CostOverviewTab({
     <div className="space-y-6">
       <MetricGrid
         values={[
-          ['Total Contract Value', `₦${totalContractValue.toLocaleString()}`],
-          ['Total Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
-          ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
-          ['Pending Payments', `₦${pendingPayments.toLocaleString()}`],
+          ['Contract Value', `₦${totalContractValue.toLocaleString()}`],
+          ['Approved Variations', `₦${approvedVariationValue.toLocaleString()}`],
+          ['Pending Variations', `₦${pendingVariationValue.toLocaleString()}`],
+          ['Forecast Final Cost', `₦${forecastFinalCost.toLocaleString()}`],
         ]}
       />
 
@@ -800,9 +910,7 @@ function ReportTable({
         <tbody>
           {items.map(item => (
             <tr key={item.id}>
-              <td className="font-medium text-[#ede8de]">
-                {item.item_title}
-              </td>
+              <td className="font-medium text-[#ede8de]">{item.item_title}</td>
 
               <td className="max-w-[360px] text-slate-400">
                 {item.description || '—'}
@@ -963,9 +1071,7 @@ function ContractsTab({
                   <td className="text-[#c49e48] font-semibold">
                     ₦{Number(contract.contract_value || 0).toLocaleString()}
                   </td>
-                  <td>
-                    ₦{Number(contract.amount_paid || 0).toLocaleString()}
-                  </td>
+                  <td>₦{Number(contract.amount_paid || 0).toLocaleString()}</td>
                   <td>
                     <span className="badge badge-muted">
                       {contract.status || 'Active'}
@@ -1035,9 +1141,7 @@ function PaymentsTab({
           <select
             className="form-control"
             value={form.payment_status}
-            onChange={e =>
-              setForm({ ...form, payment_status: e.target.value })
-            }
+            onChange={e => setForm({ ...form, payment_status: e.target.value })}
           >
             {PAYMENT_STATUSES.map(status => (
               <option key={status}>{status}</option>
@@ -1134,6 +1238,169 @@ function PaymentsTab({
                     >
                       <Trash2 size={13} />
                     </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VariationsTab({ variations, form, setForm, onAdd }: any) {
+  return (
+    <div className="space-y-5">
+      <MetricGrid
+        values={[
+          ['Variations', variations.length],
+          [
+            'Approved Value',
+            `₦${variations
+              .filter((item: any) => item.status === 'Approved')
+              .reduce(
+                (sum: number, item: any) => sum + Number(item.amount || 0),
+                0
+              )
+              .toLocaleString()}`,
+          ],
+          [
+            'Pending Value',
+            `₦${variations
+              .filter((item: any) => item.status === 'Pending')
+              .reduce(
+                (sum: number, item: any) => sum + Number(item.amount || 0),
+                0
+              )
+              .toLocaleString()}`,
+          ],
+          [
+            'Implemented',
+            variations.filter((item: any) => item.status === 'Implemented')
+              .length,
+          ],
+        ]}
+      />
+
+      <div className="card p-5">
+        <h2 className="font-bold text-white mb-4">Add Variation</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            className="form-control"
+            placeholder="Variation title"
+            value={form.variation_title}
+            onChange={e =>
+              setForm({ ...form, variation_title: e.target.value })
+            }
+          />
+
+          <input
+            className="form-control"
+            placeholder="Contractor"
+            value={form.contractor_name}
+            onChange={e =>
+              setForm({ ...form, contractor_name: e.target.value })
+            }
+          />
+
+          <select
+            className="form-control"
+            value={form.variation_type}
+            onChange={e =>
+              setForm({ ...form, variation_type: e.target.value })
+            }
+          >
+            {VARIATION_TYPES.map(type => (
+              <option key={type}>{type}</option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            className="form-control"
+            placeholder="Amount"
+            value={form.amount}
+            onChange={e => setForm({ ...form, amount: e.target.value })}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          <select
+            className="form-control"
+            value={form.status}
+            onChange={e => setForm({ ...form, status: e.target.value })}
+          >
+            {VARIATION_STATUSES.map(status => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.request_date}
+            onChange={e => setForm({ ...form, request_date: e.target.value })}
+          />
+
+          <input
+            type="date"
+            className="form-control"
+            value={form.approval_date}
+            onChange={e => setForm({ ...form, approval_date: e.target.value })}
+          />
+        </div>
+
+        <textarea
+          className="form-control mt-3"
+          rows={3}
+          placeholder="Reason for variation"
+          value={form.reason}
+          onChange={e => setForm({ ...form, reason: e.target.value })}
+        />
+
+        <textarea
+          className="form-control mt-3"
+          rows={2}
+          placeholder="Remarks"
+          value={form.remarks}
+          onChange={e => setForm({ ...form, remarks: e.target.value })}
+        />
+
+        <button onClick={onAdd} className="btn btn-gold mt-4">
+          Save Variation
+        </button>
+      </div>
+
+      {variations.length > 0 && (
+        <div className="card overflow-hidden">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Variation</th>
+                <th>Type</th>
+                <th>Contractor</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {variations.map((variation: any) => (
+                <tr key={variation.id}>
+                  <td className="font-medium text-[#ede8de]">
+                    {variation.variation_title}
+                  </td>
+                  <td>{variation.variation_type}</td>
+                  <td>{variation.contractor_name || '—'}</td>
+                  <td className="text-[#c49e48] font-semibold">
+                    ₦{Number(variation.amount || 0).toLocaleString()}
+                  </td>
+                  <td>
+                    <span className="badge badge-muted">
+                      {variation.status}
+                    </span>
                   </td>
                 </tr>
               ))}
