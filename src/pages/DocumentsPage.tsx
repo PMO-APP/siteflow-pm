@@ -1,26 +1,11 @@
 import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
-import {
-  canUploadDocuments,
-  canEditDocument,
-} from '@/lib/permissions'
+import { canUploadDocuments, canEditDocument } from '@/lib/permissions'
 import { useState } from 'react'
-import {
-  Plus,
-  X,
-  Search,
-  Upload,
-  Download,
-} from 'lucide-react'
-import {
-  useDocuments,
-  useUpsertDocument,
-} from '@/hooks/useData'
-import {
-  uploadFile,
-  backupFileToGoogleDrive,
-} from '@/lib/supabase'
+import { Plus, X, Search, Upload, Download } from 'lucide-react'
+import { useDocuments, useUpsertDocument } from '@/hooks/useData'
+import { uploadFile, backupFileToGoogleDrive } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import type { Document } from '@/types'
@@ -31,12 +16,16 @@ const TYPES: Document['type'][] = [
   'Specification',
   'BOQ',
   'Contract',
+  'Programme / Schedule',
   'RFI',
   'Method Statement',
   'Submittal',
   'Report',
+  'Payment Document',
+  'HSE Document',
+  'Quality Document',
   'Other',
-]
+] as any
 
 const DISCIPLINES = [
   'Architectural',
@@ -44,46 +33,57 @@ const DISCIPLINES = [
   'MEP',
   'ELV',
   'Landscape',
+  'Infrastructure',
+  'Housebuild',
+  'Costing',
+  'HSE',
+  'Quality',
   'General',
 ]
 
 const STATUSES = [
   'Draft',
+  'Submitted',
   'For Review',
+  'Pending Review',
+  'Approved',
   'Current',
   'Superseded',
+  'Rejected',
   'Void',
 ]
 
-const REVISIONS = [
-  'A',
-  'B',
-  'C',
-  'D',
-  'E',
-  'P1',
-  'P2',
-  'P3',
-  '1',
-  '2',
-  '3',
+const ISSUED_FOR = [
+  'Information',
+  'Review',
+  'Approval',
+  'Construction',
+  'Tender',
+  'Coordination',
+  'As Built',
 ]
+
+const REVISIONS = ['A', 'B', 'C', 'D', 'E', 'P1', 'P2', 'P3', '1', '2', '3']
 
 function getDocumentFolder(type: string, discipline?: string) {
   const cleanDiscipline = (discipline || 'general')
     .toLowerCase()
     .replace(/\s+/g, '-')
 
-  if (type === 'Drawing') return `drawings/${cleanDiscipline}`
+  if (type === 'Drawing') return `design-drawings/${cleanDiscipline}`
+  if (type === 'Programme / Schedule') return 'programmes-and-schedules'
   if (type === 'Report') return 'reports'
   if (type === 'Contract') return 'contracts'
+  if (type === 'Payment Document') return 'costing-documents/payments'
+  if (type === 'BOQ') return 'costing-documents/boq'
+  if (type === 'HSE Document') return 'hse-documents'
+  if (type === 'Quality Document') return 'quality-documents'
   if (type === 'RFI') return 'rfis'
-  if (type === 'BOQ') return 'boq'
   if (type === 'Method Statement') return 'method-statements'
   if (type === 'Submittal') return 'submittals'
   if (type === 'Specification') return 'specifications'
 
-  return 'other'
+  return `team-documents/${cleanDiscipline}`
 }
 
 function DocModal({
@@ -106,13 +106,22 @@ function DocModal({
     revision: item?.revision || 'A',
     revision_date:
       item?.revision_date || new Date().toISOString().slice(0, 10),
-    status: item?.status || 'Current',
+    status: item?.status || 'Submitted',
     description: item?.description || '',
     issued_by: item?.issued_by || '',
     storage_path: item?.storage_path || '',
     public_url: item?.public_url || '',
     file_size_kb: item?.file_size_kb || 0,
     file_type: item?.file_type || '',
+    document_type: (item as any)?.document_type || item?.type || 'Drawing',
+    consultant_name: (item as any)?.consultant_name || '',
+    revision_no: (item as any)?.revision_no || item?.revision || 'A',
+    approval_status: (item as any)?.approval_status || 'Submitted',
+    review_status: (item as any)?.review_status || 'Pending Review',
+    issued_for: (item as any)?.issued_for || 'Review',
+    drawing_number:
+      (item as any)?.drawing_number || item?.document_number || '',
+    package_name: (item as any)?.package_name || '',
     google_drive_file_id: (item as any)?.google_drive_file_id || '',
     google_drive_url: (item as any)?.google_drive_url || '',
     google_drive_sync_status:
@@ -121,10 +130,7 @@ function DocModal({
   })
 
   const set = (key: string, value: any) =>
-    setForm(current => ({
-      ...current,
-      [key]: value,
-    }))
+    setForm(current => ({ ...current, [key]: value }))
 
   async function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -140,11 +146,11 @@ function DocModal({
 
       const folder = getDocumentFolder(form.type, form.discipline)
 
-     const result = await uploadFile(
-  'project-files',
-  file,
-  `projects/${projectId}/documents/${folder}`
-)
+      const result = await uploadFile(
+        'project-files',
+        file,
+        `projects/${projectId}/documents/${folder}`
+      )
 
       if (!result) {
         alert('Upload failed. No file path returned.')
@@ -174,10 +180,7 @@ function DocModal({
         set('google_drive_file_id', driveResult.googleDriveFileId)
         set('google_drive_url', driveResult.googleDriveUrl)
         set('google_drive_sync_status', 'synced')
-        set('google_drive_sync_error', '')
       } catch (driveError: any) {
-        console.error('Google Drive backup failed:', driveError)
-
         set('google_drive_sync_status', 'failed')
         set(
           'google_drive_sync_error',
@@ -193,7 +196,6 @@ function DocModal({
         `${form.title || file.name} Rev ${form.revision}`
       )
     } catch (error: any) {
-      console.error('Document upload failed:', error)
       alert(error?.message || 'Document upload failed')
     } finally {
       setUploading(false)
@@ -205,9 +207,7 @@ function DocModal({
     if (!form.title.trim()) return
 
     if (!projectId) {
-      alert(
-        'No project selected. Please return to Workspace Hub and select a project.'
-      )
+      alert('No project selected.')
       return
     }
 
@@ -215,6 +215,9 @@ function DocModal({
       id: item?.id,
       project_id: projectId,
       ...form,
+      document_type: form.type,
+      revision_no: form.revision,
+      drawing_number: form.document_number,
       uploaded_by: item?.uploaded_by || user?.id,
     } as any)
 
@@ -236,10 +239,7 @@ function DocModal({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div
-        className="modal max-w-xl"
-        onClick={event => event.stopPropagation()}
-      >
+      <div className="modal max-w-2xl" onClick={e => e.stopPropagation()}>
         <div className="gold-bar" />
 
         <div className="modal-head">
@@ -268,21 +268,27 @@ function DocModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Document Number</label>
+              <label className="form-label">Document / Drawing Number</label>
               <input
                 className="form-control"
                 value={form.document_number}
-                onChange={event => set('document_number', event.target.value)}
+                onChange={event => {
+                  set('document_number', event.target.value)
+                  set('drawing_number', event.target.value)
+                }}
                 placeholder="e.g. A-100, S-201"
               />
             </div>
 
             <div>
-              <label className="form-label">Type</label>
+              <label className="form-label">Document Type</label>
               <select
                 className="form-control"
                 value={form.type}
-                onChange={event => set('type', event.target.value)}
+                onChange={event => {
+                  set('type', event.target.value)
+                  set('document_type', event.target.value)
+                }}
               >
                 {TYPES.map(type => (
                   <option key={type}>{type}</option>
@@ -293,7 +299,7 @@ function DocModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="form-label">Discipline</label>
+              <label className="form-label">Discipline / Team</label>
               <select
                 className="form-control"
                 value={form.discipline}
@@ -306,26 +312,55 @@ function DocModal({
             </div>
 
             <div>
-              <label className="form-label">Status</label>
+              <label className="form-label">Issued For</label>
               <select
                 className="form-control"
-                value={form.status}
-                onChange={event => set('status', event.target.value)}
+                value={form.issued_for}
+                onChange={event => set('issued_for', event.target.value)}
               >
-                {STATUSES.map(status => (
-                  <option key={status}>{status}</option>
+                {ISSUED_FOR.map(item => (
+                  <option key={item}>{item}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {form.type === 'Drawing' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Drawing Package</label>
+                <input
+                  className="form-control"
+                  value={form.package_name}
+                  onChange={event => set('package_name', event.target.value)}
+                  placeholder="e.g. Ground Floor Layout, MEP Coordination"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Consultant</label>
+                <input
+                  className="form-control"
+                  value={form.consultant_name}
+                  onChange={event =>
+                    set('consultant_name', event.target.value)
+                  }
+                  placeholder="Consultant / reviewer"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="form-label">Revision</label>
               <select
                 className="form-control"
                 value={form.revision}
-                onChange={event => set('revision', event.target.value)}
+                onChange={event => {
+                  set('revision', event.target.value)
+                  set('revision_no', event.target.value)
+                }}
               >
                 {REVISIONS.map(revision => (
                   <option key={revision}>{revision}</option>
@@ -342,7 +377,52 @@ function DocModal({
                 onChange={event => set('revision_date', event.target.value)}
               />
             </div>
+
+            <div>
+              <label className="form-label">Register Status</label>
+              <select
+                className="form-control"
+                value={form.status}
+                onChange={event => set('status', event.target.value)}
+              >
+                {STATUSES.map(status => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {form.type === 'Drawing' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="form-label">Approval Status</label>
+                <select
+                  className="form-control"
+                  value={form.approval_status}
+                  onChange={event =>
+                    set('approval_status', event.target.value)
+                  }
+                >
+                  {STATUSES.map(status => (
+                    <option key={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Review Status</label>
+                <select
+                  className="form-control"
+                  value={form.review_status}
+                  onChange={event => set('review_status', event.target.value)}
+                >
+                  {STATUSES.map(status => (
+                    <option key={status}>{status}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="form-label">Issued By</label>
@@ -350,7 +430,7 @@ function DocModal({
               className="form-control"
               value={form.issued_by}
               onChange={event => set('issued_by', event.target.value)}
-              placeholder="Architect / Engineer name…"
+              placeholder="Person, team, consultant or company…"
             />
           </div>
 
@@ -373,55 +453,21 @@ function DocModal({
                 ? 'Uploading…'
                 : form.storage_path
                 ? 'File uploaded ✓'
-                : 'Click to upload PDF / DWG / Image'}
+                : 'Click to upload PDF / DWG / Excel / Word / Image'}
 
               <input
                 type="file"
                 hidden
                 onChange={handleFile}
-                accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.docx,.xlsx"
+                accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.docx,.xlsx,.xls,.mpp"
                 disabled={uploading}
               />
             </label>
 
             {form.file_size_kb > 0 && (
-              <>
-                <div className="text-[10px] text-[#6e7d8c] mt-1">
-                  {form.file_size_kb} KB · {form.file_type || 'file'}
-                </div>
-
-                {form.google_drive_sync_status === 'syncing' && (
-                  <div className="text-[10px] text-amber-400 mt-1">
-                    Syncing to Google Drive…
-                  </div>
-                )}
-
-                {form.google_drive_sync_status === 'synced' && (
-                  <div className="text-[10px] text-emerald-400 mt-1">
-                    ✓ Backed up to Google Drive
-                  </div>
-                )}
-
-                {form.google_drive_sync_status === 'failed' && (
-                  <div className="text-[10px] text-red-400 mt-1">
-                    ⚠ Google Drive backup failed
-                    {form.google_drive_sync_error
-                      ? `: ${form.google_drive_sync_error}`
-                      : ''}
-                  </div>
-                )}
-
-                {form.google_drive_url && (
-                  <a
-                    href={form.google_drive_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-[#c49e48] underline mt-1 inline-block"
-                  >
-                    Open Google Drive backup
-                  </a>
-                )}
-              </>
+              <div className="text-[10px] text-[#6e7d8c] mt-1">
+                {form.file_size_kb} KB · {form.file_type || 'file'}
+              </div>
             )}
           </div>
         </div>
@@ -452,7 +498,7 @@ export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
 
-const canCreateDocument = canUploadDocuments(role)
+  const canCreateDocument = canUploadDocuments(role)
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
@@ -460,9 +506,7 @@ const canCreateDocument = canUploadDocuments(role)
   const [typeFilter, setTypeFilter] = useState('')
   const [discFilter, setDiscFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
-  const [viewMode, setViewMode] = useState<'register' | 'repository'>(
-    'register'
-  )
+  const [viewMode, setViewMode] = useState<'register' | 'library'>('register')
 
   const filtered = docs.filter(document => {
     const searchText = search.toLowerCase()
@@ -486,19 +530,24 @@ const canCreateDocument = canUploadDocuments(role)
   }, {} as Record<string, number>)
 
   function statBadge(status: string) {
-    if (status === 'Current') return 'badge-green'
-    if (status === 'For Review') return 'badge-amber'
-    if (status === 'Draft') return 'badge-muted'
+    if (status === 'Current' || status === 'Approved') return 'badge-green'
+    if (status === 'For Review' || status === 'Pending Review')
+      return 'badge-amber'
+    if (status === 'Draft' || status === 'Submitted') return 'badge-muted'
     if (status === 'Superseded') return 'badge badge-muted opacity-50'
-    if (status === 'Void') return 'badge-red'
+    if (status === 'Void' || status === 'Rejected') return 'badge-red'
     return 'badge-muted'
   }
 
   function typeIcon(type: string) {
     if (type === 'Drawing') return '📐'
+    if (type === 'Programme / Schedule') return '📅'
     if (type === 'RFI') return '❓'
     if (type === 'Report') return '📄'
     if (type === 'Contract') return '📜'
+    if (type === 'BOQ' || type === 'Payment Document') return '💰'
+    if (type === 'HSE Document') return '🦺'
+    if (type === 'Quality Document') return '✅'
     return '📁'
   }
 
@@ -506,7 +555,7 @@ const canCreateDocument = canUploadDocuments(role)
     <div className="space-y-4">
       {!canCreateDocument && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
-          Document Library View — you can view and download documents, but you
+          Document Control View — you can view and download documents, but you
           cannot register, edit, or upload documents.
         </div>
       )}
@@ -518,16 +567,16 @@ const canCreateDocument = canUploadDocuments(role)
           }`}
           onClick={() => setViewMode('register')}
         >
-          Register
+          Document Register
         </button>
 
         <button
           className={`btn btn-sm ${
-            viewMode === 'repository' ? 'btn-gold' : 'btn-ghost'
+            viewMode === 'library' ? 'btn-gold' : 'btn-ghost'
           }`}
-          onClick={() => setViewMode('repository')}
+          onClick={() => setViewMode('library')}
         >
-          Repository
+          Document Library
         </button>
       </div>
 
@@ -575,7 +624,7 @@ const canCreateDocument = canUploadDocuments(role)
               value={discFilter}
               onChange={event => setDiscFilter(event.target.value)}
             >
-              <option value="">All Disciplines</option>
+              <option value="">All Teams / Disciplines</option>
               {DISCIPLINES.map(discipline => (
                 <option key={discipline}>{discipline}</option>
               ))}
@@ -598,7 +647,7 @@ const canCreateDocument = canUploadDocuments(role)
                 onClick={() => setModal('new')}
               >
                 <Plus size={13} />
-                Register Doc
+                Register Document
               </button>
             )}
           </div>
@@ -611,7 +660,7 @@ const canCreateDocument = canUploadDocuments(role)
                     <th>Doc No.</th>
                     <th>Title</th>
                     <th>Type</th>
-                    <th className="hide-mobile">Discipline</th>
+                    <th className="hide-mobile">Team / Discipline</th>
                     <th>Rev</th>
                     <th>Rev Date</th>
                     <th>Status</th>
@@ -644,11 +693,11 @@ const canCreateDocument = canUploadDocuments(role)
                     </tr>
                   ) : (
                     filtered.map(document => {
-                     const canEditThisDocument = canEditDocument(
-  role,
-  document.uploaded_by,
-  user?.id
-)
+                      const canEditThisDocument = canEditDocument(
+                        role,
+                        document.uploaded_by,
+                        user?.id
+                      )
 
                       return (
                         <tr
@@ -762,7 +811,7 @@ const canCreateDocument = canUploadDocuments(role)
           </div>
         </>
       ) : (
-        <DocumentRepository />
+        <DocumentRepository title="Document Library" rootFolder="documents" />
       )}
 
       {modal !== null && canCreateDocument && (
