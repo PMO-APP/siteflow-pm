@@ -222,7 +222,7 @@ export default function PMOWeeklyReportPage() {
       return
     }
 
-    setNotice('PMO weekly report saved successfully.')
+    setNotice('Executive Reports saved successfully.')
   }
 
   function updateField(key: keyof typeof report, value: string) {
@@ -237,12 +237,11 @@ export default function PMOWeeklyReportPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          PMO Weekly Report
+          Executive Reports
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Generate a management report from live Design, Costing, Risk and
-          project records.
+          Generate, review, save and download PMO executive reports from live project records.
         </p>
       </section>
 
