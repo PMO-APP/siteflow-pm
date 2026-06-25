@@ -16,6 +16,7 @@ import {
   CalendarDays,
   CalendarCheck,
   ShoppingCart,
+  Brain,
   Wallet,
   CheckSquare,
   HardHat,
@@ -89,6 +90,11 @@ const NAV = [
     icon: MessageSquare,
     label: 'Communications',
   },
+  {
+  to: '/app/business-intelligence',
+  icon: Brain,
+  label: 'Business Intelligence',
+},
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
