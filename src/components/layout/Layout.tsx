@@ -60,6 +60,11 @@ const NAV = [
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/reports', icon: FileText, label: 'Reports' },
   {
+  to: '/app/pmo-weekly-report',
+  icon: FileText,
+  label: 'PMO Weekly Report',
+},
+  {
     to: '/app/internal-assignments',
     icon: ClipboardList,
     label: 'Internal Assignments',
