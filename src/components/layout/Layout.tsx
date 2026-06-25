@@ -62,7 +62,7 @@ const NAV = [
   {
   to: '/app/pmo-weekly-report',
   icon: FileText,
-  label: 'PMO Weekly Report',
+  label: 'Executive Reports',
 },
   {
     to: '/app/internal-assignments',
