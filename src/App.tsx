@@ -36,6 +36,7 @@ import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPag
 import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReviewPage'
 import ExternalTaskDetailPage from '@/pages/external/ExternalTaskDetailPage'
 import ExternalTaskReviewPage from '@/pages/ExternalTaskReviewPage'
+import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -414,6 +415,7 @@ export default function App() {
           <Route path="external-review" element={<ExternalReviewDashboard />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
           <Route path="pmo-weekly-report" element={<PMOWeeklyReportPage />} />
+          <Route path="business-intelligence" element={<BusinessIntelligencePage />} />
           <Route
             path="external-communication"
             element={<ExternalCommunicationReviewPage />}
