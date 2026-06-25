@@ -21,6 +21,7 @@ import PortfolioDashboardPage from '@/pages/PortfolioDashboardPage'
 import PlannerPage from '@/pages/PlannerPage'
 import CostingPage from '@/pages/CostingPage'
 import DesignReportsPage from '@/pages/DesignReportsPage'
+import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
 
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
@@ -412,6 +413,7 @@ export default function App() {
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="external-review" element={<ExternalReviewDashboard />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
+          <Route path="pmo-weekly-report" element={<PMOWeeklyReportPage />} />
           <Route
             path="external-communication"
             element={<ExternalCommunicationReviewPage />}
