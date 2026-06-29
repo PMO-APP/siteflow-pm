@@ -18,6 +18,7 @@ import {
   ShoppingCart,
   Brain,
   Wallet,
+  Building2,
   CheckSquare,
   HardHat,
   AlertTriangle,
@@ -66,6 +67,11 @@ const NAV = [
   label: 'Executive Reports',
 },
   {
+  to: '/app/project-packages',
+  icon: Building2,
+  label: 'Project Packages',
+},
+  {
     to: '/app/internal-assignments',
     icon: ClipboardList,
     label: 'Internal Assignments',
@@ -80,6 +86,7 @@ const NAV = [
     icon: Building2,
     label: 'External Assignments',
   },
+
   {
     to: '/app/external-review',
     icon: Building2,
