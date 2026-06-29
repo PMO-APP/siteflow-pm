@@ -19,6 +19,7 @@ import {
   Brain,
   Wallet,
   CheckSquare,
+  Activity,
   HardHat,
   AlertTriangle,
   FolderOpen,
@@ -45,6 +46,11 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 const NAV = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
+  {
+  to: '/app/project-controls',
+  icon: Activity,
+  label: 'Project Controls',
+},
   { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
   { to: '/app/planner', icon: CalendarCheck, label: 'Planner', },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
