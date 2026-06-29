@@ -52,6 +52,11 @@ const NAV = [
   icon: Activity,
   label: 'Project Controls',
 },
+   {
+  to: '/app/schedule-revisions',
+  icon: FileSpreadsheet,
+  label: 'Schedule Revisions',
+},
   { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
   { to: '/app/planner', icon: CalendarCheck, label: 'Planner', },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
@@ -72,11 +77,7 @@ const NAV = [
   icon: Building2,
   label: 'Project Packages',
 },
-  {
-  to: '/app/schedule-revisions',
-  icon: FileSpreadsheet,
-  label: 'Schedule Revisions',
-},
+ 
   {
   to: '/app/pmo-weekly-report',
   icon: FileText,
