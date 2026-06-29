@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, Clock, History, RefreshCw, Save, ShieldAlert } from 'lucide-react'
+import { Activity, Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
@@ -8,53 +8,39 @@ import { fdate } from '@/lib/utils'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
 
-const DELAY_REASONS = [
-  '',
-  'Material Delay',
-  'Heavy Rain',
-  'Variation',
-  'Awaiting Drawing',
-  'Awaiting Approval',
-  'Cashflow',
-  'Labour Shortage',
-  'Equipment Issue',
-  'Client Instruction',
-  'Other',
-]
-
-const RECOVERY_ACTIONS = [
-  '',
-  'Additional Labour',
-  'Weekend Work',
-  'Night Shift',
-  'Additional Equipment',
-  'Resequencing',
-  'Expedited Procurement',
-  'Awaiting Approval',
-  'No Recovery Plan',
-]
+const DELAY_REASONS = ['', 'Material Delay', 'Heavy Rain', 'Variation', 'Awaiting Drawing', 'Awaiting Approval', 'Cashflow', 'Labour Shortage', 'Equipment Issue', 'Client Instruction', 'Other']
+const RECOVERY_ACTIONS = ['', 'Additional Labour', 'Weekend Work', 'Night Shift', 'Additional Equipment', 'Resequencing', 'Expedited Procurement', 'Awaiting Approval', 'No Recovery Plan']
 
 function canManageSchedule(role?: string | null) {
   return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
 }
 
 function getTaskName(task: any) {
-  return task.activity || task.title || task.name || task.milestone_name || 'Untitled Activity'
+  return task.name || 'Untitled Activity'
 }
 
 function getProgress(task: any) {
-  return Number(task.progress_pct ?? task.progress ?? task.percent_complete ?? 0)
+  return Number(task.progress_pct || 0)
+}
+
+function getPlannedStart(task: any) {
+  return task.planned_start || task.start_date
+}
+
+function getPlannedFinish(task: any) {
+  return task.planned_finish || task.finish_date
 }
 
 function getStatus(task: any) {
   const progress = getProgress(task)
   const today = new Date().toISOString().slice(0, 10)
+  const finish = getPlannedFinish(task)
 
   if (task.is_blocked) return 'Blocked'
   if (task.is_on_hold) return 'On Hold'
-  if (progress >= 100) return 'Completed'
-  if (progress > 0 && task.planned_finish && task.planned_finish < today) return 'Behind'
-  if (progress > 0) return 'In Progress'
+  if (progress >= 100 || task.status === 'Completed') return 'Completed'
+  if (progress > 0 && finish && finish < today) return 'Behind'
+  if (progress > 0 || task.status === 'In Progress') return 'In Progress'
   return 'Not Started'
 }
 
@@ -77,8 +63,7 @@ export default function ProjectControlsPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
-  const [savingId, setSavingId] = useState<number | string | null>(null)
-
+  const [savingId, setSavingId] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, any>>({})
 
   useEffect(() => {
@@ -95,26 +80,14 @@ export default function ProjectControlsPage() {
     setNotice('')
 
     const [taskResult, scheduleResult, logResult] = await Promise.all([
-      supabase
-        .from('project_milestones')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('planned_start', { ascending: true }),
-
-      supabase
-        .from('schedule_revisions')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false }),
-
-      supabase
-        .from('schedule_progress_logs')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false }),
+      supabase.from('tasks').select('*').eq('project_id', projectId).order('task_number', { ascending: true }),
+      supabase.from('schedule_revisions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+      supabase.from('task_progress_logs').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     ])
 
     if (taskResult.error) setNotice(taskResult.error.message)
+    if (scheduleResult.error) setNotice(scheduleResult.error.message)
+    if (logResult.error) setNotice(logResult.error.message)
 
     setTasks(taskResult.data || [])
     setSchedules(scheduleResult.data || [])
@@ -122,7 +95,7 @@ export default function ProjectControlsPage() {
     setLoading(false)
   }
 
-  function updateEdit(taskId: string | number, key: string, value: any) {
+  function updateEdit(taskId: string, key: string, value: any) {
     setEdits(current => ({
       ...current,
       [taskId]: {
@@ -135,11 +108,8 @@ export default function ProjectControlsPage() {
   async function saveTaskProgress(task: any) {
     const taskId = task.id
     const edit = edits[taskId] || {}
-
     const previousProgress = getProgress(task)
-    const newProgress = Number(
-      edit.progress_pct ?? previousProgress
-    )
+    const newProgress = Number(edit.progress_pct ?? previousProgress)
 
     if (newProgress < 0 || newProgress > 100) {
       setNotice('Progress must be between 0 and 100.')
@@ -158,6 +128,12 @@ export default function ProjectControlsPage() {
       progress_comments: edit.progress_comments ?? task.progress_comments ?? null,
       is_on_hold: edit.is_on_hold ?? task.is_on_hold ?? false,
       is_blocked: edit.is_blocked ?? task.is_blocked ?? false,
+      status:
+        newProgress >= 100
+          ? 'Completed'
+          : newProgress > 0
+          ? 'In Progress'
+          : 'Not Started',
       updated_at: new Date().toISOString(),
     }
 
@@ -169,10 +145,7 @@ export default function ProjectControlsPage() {
       payload.actual_finish = today
     }
 
-    const { error } = await supabase
-      .from('project_milestones')
-      .update(payload)
-      .eq('id', taskId)
+    const { error } = await supabase.from('tasks').update(payload).eq('id', taskId)
 
     if (error) {
       setNotice(error.message)
@@ -180,9 +153,9 @@ export default function ProjectControlsPage() {
       return
     }
 
-    await supabase.from('schedule_progress_logs').insert({
+    await supabase.from('task_progress_logs').insert({
       project_id: projectId,
-      milestone_id: taskId,
+      task_id: taskId,
       schedule_revision_id: task.schedule_revision_id || null,
       block_id: task.block_id || null,
       previous_progress: previousProgress,
@@ -210,19 +183,11 @@ export default function ProjectControlsPage() {
     const delayed = tasks.filter(task => getStatus(task) === 'Behind').length
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
-
-    const avgProgress =
-      total === 0
-        ? 0
-        : tasks.reduce((sum, task) => sum + getProgress(task), 0) / total
-
+    const avgProgress = total === 0 ? 0 : tasks.reduce((sum, task) => sum + getProgress(task), 0) / total
     return { total, completed, delayed, blocked, onHold, avgProgress }
   }, [tasks])
 
-  const delayedTasks = tasks.filter(task =>
-    ['Behind', 'Blocked', 'On Hold'].includes(getStatus(task))
-  )
-
+  const delayedTasks = tasks.filter(task => ['Behind', 'Blocked', 'On Hold'].includes(getStatus(task)))
   const activeSchedule = schedules.find(schedule => schedule.is_active)
 
   return (
@@ -291,38 +256,18 @@ export default function ProjectControlsPage() {
             <ScheduleTab schedules={schedules} canUpload={canManageSchedule(role)} />
           )}
 
-          {activeTab === 'Progress' && (
-            <ProgressTab tasks={tasks} metrics={metrics} />
-          )}
-
-          {activeTab === 'Delays' && (
-            <DelaysTab tasks={delayedTasks} />
-          )}
-
-          {activeTab === 'Forecast' && (
-            <ForecastTab activeSchedule={activeSchedule} tasks={tasks} />
-          )}
-
-          {activeTab === 'Recovery' && (
-            <RecoveryTab tasks={delayedTasks} />
-          )}
-
-          {activeTab === 'History' && (
-            <HistoryTab logs={logs} tasks={tasks} />
-          )}
+          {activeTab === 'Progress' && <ProgressTab tasks={tasks} metrics={metrics} />}
+          {activeTab === 'Delays' && <DelaysTab tasks={delayedTasks} />}
+          {activeTab === 'Forecast' && <ForecastTab activeSchedule={activeSchedule} tasks={tasks} />}
+          {activeTab === 'Recovery' && <RecoveryTab tasks={delayedTasks} />}
+          {activeTab === 'History' && <HistoryTab logs={logs} tasks={tasks} />}
         </>
       )}
     </div>
   )
 }
 
-function ExecutionTab({
-  tasks,
-  edits,
-  updateEdit,
-  saveTaskProgress,
-  savingId,
-}: any) {
+function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: any) {
   if (!tasks.length) {
     return (
       <div className="card p-8 text-center text-[#6e7d8c]">
@@ -365,8 +310,8 @@ function ExecutionTab({
 
                 <td>{task.package_name || 'Project Wide'}</td>
                 <td>{task.discipline || '—'}</td>
-                <td>{task.planned_start ? fdate(task.planned_start) : '—'}</td>
-                <td>{task.planned_finish ? fdate(task.planned_finish) : '—'}</td>
+                <td>{getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}</td>
+                <td>{getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}</td>
 
                 <td>
                   <input
@@ -375,9 +320,7 @@ function ExecutionTab({
                     max={100}
                     className="form-control w-24"
                     value={progress}
-                    onChange={e =>
-                      updateEdit(taskId, 'progress_pct', Number(e.target.value))
-                    }
+                    onChange={e => updateEdit(taskId, 'progress_pct', Number(e.target.value))}
                   />
                 </td>
 
@@ -391,9 +334,7 @@ function ExecutionTab({
                   <select
                     className="form-control min-w-[150px]"
                     value={edit.delay_reason ?? task.delay_reason ?? ''}
-                    onChange={e =>
-                      updateEdit(taskId, 'delay_reason', e.target.value)
-                    }
+                    onChange={e => updateEdit(taskId, 'delay_reason', e.target.value)}
                   >
                     {DELAY_REASONS.map(reason => (
                       <option key={reason} value={reason}>
@@ -407,9 +348,7 @@ function ExecutionTab({
                   <select
                     className="form-control min-w-[170px]"
                     value={edit.recovery_action ?? task.recovery_action ?? ''}
-                    onChange={e =>
-                      updateEdit(taskId, 'recovery_action', e.target.value)
-                    }
+                    onChange={e => updateEdit(taskId, 'recovery_action', e.target.value)}
                   >
                     {RECOVERY_ACTIONS.map(action => (
                       <option key={action} value={action}>
@@ -423,9 +362,7 @@ function ExecutionTab({
                   <input
                     className="form-control min-w-[180px]"
                     value={edit.progress_comments ?? task.progress_comments ?? ''}
-                    onChange={e =>
-                      updateEdit(taskId, 'progress_comments', e.target.value)
-                    }
+                    onChange={e => updateEdit(taskId, 'progress_comments', e.target.value)}
                     placeholder="Comment"
                   />
 
@@ -434,9 +371,7 @@ function ExecutionTab({
                       <input
                         type="checkbox"
                         checked={edit.is_on_hold ?? task.is_on_hold ?? false}
-                        onChange={e =>
-                          updateEdit(taskId, 'is_on_hold', e.target.checked)
-                        }
+                        onChange={e => updateEdit(taskId, 'is_on_hold', e.target.checked)}
                       />{' '}
                       On Hold
                     </label>
@@ -445,9 +380,7 @@ function ExecutionTab({
                       <input
                         type="checkbox"
                         checked={edit.is_blocked ?? task.is_blocked ?? false}
-                        onChange={e =>
-                          updateEdit(taskId, 'is_blocked', e.target.checked)
-                        }
+                        onChange={e => updateEdit(taskId, 'is_blocked', e.target.checked)}
                       />{' '}
                       Blocked
                     </label>
@@ -504,9 +437,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
             <tbody>
               {schedules.map((item: any) => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">
-                    {item.revision_name}
-                  </td>
+                  <td className="font-medium text-[#ede8de]">{item.revision_name}</td>
                   <td>{item.revision_type || '—'}</td>
                   <td>{item.status || 'Draft'}</td>
                   <td>{item.is_active ? 'Yes' : 'No'}</td>
@@ -589,7 +520,7 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
               <tr key={task.id}>
                 <td className="font-medium text-[#ede8de]">{getTaskName(task)}</td>
                 <td>{task.package_name || 'Project Wide'}</td>
-                <td>{task.planned_finish ? fdate(task.planned_finish) : '—'}</td>
+                <td>{getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}</td>
                 <td className={statusColor(status)}>{status}</td>
                 <td>{task.delay_reason || '—'}</td>
                 <td>{task.recovery_action || '—'}</td>
@@ -608,18 +539,9 @@ function ForecastTab({ activeSchedule, tasks }: any) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <Metric
-        title="Active Schedule"
-        value={activeSchedule?.revision_name || 'None'}
-      />
-      <Metric
-        title="Incomplete Tasks"
-        value={incomplete.length}
-      />
-      <Metric
-        title="Delayed Incomplete Tasks"
-        value={delayed.length}
-      />
+      <Metric title="Active Schedule" value={activeSchedule?.revision_name || 'None'} />
+      <Metric title="Incomplete Tasks" value={incomplete.length} />
+      <Metric title="Delayed Incomplete Tasks" value={delayed.length} />
     </div>
   )
 }
@@ -658,17 +580,16 @@ function HistoryTab({ logs, tasks }: any) {
 
         <tbody>
           {logs.map((log: any) => {
-            const task = tasks.find((item: any) => item.id === log.milestone_id)
+            const task = tasks.find((item: any) => item.id === log.task_id)
 
             return (
               <tr key={log.id}>
                 <td>{fdate(log.created_at)}</td>
                 <td className="font-medium text-[#ede8de]">
-                  {task ? getTaskName(task) : `Task ${log.milestone_id}`}
+                  {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
                 <td>
-                  {Number(log.previous_progress || 0)}% →{' '}
-                  {Number(log.new_progress || 0)}%
+                  {Number(log.previous_progress || 0)}% → {Number(log.new_progress || 0)}%
                 </td>
                 <td>{log.delay_reason || '—'}</td>
                 <td>{log.recovery_action || '—'}</td>
