@@ -16,6 +16,7 @@ import {
   CalendarDays,
   CalendarCheck,
   ShoppingCart,
+  FileSpreadsheet,
   Brain,
   Wallet,
   CheckSquare,
@@ -70,6 +71,11 @@ const NAV = [
   to: '/app/project-packages',
   icon: Building2,
   label: 'Project Packages',
+},
+  {
+  to: '/app/schedule-revisions',
+  icon: FileSpreadsheet,
+  label: 'Schedule Revisions',
 },
   {
   to: '/app/pmo-weekly-report',
