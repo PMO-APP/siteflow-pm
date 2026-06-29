@@ -11,7 +11,6 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
-import { canEditSchedule } from '@/lib/permissions'
 import { Fragment, useEffect, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useQualityGates } from '@/hooks/useData'
@@ -21,8 +20,6 @@ import type { Task } from '@/types'
 import TaskModal from '@/components/modules/schedule/TaskModal'
 import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
-import { useAuthStore } from '@/store/auth'
-
 
 type View = 'list' | 'gantt' | 'milestones'
 
@@ -42,20 +39,8 @@ const DISCIPLINE_TABS: DisciplineTab[] = [
 ]
 
 export default function SchedulePage() {
- const {
-  projectId,
-  projectName,
-  projectOwnerEmail,
-  housebuildOwnerEmail,
-  mepOwnerEmail,
-  infrastructureOwnerEmail,
-} = useProjectStore()
-
- const role = useMembershipStore(state => state.role)
-const assignedProjectIds = useMembershipStore(
-  state => state.projectIds
-)
-  const { user } = useAuthStore()
+  const { projectId, projectName } = useProjectStore()
+  const role = useMembershipStore(state => state.role)
 
   const [disciplineTab, setDisciplineTab] =
     useState<DisciplineTab>('Overall')
@@ -71,40 +56,15 @@ const assignedProjectIds = useMembershipStore(
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
 
-  const currentEmail = user?.email?.toLowerCase().trim() || ''
-
-  const permissionContext = {
-  isOverallProjectOwner:
-    !!currentEmail &&
-    currentEmail === projectOwnerEmail?.toLowerCase().trim(),
-
-  isHousebuildOwner:
-    !!currentEmail &&
-    currentEmail === housebuildOwnerEmail?.toLowerCase().trim(),
-
-  isMEPOwner:
-    !!currentEmail &&
-    currentEmail === mepOwnerEmail?.toLowerCase().trim(),
-
-  isInfrastructureOwner:
-    !!currentEmail &&
-    currentEmail === infrastructureOwnerEmail?.toLowerCase().trim(),
-}
-
   const activeDiscipline =
     disciplineTab === 'Overall'
       ? undefined
       : (disciplineTab as ScheduleDiscipline)
-const isAssignedProjectOwner =
-  !!projectId &&
-  assignedProjectIds.includes(projectId)
 
-const canManageSchedule =
-  disciplineTab !== 'Overall' &&
-  ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+  const canManageScheduleUpload =
+    disciplineTab !== 'Overall' &&
+    ['workspace_admin', 'admin', 'pmo'].includes(role || '')
 
-const canViewSchedule =
-  !!projectId
   const today = new Date()
 
   const projectTasks: Task[] = allTasks.filter(
@@ -157,7 +117,7 @@ const canViewSchedule =
   const handleBackupUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEditDisciplineSchedule || !activeDiscipline) {
+    if (!canManageScheduleUpload || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -187,7 +147,7 @@ const canViewSchedule =
   const handleScheduleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEditDisciplineSchedule || !activeDiscipline) {
+    if (!canManageScheduleUpload || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -226,6 +186,8 @@ const canViewSchedule =
           phase: row['Phase'] || `Imported ${activeDiscipline} Schedule`,
           start_date: excelDateToISO(row['Start Date']),
           finish_date: excelDateToISO(row['Finish Date']),
+          planned_start: excelDateToISO(row['Start Date']),
+          planned_finish: excelDateToISO(row['Finish Date']),
           dependencies: row['Dependencies'] || null,
           responsible: row['Responsible'] || null,
           status: row['Status'] || 'Not Started',
@@ -271,7 +233,7 @@ const canViewSchedule =
   const handleXmlScheduleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!canEditDisciplineSchedule || !activeDiscipline) {
+    if (!canManageScheduleUpload || !activeDiscipline) {
       event.target.value = ''
       return
     }
@@ -325,6 +287,8 @@ const canViewSchedule =
               : `Imported ${activeDiscipline} MS Project Schedule`,
           start_date: start ? start.slice(0, 10) : null,
           finish_date: finish ? finish.slice(0, 10) : null,
+          planned_start: start ? start.slice(0, 10) : null,
+          planned_finish: finish ? finish.slice(0, 10) : null,
           dependencies: null,
           responsible: null,
           status:
@@ -456,17 +420,17 @@ const canViewSchedule =
   }
 
   const openTaskModal = (task: Task | 'new') => {
-    if (!canEditDisciplineSchedule) return
+    if (!canManageScheduleUpload) return
     setModalTask(task)
   }
 
   return (
     <div className="space-y-4">
-      {!canEditDisciplineSchedule && (
+      {!canManageScheduleUpload && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           {disciplineTab === 'Overall'
             ? 'Overall schedule is auto-generated from Housebuild, MEP, and Infrastructure schedules. It cannot be edited directly.'
-            : 'Schedule View Only — you can view this discipline schedule, but you cannot upload, add, or edit tasks.'}
+            : 'Schedule View Only — only PMO/Admin can upload or edit approved schedules. Project Owners should update progress inside Project Controls.'}
         </div>
       )}
 
@@ -474,7 +438,7 @@ const canViewSchedule =
         <div className="text-xl font-semibold text-[#ede8de]">
           {disciplineTab === 'Overall'
             ? 'Master Schedule'
-            : `${disciplineTab} Schedule`}
+            : `${disciplineTab} Approved Schedule`}
         </div>
 
         <div className="text-[11px] text-[#6e7d8c] mt-1">{projectName}</div>
@@ -591,7 +555,7 @@ const canViewSchedule =
           ))}
         </select>
 
-        {canEditDisciplineSchedule && (
+        {canManageScheduleUpload && (
           <div className="flex gap-2 ml-auto">
             <label className="btn-ghost btn-sm btn cursor-pointer">
               <Upload size={13} />
@@ -641,7 +605,7 @@ const canViewSchedule =
         <GanttView
           tasks={filtered}
           onTaskClick={(task: Task) => {
-            if (canEditDisciplineSchedule) openTaskModal(task)
+            if (canManageScheduleUpload) openTaskModal(task)
           }}
         />
       )}
@@ -843,7 +807,7 @@ const canViewSchedule =
                                       'Quality Gate'}
                                   </span>
                                 </div>
-                              ) : canEditDisciplineSchedule ? (
+                              ) : canManageScheduleUpload ? (
                                 <button
                                   className="tbl-action"
                                   onClick={() => openTaskModal(task)}
@@ -868,7 +832,7 @@ const canViewSchedule =
         </div>
       )}
 
-      {modalTask !== null && canEditDisciplineSchedule && (
+      {modalTask !== null && canManageScheduleUpload && (
         <TaskModal
           task={modalTask === 'new' ? null : modalTask}
           onClose={() => setModalTask(null)}
