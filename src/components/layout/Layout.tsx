@@ -18,7 +18,6 @@ import {
   ShoppingCart,
   Brain,
   Wallet,
-  Building2,
   CheckSquare,
   HardHat,
   AlertTriangle,
