@@ -59,17 +59,18 @@ const NAV = [
   { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
-  { to: '/app/reports', icon: FileText, label: 'Reports' },
+  { to: '/app/reports', icon: FileText, label: 'IPD Reports' },
+   {
+  to: '/app/project-packages',
+  icon: Building2,
+  label: 'Project Packages',
+},
   {
   to: '/app/pmo-weekly-report',
   icon: FileText,
   label: 'Executive Reports',
 },
-  {
-  to: '/app/project-packages',
-  icon: Building2,
-  label: 'Project Packages',
-},
+ 
   {
     to: '/app/internal-assignments',
     icon: ClipboardList,
