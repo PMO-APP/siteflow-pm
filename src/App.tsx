@@ -55,6 +55,7 @@ import TeamPage from '@/pages/TeamPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
+import ProjectControlsPage from '@/pages/ProjectControlsPage'
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
@@ -418,6 +419,7 @@ export default function App() {
           <Route path="pmo-weekly-report" element={<PMOWeeklyReportPage />} />
           <Route path="business-intelligence" element={<BusinessIntelligencePage />} />
           <Route path="project-packages" element={<ProjectPackagesPage />} />
+          <Route path="project-controls" element={<ProjectControlsPage />} />
           <Route
             path="external-communication"
             element={<ExternalCommunicationReviewPage />}
