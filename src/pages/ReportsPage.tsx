@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Printer,
   Plus,
@@ -26,17 +26,20 @@ import {
 import { fdate, formatCurrency } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 
-const REPORT_DEPARTMENTS = [
-  'PMO',
-  'Housebuild',
-  'Infrastructure',
-  'MEP',
-  'Design',
-  'Costing',
-  'Quality',
-  'HSE',
-  'Project Owner',
-]
+const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
+
+function inferDiscipline(role?: string | null) {
+  if (role === 'housebuild') return 'Housebuild'
+  if (role === 'infrastructure') return 'Infrastructure'
+  if (role === 'mep') return 'MEP'
+  return ''
+}
+
+function getActivityStatus(thisWeek: number, planned: number) {
+  if (thisWeek >= planned) return 'On Track'
+  if (planned - thisWeek <= 10) return 'Behind'
+  return 'Stuck'
+}
 
 export default function ReportsPage() {
   const { projectId, projectName } = useProjectStore()
@@ -54,6 +57,7 @@ export default function ReportsPage() {
   const upsertReport = useUpsertWeeklyReport()
   const upsertActivity = useUpsertWeeklyActivity()
 
+  const [packages, setPackages] = useState<any[]>([])
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
@@ -69,7 +73,10 @@ export default function ReportsPage() {
 
   const [reportForm, setReportForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
-    department: '',
+    department: inferDiscipline(role),
+    block_id: '',
+    package_name: '',
+    contractor_name: '',
     reporting_officer: '',
     reporting_officer_email: '',
     status: 'On Track',
@@ -87,12 +94,39 @@ export default function ReportsPage() {
     last_week: 0,
     this_week: 0,
     planned: 0,
+    activity_status: 'On Track',
     remarks: '',
   })
 
   useEffect(() => {
+    loadPackages()
+  }, [projectId])
+
+  useEffect(() => {
     loadReportPhotos()
   }, [selectedReport?.id])
+
+  async function loadPackages() {
+    if (!projectId) {
+      setPackages([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('project_blocks')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
+    if (error) {
+      console.error(error.message)
+      setPackages([])
+      return
+    }
+
+    setPackages(data || [])
+  }
 
   async function loadReportPhotos() {
     if (!selectedReport?.id) {
@@ -104,7 +138,7 @@ export default function ReportsPage() {
       .from('report_photos')
       .select('*')
       .eq('report_id', selectedReport.id)
-     .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true })
 
     if (error) {
       console.error(error.message)
@@ -114,6 +148,22 @@ export default function ReportsPage() {
 
     setReportPhotos(data || [])
   }
+
+  const selectedPackage = packages.find(
+    item => item.id === (selectedReport as any)?.block_id
+  )
+
+  const reportGroups = useMemo(() => {
+    const map: Record<string, any[]> = {}
+
+    reports.forEach(report => {
+      const key = report.report_date || 'No date'
+      if (!map[key]) map[key] = []
+      map[key].push(report)
+    })
+
+    return Object.entries(map).sort(([a], [b]) => b.localeCompare(a))
+  }, [reports])
 
   const openRisks = risks.filter(risk => risk.status === 'Open').length
   const highRisks = risks.filter(
@@ -136,7 +186,10 @@ export default function ReportsPage() {
   function openNewReport() {
     setReportForm({
       report_date: new Date().toISOString().slice(0, 10),
-      department: '',
+      department: inferDiscipline(role),
+      block_id: '',
+      package_name: '',
+      contractor_name: '',
       reporting_officer: user?.full_name || '',
       reporting_officer_email: user?.email || '',
       status: 'On Track',
@@ -148,7 +201,8 @@ export default function ReportsPage() {
       procurement_tracking: '',
       safety_tracking: '',
     })
-setPhotoCaptions({})
+
+    setPhotoCaptions({})
     setPhotos([])
     setSelectedReportId(null)
     setShowReportModal(true)
@@ -159,7 +213,10 @@ setPhotoCaptions({})
 
     setReportForm({
       report_date: report.report_date || new Date().toISOString().slice(0, 10),
-      department: reportAny.department || '',
+      department: reportAny.department || reportAny.discipline || '',
+      block_id: reportAny.block_id || '',
+      package_name: reportAny.package_name || '',
+      contractor_name: reportAny.contractor_name || '',
       reporting_officer: reportAny.reporting_officer || '',
       reporting_officer_email: reportAny.reporting_officer_email || '',
       status: report.status || 'On Track',
@@ -171,10 +228,22 @@ setPhotoCaptions({})
       procurement_tracking: report.procurement_tracking || '',
       safety_tracking: report.safety_tracking || '',
     })
-setPhotoCaptions({})
+
+    setPhotoCaptions({})
     setPhotos([])
     setSelectedReportId(report.id)
     setShowReportModal(true)
+  }
+
+  function onPackageChange(packageId: string) {
+    const pkg = packages.find(item => item.id === packageId)
+
+    setReportForm(current => ({
+      ...current,
+      block_id: packageId,
+      package_name: pkg?.package_name || pkg?.block_name || '',
+      contractor_name: pkg?.contractor_name || '',
+    }))
   }
 
   function getSavedReportId(savedReport: any) {
@@ -185,7 +254,6 @@ setPhotoCaptions({})
     if (Array.isArray(savedReport.data) && savedReport.data[0]?.id) {
       return savedReport.data[0].id
     }
-
     return null
   }
 
@@ -200,12 +268,10 @@ setPhotoCaptions({})
       .order('created_at', { ascending: false })
       .limit(1)
 
-    if (reportForm.department) {
-      query = query.eq('department', reportForm.department)
-    }
+    if (reportForm.department) query = query.eq('department', reportForm.department)
+    if (reportForm.block_id) query = query.eq('block_id', reportForm.block_id)
 
     const { data } = await query.maybeSingle()
-
     return data?.id || null
   }
 
@@ -244,10 +310,10 @@ setPhotoCaptions({})
           uploaded_by: user?.full_name || user?.email || 'User',
         })
 
-     if (photoInsertError) {
-  console.error(photoInsertError.message)
-  alert(photoInsertError.message)
-}
+      if (photoInsertError) {
+        console.error(photoInsertError.message)
+        alert(photoInsertError.message)
+      }
     }
 
     setUploadingPhotos(false)
@@ -255,49 +321,50 @@ setPhotoCaptions({})
     await loadReportPhotos()
   }
 
- async function saveReport() {
-  try {
-    console.log('Saving report...', reportForm)
+  async function saveReport() {
+    try {
+      const savedReport = await upsertReport.mutateAsync({
+        id: selectedReportId || undefined,
+        ...reportForm,
+        discipline: reportForm.department,
+        reporting_officer_email:
+          reportForm.reporting_officer_email || user?.email || '',
+        created_by_role: role,
+        next_meeting: reportForm.next_meeting || undefined,
+      } as any)
 
-    const savedReport = await upsertReport.mutateAsync({
-      id: selectedReportId || undefined,
-      ...reportForm,
-      reporting_officer_email:
-        reportForm.reporting_officer_email || user?.email || '',
-      created_by_role: role,
-      next_meeting: reportForm.next_meeting || undefined,
-    } as any)
+      const reportId =
+        selectedReportId ||
+        getSavedReportId(savedReport) ||
+        (await findReportIdFallback())
 
-    console.log('Saved report response:', savedReport)
+      if (!reportId) {
+        alert('Report saved, but report ID could not be found for photo upload.')
+        return
+      }
 
-    const reportId =
-      selectedReportId ||
-      getSavedReportId(savedReport) ||
-      (await findReportIdFallback())
+      if (photos.length > 0) {
+        await uploadReportPhotos(reportId)
+      }
 
-    console.log('Resolved report ID:', reportId)
-
-    if (!reportId) {
-      alert('Report saved, but report ID could not be found for photo upload.')
-      return
+      setShowReportModal(false)
+      setSelectedReportId(null)
+      setPhotos([])
+      setPhotoCaptions({})
+    } catch (error: any) {
+      console.error('Save report failed:', error)
+      alert(error?.message || 'Failed to save report.')
     }
-
-    if (photos.length > 0) {
-      await uploadReportPhotos(reportId)
-    }
-
-    setShowReportModal(false)
-    setSelectedReportId(null)
-    setPhotos([])
-    setPhotoCaptions({})
-  } catch (error: any) {
-    console.error('Save report failed:', error)
-    alert(error?.message || 'Failed to save report.')
   }
-}
 
   async function saveActivity() {
     if (!selectedReport?.id || !activityForm.activity.trim()) return
+
+    const reportAny = selectedReport as any
+    const status = getActivityStatus(
+      Number(activityForm.this_week || 0),
+      Number(activityForm.planned || 0)
+    )
 
     await upsertActivity.mutateAsync({
       report_id: selectedReport.id,
@@ -305,14 +372,20 @@ setPhotoCaptions({})
       last_week: Number(activityForm.last_week || 0),
       this_week: Number(activityForm.this_week || 0),
       planned: Number(activityForm.planned || 0),
+      activity_status: status,
       remarks: activityForm.remarks || undefined,
-    })
+      block_id: reportAny.block_id || null,
+      package_name: reportAny.package_name || null,
+      contractor_name: reportAny.contractor_name || null,
+      discipline: reportAny.department || reportAny.discipline || null,
+    } as any)
 
     setActivityForm({
       activity: '',
       last_week: 0,
       this_week: 0,
       planned: 0,
+      activity_status: 'On Track',
       remarks: '',
     })
 
@@ -332,10 +405,12 @@ setPhotoCaptions({})
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-xl font-semibold text-[#ede8de]">
-            Weekly Project Reports
+            IPD Reports
           </div>
 
-          <div className="text-[11px] text-[#6e7d8c] mt-1">{projectName}</div>
+          <div className="text-[11px] text-[#6e7d8c] mt-1">
+            Internal Project Delivery Weekly Reporting · {projectName}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -351,7 +426,7 @@ setPhotoCaptions({})
 
               <button className="btn-gold btn-sm btn" onClick={openNewReport}>
                 <Plus size={13} />
-                New Weekly Report
+                New IPD Report
               </button>
             </>
           )}
@@ -360,20 +435,20 @@ setPhotoCaptions({})
 
       {!canExport && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
-          Reports View Only — you can view reports, but you cannot create or
+          IPD Reports View Only — you can view reports, but you cannot create or
           export reports.
         </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Metric title="Reports" value={reports.length} color="text-[#c49e48]" />
+        <Metric title="IPD Reports" value={reports.length} color="text-[#c49e48]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="Open Snags" value={openSnags} color={openSnags > 0 ? 'text-amber-400' : 'text-emerald-400'} />
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#ede8de] font-semibold">
             <FileText size={16} className="text-[#c49e48]" />
@@ -384,56 +459,73 @@ setPhotoCaptions({})
             <div className="text-sm text-[#6e7d8c]">Loading reports…</div>
           ) : reports.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-[#6e7d8c]">
-              No weekly reports yet.
+              No IPD reports yet.
             </div>
           ) : (
-            reports.map(report => {
-              const reportAny = report as any
+            reportGroups.map(([date, dateReports]) => (
+              <div key={date} className="space-y-2">
+                <div className="text-[10px] uppercase tracking-widest text-[#c49e48] pt-2">
+                  Week Ending {fdate(date)}
+                </div>
 
-              return (
-                <button
-                  key={report.id}
-                  onClick={() => setSelectedReportId(report.id)}
-                  className={`w-full text-left rounded-xl border p-3 transition ${
-                    selectedReport?.id === report.id
-                      ? 'border-[#c49e48]/40 bg-[#c49e48]/10'
-                      : 'border-white/10 bg-white/[0.03] hover:border-[#c49e48]/30'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-[#ede8de]">
-                      {fdate(report.report_date)}
-                    </div>
+                {dateReports.map(report => {
+                  const reportAny = report as any
+                  const packageName =
+                    reportAny.package_name ||
+                    packages.find(item => item.id === reportAny.block_id)?.package_name ||
+                    packages.find(item => item.id === reportAny.block_id)?.block_name ||
+                    'Project Wide'
 
-                    <span className={`text-[10px] font-semibold ${statusColor(report.status)}`}>
-                      {report.status || 'On Track'}
-                    </span>
-                  </div>
+                  return (
+                    <button
+                      key={report.id}
+                      onClick={() => setSelectedReportId(report.id)}
+                      className={`w-full text-left rounded-xl border p-3 transition ${
+                        selectedReport?.id === report.id
+                          ? 'border-[#c49e48]/40 bg-[#c49e48]/10'
+                          : 'border-white/10 bg-white/[0.03] hover:border-[#c49e48]/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-[#ede8de]">
+                          {reportAny.department || reportAny.discipline || 'IPD'}
+                        </div>
 
-                  <div className="text-[11px] text-[#c49e48] mt-1">
-                    {reportAny.department || 'No department'}
-                  </div>
+                        <span className={`text-[10px] font-semibold ${statusColor(report.status)}`}>
+                          {report.status || 'On Track'}
+                        </span>
+                      </div>
 
-                  <div className="text-[11px] text-[#6e7d8c] mt-1">
-                    Officer: {reportAny.reporting_officer || '—'}
-                  </div>
+                      <div className="text-[11px] text-[#c49e48] mt-1">
+                        {packageName}
+                      </div>
 
-                  {selectedReport?.id === report.id && reportPhotos.length > 0 && (
-                    <div className="text-[10px] text-[#6e7d8c] mt-1 flex items-center gap-1">
-                      <ImageIcon size={11} />
-                      {reportPhotos.length} photo(s)
-                    </div>
-                  )}
-                </button>
-              )
-            })
+                      <div className="text-[11px] text-[#6e7d8c] mt-1">
+                        Contractor: {reportAny.contractor_name || '—'}
+                      </div>
+
+                      <div className="text-[11px] text-[#6e7d8c] mt-1">
+                        Officer: {reportAny.reporting_officer || '—'}
+                      </div>
+
+                      {selectedReport?.id === report.id && reportPhotos.length > 0 && (
+                        <div className="text-[10px] text-[#6e7d8c] mt-1 flex items-center gap-1">
+                          <ImageIcon size={11} />
+                          {reportPhotos.length} photo(s)
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))
           )}
         </div>
 
         <div className="card print:shadow-none">
           {!selectedReport ? (
             <div className="p-8 text-center text-[#6e7d8c]">
-              Select or create a weekly report.
+              Select or create an IPD report.
             </div>
           ) : (
             <div id="weekly-report-print">
@@ -443,7 +535,7 @@ setPhotoCaptions({})
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.25em] text-[#c49e48]">
-                      IPD Weekly Project Report
+                      IPD Weekly Report
                     </div>
 
                     <div className="text-2xl font-bold text-[#ede8de] mt-1">
@@ -455,7 +547,10 @@ setPhotoCaptions({})
                     </div>
 
                     <div className="text-sm text-[#c49e48] mt-1">
-                      Department: {(selectedReport as any).department || '—'}
+                      Discipline:{' '}
+                      {(selectedReport as any).department ||
+                        (selectedReport as any).discipline ||
+                        '—'}
                     </div>
                   </div>
 
@@ -488,11 +583,19 @@ setPhotoCaptions({})
               </div>
 
               <div className="p-6 space-y-6">
-                <Section title="Project Information">
+                <Section title="Project / Package Information">
                   <InfoGrid
                     items={[
                       ['Project Title', projectName || '—'],
-                      ['Department', (selectedReport as any).department || '—'],
+                      [
+                        'Package',
+                        (selectedReport as any).package_name ||
+                          selectedPackage?.package_name ||
+                          selectedPackage?.block_name ||
+                          'Project Wide',
+                      ],
+                      ['Discipline', (selectedReport as any).department || '—'],
+                      ['Contractor', (selectedReport as any).contractor_name || selectedPackage?.contractor_name || '—'],
                       ['Contract Sum', contractSum ? formatCurrency(contractSum) : 'TBC'],
                       ['Open Snags', openSnags],
                       ['Critical Snags', criticalSnags],
@@ -511,6 +614,7 @@ setPhotoCaptions({})
                           <th>Last Week %</th>
                           <th>This Week %</th>
                           <th>Planned %</th>
+                          <th>Status</th>
                           <th>Remarks</th>
                         </tr>
                       </thead>
@@ -518,24 +622,38 @@ setPhotoCaptions({})
                       <tbody>
                         {activities.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="text-center py-6 text-[#6e7d8c]">
+                            <td colSpan={6} className="text-center py-6 text-[#6e7d8c]">
                               No activities added yet.
                             </td>
                           </tr>
                         ) : (
-                          activities.map(activity => (
-                            <tr key={activity.id}>
-                              <td className="text-[#ede8de] font-medium">
-                                {activity.activity}
-                              </td>
-                              <td>{activity.last_week || 0}%</td>
-                              <td>{activity.this_week || 0}%</td>
-                              <td>{activity.planned || 0}%</td>
-                              <td className="text-[#6e7d8c]">
-                                {activity.remarks || '—'}
-                              </td>
-                            </tr>
-                          ))
+                          activities.map((activity: any) => {
+                            const status =
+                              activity.activity_status ||
+                              getActivityStatus(
+                                Number(activity.this_week || 0),
+                                Number(activity.planned || 0)
+                              )
+
+                            return (
+                              <tr key={activity.id}>
+                                <td className="text-[#ede8de] font-medium">
+                                  {activity.activity}
+                                </td>
+                                <td>{activity.last_week || 0}%</td>
+                                <td>{activity.this_week || 0}%</td>
+                                <td>{activity.planned || 0}%</td>
+                                <td>
+                                  <span className={`text-[10px] font-semibold ${statusColor(status)}`}>
+                                    {status}
+                                  </span>
+                                </td>
+                                <td className="text-[#6e7d8c]">
+                                  {activity.remarks || '—'}
+                                </td>
+                              </tr>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
@@ -600,7 +718,7 @@ setPhotoCaptions({})
 
       {showReportModal && (
         <Modal
-          title={selectedReportId ? 'Edit Weekly Report' : 'New Weekly Report'}
+          title={selectedReportId ? 'Edit IPD Report' : 'New IPD Report'}
           onClose={() => {
             setShowReportModal(false)
             setSelectedReportId(null)
@@ -629,13 +747,39 @@ setPhotoCaptions({})
                 }))
               }
             >
-              <option value="">Select Department</option>
-              {REPORT_DEPARTMENTS.map(department => (
+              <option value="">Select IPD Discipline</option>
+              {IPD_DISCIPLINES.map(department => (
                 <option key={department} value={department}>
                   {department}
                 </option>
               ))}
             </select>
+
+            <select
+              className="form-control"
+              value={reportForm.block_id}
+              onChange={event => onPackageChange(event.target.value)}
+            >
+              <option value="">Project Wide / No Package</option>
+              {packages.map(pkg => (
+                <option key={pkg.id} value={pkg.id}>
+                  {pkg.package_name || pkg.block_name}
+                  {pkg.contractor_name ? ` — ${pkg.contractor_name}` : ''}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="form-control"
+              placeholder="Contractor"
+              value={reportForm.contractor_name}
+              onChange={event =>
+                setReportForm(current => ({
+                  ...current,
+                  contractor_name: event.target.value,
+                }))
+              }
+            />
 
             <input
               className="form-control"
@@ -755,156 +899,155 @@ setPhotoCaptions({})
               }
             />
 
-           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-  <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
-    <UploadCloud size={15} className="text-[#c49e48]" />
-    Upload Progress Photos
-  </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
+                <UploadCloud size={15} className="text-[#c49e48]" />
+                Upload Progress Photos
+              </div>
 
-  <input
-    type="file"
-    multiple
-    accept="image/*"
-    className="form-control"
-    onChange={event => {
-      const selectedPhotos = Array.from(
-        event.target.files || []
-      )
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                className="form-control"
+                onChange={event => {
+                  const selectedPhotos = Array.from(event.target.files || [])
+                  setPhotos(selectedPhotos)
+                  setPhotoCaptions({})
+                }}
+              />
 
-      setPhotos(selectedPhotos)
-      setPhotoCaptions({})
-    }}
-  />
+              {photos.length > 0 && (
+                <div className="space-y-3">
+                  <div className="text-xs text-[#6e7d8c]">
+                    {photos.length} photo(s) selected.
+                  </div>
 
-  {photos.length > 0 && (
-    <div className="space-y-3">
-      <div className="text-xs text-[#6e7d8c]">
-        {photos.length} photo(s) selected.
-      </div>
+                  {photos.map(photo => (
+                    <div
+                      key={photo.name}
+                      className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
+                    >
+                      <div className="text-xs text-[#ede8de]">
+                        {photo.name}
+                      </div>
 
-      {photos.map(photo => (
-        <div
-          key={photo.name}
-          className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
-        >
-          <div className="text-xs text-[#ede8de]">
-            {photo.name}
-          </div>
+                      <input
+                        className="form-control"
+                        placeholder="Photo caption"
+                        value={photoCaptions[photo.name] || ''}
+                        onChange={event =>
+                          setPhotoCaptions(current => ({
+                            ...current,
+                            [photo.name]: event.target.value,
+                          }))
+                        }
+                      />
 
-          <input
-            className="form-control"
-            placeholder="Photo caption"
-            value={photoCaptions[photo.name] || ''}
-            onChange={event =>
-              setPhotoCaptions(current => ({
-                ...current,
-                [photo.name]: event.target.value,
-              }))
-            }
-          />
-          <img
-  src={URL.createObjectURL(photo)}
-  alt={photo.name}
-  className="w-full max-h-48 object-cover rounded-xl border border-white/10"
-/>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={photo.name}
+                        className="w-full max-h-48 object-cover rounded-xl border border-white/10"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-<button
-  className="btn-gold btn w-full justify-center"
-  onClick={saveReport}
-  disabled={upsertReport.isPending || uploadingPhotos}
->
-  {upsertReport.isPending || uploadingPhotos ? 'Saving…' : 'Save Report'}
-</button>
+            <button
+              className="btn-gold btn w-full justify-center"
+              onClick={saveReport}
+              disabled={upsertReport.isPending || uploadingPhotos}
+            >
+              {upsertReport.isPending || uploadingPhotos ? 'Saving…' : 'Save Report'}
+            </button>
           </div>
         </Modal>
       )}
+
       {showActivityModal && (
-  <Modal
-    title="Add Weekly Activity"
-    onClose={() => setShowActivityModal(false)}
-  >
-    <div className="space-y-3">
-      <input
-        className="form-control"
-        placeholder="Activity"
-        value={activityForm.activity}
-        onChange={event =>
-          setActivityForm(current => ({
-            ...current,
-            activity: event.target.value,
-          }))
-        }
-      />
+        <Modal
+          title="Add Weekly Activity"
+          onClose={() => setShowActivityModal(false)}
+        >
+          <div className="space-y-3">
+            <input
+              className="form-control"
+              placeholder="Activity"
+              value={activityForm.activity}
+              onChange={event =>
+                setActivityForm(current => ({
+                  ...current,
+                  activity: event.target.value,
+                }))
+              }
+            />
 
-      <div className="grid grid-cols-3 gap-3">
-        <input
-          type="number"
-          className="form-control"
-          placeholder="Last Week %"
-          value={activityForm.last_week}
-          onChange={event =>
-            setActivityForm(current => ({
-              ...current,
-              last_week: Number(event.target.value),
-            }))
-          }
-        />
+            <div className="grid grid-cols-3 gap-3">
+              <input
+                type="number"
+                className="form-control"
+                placeholder="Last Week %"
+                value={activityForm.last_week}
+                onChange={event =>
+                  setActivityForm(current => ({
+                    ...current,
+                    last_week: Number(event.target.value),
+                  }))
+                }
+              />
 
-        <input
-          type="number"
-          className="form-control"
-          placeholder="This Week %"
-          value={activityForm.this_week}
-          onChange={event =>
-            setActivityForm(current => ({
-              ...current,
-              this_week: Number(event.target.value),
-            }))
-          }
-        />
+              <input
+                type="number"
+                className="form-control"
+                placeholder="This Week %"
+                value={activityForm.this_week}
+                onChange={event =>
+                  setActivityForm(current => ({
+                    ...current,
+                    this_week: Number(event.target.value),
+                  }))
+                }
+              />
 
-        <input
-          type="number"
-          className="form-control"
-          placeholder="Planned %"
-          value={activityForm.planned}
-          onChange={event =>
-            setActivityForm(current => ({
-              ...current,
-              planned: Number(event.target.value),
-            }))
-          }
-        />
-      </div>
+              <input
+                type="number"
+                className="form-control"
+                placeholder="Planned %"
+                value={activityForm.planned}
+                onChange={event =>
+                  setActivityForm(current => ({
+                    ...current,
+                    planned: Number(event.target.value),
+                  }))
+                }
+              />
+            </div>
 
-      <textarea
-        className="form-control"
-        rows={2}
-        placeholder="Remarks"
-        value={activityForm.remarks}
-        onChange={event =>
-          setActivityForm(current => ({
-            ...current,
-            remarks: event.target.value,
-          }))
-        }
-      />
+            <textarea
+              className="form-control"
+              rows={2}
+              placeholder="Remarks"
+              value={activityForm.remarks}
+              onChange={event =>
+                setActivityForm(current => ({
+                  ...current,
+                  remarks: event.target.value,
+                }))
+              }
+            />
 
-      <button
-        className="btn-gold btn w-full justify-center"
-        onClick={saveActivity}
-        disabled={upsertActivity.isPending}
-      >
-        {upsertActivity.isPending ? 'Saving…' : 'Save Activity'}
-      </button>
-    </div>
-  </Modal>
-)}
+            <button
+              className="btn-gold btn w-full justify-center"
+              onClick={saveActivity}
+              disabled={upsertActivity.isPending}
+            >
+              {upsertActivity.isPending ? 'Saving…' : 'Save Activity'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
