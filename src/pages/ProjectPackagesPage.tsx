@@ -17,8 +17,6 @@ const PACKAGE_TYPES = [
   'Other',
 ]
 
-const DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP', 'General']
-
 const STATUSES = [
   'Not Started',
   'In Progress',
@@ -43,7 +41,6 @@ export default function ProjectPackagesPage() {
     package_type: 'Building',
     package_label: 'Package',
     contractor_name: '',
-    discipline: 'Housebuild',
     progress_weight: '',
     units_count: '',
     planned_start: '',
@@ -96,7 +93,6 @@ export default function ProjectPackagesPage() {
     }
 
     const nextOrder = packages.length + 1
-
     const packageName = form.package_name.trim() || form.block_name.trim()
 
     const { error } = await supabase.from('project_blocks').insert({
@@ -110,7 +106,8 @@ export default function ProjectPackagesPage() {
       package_label: form.package_label || 'Package',
 
       contractor_name: form.contractor_name.trim() || null,
-      discipline: form.discipline,
+      discipline: 'General',
+
       progress_weight: Number(form.progress_weight || 0),
       units_count: Number(form.units_count || 0),
 
@@ -137,7 +134,6 @@ export default function ProjectPackagesPage() {
       package_type: 'Building',
       package_label: 'Package',
       contractor_name: '',
-      discipline: 'Housebuild',
       progress_weight: '',
       units_count: '',
       planned_start: '',
@@ -175,6 +171,7 @@ export default function ProjectPackagesPage() {
   const weightedProgress = packages.reduce((sum, item) => {
     const weight = Number(item.progress_weight || 0)
     const progress = Number(item.progress_pct || 0)
+
     return sum + (weight * progress) / 100
   }, 0)
 
@@ -211,7 +208,10 @@ export default function ProjectPackagesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <Metric title="Packages" value={packages.length} />
         <Metric title="Total Weight" value={`${totalWeight}%`} />
-        <Metric title="Weighted Progress" value={`${weightedProgress.toFixed(1)}%`} />
+        <Metric
+          title="Weighted Progress"
+          value={`${weightedProgress.toFixed(1)}%`}
+        />
         <Metric
           title="Completed"
           value={packages.filter(item => item.status === 'Completed').length}
@@ -221,19 +221,20 @@ export default function ProjectPackagesPage() {
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Plus size={17} className="text-[#c49e48]" />
+
           <h2 className="font-bold text-[#ede8de]">Add Project Package</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
             className="form-control"
             placeholder="Package / Block name e.g. B5-B6"
             value={form.block_name}
-            onChange={e =>
+            onChange={event =>
               setForm({
                 ...form,
-                block_name: e.target.value,
-                package_name: e.target.value,
+                block_name: event.target.value,
+                package_name: event.target.value,
               })
             }
           />
@@ -241,20 +242,12 @@ export default function ProjectPackagesPage() {
           <select
             className="form-control"
             value={form.package_type}
-            onChange={e => setForm({ ...form, package_type: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, package_type: event.target.value })
+            }
           >
             {PACKAGE_TYPES.map(type => (
               <option key={type}>{type}</option>
-            ))}
-          </select>
-
-          <select
-            className="form-control"
-            value={form.discipline}
-            onChange={e => setForm({ ...form, discipline: e.target.value })}
-          >
-            {DISCIPLINES.map(discipline => (
-              <option key={discipline}>{discipline}</option>
             ))}
           </select>
 
@@ -262,8 +255,8 @@ export default function ProjectPackagesPage() {
             className="form-control"
             placeholder="Contractor"
             value={form.contractor_name}
-            onChange={e =>
-              setForm({ ...form, contractor_name: e.target.value })
+            onChange={event =>
+              setForm({ ...form, contractor_name: event.target.value })
             }
           />
         </div>
@@ -274,8 +267,8 @@ export default function ProjectPackagesPage() {
             className="form-control"
             placeholder="Weight %"
             value={form.progress_weight}
-            onChange={e =>
-              setForm({ ...form, progress_weight: e.target.value })
+            onChange={event =>
+              setForm({ ...form, progress_weight: event.target.value })
             }
           />
 
@@ -284,7 +277,9 @@ export default function ProjectPackagesPage() {
             className="form-control"
             placeholder="Units count"
             value={form.units_count}
-            onChange={e => setForm({ ...form, units_count: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, units_count: event.target.value })
+            }
           />
 
           <input
@@ -292,13 +287,17 @@ export default function ProjectPackagesPage() {
             className="form-control"
             placeholder="Current progress %"
             value={form.progress_pct}
-            onChange={e => setForm({ ...form, progress_pct: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, progress_pct: event.target.value })
+            }
           />
 
           <select
             className="form-control"
             value={form.status}
-            onChange={e => setForm({ ...form, status: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, status: event.target.value })
+            }
           >
             {STATUSES.map(status => (
               <option key={status}>{status}</option>
@@ -311,14 +310,18 @@ export default function ProjectPackagesPage() {
             type="date"
             className="form-control"
             value={form.planned_start}
-            onChange={e => setForm({ ...form, planned_start: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, planned_start: event.target.value })
+            }
           />
 
           <input
             type="date"
             className="form-control"
             value={form.planned_finish}
-            onChange={e => setForm({ ...form, planned_finish: e.target.value })}
+            onChange={event =>
+              setForm({ ...form, planned_finish: event.target.value })
+            }
           />
         </div>
 
@@ -327,7 +330,9 @@ export default function ProjectPackagesPage() {
           rows={2}
           placeholder="Remarks"
           value={form.remarks}
-          onChange={e => setForm({ ...form, remarks: e.target.value })}
+          onChange={event =>
+            setForm({ ...form, remarks: event.target.value })
+          }
         />
 
         <button className="btn btn-gold mt-4" onClick={addPackage}>
@@ -349,7 +354,6 @@ export default function ProjectPackagesPage() {
               <tr>
                 <th>Package</th>
                 <th>Type</th>
-                <th>Discipline</th>
                 <th>Contractor</th>
                 <th>Weight</th>
                 <th>Progress</th>
@@ -366,8 +370,6 @@ export default function ProjectPackagesPage() {
                   </td>
 
                   <td>{item.package_type || item.block_type || 'Package'}</td>
-
-                  <td>{item.discipline || '—'}</td>
 
                   <td>{item.contractor_name || '—'}</td>
 
@@ -405,7 +407,9 @@ function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
       <Building2 size={18} className="text-[#c49e48]" />
+
       <div className="text-2xl font-black text-white mt-3">{value}</div>
+
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
       </div>
