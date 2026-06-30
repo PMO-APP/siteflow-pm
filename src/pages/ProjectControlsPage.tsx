@@ -8,7 +8,17 @@ import { fdate } from '@/lib/utils'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
 
+type DisciplineTab = 'Overall' | 'Housebuild' | 'MEP' | 'Infrastructure'
+
+const DISCIPLINE_TABS: DisciplineTab[] = [
+  'Overall',
+  'Housebuild',
+  'MEP',
+  'Infrastructure',
+]
+
 const DELAY_REASONS = ['', 'Material Delay', 'Heavy Rain', 'Variation', 'Awaiting Drawing', 'Awaiting Approval', 'Cashflow', 'Labour Shortage', 'Equipment Issue', 'Client Instruction', 'Other']
+
 const RECOVERY_ACTIONS = ['', 'Additional Labour', 'Weekend Work', 'Night Shift', 'Additional Equipment', 'Resequencing', 'Expedited Procurement', 'Awaiting Approval', 'No Recovery Plan']
 
 function canManageSchedule(role?: string | null) {
@@ -58,7 +68,9 @@ export default function ProjectControlsPage() {
   const { user } = useAuthStore()
 
   const [activeTab, setActiveTab] = useState('Execution')
-  const [tasks, setTasks] = useState<any[]>([])
+  const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
+
+  const [allTasks, setAllTasks] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,6 +82,13 @@ export default function ProjectControlsPage() {
     loadData()
   }, [projectId])
 
+  const tasks =
+    disciplineTab === 'Overall'
+      ? allTasks
+      : allTasks.filter(
+          task => (task.discipline || 'Housebuild') === disciplineTab
+        )
+
   async function loadData() {
     if (!projectId) {
       setLoading(false)
@@ -80,16 +99,30 @@ export default function ProjectControlsPage() {
     setNotice('')
 
     const [taskResult, scheduleResult, logResult] = await Promise.all([
-      supabase.from('tasks').select('*').eq('project_id', projectId).order('task_number', { ascending: true }),
-      supabase.from('schedule_revisions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
-      supabase.from('task_progress_logs').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+      supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('task_number', { ascending: true }),
+
+      supabase
+        .from('schedule_revisions')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
+
+      supabase
+        .from('task_progress_logs')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
     ])
 
     if (taskResult.error) setNotice(taskResult.error.message)
     if (scheduleResult.error) setNotice(scheduleResult.error.message)
     if (logResult.error) setNotice(logResult.error.message)
 
-    setTasks(taskResult.data || [])
+    setAllTasks(taskResult.data || [])
     setSchedules(scheduleResult.data || [])
     setLogs(logResult.data || [])
     setLoading(false)
@@ -145,7 +178,10 @@ export default function ProjectControlsPage() {
       payload.actual_finish = today
     }
 
-    const { error } = await supabase.from('tasks').update(payload).eq('id', taskId)
+    const { error } = await supabase
+      .from('tasks')
+      .update(payload)
+      .eq('id', taskId)
 
     if (error) {
       setNotice(error.message)
@@ -183,11 +219,18 @@ export default function ProjectControlsPage() {
     const delayed = tasks.filter(task => getStatus(task) === 'Behind').length
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
-    const avgProgress = total === 0 ? 0 : tasks.reduce((sum, task) => sum + getProgress(task), 0) / total
+    const avgProgress =
+      total === 0
+        ? 0
+        : tasks.reduce((sum, task) => sum + getProgress(task), 0) / total
+
     return { total, completed, delayed, blocked, onHold, avgProgress }
   }, [tasks])
 
-  const delayedTasks = tasks.filter(task => ['Behind', 'Blocked', 'On Hold'].includes(getStatus(task)))
+  const delayedTasks = tasks.filter(task =>
+    ['Behind', 'Blocked', 'On Hold'].includes(getStatus(task))
+  )
+
   const activeSchedule = schedules.find(schedule => schedule.is_active)
 
   return (
@@ -202,12 +245,29 @@ export default function ProjectControlsPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-3xl">
-          PMO/Admin controls schedule uploads. Project Owners only update progress,
-          delay reason, recovery action and comments.
+          PMO/Admin controls schedule uploads. Project Owners only update
+          progress, delay reason, recovery action and comments.
         </p>
 
         <div className="text-xs text-[#6e7d8c] mt-4">
-          Project: <span className="text-[#c49e48]">{projectName || 'No project selected'}</span>
+          Project:{' '}
+          <span className="text-[#c49e48]">
+            {projectName || 'No project selected'}
+          </span>
+        </div>
+
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {DISCIPLINE_TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setDisciplineTab(tab)}
+              className={`btn-sm btn ${
+                disciplineTab === tab ? 'btn-gold' : 'btn-ghost'
+              }`}
+            >
+              {tab === 'Overall' ? 'Master' : tab}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -219,7 +279,10 @@ export default function ProjectControlsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
-        <Metric title="Average Progress" value={`${metrics.avgProgress.toFixed(1)}%`} />
+        <Metric
+          title="Average Progress"
+          value={`${metrics.avgProgress.toFixed(1)}%`}
+        />
         <Metric title="Completed" value={metrics.completed} />
         <Metric title="Delayed" value={metrics.delayed} />
         <Metric title="Blocked" value={metrics.blocked} />
@@ -230,7 +293,9 @@ export default function ProjectControlsPage() {
         {TABS.map(tab => (
           <button
             key={tab}
-            className={`btn btn-sm ${activeTab === tab ? 'btn-gold' : 'btn-ghost'}`}
+            className={`btn btn-sm ${
+              activeTab === tab ? 'btn-gold' : 'btn-ghost'
+            }`}
             onClick={() => setActiveTab(tab)}
           >
             {tab}
@@ -239,7 +304,9 @@ export default function ProjectControlsPage() {
       </div>
 
       {loading ? (
-        <div className="card p-6 text-slate-400">Loading project controls…</div>
+        <div className="card p-6 text-slate-400">
+          Loading project controls…
+        </div>
       ) : (
         <>
           {activeTab === 'Execution' && (
@@ -253,25 +320,44 @@ export default function ProjectControlsPage() {
           )}
 
           {activeTab === 'Schedule' && (
-            <ScheduleTab schedules={schedules} canUpload={canManageSchedule(role)} />
+            <ScheduleTab
+              schedules={schedules}
+              canUpload={canManageSchedule(role)}
+            />
           )}
 
-          {activeTab === 'Progress' && <ProgressTab tasks={tasks} metrics={metrics} />}
+          {activeTab === 'Progress' && (
+            <ProgressTab tasks={tasks} metrics={metrics} />
+          )}
+
           {activeTab === 'Delays' && <DelaysTab tasks={delayedTasks} />}
-          {activeTab === 'Forecast' && <ForecastTab activeSchedule={activeSchedule} tasks={tasks} />}
+
+          {activeTab === 'Forecast' && (
+            <ForecastTab activeSchedule={activeSchedule} tasks={tasks} />
+          )}
+
           {activeTab === 'Recovery' && <RecoveryTab tasks={delayedTasks} />}
-          {activeTab === 'History' && <HistoryTab logs={logs} tasks={tasks} />}
+
+          {activeTab === 'History' && (
+            <HistoryTab logs={logs} tasks={allTasks} disciplineTab={disciplineTab} />
+          )}
         </>
       )}
     </div>
   )
 }
 
-function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: any) {
+function ExecutionTab({
+  tasks,
+  edits,
+  updateEdit,
+  saveTaskProgress,
+  savingId,
+}: any) {
   if (!tasks.length) {
     return (
       <div className="card p-8 text-center text-[#6e7d8c]">
-        No schedule tasks found for this project yet.
+        No schedule tasks found for this discipline.
       </div>
     )
   }
@@ -300,7 +386,11 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
             const taskId = task.id
             const edit = edits[taskId] || {}
             const progress = edit.progress_pct ?? getProgress(task)
-            const status = getStatus({ ...task, ...edit, progress_pct: progress })
+            const status = getStatus({
+              ...task,
+              ...edit,
+              progress_pct: progress,
+            })
 
             return (
               <tr key={taskId}>
@@ -310,8 +400,16 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
 
                 <td>{task.package_name || 'Project Wide'}</td>
                 <td>{task.discipline || '—'}</td>
-                <td>{getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}</td>
-                <td>{getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}</td>
+
+                <td>
+                  {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
+                </td>
+
+                <td>
+                  {getPlannedFinish(task)
+                    ? fdate(getPlannedFinish(task))
+                    : '—'}
+                </td>
 
                 <td>
                   <input
@@ -320,12 +418,22 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                     max={100}
                     className="form-control w-24"
                     value={progress}
-                    onChange={e => updateEdit(taskId, 'progress_pct', Number(e.target.value))}
+                    onChange={e =>
+                      updateEdit(
+                        taskId,
+                        'progress_pct',
+                        Number(e.target.value)
+                      )
+                    }
                   />
                 </td>
 
                 <td>
-                  <span className={`text-[10px] font-semibold ${statusColor(status)}`}>
+                  <span
+                    className={`text-[10px] font-semibold ${statusColor(
+                      status
+                    )}`}
+                  >
                     {status}
                   </span>
                 </td>
@@ -334,7 +442,9 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                   <select
                     className="form-control min-w-[150px]"
                     value={edit.delay_reason ?? task.delay_reason ?? ''}
-                    onChange={e => updateEdit(taskId, 'delay_reason', e.target.value)}
+                    onChange={e =>
+                      updateEdit(taskId, 'delay_reason', e.target.value)
+                    }
                   >
                     {DELAY_REASONS.map(reason => (
                       <option key={reason} value={reason}>
@@ -348,7 +458,9 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                   <select
                     className="form-control min-w-[170px]"
                     value={edit.recovery_action ?? task.recovery_action ?? ''}
-                    onChange={e => updateEdit(taskId, 'recovery_action', e.target.value)}
+                    onChange={e =>
+                      updateEdit(taskId, 'recovery_action', e.target.value)
+                    }
                   >
                     {RECOVERY_ACTIONS.map(action => (
                       <option key={action} value={action}>
@@ -361,8 +473,16 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                 <td>
                   <input
                     className="form-control min-w-[180px]"
-                    value={edit.progress_comments ?? task.progress_comments ?? ''}
-                    onChange={e => updateEdit(taskId, 'progress_comments', e.target.value)}
+                    value={
+                      edit.progress_comments ?? task.progress_comments ?? ''
+                    }
+                    onChange={e =>
+                      updateEdit(
+                        taskId,
+                        'progress_comments',
+                        e.target.value
+                      )
+                    }
                     placeholder="Comment"
                   />
 
@@ -371,7 +491,9 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                       <input
                         type="checkbox"
                         checked={edit.is_on_hold ?? task.is_on_hold ?? false}
-                        onChange={e => updateEdit(taskId, 'is_on_hold', e.target.checked)}
+                        onChange={e =>
+                          updateEdit(taskId, 'is_on_hold', e.target.checked)
+                        }
                       />{' '}
                       On Hold
                     </label>
@@ -380,7 +502,9 @@ function ExecutionTab({ tasks, edits, updateEdit, saveTaskProgress, savingId }: 
                       <input
                         type="checkbox"
                         checked={edit.is_blocked ?? task.is_blocked ?? false}
-                        onChange={e => updateEdit(taskId, 'is_blocked', e.target.checked)}
+                        onChange={e =>
+                          updateEdit(taskId, 'is_blocked', e.target.checked)
+                        }
                       />{' '}
                       Blocked
                     </label>
@@ -411,7 +535,8 @@ function ScheduleTab({ schedules, canUpload }: any) {
     <div className="space-y-4">
       {!canUpload && (
         <div className="card p-4 text-sm text-amber-400">
-          You can view schedules, but only PMO/Admin can upload or activate schedules.
+          You can view schedules, but only PMO/Admin can upload or activate
+          schedules.
         </div>
       )}
 
@@ -428,6 +553,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
                 <th>Type</th>
                 <th>Status</th>
                 <th>Active</th>
+                <th>Package</th>
                 <th>Planned Finish</th>
                 <th>Forecast Finish</th>
                 <th>Reason</th>
@@ -437,12 +563,19 @@ function ScheduleTab({ schedules, canUpload }: any) {
             <tbody>
               {schedules.map((item: any) => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">{item.revision_name}</td>
+                  <td className="font-medium text-[#ede8de]">
+                    {item.revision_name}
+                  </td>
                   <td>{item.revision_type || '—'}</td>
                   <td>{item.status || 'Draft'}</td>
                   <td>{item.is_active ? 'Yes' : 'No'}</td>
-                  <td>{item.planned_finish ? fdate(item.planned_finish) : '—'}</td>
-                  <td>{item.forecast_finish ? fdate(item.forecast_finish) : '—'}</td>
+                  <td>{item.package_name || 'Project Wide'}</td>
+                  <td>
+                    {item.planned_finish ? fdate(item.planned_finish) : '—'}
+                  </td>
+                  <td>
+                    {item.forecast_finish ? fdate(item.forecast_finish) : '—'}
+                  </td>
                   <td>{item.reason || '—'}</td>
                 </tr>
               ))}
@@ -467,7 +600,10 @@ function ProgressTab({ tasks, metrics }: any) {
 
   return (
     <div className="space-y-4">
-      <Metric title="Overall Progress" value={`${metrics.avgProgress.toFixed(1)}%`} />
+      <Metric
+        title="Overall Progress"
+        value={`${metrics.avgProgress.toFixed(1)}%`}
+      />
 
       <div className="card overflow-hidden">
         <table className="tbl">
@@ -482,7 +618,9 @@ function ProgressTab({ tasks, metrics }: any) {
           <tbody>
             {byDiscipline.map(item => (
               <tr key={item.discipline}>
-                <td className="font-medium text-[#ede8de]">{item.discipline}</td>
+                <td className="font-medium text-[#ede8de]">
+                  {item.discipline}
+                </td>
                 <td>{item.count}</td>
                 <td>{(item.progress / item.count).toFixed(1)}%</td>
               </tr>
@@ -496,7 +634,11 @@ function ProgressTab({ tasks, metrics }: any) {
 
 function DelaysTab({ tasks }: { tasks: any[] }) {
   if (!tasks.length) {
-    return <div className="card p-8 text-center text-[#6e7d8c]">No delayed, blocked or on-hold tasks.</div>
+    return (
+      <div className="card p-8 text-center text-[#6e7d8c]">
+        No delayed, blocked or on-hold tasks.
+      </div>
+    )
   }
 
   return (
@@ -506,6 +648,7 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
           <tr>
             <th>Activity</th>
             <th>Package</th>
+            <th>Discipline</th>
             <th>Planned Finish</th>
             <th>Status</th>
             <th>Delay Reason</th>
@@ -516,11 +659,19 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
         <tbody>
           {tasks.map(task => {
             const status = getStatus(task)
+
             return (
               <tr key={task.id}>
-                <td className="font-medium text-[#ede8de]">{getTaskName(task)}</td>
+                <td className="font-medium text-[#ede8de]">
+                  {getTaskName(task)}
+                </td>
                 <td>{task.package_name || 'Project Wide'}</td>
-                <td>{getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}</td>
+                <td>{task.discipline || '—'}</td>
+                <td>
+                  {getPlannedFinish(task)
+                    ? fdate(getPlannedFinish(task))
+                    : '—'}
+                </td>
                 <td className={statusColor(status)}>{status}</td>
                 <td>{task.delay_reason || '—'}</td>
                 <td>{task.recovery_action || '—'}</td>
@@ -535,11 +686,16 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
 
 function ForecastTab({ activeSchedule, tasks }: any) {
   const incomplete = tasks.filter((task: any) => getProgress(task) < 100)
-  const delayed = incomplete.filter((task: any) => getStatus(task) === 'Behind')
+  const delayed = incomplete.filter(
+    (task: any) => getStatus(task) === 'Behind'
+  )
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      <Metric title="Active Schedule" value={activeSchedule?.revision_name || 'None'} />
+      <Metric
+        title="Active Schedule"
+        value={activeSchedule?.revision_name || 'None'}
+      />
       <Metric title="Incomplete Tasks" value={incomplete.length} />
       <Metric title="Delayed Incomplete Tasks" value={delayed.length} />
     </div>
@@ -547,8 +703,12 @@ function ForecastTab({ activeSchedule, tasks }: any) {
 }
 
 function RecoveryTab({ tasks }: { tasks: any[] }) {
-  const withRecovery = tasks.filter(task => task.recovery_action && task.recovery_action !== 'No Recovery Plan')
-  const noRecovery = tasks.filter(task => !task.recovery_action || task.recovery_action === 'No Recovery Plan')
+  const withRecovery = tasks.filter(
+    task => task.recovery_action && task.recovery_action !== 'No Recovery Plan'
+  )
+  const noRecovery = tasks.filter(
+    task => !task.recovery_action || task.recovery_action === 'No Recovery Plan'
+  )
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -559,9 +719,21 @@ function RecoveryTab({ tasks }: { tasks: any[] }) {
   )
 }
 
-function HistoryTab({ logs, tasks }: any) {
-  if (!logs.length) {
-    return <div className="card p-8 text-center text-[#6e7d8c]">No progress history yet.</div>
+function HistoryTab({ logs, tasks, disciplineTab }: any) {
+  const filteredLogs =
+    disciplineTab === 'Overall'
+      ? logs
+      : logs.filter((log: any) => {
+          const task = tasks.find((item: any) => item.id === log.task_id)
+          return (task?.discipline || 'Housebuild') === disciplineTab
+        })
+
+  if (!filteredLogs.length) {
+    return (
+      <div className="card p-8 text-center text-[#6e7d8c]">
+        No progress history yet.
+      </div>
+    )
   }
 
   return (
@@ -571,6 +743,7 @@ function HistoryTab({ logs, tasks }: any) {
           <tr>
             <th>Date</th>
             <th>Activity</th>
+            <th>Discipline</th>
             <th>Progress Change</th>
             <th>Delay Reason</th>
             <th>Recovery Action</th>
@@ -579,7 +752,7 @@ function HistoryTab({ logs, tasks }: any) {
         </thead>
 
         <tbody>
-          {logs.map((log: any) => {
+          {filteredLogs.map((log: any) => {
             const task = tasks.find((item: any) => item.id === log.task_id)
 
             return (
@@ -588,8 +761,10 @@ function HistoryTab({ logs, tasks }: any) {
                 <td className="font-medium text-[#ede8de]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
+                <td>{task?.discipline || '—'}</td>
                 <td>
-                  {Number(log.previous_progress || 0)}% → {Number(log.new_progress || 0)}%
+                  {Number(log.previous_progress || 0)}% →{' '}
+                  {Number(log.new_progress || 0)}%
                 </td>
                 <td>{log.delay_reason || '—'}</td>
                 <td>{log.recovery_action || '—'}</td>
