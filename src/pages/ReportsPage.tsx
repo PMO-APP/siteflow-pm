@@ -6,6 +6,10 @@ import {
   CalendarDays,
   Image as ImageIcon,
   UploadCloud,
+  CheckCircle,
+  Lock,
+  RotateCcw,
+  Send,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
@@ -27,6 +31,11 @@ import { fdate, formatCurrency } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
+const PMO_ROLES = ['workspace_admin', 'admin', 'pmo']
+
+function isPMO(role?: string | null) {
+  return PMO_ROLES.includes(role || '')
+}
 
 function inferDiscipline(role?: string | null) {
   if (role === 'housebuild') return 'Housebuild'
@@ -41,11 +50,20 @@ function getActivityStatus(thisWeek: number, planned: number) {
   return 'Stuck'
 }
 
+function workflowBadge(status?: string | null) {
+  if (status === 'Approved') return 'badge-green'
+  if (status === 'Locked') return 'badge-green'
+  if (status === 'Submitted') return 'badge-amber'
+  if (status === 'Returned') return 'badge-red'
+  return 'badge-muted'
+}
+
 export default function ReportsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
   const canExport = canExportReports(role)
+  const canReview = isPMO(role)
 
   const { data: reports = [], isLoading } = useWeeklyReports()
   const { data: risks = [] } = useRisks()
@@ -65,11 +83,35 @@ export default function ReportsPage() {
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>({})
   const [reportPhotos, setReportPhotos] = useState<any[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [printMode, setPrintMode] = useState<'selected' | 'all'>('selected')
+  const [returnComment, setReturnComment] = useState('')
 
   const selectedReport =
     reports.find(report => report.id === selectedReportId) || reports[0]
 
   const { data: activities = [] } = useWeeklyActivities(selectedReport?.id)
+
+  const selectedReportAny = selectedReport as any
+  const workflowStatus = selectedReportAny?.workflow_status || 'Draft'
+  const isLocked = workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
+  const isApproved = workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
+
+  const isCreator =
+    Boolean(user?.id) &&
+    Boolean(selectedReportAny?.created_by) &&
+    selectedReportAny.created_by === user?.id
+
+  const canEditSelectedReport =
+    Boolean(selectedReport) &&
+    !isLocked &&
+    !isApproved &&
+    (isCreator || canReview)
+
+  const canAddActivity =
+    Boolean(selectedReport) &&
+    !isLocked &&
+    !isApproved &&
+    (isCreator || canReview)
 
   const [reportForm, setReportForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
@@ -291,12 +333,12 @@ export default function ReportsPage() {
           upsert: false,
         })
 
-     if (uploadError) {
-  console.error(uploadError.message)
-  alert(`Photo upload failed: ${uploadError.message}`)
-  setUploadingPhotos(false)
-  return
-}
+      if (uploadError) {
+        console.error(uploadError.message)
+        alert(`Photo upload failed: ${uploadError.message}`)
+        setUploadingPhotos(false)
+        return
+      }
 
       const {
         data: { publicUrl },
@@ -310,6 +352,8 @@ export default function ReportsPage() {
           photo_name: photo.name,
           caption: photoCaptions[photo.name] || null,
           uploaded_by: user?.full_name || user?.email || 'User',
+          created_by: user?.id || null,
+          report_type: 'IPD',
         })
 
       if (photoInsertError) {
@@ -320,7 +364,6 @@ export default function ReportsPage() {
 
     setUploadingPhotos(false)
     setPhotos([])
-    await loadReportPhotos()
   }
 
   async function saveReport() {
@@ -332,6 +375,13 @@ export default function ReportsPage() {
         reporting_officer_email:
           reportForm.reporting_officer_email || user?.email || '',
         created_by_role: role,
+        created_by: selectedReportId
+          ? (selectedReport as any)?.created_by || user?.id || null
+          : user?.id || null,
+        updated_by: user?.id || null,
+        workflow_status: selectedReportId
+          ? (selectedReport as any)?.workflow_status || 'Draft'
+          : 'Draft',
         next_meeting: reportForm.next_meeting || undefined,
       } as any)
 
@@ -349,8 +399,10 @@ export default function ReportsPage() {
         await uploadReportPhotos(reportId)
       }
 
+      setSelectedReportId(reportId)
+      await loadReportPhotos()
+
       setShowReportModal(false)
-      setSelectedReportId(null)
       setPhotos([])
       setPhotoCaptions({})
     } catch (error: any) {
@@ -394,6 +446,64 @@ export default function ReportsPage() {
     setShowActivityModal(false)
   }
 
+  async function updateWorkflow(status: string, extra: Record<string, any> = {}) {
+    if (!selectedReport?.id) return
+
+    const now = new Date().toISOString()
+
+    const payload: any = {
+      workflow_status: status,
+      updated_by: user?.id || null,
+      ...extra,
+    }
+
+    if (status === 'Submitted') {
+      payload.submitted_at = now
+      payload.submitted_by = user?.id || null
+    }
+
+    if (status === 'Approved') {
+      payload.approved_at = now
+      payload.approved_by = user?.id || null
+      payload.reviewed_at = now
+      payload.reviewed_by = user?.id || null
+    }
+
+    if (status === 'Returned') {
+      payload.returned_at = now
+      payload.returned_by = user?.id || null
+      payload.return_comment = returnComment || null
+    }
+
+    if (status === 'Locked') {
+      payload.locked_at = now
+      payload.locked_by = user?.id || null
+    }
+
+    const { error } = await supabase
+      .from('weekly_reports')
+      .update(payload)
+      .eq('id', selectedReport.id)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setReturnComment('')
+    alert(`Report marked as ${status}.`)
+  }
+
+  function printSelectedReport() {
+    setPrintMode('selected')
+    setTimeout(() => window.print(), 50)
+  }
+
+  function printAllReports() {
+    setPrintMode('all')
+    setTimeout(() => window.print(), 50)
+  }
+
   function statusColor(status?: string | null) {
     if (status === 'Ahead') return 'text-emerald-400'
     if (status === 'On Track') return 'text-blue-400'
@@ -404,45 +514,81 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="text-xl font-semibold text-[#ede8de]">
-            IPD Reports
-          </div>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
 
+          #selected-report-print,
+          #selected-report-print *,
+          #all-reports-print,
+          #all-reports-print * {
+            visibility: visible;
+          }
+
+          #selected-report-print,
+          #all-reports-print {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white !important;
+            color: black !important;
+            padding: 24px;
+          }
+
+          .no-print {
+            display: none !important;
+          }
+
+          .print-dark,
+          .print-dark * {
+            color: black !important;
+            background: white !important;
+          }
+
+          .print-break {
+            page-break-after: always;
+          }
+        }
+
+        @media screen {
+          #all-reports-print {
+            display: none;
+          }
+        }
+      `}</style>
+
+      <div className="no-print flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="text-xl font-semibold text-[#ede8de]">IPD Reports</div>
           <div className="text-[11px] text-[#6e7d8c] mt-1">
             Internal Project Delivery Weekly Reporting · {projectName}
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canExport && (
-            <>
-              <button
-                className="btn-ghost btn-sm btn"
-                onClick={() => window.print()}
-              >
-                <Printer size={13} />
-                Print / PDF
-              </button>
+          <button className="btn-ghost btn-sm btn" onClick={printSelectedReport}>
+            <Printer size={13} />
+            Print Selected
+          </button>
 
-              <button className="btn-gold btn-sm btn" onClick={openNewReport}>
-                <Plus size={13} />
-                New IPD Report
-              </button>
-            </>
+          <button className="btn-ghost btn-sm btn" onClick={printAllReports}>
+            <Printer size={13} />
+            Print All IPD
+          </button>
+
+          {canExport && (
+            <button className="btn-gold btn-sm btn" onClick={openNewReport}>
+              <Plus size={13} />
+              New IPD Report
+            </button>
           )}
         </div>
       </div>
 
-      {!canExport && (
-        <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
-          IPD Reports View Only — you can view reports, but you cannot create or
-          export reports.
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="no-print grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Metric title="IPD Reports" value={reports.length} color="text-[#c49e48]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
@@ -450,7 +596,7 @@ export default function ReportsPage() {
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
+      <div className="no-print grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#ede8de] font-semibold">
             <FileText size={16} className="text-[#c49e48]" />
@@ -493,19 +639,15 @@ export default function ReportsPage() {
                           {reportAny.department || reportAny.discipline || 'IPD'}
                         </div>
 
-                        <span className={`text-[10px] font-semibold ${statusColor(report.status)}`}>
-                          {report.status || 'On Track'}
+                        <span className={`badge ${workflowBadge(reportAny.workflow_status || 'Draft')}`}>
+                          {reportAny.workflow_status || 'Draft'}
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-[#c49e48] mt-1">
-                        {packageName}
-                      </div>
-
+                      <div className="text-[11px] text-[#c49e48] mt-1">{packageName}</div>
                       <div className="text-[11px] text-[#6e7d8c] mt-1">
                         Contractor: {reportAny.contractor_name || '—'}
                       </div>
-
                       <div className="text-[11px] text-[#6e7d8c] mt-1">
                         Officer: {reportAny.reporting_officer || '—'}
                       </div>
@@ -530,192 +672,112 @@ export default function ReportsPage() {
               Select or create an IPD report.
             </div>
           ) : (
-            <div id="weekly-report-print">
-              <div className="gold-bar" />
+            <div>
+              <ReportView
+                id="selected-report-print"
+                report={selectedReport}
+                projectName={projectName}
+                selectedPackage={selectedPackage}
+                reportPhotos={reportPhotos}
+                activities={activities}
+                contractSum={contractSum}
+                openSnags={openSnags}
+                criticalSnags={criticalSnags}
+                openRisks={openRisks}
+                pendingProcurement={pendingProcurement}
+                statusColor={statusColor}
+              />
 
-              <div className="p-6 border-b border-white/[0.06]">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.25em] text-[#c49e48]">
-                      IPD Weekly Report
-                    </div>
+              <div className="no-print p-6 border-t border-white/[0.06] flex flex-wrap gap-2">
+                {canEditSelectedReport && (
+                  <button
+                    className="btn-ghost btn-sm btn"
+                    onClick={() => openEditReport(selectedReport)}
+                  >
+                    Edit Report
+                  </button>
+                )}
 
-                    <div className="text-2xl font-bold text-[#ede8de] mt-1">
-                      {projectName}
-                    </div>
+                {canAddActivity && (
+                  <button
+                    className="btn-gold btn-sm btn"
+                    onClick={() => setShowActivityModal(true)}
+                  >
+                    <Plus size={13} />
+                    Add Activity
+                  </button>
+                )}
 
-                    <div className="text-sm text-[#6e7d8c] mt-1">
-                      Report Date: {fdate(selectedReport.report_date)}
-                    </div>
+                {!isLocked && !isApproved && isCreator && workflowStatus === 'Draft' && (
+                  <button
+                    className="btn-ghost btn-sm btn"
+                    onClick={() => updateWorkflow('Submitted')}
+                  >
+                    <Send size={13} />
+                    Submit
+                  </button>
+                )}
 
-                    <div className="text-sm text-[#c49e48] mt-1">
-                      Discipline:{' '}
-                      {(selectedReport as any).department ||
-                        (selectedReport as any).discipline ||
-                        '—'}
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className={`text-xl font-bold ${statusColor(selectedReport.status)}`}>
-                      {selectedReport.status || 'On Track'}
-                    </div>
-
-                    <div className="text-[11px] text-[#6e7d8c] mt-1">
-                      Reporting Officer:{' '}
-                      {(selectedReport as any).reporting_officer || '—'}
-                    </div>
-
-                    {(selectedReport as any).reporting_officer_email && (
-                      <div className="text-[10px] text-[#6e7d8c] mt-1">
-                        {(selectedReport as any).reporting_officer_email}
-                      </div>
-                    )}
-
-                    {canExport && (
-                      <button
-                        className="btn-ghost btn-sm btn mt-3"
-                        onClick={() => openEditReport(selectedReport)}
-                      >
-                        Edit Report
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <Section title="Project / Package Information">
-                  <InfoGrid
-                    items={[
-                      ['Project Title', projectName || '—'],
-                      [
-                        'Package',
-                        (selectedReport as any).package_name ||
-                          selectedPackage?.package_name ||
-                          selectedPackage?.block_name ||
-                          'Project Wide',
-                      ],
-                      ['Discipline', (selectedReport as any).department || '—'],
-                      ['Contractor', (selectedReport as any).contractor_name || selectedPackage?.contractor_name || '—'],
-                      ['Contract Sum', contractSum ? formatCurrency(contractSum) : 'TBC'],
-                      ['Open Snags', openSnags],
-                      ['Critical Snags', criticalSnags],
-                      ['Open Risks', openRisks],
-                      ['Pending Procurement', pendingProcurement],
-                    ]}
-                  />
-                </Section>
-
-                <Section title="Weekly Progress Activities">
-                  <div className="overflow-x-auto">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Activity</th>
-                          <th>Last Week %</th>
-                          <th>This Week %</th>
-                          <th>Planned %</th>
-                          <th>Status</th>
-                          <th>Remarks</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {activities.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="text-center py-6 text-[#6e7d8c]">
-                              No activities added yet.
-                            </td>
-                          </tr>
-                        ) : (
-                          activities.map((activity: any) => {
-                            const status =
-                              activity.activity_status ||
-                              getActivityStatus(
-                                Number(activity.this_week || 0),
-                                Number(activity.planned || 0)
-                              )
-
-                            return (
-                              <tr key={activity.id}>
-                                <td className="text-[#ede8de] font-medium">
-                                  {activity.activity}
-                                </td>
-                                <td>{activity.last_week || 0}%</td>
-                                <td>{activity.this_week || 0}%</td>
-                                <td>{activity.planned || 0}%</td>
-                                <td>
-                                  <span className={`text-[10px] font-semibold ${statusColor(status)}`}>
-                                    {status}
-                                  </span>
-                                </td>
-                                <td className="text-[#6e7d8c]">
-                                  {activity.remarks || '—'}
-                                </td>
-                              </tr>
-                            )
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {canExport && (
+                {canReview && workflowStatus === 'Submitted' && (
+                  <>
                     <button
-                      className="btn-gold btn-sm btn mt-3"
-                      onClick={() => setShowActivityModal(true)}
+                      className="btn-gold btn-sm btn"
+                      onClick={() => updateWorkflow('Approved')}
                     >
-                      <Plus size={13} />
-                      Add Activity
+                      <CheckCircle size={13} />
+                      Approve
                     </button>
-                  )}
-                </Section>
 
-                <Section title="Pending Issues">
-                  <TextBlock value={selectedReport.pending_issues} />
-                </Section>
+                    <input
+                      className="form-control max-w-xs"
+                      placeholder="Return comment"
+                      value={returnComment}
+                      onChange={e => setReturnComment(e.target.value)}
+                    />
 
-                <Section title="Matters Arising">
-                  <TextBlock value={selectedReport.matters_arising} />
-                </Section>
+                    <button
+                      className="btn-ghost btn-sm btn"
+                      onClick={() => updateWorkflow('Returned')}
+                    >
+                      <RotateCcw size={13} />
+                      Return
+                    </button>
+                  </>
+                )}
 
-                <Section title="Look Ahead">
-                  <TextBlock value={selectedReport.look_ahead} />
-                </Section>
-
-                <Section title="Quality Tracking">
-                  <TextBlock value={selectedReport.quality_tracking} />
-                </Section>
-
-                <Section title="Procurement Tracking">
-                  <TextBlock value={selectedReport.procurement_tracking} />
-                </Section>
-
-                <Section title="Safety Tracking">
-                  <TextBlock value={selectedReport.safety_tracking} />
-                </Section>
-
-                <Section title="Progress Photos">
-                  <PhotoGallery photos={reportPhotos} />
-                </Section>
-
-                <Section title="Next Site Meeting">
-                  <div className="flex items-center gap-2 text-[#ede8de]">
-                    <CalendarDays size={14} className="text-[#c49e48]" />
-                    {selectedReport.next_meeting
-                      ? fdate(selectedReport.next_meeting)
-                      : 'Not set'}
-                  </div>
-                </Section>
-
-                <div className="border-t border-white/[0.06] pt-4 text-[10px] text-[#6e7d8c] font-mono">
-                  Generated by PMOCorex · {new Date().toLocaleDateString('en-GB')} · Confidential
-                </div>
+                {canReview && isApproved && !isLocked && (
+                  <button
+                    className="btn-gold btn-sm btn"
+                    onClick={() => updateWorkflow('Locked')}
+                  >
+                    <Lock size={13} />
+                    Lock
+                  </button>
+                )}
               </div>
             </div>
           )}
         </div>
+      </div>
+
+      <div id="all-reports-print">
+        {reports.map((report: any) => (
+          <div key={report.id} className="print-break">
+            <ReportView
+              report={report}
+              projectName={projectName}
+              selectedPackage={packages.find(item => item.id === report.block_id)}
+              reportPhotos={[]}
+              activities={[]}
+              contractSum={contractSum}
+              openSnags={openSnags}
+              criticalSnags={criticalSnags}
+              openRisks={openRisks}
+              pendingProcurement={pendingProcurement}
+              statusColor={statusColor}
+            />
+          </div>
+        ))}
       </div>
 
       {showReportModal && (
@@ -823,83 +885,28 @@ export default function ReportsPage() {
               <option>Stuck</option>
             </select>
 
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Pending Issues"
-              value={reportForm.pending_issues}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  pending_issues: event.target.value,
-                }))
-              }
-            />
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Matters Arising"
-              value={reportForm.matters_arising}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  matters_arising: event.target.value,
-                }))
-              }
-            />
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Look Ahead"
-              value={reportForm.look_ahead}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  look_ahead: event.target.value,
-                }))
-              }
-            />
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Quality Tracking"
-              value={reportForm.quality_tracking}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  quality_tracking: event.target.value,
-                }))
-              }
-            />
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Procurement Tracking"
-              value={reportForm.procurement_tracking}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  procurement_tracking: event.target.value,
-                }))
-              }
-            />
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Safety Tracking"
-              value={reportForm.safety_tracking}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  safety_tracking: event.target.value,
-                }))
-              }
-            />
+            {[
+              ['pending_issues', 'Pending Issues'],
+              ['matters_arising', 'Matters Arising'],
+              ['look_ahead', 'Look Ahead'],
+              ['quality_tracking', 'Quality Tracking'],
+              ['procurement_tracking', 'Procurement Tracking'],
+              ['safety_tracking', 'Safety Tracking'],
+            ].map(([key, label]) => (
+              <textarea
+                key={key}
+                className="form-control"
+                rows={2}
+                placeholder={label}
+                value={(reportForm as any)[key]}
+                onChange={event =>
+                  setReportForm(current => ({
+                    ...current,
+                    [key]: event.target.value,
+                  }))
+                }
+              />
+            ))}
 
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
@@ -930,9 +937,7 @@ export default function ReportsPage() {
                       key={photo.name}
                       className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
                     >
-                      <div className="text-xs text-[#ede8de]">
-                        {photo.name}
-                      </div>
+                      <div className="text-xs text-[#ede8de]">{photo.name}</div>
 
                       <input
                         className="form-control"
@@ -969,10 +974,7 @@ export default function ReportsPage() {
       )}
 
       {showActivityModal && (
-        <Modal
-          title="Add Weekly Activity"
-          onClose={() => setShowActivityModal(false)}
-        >
+        <Modal title="Add Weekly Activity" onClose={() => setShowActivityModal(false)}>
           <div className="space-y-3">
             <input
               className="form-control"
@@ -987,44 +989,25 @@ export default function ReportsPage() {
             />
 
             <div className="grid grid-cols-3 gap-3">
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Last Week %"
-                value={activityForm.last_week}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    last_week: Number(event.target.value),
-                  }))
-                }
-              />
-
-              <input
-                type="number"
-                className="form-control"
-                placeholder="This Week %"
-                value={activityForm.this_week}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    this_week: Number(event.target.value),
-                  }))
-                }
-              />
-
-              <input
-                type="number"
-                className="form-control"
-                placeholder="Planned %"
-                value={activityForm.planned}
-                onChange={event =>
-                  setActivityForm(current => ({
-                    ...current,
-                    planned: Number(event.target.value),
-                  }))
-                }
-              />
+              {[
+                ['last_week', 'Last Week %'],
+                ['this_week', 'This Week %'],
+                ['planned', 'Planned %'],
+              ].map(([key, label]) => (
+                <input
+                  key={key}
+                  type="number"
+                  className="form-control"
+                  placeholder={label}
+                  value={(activityForm as any)[key]}
+                  onChange={event =>
+                    setActivityForm(current => ({
+                      ...current,
+                      [key]: Number(event.target.value),
+                    }))
+                  }
+                />
+              ))}
             </div>
 
             <textarea
@@ -1054,21 +1037,178 @@ export default function ReportsPage() {
   )
 }
 
-function Metric({
-  title,
-  value,
-  color,
-}: {
-  title: string
-  value: number
-  color: string
-}) {
+function ReportView({
+  id,
+  report,
+  projectName,
+  selectedPackage,
+  reportPhotos,
+  activities,
+  contractSum,
+  openSnags,
+  criticalSnags,
+  openRisks,
+  pendingProcurement,
+  statusColor,
+}: any) {
   return (
-    <div className="card p-3">
-      <div className={`font-display text-3xl font-bold ${color}`}>
-        {value}
+    <div id={id} className="print-dark">
+      <div className="gold-bar" />
+
+      <div className="p-6 border-b border-white/[0.06]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#c49e48]">
+              IPD Weekly Report
+            </div>
+
+            <div className="text-2xl font-bold text-[#ede8de] mt-1">
+              {projectName}
+            </div>
+
+            <div className="text-sm text-[#6e7d8c] mt-1">
+              Report Date: {fdate(report.report_date)}
+            </div>
+
+            <div className="text-sm text-[#c49e48] mt-1">
+              Discipline: {(report as any).department || (report as any).discipline || '—'}
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className={`text-xl font-bold ${statusColor(report.status)}`}>
+              {report.status || 'On Track'}
+            </div>
+
+            <div className="mt-2">
+              <span className={`badge ${workflowBadge((report as any).workflow_status || 'Draft')}`}>
+                {(report as any).workflow_status || 'Draft'}
+              </span>
+            </div>
+
+            <div className="text-[11px] text-[#6e7d8c] mt-2">
+              Reporting Officer: {(report as any).reporting_officer || '—'}
+            </div>
+          </div>
+        </div>
       </div>
 
+      <div className="p-6 space-y-6">
+        <Section title="Project / Package Information">
+          <InfoGrid
+            items={[
+              ['Project Title', projectName || '—'],
+              [
+                'Package',
+                (report as any).package_name ||
+                  selectedPackage?.package_name ||
+                  selectedPackage?.block_name ||
+                  'Project Wide',
+              ],
+              ['Discipline', (report as any).department || (report as any).discipline || '—'],
+              ['Contractor', (report as any).contractor_name || selectedPackage?.contractor_name || '—'],
+              ['Contract Sum', contractSum ? formatCurrency(contractSum) : 'TBC'],
+              ['Open Snags', openSnags],
+              ['Critical Snags', criticalSnags],
+              ['Open Risks', openRisks],
+              ['Pending Procurement', pendingProcurement],
+            ]}
+          />
+        </Section>
+
+        <Section title="Weekly Progress Activities">
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th>Last Week %</th>
+                  <th>This Week %</th>
+                  <th>Planned %</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-[#6e7d8c]">
+                      No activities added yet.
+                    </td>
+                  </tr>
+                ) : (
+                  activities.map((activity: any) => {
+                    const status =
+                      activity.activity_status ||
+                      getActivityStatus(
+                        Number(activity.this_week || 0),
+                        Number(activity.planned || 0)
+                      )
+
+                    return (
+                      <tr key={activity.id}>
+                        <td className="text-[#ede8de] font-medium">{activity.activity}</td>
+                        <td>{activity.last_week || 0}%</td>
+                        <td>{activity.this_week || 0}%</td>
+                        <td>{activity.planned || 0}%</td>
+                        <td>{status}</td>
+                        <td className="text-[#6e7d8c]">{activity.remarks || '—'}</td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+
+        <Section title="Pending Issues">
+          <TextBlock value={report.pending_issues} />
+        </Section>
+
+        <Section title="Matters Arising">
+          <TextBlock value={report.matters_arising} />
+        </Section>
+
+        <Section title="Look Ahead">
+          <TextBlock value={report.look_ahead} />
+        </Section>
+
+        <Section title="Quality Tracking">
+          <TextBlock value={report.quality_tracking} />
+        </Section>
+
+        <Section title="Procurement Tracking">
+          <TextBlock value={report.procurement_tracking} />
+        </Section>
+
+        <Section title="Safety Tracking">
+          <TextBlock value={report.safety_tracking} />
+        </Section>
+
+        <Section title="Progress Photos">
+          <PhotoGallery photos={reportPhotos} />
+        </Section>
+
+        <Section title="Next Site Meeting">
+          <div className="flex items-center gap-2 text-[#ede8de]">
+            <CalendarDays size={14} className="text-[#c49e48]" />
+            {report.next_meeting ? fdate(report.next_meeting) : 'Not set'}
+          </div>
+        </Section>
+
+        <div className="border-t border-white/[0.06] pt-4 text-[10px] text-[#6e7d8c] font-mono">
+          Generated by PMOCorex · {new Date().toLocaleDateString('en-GB')} · Confidential
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Metric({ title, value, color }: { title: string; value: number; color: string }) {
+  return (
+    <div className="card p-3">
+      <div className={`font-display text-3xl font-bold ${color}`}>{value}</div>
       <div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">
         {title}
       </div>
@@ -1076,19 +1216,12 @@ function Metric({
   )
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
       <div className="text-[10px] font-mono text-[#c49e48] uppercase tracking-widest border-b border-[#c49e48]/20 pb-1 mb-3">
         {title}
       </div>
-
       {children}
     </div>
   )
@@ -1106,14 +1239,10 @@ function InfoGrid({ items }: { items: [string, any][] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       {items.map(([label, value]) => (
-        <div
-          key={label}
-          className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
-        >
+        <div key={label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c]">
             {label}
           </div>
-
           <div className="text-sm text-[#ede8de] mt-1">{value || '—'}</div>
         </div>
       ))}
@@ -1122,9 +1251,7 @@ function InfoGrid({ items }: { items: [string, any][] }) {
 }
 
 function PhotoGallery({ photos }: { photos: any[] }) {
-  if (!photos.length) {
-    return <TextBlock value="No photos attached." />
-  }
+  if (!photos.length) return <TextBlock value="No photos attached." />
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
@@ -1138,7 +1265,6 @@ function PhotoGallery({ photos }: { photos: any[] }) {
             alt={photo.photo_name || `Report photo ${index + 1}`}
             className="w-full h-64 object-cover print:h-auto print:max-h-[320px]"
           />
-
           <div className="p-3 text-xs text-[#6e7d8c]">
             {photo.caption || photo.photo_name || `Progress Photo ${index + 1}`}
           </div>
@@ -1162,15 +1288,10 @@ function Modal({
       <div className="card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
-
-          <button
-            onClick={onClose}
-            className="text-[#6e7d8c] hover:text-white"
-          >
+          <button onClick={onClose} className="text-[#6e7d8c] hover:text-white">
             ✕
           </button>
         </div>
-
         {children}
       </div>
     </div>
