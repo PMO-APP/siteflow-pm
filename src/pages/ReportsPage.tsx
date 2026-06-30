@@ -291,10 +291,12 @@ export default function ReportsPage() {
           upsert: false,
         })
 
-      if (uploadError) {
-        console.error(uploadError.message)
-        continue
-      }
+     if (uploadError) {
+  console.error(uploadError.message)
+  alert(`Photo upload failed: ${uploadError.message}`)
+  setUploadingPhotos(false)
+  return
+}
 
       const {
         data: { publicUrl },
