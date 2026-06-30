@@ -1,17 +1,55 @@
-import { useEffect, useState } from 'react'
-import { FileText, RefreshCw, Save } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { FileText, Printer, RefreshCw, Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
+import { fdate, formatCurrency } from '@/lib/utils'
+
+type ExecutiveRow = {
+  project: string
+  package_name: string
+  discipline: string
+  status: string
+  comments: string
+  rag: string
+  approved_budget: string
+  outstanding_works: string
+  risks: string
+  performance: string
+  finish_by: string
+}
+
+function canManageExecutiveReports(role?: string | null) {
+  return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+}
+
+function getRag(status?: string | null) {
+  if (status === 'Ahead' || status === 'On Track') return 'GREEN'
+  if (status === 'Behind') return 'AMBER'
+  if (status === 'Stuck') return 'RED'
+  return 'AMBER'
+}
+
+function getPerformance(status?: string | null) {
+  if (status === 'Ahead' || status === 'On Track') return 'on track'
+  if (status === 'Behind' || status === 'Stuck') return 'lagging'
+  return 'lagging'
+}
 
 export default function PMOWeeklyReportPage() {
   const { user } = useAuthStore()
+  const role = useMembershipStore(state => state.role)
+
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
+
+  const canManage = canManageExecutiveReports(role)
 
   const [reportWeek, setReportWeek] = useState(
     new Date().toISOString().slice(0, 10)
   )
+
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
 
@@ -25,6 +63,8 @@ export default function PMOWeeklyReportPage() {
     key_decisions_required: '',
     management_attention: '',
   })
+
+  const [rows, setRows] = useState<ExecutiveRow[]>([])
 
   useEffect(() => {
     loadExistingReport()
@@ -51,10 +91,17 @@ export default function PMOWeeklyReportPage() {
         key_decisions_required: data.key_decisions_required || '',
         management_attention: data.management_attention || '',
       })
+
+      setRows(data.report_rows || [])
     }
   }
 
   async function generateReport() {
+    if (!canManage) {
+      setNotice('Only PMO/Admin can generate executive reports.')
+      return
+    }
+
     if (!projectId) {
       setNotice('No project selected.')
       return
@@ -64,6 +111,8 @@ export default function PMOWeeklyReportPage() {
     setNotice('')
 
     const [
+      ipdResult,
+      activitiesResult,
       designResult,
       drawingsResult,
       costingResult,
@@ -71,7 +120,18 @@ export default function PMOWeeklyReportPage() {
       paymentsResult,
       variationsResult,
       risksResult,
+      procurementResult,
+      snagsResult,
+      approvalsResult,
     ] = await Promise.all([
+      supabase
+        .from('weekly_reports')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('report_date', reportWeek),
+
+      supabase.from('weekly_activities').select('*'),
+
       supabase
         .from('design_reports')
         .select('*')
@@ -97,8 +157,16 @@ export default function PMOWeeklyReportPage() {
       supabase.from('cost_variations').select('*').eq('project_id', projectId),
 
       supabase.from('risks').select('*').eq('project_id', projectId),
+
+      supabase.from('procurement_items').select('*').eq('project_id', projectId),
+
+      supabase.from('snags').select('*').eq('project_id', projectId),
+
+      supabase.from('approvals').select('*').eq('project_id', projectId),
     ])
 
+    const ipdReports = ipdResult.data || []
+    const activities = activitiesResult.data || []
     const designItems = designResult.data || []
     const drawings = drawingsResult.data || []
     const costItems = costingResult.data || []
@@ -106,6 +174,9 @@ export default function PMOWeeklyReportPage() {
     const payments = paymentsResult.data || []
     const variations = variationsResult.data || []
     const risks = risksResult.data || []
+    const procurement = procurementResult.data || []
+    const snags = snagsResult.data || []
+    const approvals = approvalsResult.data || []
 
     const approvedDrawings = drawings.filter(
       item =>
@@ -120,10 +191,6 @@ export default function PMOWeeklyReportPage() {
         item.status === 'For Review' ||
         item.review_status === 'Pending Review'
     ).length
-
-    const designIssues = designItems.filter(
-      item => item.category === 'Design Issue'
-    )
 
     const totalContractValue = contracts.reduce(
       (sum, item) => sum + Number(item.contract_value || 0),
@@ -143,40 +210,148 @@ export default function PMOWeeklyReportPage() {
       .filter(item => item.status === 'Approved')
       .reduce((sum, item) => sum + Number(item.amount || 0), 0)
 
+    const openRisks = risks.filter(item => item.status === 'Open')
     const highRisks = risks.filter(
       item =>
         item.severity === 'High' ||
         item.risk_level === 'High' ||
-        item.status === 'Open'
+        Number(item.risk_score || 0) >= 12
     )
 
-    setReport({
-      executive_summary: `${projectName || 'Project'} weekly PMO report generated from live PMOCorex records for the selected reporting week.`,
+    const openSnags = snags.filter(item => item.status !== 'Closed')
+    const pendingProcurement = procurement.filter(
+      item => item.status !== 'Delivered'
+    )
+    const pendingApprovals = approvals.filter(
+      item => item.status !== 'Approved' && item.status !== 'Rejected'
+    )
 
-      design_summary: `Design records show ${drawings.length} drawing(s), ${approvedDrawings} approved drawing(s), and ${pendingDrawings} drawing(s) pending review. ${designIssues.length} design issue(s) were recorded for the week.`,
+    const generatedRows: ExecutiveRow[] = ipdReports.map(reportItem => {
+      const reportAny = reportItem as any
+
+      const reportActivities = activities.filter(
+        activity => activity.report_id === reportItem.id
+      )
+
+      const activityLines = reportActivities.length
+        ? reportActivities
+            .map(
+              activity =>
+                `- ${activity.activity}: ${activity.this_week || 0}% achieved against ${activity.planned || 0}% planned. ${activity.remarks || ''}`
+            )
+            .join('\n')
+        : reportItem.look_ahead || reportItem.matters_arising || 'No activities recorded.'
+
+      return {
+        project: projectName || 'Project',
+        package_name: reportAny.package_name || 'Project Wide',
+        discipline: reportAny.department || reportAny.discipline || 'IPD',
+        status: reportItem.status || 'On Track',
+        comments: [
+          `Reporting Officer: ${reportAny.reporting_officer || '—'}`,
+          `Contractor: ${reportAny.contractor_name || '—'}`,
+          activityLines,
+          reportItem.pending_issues
+            ? `Pending Issues: ${reportItem.pending_issues}`
+            : '',
+          reportItem.look_ahead ? `Look Ahead: ${reportItem.look_ahead}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        rag: getRag(reportItem.status),
+        approved_budget: totalContractValue
+          ? formatCurrency(totalContractValue)
+          : 'TBC',
+        outstanding_works:
+          reportItem.pending_issues ||
+          reportItem.look_ahead ||
+          'To be updated from IPD report.',
+        risks: openRisks.length
+          ? openRisks
+              .slice(0, 3)
+              .map(risk => risk.title || risk.risk || risk.description)
+              .join('\n')
+          : 'No open risks recorded.',
+        performance: getPerformance(reportItem.status),
+        finish_by: reportAny.finish_by || reportAny.next_meeting || 'TBC',
+      }
+    })
+
+    if (generatedRows.length === 0) {
+      generatedRows.push({
+        project: projectName || 'Project',
+        package_name: 'Project Wide',
+        discipline: 'PMO',
+        status: 'No IPD Report',
+        comments:
+          'No IPD report has been submitted for the selected reporting week.',
+        rag: 'AMBER',
+        approved_budget: totalContractValue
+          ? formatCurrency(totalContractValue)
+          : 'TBC',
+        outstanding_works: 'Awaiting IPD report submissions.',
+        risks: openRisks.length
+          ? openRisks
+              .slice(0, 3)
+              .map(risk => risk.title || risk.risk || risk.description)
+              .join('\n')
+          : 'No open risks recorded.',
+        performance: 'lagging',
+        finish_by: 'TBC',
+      })
+    }
+
+    setRows(generatedRows)
+
+    setReport({
+      executive_summary: `${projectName || 'Project'} PMO executive report for ${fdate(
+        reportWeek
+      )}. ${ipdReports.length} IPD report(s), ${
+        designItems.length
+      } design report(s), and ${
+        costItems.length
+      } cost report(s) were reviewed. Overall management attention is required for ${
+        highRisks.length
+      } high risk item(s), ${pendingDrawings} pending drawing(s), ${
+        pendingProcurement.length
+      } pending procurement item(s), and ${pendingPayments.toLocaleString()} in pending payments.`,
+
+      design_summary: `Design records show ${drawings.length} drawing(s), ${approvedDrawings} approved/current drawing(s), and ${pendingDrawings} drawing(s) pending review.`,
 
       costing_summary: `Cost records show total contract value of ₦${totalContractValue.toLocaleString()}, total paid of ₦${totalPaid.toLocaleString()}, pending payments of ₦${pendingPayments.toLocaleString()}, and approved variations of ₦${approvedVariations.toLocaleString()}.`,
 
-      site_summary: `Site progress summary should be pulled from the Site Progress module in the next build phase.`,
+      site_summary: `${ipdReports.length} IPD report(s) were submitted for the week. ${openSnags.length} open snag(s) and ${pendingProcurement.length} pending procurement item(s) remain active.`,
 
-      hse_summary: `HSE summary should be pulled from the HSE module in the next build phase.`,
+      hse_summary: `HSE summary will pull from HSE records once HSE reporting is connected to the executive report module.`,
 
-      risk_summary: `${highRisks.length} high/open risk item(s) require attention.`,
+      risk_summary: `${openRisks.length} open risk(s) recorded, including ${highRisks.length} high risk item(s).`,
 
-      key_decisions_required: designItems
-        .filter(item => item.management_attention)
-        .map(item => `- ${item.title}`)
+      key_decisions_required: [
+        pendingDrawings > 0
+          ? `- Resolve ${pendingDrawings} pending drawing review(s).`
+          : '',
+        pendingApprovals.length > 0
+          ? `- Close ${pendingApprovals.length} pending approval item(s).`
+          : '',
+        pendingPayments > 0
+          ? `- Review pending payments totaling ₦${pendingPayments.toLocaleString()}.`
+          : '',
+        highRisks.length > 0
+          ? `- Review ${highRisks.length} high risk item(s).`
+          : '',
+      ]
+        .filter(Boolean)
         .join('\n'),
 
       management_attention: [
-        pendingDrawings > 0
-          ? `- ${pendingDrawings} drawing(s) are still pending review.`
+        pendingProcurement.length > 0
+          ? `- ${pendingProcurement.length} procurement item(s) are pending delivery.`
           : '',
-        pendingPayments > 0
-          ? `- Pending payments total ₦${pendingPayments.toLocaleString()}.`
+        openSnags.length > 0
+          ? `- ${openSnags.length} snag(s) remain open.`
           : '',
-        highRisks.length > 0
-          ? `- ${highRisks.length} high/open risk item(s) require attention.`
+        approvedVariations > 0
+          ? `- Approved variations total ₦${approvedVariations.toLocaleString()}.`
           : '',
       ]
         .filter(Boolean)
@@ -187,6 +362,11 @@ export default function PMOWeeklyReportPage() {
   }
 
   async function saveReport() {
+    if (!canManage) {
+      setNotice('Only PMO/Admin can save executive reports.')
+      return
+    }
+
     if (!projectId) {
       setNotice('No project selected.')
       return
@@ -198,6 +378,7 @@ export default function PMOWeeklyReportPage() {
       project_id: projectId,
       report_week: reportWeek,
       ...report,
+      report_rows: rows,
       status: 'Draft',
       generated_by: user?.id || null,
       updated_at: new Date().toISOString(),
@@ -222,16 +403,73 @@ export default function PMOWeeklyReportPage() {
       return
     }
 
-    setNotice('Executive Reports saved successfully.')
+    setNotice('Executive report saved successfully.')
+  }
+
+  function printExecutiveReport() {
+    window.print()
   }
 
   function updateField(key: keyof typeof report, value: string) {
     setReport(current => ({ ...current, [key]: value }))
   }
 
+  const ragCounts = useMemo(() => {
+    return {
+      green: rows.filter(row => row.rag === 'GREEN').length,
+      amber: rows.filter(row => row.rag === 'AMBER').length,
+      red: rows.filter(row => row.rag === 'RED').length,
+    }
+  }, [rows])
+
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+
+          #executive-report-print,
+          #executive-report-print * {
+            visibility: visible;
+          }
+
+          #executive-report-print {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white;
+            color: black;
+          }
+
+          .no-print {
+            display: none !important;
+          }
+
+          .print-table {
+            color: black !important;
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 10px;
+          }
+
+          .print-table th,
+          .print-table td {
+            border: 1px solid #222;
+            padding: 6px;
+            vertical-align: top;
+          }
+
+          .print-dark {
+            color: black !important;
+            background: white !important;
+          }
+        }
+      `}</style>
+
+      <section className="no-print rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
         <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
           PMO Reporting
         </div>
@@ -241,17 +479,24 @@ export default function PMOWeeklyReportPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Generate, review, save and download PMO executive reports from live project records.
+          PMO/Admin can generate and save executive reports compiled from IPD,
+          design, costing, risks, procurement, approvals and project records.
         </p>
       </section>
 
       {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="no-print rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
           {notice}
         </div>
       )}
 
-      <div className="card p-4 flex flex-wrap gap-3 items-end">
+      {!canManage && (
+        <div className="no-print card p-4 text-sm text-amber-400">
+          View only. Only PMO/Admin can generate or save executive reports.
+        </div>
+      )}
+
+      <div className="no-print card p-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="form-label">Report Week</label>
           <input
@@ -262,90 +507,235 @@ export default function PMOWeeklyReportPage() {
           />
         </div>
 
-        <button className="btn btn-gold" onClick={generateReport}>
-          <RefreshCw size={14} />
-          {loading ? 'Generating…' : 'Generate Report'}
-        </button>
+        {canManage && (
+          <>
+            <button className="btn btn-gold" onClick={generateReport}>
+              <RefreshCw size={14} />
+              {loading ? 'Generating…' : 'Generate Report'}
+            </button>
 
-        <button className="btn btn-ghost" onClick={saveReport}>
-          <Save size={14} />
-          Save Draft
+            <button className="btn btn-ghost" onClick={saveReport}>
+              <Save size={14} />
+              Save Draft
+            </button>
+          </>
+        )}
+
+        <button className="btn btn-ghost" onClick={printExecutiveReport}>
+          <Printer size={14} />
+          Print / PDF
         </button>
       </div>
 
-      <ReportSection
-        title="Executive Summary"
-        value={report.executive_summary}
-        onChange={value => updateField('executive_summary', value)}
-      />
+      <div id="executive-report-print" className="card p-6 print-dark">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4 mb-5">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#c49e48]">
+              PMO Snapshot Report
+            </div>
 
-      <ReportSection
-        title="Design Summary"
-        value={report.design_summary}
-        onChange={value => updateField('design_summary', value)}
-      />
+            <h1 className="text-2xl font-black text-[#ede8de] print-dark mt-1">
+              {projectName || 'Project'} Executive Weekly Report
+            </h1>
 
-      <ReportSection
-        title="Costing Summary"
-        value={report.costing_summary}
-        onChange={value => updateField('costing_summary', value)}
-      />
+            <div className="text-sm text-[#6e7d8c] print-dark mt-1">
+              Report Week: {fdate(reportWeek)}
+            </div>
+          </div>
 
-      <ReportSection
-        title="Site Summary"
-        value={report.site_summary}
-        onChange={value => updateField('site_summary', value)}
-      />
+          <div className="text-right text-sm text-[#6e7d8c] print-dark">
+            Generated by: {user?.full_name || user?.email || 'PMOCorex'}
+          </div>
+        </div>
 
-      <ReportSection
-        title="HSE Summary"
-        value={report.hse_summary}
-        onChange={value => updateField('hse_summary', value)}
-      />
+        <div className="grid grid-cols-3 gap-3 mb-5 no-print">
+          <Metric title="Green" value={ragCounts.green} color="text-emerald-400" />
+          <Metric title="Amber" value={ragCounts.amber} color="text-amber-400" />
+          <Metric title="Red" value={ragCounts.red} color="text-red-400" />
+        </div>
 
-      <ReportSection
-        title="Risk Summary"
-        value={report.risk_summary}
-        onChange={value => updateField('risk_summary', value)}
-      />
+        <ReportBlock
+          title="Executive Summary"
+          value={report.executive_summary}
+          editable={canManage}
+          onChange={value => updateField('executive_summary', value)}
+        />
 
-      <ReportSection
-        title="Key Decisions Required"
-        value={report.key_decisions_required}
-        onChange={value => updateField('key_decisions_required', value)}
-      />
+        <div className="mt-6">
+          <div className="text-[10px] font-mono text-[#c49e48] uppercase tracking-widest border-b border-[#c49e48]/20 pb-1 mb-3">
+            Project Performance Snapshot
+          </div>
 
-      <ReportSection
-        title="Management Attention"
-        value={report.management_attention}
-        onChange={value => updateField('management_attention', value)}
-      />
+          <div className="overflow-x-auto">
+            <table className="tbl print-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Status</th>
+                  <th>Status / Comments</th>
+                  <th>RAG</th>
+                  <th>Approved Budget</th>
+                  <th>Outstanding Works</th>
+                  <th>Risks</th>
+                  <th>Performance</th>
+                  <th>Finish By</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-6">
+                      Generate report to compile project records.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((row, index) => (
+                    <tr key={`${row.project}-${row.package_name}-${index}`}>
+                      <td>
+                        <strong>{row.project}</strong>
+                        <br />
+                        {row.package_name}
+                        <br />
+                        <span>{row.discipline}</span>
+                      </td>
+                      <td>{row.status}</td>
+                      <td className="whitespace-pre-wrap">{row.comments}</td>
+                      <td>
+                        <span
+                          className={`badge ${
+                            row.rag === 'GREEN'
+                              ? 'badge-green'
+                              : row.rag === 'RED'
+                              ? 'badge-red'
+                              : 'badge-amber'
+                          }`}
+                        >
+                          {row.rag}
+                        </span>
+                      </td>
+                      <td>{row.approved_budget}</td>
+                      <td className="whitespace-pre-wrap">
+                        {row.outstanding_works}
+                      </td>
+                      <td className="whitespace-pre-wrap">{row.risks}</td>
+                      <td>{row.performance}</td>
+                      <td>{row.finish_by ? fdate(row.finish_by) : 'TBC'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <ReportBlock
+          title="Design Summary"
+          value={report.design_summary}
+          editable={canManage}
+          onChange={value => updateField('design_summary', value)}
+        />
+
+        <ReportBlock
+          title="Costing Summary"
+          value={report.costing_summary}
+          editable={canManage}
+          onChange={value => updateField('costing_summary', value)}
+        />
+
+        <ReportBlock
+          title="Site Summary"
+          value={report.site_summary}
+          editable={canManage}
+          onChange={value => updateField('site_summary', value)}
+        />
+
+        <ReportBlock
+          title="HSE Summary"
+          value={report.hse_summary}
+          editable={canManage}
+          onChange={value => updateField('hse_summary', value)}
+        />
+
+        <ReportBlock
+          title="Risk Summary"
+          value={report.risk_summary}
+          editable={canManage}
+          onChange={value => updateField('risk_summary', value)}
+        />
+
+        <ReportBlock
+          title="Key Decisions Required"
+          value={report.key_decisions_required}
+          editable={canManage}
+          onChange={value => updateField('key_decisions_required', value)}
+        />
+
+        <ReportBlock
+          title="Management Attention"
+          value={report.management_attention}
+          editable={canManage}
+          onChange={value => updateField('management_attention', value)}
+        />
+
+        <div className="border-t border-white/10 mt-6 pt-4 text-[10px] text-[#6e7d8c] print-dark">
+          Generated by PMOCorex · {new Date().toLocaleDateString('en-GB')} ·
+          Confidential
+        </div>
+      </div>
     </div>
   )
 }
 
-function ReportSection({
+function ReportBlock({
   title,
   value,
+  editable,
   onChange,
 }: {
   title: string
   value: string
+  editable: boolean
   onChange: (value: string) => void
 }) {
   return (
-    <div className="card p-5">
+    <div className="mt-5">
       <div className="flex items-center gap-2 mb-3">
         <FileText size={16} className="text-[#c49e48]" />
-        <h2 className="font-bold text-[#ede8de]">{title}</h2>
+        <h2 className="font-bold text-[#ede8de] print-dark">{title}</h2>
       </div>
 
-      <textarea
-        className="form-control"
-        rows={4}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      />
+      {editable ? (
+        <textarea
+          className="form-control no-print"
+          rows={4}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        />
+      ) : null}
+
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-[#bfb9ae] whitespace-pre-wrap min-h-[60px] print-dark">
+        {value || '—'}
+      </div>
+    </div>
+  )
+}
+
+function Metric({
+  title,
+  value,
+  color,
+}: {
+  title: string
+  value: number
+  color: string
+}) {
+  return (
+    <div className="card p-3">
+      <div className={`font-display text-3xl font-bold ${color}`}>{value}</div>
+      <div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">
+        {title}
+      </div>
     </div>
   )
 }
