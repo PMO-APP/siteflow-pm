@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Printer,
   Plus,
   FileText,
-  CalendarDays,
   Image as ImageIcon,
   UploadCloud,
   CheckCircle,
@@ -16,6 +15,7 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
 import { canExportReports } from '@/lib/permissions'
+import ReportDocument from '@/components/reports/ReportDocument'
 import {
   useWeeklyReports,
   useUpsertWeeklyReport,
@@ -27,7 +27,7 @@ import {
   useProcurement,
   useFinancial,
 } from '@/hooks/useData'
-import { fdate, formatCurrency } from '@/lib/utils'
+import { fdate } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
@@ -51,8 +51,7 @@ function getActivityStatus(thisWeek: number, planned: number) {
 }
 
 function workflowBadge(status?: string | null) {
-  if (status === 'Approved') return 'badge-green'
-  if (status === 'Locked') return 'badge-green'
+  if (status === 'Approved' || status === 'Locked') return 'badge-green'
   if (status === 'Submitted') return 'badge-amber'
   if (status === 'Returned') return 'badge-red'
   return 'badge-muted'
@@ -62,8 +61,12 @@ export default function ReportsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
+
   const canExport = canExportReports(role)
   const canReview = isPMO(role)
+
+  const reportRef = useRef<HTMLDivElement>(null)
+  const allReportsRef = useRef<HTMLDivElement>(null)
 
   const { data: reports = [], isLoading } = useWeeklyReports()
   const { data: risks = [] } = useRisks()
@@ -79,11 +82,13 @@ export default function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+
   const [photos, setPhotos] = useState<File[]>([])
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>({})
   const [reportPhotos, setReportPhotos] = useState<any[]>([])
+  const [allReportPhotos, setAllReportPhotos] = useState<Record<string, any[]>>({})
+  const [allReportActivities, setAllReportActivities] = useState<Record<string, any[]>>({})
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
-  const [printMode, setPrintMode] = useState<'selected' | 'all'>('selected')
   const [returnComment, setReturnComment] = useState('')
 
   const selectedReport =
@@ -93,13 +98,20 @@ export default function ReportsPage() {
 
   const selectedReportAny = selectedReport as any
   const workflowStatus = selectedReportAny?.workflow_status || 'Draft'
-  const isLocked = workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
-  const isApproved = workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
+  const isLocked =
+    workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
+  const isApproved =
+    workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
+
+  const currentEmail = user?.email?.toLowerCase().trim() || ''
 
   const isCreator =
     Boolean(user?.id) &&
-    Boolean(selectedReportAny?.created_by) &&
-    selectedReportAny.created_by === user?.id
+    (
+      selectedReportAny?.created_by === user?.id ||
+      !selectedReportAny?.created_by ||
+      selectedReportAny?.reporting_officer_email?.toLowerCase().trim() === currentEmail
+    )
 
   const canEditSelectedReport =
     Boolean(selectedReport) &&
@@ -107,11 +119,7 @@ export default function ReportsPage() {
     !isApproved &&
     (isCreator || canReview)
 
-  const canAddActivity =
-    Boolean(selectedReport) &&
-    !isLocked &&
-    !isApproved &&
-    (isCreator || canReview)
+  const canAddActivity = canEditSelectedReport
 
   const [reportForm, setReportForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
@@ -191,8 +199,43 @@ export default function ReportsPage() {
     setReportPhotos(data || [])
   }
 
+  async function loadAllPrintData() {
+    if (!reports.length) return
+
+    const reportIds = reports.map((report: any) => report.id)
+
+    const [photoResult, activityResult] = await Promise.all([
+      supabase
+        .from('report_photos')
+        .select('*')
+        .in('report_id', reportIds)
+        .order('created_at', { ascending: true }),
+
+      supabase
+        .from('weekly_activities')
+        .select('*')
+        .in('report_id', reportIds),
+    ])
+
+    const photoMap: Record<string, any[]> = {}
+    const activityMap: Record<string, any[]> = {}
+
+    ;(photoResult.data || []).forEach((photo: any) => {
+      if (!photoMap[photo.report_id]) photoMap[photo.report_id] = []
+      photoMap[photo.report_id].push(photo)
+    })
+
+    ;(activityResult.data || []).forEach((activity: any) => {
+      if (!activityMap[activity.report_id]) activityMap[activity.report_id] = []
+      activityMap[activity.report_id].push(activity)
+    })
+
+    setAllReportPhotos(photoMap)
+    setAllReportActivities(activityMap)
+  }
+
   const selectedPackage = packages.find(
-    item => item.id === (selectedReport as any)?.block_id
+    item => item.id === selectedReportAny?.block_id
   )
 
   const reportGroups = useMemo(() => {
@@ -334,7 +377,6 @@ export default function ReportsPage() {
         })
 
       if (uploadError) {
-        console.error(uploadError.message)
         alert(`Photo upload failed: ${uploadError.message}`)
         setUploadingPhotos(false)
         return
@@ -356,10 +398,7 @@ export default function ReportsPage() {
           report_type: 'IPD',
         })
 
-      if (photoInsertError) {
-        console.error(photoInsertError.message)
-        alert(photoInsertError.message)
-      }
+      if (photoInsertError) alert(photoInsertError.message)
     }
 
     setUploadingPhotos(false)
@@ -376,11 +415,11 @@ export default function ReportsPage() {
           reportForm.reporting_officer_email || user?.email || '',
         created_by_role: role,
         created_by: selectedReportId
-          ? (selectedReport as any)?.created_by || user?.id || null
+          ? selectedReportAny?.created_by || user?.id || null
           : user?.id || null,
         updated_by: user?.id || null,
         workflow_status: selectedReportId
-          ? (selectedReport as any)?.workflow_status || 'Draft'
+          ? selectedReportAny?.workflow_status || 'Draft'
           : 'Draft',
         next_meeting: reportForm.next_meeting || undefined,
       } as any)
@@ -395,18 +434,15 @@ export default function ReportsPage() {
         return
       }
 
-      if (photos.length > 0) {
-        await uploadReportPhotos(reportId)
-      }
+      if (photos.length > 0) await uploadReportPhotos(reportId)
 
       setSelectedReportId(reportId)
-      await loadReportPhotos()
-
       setShowReportModal(false)
       setPhotos([])
       setPhotoCaptions({})
+
+      setTimeout(loadReportPhotos, 300)
     } catch (error: any) {
-      console.error('Save report failed:', error)
       alert(error?.message || 'Failed to save report.')
     }
   }
@@ -446,7 +482,7 @@ export default function ReportsPage() {
     setShowActivityModal(false)
   }
 
-  async function updateWorkflow(status: string, extra: Record<string, any> = {}) {
+  async function updateWorkflow(status: string) {
     if (!selectedReport?.id) return
 
     const now = new Date().toISOString()
@@ -454,7 +490,6 @@ export default function ReportsPage() {
     const payload: any = {
       workflow_status: status,
       updated_by: user?.id || null,
-      ...extra,
     }
 
     if (status === 'Submitted') {
@@ -491,76 +526,55 @@ export default function ReportsPage() {
     }
 
     setReturnComment('')
-    alert(`Report marked as ${status}.`)
+    alert(`Report marked as ${status}. Please refresh if the badge does not update immediately.`)
+  }
+
+  function printHtml(html: string, title: string) {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { margin: 0; background: white; }
+            @page { size: A4; margin: 0; }
+            .page-break { page-break-after: always; }
+            img { max-width: 100%; }
+          </style>
+        </head>
+        <body>${html}</body>
+      </html>
+    `)
+
+    printWindow.document.close()
+
+    setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }, 700)
   }
 
   function printSelectedReport() {
-    setPrintMode('selected')
-    setTimeout(() => window.print(), 50)
+    if (!reportRef.current) return
+    printHtml(reportRef.current.innerHTML, 'IPD Report')
   }
 
-  function printAllReports() {
-    setPrintMode('all')
-    setTimeout(() => window.print(), 50)
-  }
+  async function printAllReports() {
+    await loadAllPrintData()
 
-  function statusColor(status?: string | null) {
-    if (status === 'Ahead') return 'text-emerald-400'
-    if (status === 'On Track') return 'text-blue-400'
-    if (status === 'Behind') return 'text-amber-400'
-    if (status === 'Stuck') return 'text-red-400'
-    return 'text-[#c49e48]'
+    setTimeout(() => {
+      if (!allReportsRef.current) return
+      printHtml(allReportsRef.current.innerHTML, 'All IPD Reports')
+    }, 300)
   }
 
   return (
     <div className="space-y-5">
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-
-          #selected-report-print,
-          #selected-report-print *,
-          #all-reports-print,
-          #all-reports-print * {
-            visibility: visible;
-          }
-
-          #selected-report-print,
-          #all-reports-print {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white !important;
-            color: black !important;
-            padding: 24px;
-          }
-
-          .no-print {
-            display: none !important;
-          }
-
-          .print-dark,
-          .print-dark * {
-            color: black !important;
-            background: white !important;
-          }
-
-          .print-break {
-            page-break-after: always;
-          }
-        }
-
-        @media screen {
-          #all-reports-print {
-            display: none;
-          }
-        }
-      `}</style>
-
-      <div className="no-print flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-xl font-semibold text-[#ede8de]">IPD Reports</div>
           <div className="text-[11px] text-[#6e7d8c] mt-1">
@@ -588,7 +602,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="no-print grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Metric title="IPD Reports" value={reports.length} color="text-[#c49e48]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
@@ -596,7 +610,7 @@ export default function ReportsPage() {
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
-      <div className="no-print grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#ede8de] font-semibold">
             <FileText size={16} className="text-[#c49e48]" />
@@ -646,9 +660,6 @@ export default function ReportsPage() {
 
                       <div className="text-[11px] text-[#c49e48] mt-1">{packageName}</div>
                       <div className="text-[11px] text-[#6e7d8c] mt-1">
-                        Contractor: {reportAny.contractor_name || '—'}
-                      </div>
-                      <div className="text-[11px] text-[#6e7d8c] mt-1">
                         Officer: {reportAny.reporting_officer || '—'}
                       </div>
 
@@ -666,53 +677,29 @@ export default function ReportsPage() {
           )}
         </div>
 
-        <div className="card print:shadow-none">
+        <div className="space-y-3">
           {!selectedReport ? (
-            <div className="p-8 text-center text-[#6e7d8c]">
+            <div className="card p-8 text-center text-[#6e7d8c]">
               Select or create an IPD report.
             </div>
           ) : (
-            <div>
-              <ReportView
-                id="selected-report-print"
-                report={selectedReport}
-                projectName={projectName}
-                selectedPackage={selectedPackage}
-                reportPhotos={reportPhotos}
-                activities={activities}
-                contractSum={contractSum}
-                openSnags={openSnags}
-                criticalSnags={criticalSnags}
-                openRisks={openRisks}
-                pendingProcurement={pendingProcurement}
-                statusColor={statusColor}
-              />
-
-              <div className="no-print p-6 border-t border-white/[0.06] flex flex-wrap gap-2">
+            <>
+              <div className="card p-3 flex flex-wrap gap-2">
                 {canEditSelectedReport && (
-                  <button
-                    className="btn-ghost btn-sm btn"
-                    onClick={() => openEditReport(selectedReport)}
-                  >
+                  <button className="btn-ghost btn-sm btn" onClick={() => openEditReport(selectedReport)}>
                     Edit Report
                   </button>
                 )}
 
                 {canAddActivity && (
-                  <button
-                    className="btn-gold btn-sm btn"
-                    onClick={() => setShowActivityModal(true)}
-                  >
+                  <button className="btn-gold btn-sm btn" onClick={() => setShowActivityModal(true)}>
                     <Plus size={13} />
                     Add Activity
                   </button>
                 )}
 
                 {!isLocked && !isApproved && isCreator && workflowStatus === 'Draft' && (
-                  <button
-                    className="btn-ghost btn-sm btn"
-                    onClick={() => updateWorkflow('Submitted')}
-                  >
+                  <button className="btn-ghost btn-sm btn" onClick={() => updateWorkflow('Submitted')}>
                     <Send size={13} />
                     Submit
                   </button>
@@ -720,10 +707,7 @@ export default function ReportsPage() {
 
                 {canReview && workflowStatus === 'Submitted' && (
                   <>
-                    <button
-                      className="btn-gold btn-sm btn"
-                      onClick={() => updateWorkflow('Approved')}
-                    >
+                    <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Approved')}>
                       <CheckCircle size={13} />
                       Approve
                     </button>
@@ -735,10 +719,7 @@ export default function ReportsPage() {
                       onChange={e => setReturnComment(e.target.value)}
                     />
 
-                    <button
-                      className="btn-ghost btn-sm btn"
-                      onClick={() => updateWorkflow('Returned')}
-                    >
+                    <button className="btn-ghost btn-sm btn" onClick={() => updateWorkflow('Returned')}>
                       <RotateCcw size={13} />
                       Return
                     </button>
@@ -746,38 +727,51 @@ export default function ReportsPage() {
                 )}
 
                 {canReview && isApproved && !isLocked && (
-                  <button
-                    className="btn-gold btn-sm btn"
-                    onClick={() => updateWorkflow('Locked')}
-                  >
+                  <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Locked')}>
                     <Lock size={13} />
                     Lock
                   </button>
                 )}
               </div>
-            </div>
+
+              <div ref={reportRef}>
+                <ReportDocument
+                  report={selectedReport}
+                  projectName={projectName}
+                  selectedPackage={selectedPackage}
+                  activities={activities}
+                  photos={reportPhotos}
+                  contractSum={contractSum}
+                  openSnags={openSnags}
+                  criticalSnags={criticalSnags}
+                  openRisks={openRisks}
+                  pendingProcurement={pendingProcurement}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      <div id="all-reports-print">
-        {reports.map((report: any) => (
-          <div key={report.id} className="print-break">
-            <ReportView
-              report={report}
-              projectName={projectName}
-              selectedPackage={packages.find(item => item.id === report.block_id)}
-              reportPhotos={[]}
-              activities={[]}
-              contractSum={contractSum}
-              openSnags={openSnags}
-              criticalSnags={criticalSnags}
-              openRisks={openRisks}
-              pendingProcurement={pendingProcurement}
-              statusColor={statusColor}
-            />
-          </div>
-        ))}
+      <div style={{ display: 'none' }}>
+        <div ref={allReportsRef}>
+          {reports.map((report: any) => (
+            <div key={report.id} className="page-break">
+              <ReportDocument
+                report={report}
+                projectName={projectName}
+                selectedPackage={packages.find(item => item.id === report.block_id)}
+                activities={allReportActivities[report.id] || []}
+                photos={allReportPhotos[report.id] || []}
+                contractSum={contractSum}
+                openSnags={openSnags}
+                criticalSnags={criticalSnags}
+                openRisks={openRisks}
+                pendingProcurement={pendingProcurement}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {showReportModal && (
@@ -794,10 +788,7 @@ export default function ReportsPage() {
               className="form-control"
               value={reportForm.report_date}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  report_date: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, report_date: event.target.value }))
               }
             />
 
@@ -805,17 +796,12 @@ export default function ReportsPage() {
               className="form-control"
               value={reportForm.department}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  department: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, department: event.target.value }))
               }
             >
               <option value="">Select IPD Discipline</option>
               {IPD_DISCIPLINES.map(department => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
+                <option key={department} value={department}>{department}</option>
               ))}
             </select>
 
@@ -838,10 +824,7 @@ export default function ReportsPage() {
               placeholder="Contractor"
               value={reportForm.contractor_name}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  contractor_name: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, contractor_name: event.target.value }))
               }
             />
 
@@ -850,10 +833,7 @@ export default function ReportsPage() {
               placeholder="Reporting Officer"
               value={reportForm.reporting_officer}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  reporting_officer: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, reporting_officer: event.target.value }))
               }
             />
 
@@ -862,10 +842,7 @@ export default function ReportsPage() {
               placeholder="Reporting Officer Email"
               value={reportForm.reporting_officer_email}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  reporting_officer_email: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, reporting_officer_email: event.target.value }))
               }
             />
 
@@ -873,10 +850,7 @@ export default function ReportsPage() {
               className="form-control"
               value={reportForm.status}
               onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  status: event.target.value,
-                }))
+                setReportForm(current => ({ ...current, status: event.target.value }))
               }
             >
               <option>Ahead</option>
@@ -926,40 +900,29 @@ export default function ReportsPage() {
                 }}
               />
 
-              {photos.length > 0 && (
-                <div className="space-y-3">
-                  <div className="text-xs text-[#6e7d8c]">
-                    {photos.length} photo(s) selected.
-                  </div>
+              {photos.map(photo => (
+                <div key={photo.name} className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="text-xs text-[#ede8de]">{photo.name}</div>
 
-                  {photos.map(photo => (
-                    <div
-                      key={photo.name}
-                      className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
-                    >
-                      <div className="text-xs text-[#ede8de]">{photo.name}</div>
+                  <input
+                    className="form-control"
+                    placeholder="Photo caption"
+                    value={photoCaptions[photo.name] || ''}
+                    onChange={event =>
+                      setPhotoCaptions(current => ({
+                        ...current,
+                        [photo.name]: event.target.value,
+                      }))
+                    }
+                  />
 
-                      <input
-                        className="form-control"
-                        placeholder="Photo caption"
-                        value={photoCaptions[photo.name] || ''}
-                        onChange={event =>
-                          setPhotoCaptions(current => ({
-                            ...current,
-                            [photo.name]: event.target.value,
-                          }))
-                        }
-                      />
-
-                      <img
-                        src={URL.createObjectURL(photo)}
-                        alt={photo.name}
-                        className="w-full max-h-48 object-cover rounded-xl border border-white/10"
-                      />
-                    </div>
-                  ))}
+                  <img
+                    src={URL.createObjectURL(photo)}
+                    alt={photo.name}
+                    className="w-full max-h-48 object-cover rounded-xl border border-white/10"
+                  />
                 </div>
-              )}
+              ))}
             </div>
 
             <button
@@ -981,10 +944,7 @@ export default function ReportsPage() {
               placeholder="Activity"
               value={activityForm.activity}
               onChange={event =>
-                setActivityForm(current => ({
-                  ...current,
-                  activity: event.target.value,
-                }))
+                setActivityForm(current => ({ ...current, activity: event.target.value }))
               }
             />
 
@@ -1016,10 +976,7 @@ export default function ReportsPage() {
               placeholder="Remarks"
               value={activityForm.remarks}
               onChange={event =>
-                setActivityForm(current => ({
-                  ...current,
-                  remarks: event.target.value,
-                }))
+                setActivityForm(current => ({ ...current, remarks: event.target.value }))
               }
             />
 
@@ -1037,174 +994,6 @@ export default function ReportsPage() {
   )
 }
 
-function ReportView({
-  id,
-  report,
-  projectName,
-  selectedPackage,
-  reportPhotos,
-  activities,
-  contractSum,
-  openSnags,
-  criticalSnags,
-  openRisks,
-  pendingProcurement,
-  statusColor,
-}: any) {
-  return (
-    <div id={id} className="print-dark">
-      <div className="gold-bar" />
-
-      <div className="p-6 border-b border-white/[0.06]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-[#c49e48]">
-              IPD Weekly Report
-            </div>
-
-            <div className="text-2xl font-bold text-[#ede8de] mt-1">
-              {projectName}
-            </div>
-
-            <div className="text-sm text-[#6e7d8c] mt-1">
-              Report Date: {fdate(report.report_date)}
-            </div>
-
-            <div className="text-sm text-[#c49e48] mt-1">
-              Discipline: {(report as any).department || (report as any).discipline || '—'}
-            </div>
-          </div>
-
-          <div className="text-right">
-            <div className={`text-xl font-bold ${statusColor(report.status)}`}>
-              {report.status || 'On Track'}
-            </div>
-
-            <div className="mt-2">
-              <span className={`badge ${workflowBadge((report as any).workflow_status || 'Draft')}`}>
-                {(report as any).workflow_status || 'Draft'}
-              </span>
-            </div>
-
-            <div className="text-[11px] text-[#6e7d8c] mt-2">
-              Reporting Officer: {(report as any).reporting_officer || '—'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <Section title="Project / Package Information">
-          <InfoGrid
-            items={[
-              ['Project Title', projectName || '—'],
-              [
-                'Package',
-                (report as any).package_name ||
-                  selectedPackage?.package_name ||
-                  selectedPackage?.block_name ||
-                  'Project Wide',
-              ],
-              ['Discipline', (report as any).department || (report as any).discipline || '—'],
-              ['Contractor', (report as any).contractor_name || selectedPackage?.contractor_name || '—'],
-              ['Contract Sum', contractSum ? formatCurrency(contractSum) : 'TBC'],
-              ['Open Snags', openSnags],
-              ['Critical Snags', criticalSnags],
-              ['Open Risks', openRisks],
-              ['Pending Procurement', pendingProcurement],
-            ]}
-          />
-        </Section>
-
-        <Section title="Weekly Progress Activities">
-          <div className="overflow-x-auto">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Activity</th>
-                  <th>Last Week %</th>
-                  <th>This Week %</th>
-                  <th>Planned %</th>
-                  <th>Status</th>
-                  <th>Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activities.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-6 text-[#6e7d8c]">
-                      No activities added yet.
-                    </td>
-                  </tr>
-                ) : (
-                  activities.map((activity: any) => {
-                    const status =
-                      activity.activity_status ||
-                      getActivityStatus(
-                        Number(activity.this_week || 0),
-                        Number(activity.planned || 0)
-                      )
-
-                    return (
-                      <tr key={activity.id}>
-                        <td className="text-[#ede8de] font-medium">{activity.activity}</td>
-                        <td>{activity.last_week || 0}%</td>
-                        <td>{activity.this_week || 0}%</td>
-                        <td>{activity.planned || 0}%</td>
-                        <td>{status}</td>
-                        <td className="text-[#6e7d8c]">{activity.remarks || '—'}</td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-
-        <Section title="Pending Issues">
-          <TextBlock value={report.pending_issues} />
-        </Section>
-
-        <Section title="Matters Arising">
-          <TextBlock value={report.matters_arising} />
-        </Section>
-
-        <Section title="Look Ahead">
-          <TextBlock value={report.look_ahead} />
-        </Section>
-
-        <Section title="Quality Tracking">
-          <TextBlock value={report.quality_tracking} />
-        </Section>
-
-        <Section title="Procurement Tracking">
-          <TextBlock value={report.procurement_tracking} />
-        </Section>
-
-        <Section title="Safety Tracking">
-          <TextBlock value={report.safety_tracking} />
-        </Section>
-
-        <Section title="Progress Photos">
-          <PhotoGallery photos={reportPhotos} />
-        </Section>
-
-        <Section title="Next Site Meeting">
-          <div className="flex items-center gap-2 text-[#ede8de]">
-            <CalendarDays size={14} className="text-[#c49e48]" />
-            {report.next_meeting ? fdate(report.next_meeting) : 'Not set'}
-          </div>
-        </Section>
-
-        <div className="border-t border-white/[0.06] pt-4 text-[10px] text-[#6e7d8c] font-mono">
-          Generated by PMOCorex · {new Date().toLocaleDateString('en-GB')} · Confidential
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function Metric({ title, value, color }: { title: string; value: number; color: string }) {
   return (
     <div className="card p-3">
@@ -1212,64 +1001,6 @@ function Metric({ title, value, color }: { title: string; value: number; color: 
       <div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">
         {title}
       </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] font-mono text-[#c49e48] uppercase tracking-widest border-b border-[#c49e48]/20 pb-1 mb-3">
-        {title}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function TextBlock({ value }: { value?: string | null }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-[#bfb9ae] whitespace-pre-wrap min-h-[60px]">
-      {value || '—'}
-    </div>
-  )
-}
-
-function InfoGrid({ items }: { items: [string, any][] }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      {items.map(([label, value]) => (
-        <div key={label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c]">
-            {label}
-          </div>
-          <div className="text-sm text-[#ede8de] mt-1">{value || '—'}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PhotoGallery({ photos }: { photos: any[] }) {
-  if (!photos.length) return <TextBlock value="No photos attached." />
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
-      {photos.map((photo, index) => (
-        <div
-          key={photo.id || `${photo.photo_url}-${index}`}
-          className="rounded-xl border border-white/10 bg-white/[0.03] overflow-hidden break-inside-avoid"
-        >
-          <img
-            src={photo.photo_url}
-            alt={photo.photo_name || `Report photo ${index + 1}`}
-            className="w-full h-64 object-cover print:h-auto print:max-h-[320px]"
-          />
-          <div className="p-3 text-xs text-[#6e7d8c]">
-            {photo.caption || photo.photo_name || `Progress Photo ${index + 1}`}
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -1288,9 +1019,7 @@ function Modal({
       <div className="card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
-          <button onClick={onClose} className="text-[#6e7d8c] hover:text-white">
-            ✕
-          </button>
+          <button onClick={onClose} className="text-[#6e7d8c] hover:text-white">✕</button>
         </div>
         {children}
       </div>
