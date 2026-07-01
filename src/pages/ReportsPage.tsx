@@ -442,21 +442,32 @@ export default function ReportsPage() {
 
   async function saveReport() {
     try {
-      const savedReport = await upsertReport.mutateAsync({
-        id: selectedReportId || undefined,
-        ...reportForm,
-        discipline: reportForm.department,
-        reporting_officer_email: reportForm.reporting_officer_email || user?.email || '',
-        created_by_role: role,
-        created_by: selectedReportId
-          ? selectedReportAny?.created_by || user?.id || null
-          : user?.id || null,
-        updated_by: user?.id || null,
-        workflow_status: selectedReportId
-          ? selectedReportAny?.workflow_status || 'Draft'
-          : 'Draft',
-        next_meeting: reportForm.next_meeting || undefined,
-      } as any)
+     const savedReport = await upsertReport.mutateAsync({
+  id: selectedReportId || undefined,
+
+  ...reportForm,
+
+  block_id: reportForm.block_id || null,
+
+  next_meeting: reportForm.next_meeting || null,
+
+  discipline: reportForm.department,
+
+  reporting_officer_email:
+    reportForm.reporting_officer_email || user?.email || '',
+
+  created_by_role: role,
+
+  created_by: selectedReportId
+    ? selectedReportAny?.created_by || user?.id || null
+    : user?.id || null,
+
+  updated_by: user?.id || null,
+
+  workflow_status: selectedReportId
+    ? selectedReportAny?.workflow_status || 'Draft'
+    : 'Draft',
+} as any)
 
       const reportId =
         selectedReportId ||
