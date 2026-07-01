@@ -173,14 +173,23 @@ export default function ReportsPage() {
     remarks: '',
   })
 
-  useEffect(() => {
-    loadPackages()
-  }, [projectId])
+ useEffect(() => {
+  loadPackages()
+}, [projectId])
 
-  useEffect(() => {
-    loadReportPhotos()
-    loadReviewHistory()
-  }, [selectedReport?.id])
+useEffect(() => {
+  return () => {
+    setShowReportModal(false)
+    setShowActivityModal(false)
+    setShowReturnModal(false)
+    setShowRejectModal(false)
+  }
+}, [])
+
+useEffect(() => {
+  loadReportPhotos()
+  loadReviewHistory()
+}, [selectedReport?.id])
 
   function notify(type: 'success' | 'error' | 'info', text: string) {
     setNotice({ type, text })
@@ -1225,7 +1234,7 @@ function Modal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4">
       <div className="card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
