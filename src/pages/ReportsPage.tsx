@@ -9,7 +9,6 @@ import {
   Lock,
   RotateCcw,
   Send,
-  XCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
@@ -53,8 +52,8 @@ function getActivityStatus(thisWeek: number, planned: number) {
 
 function workflowBadge(status?: string | null) {
   if (status === 'Approved' || status === 'Locked') return 'badge-green'
-  if (status === 'Submitted' || status === 'Resubmitted') return 'badge-amber'
-  if (status === 'Returned' || status === 'Rejected') return 'badge-red'
+  if (status === 'Submitted') return 'badge-amber'
+  if (status === 'Returned') return 'badge-red'
   return 'badge-muted'
 }
 
@@ -83,18 +82,14 @@ export default function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
-  const [showReturnModal, setShowReturnModal] = useState(false)
-  const [showRejectModal, setShowRejectModal] = useState(false)
 
   const [photos, setPhotos] = useState<File[]>([])
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>({})
   const [reportPhotos, setReportPhotos] = useState<any[]>([])
   const [allReportPhotos, setAllReportPhotos] = useState<Record<string, any[]>>({})
   const [allReportActivities, setAllReportActivities] = useState<Record<string, any[]>>({})
-  const [reviewHistory, setReviewHistory] = useState<any[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
-  const [workflowComment, setWorkflowComment] = useState('')
-  const [notice, setNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
+  const [returnComment, setReturnComment] = useState('')
 
   const selectedReport =
     reports.find(report => report.id === selectedReportId) || reports[0]
@@ -103,15 +98,10 @@ export default function ReportsPage() {
 
   const selectedReportAny = selectedReport as any
   const workflowStatus = selectedReportAny?.workflow_status || 'Draft'
-
   const isLocked =
     workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
-
   const isApproved =
     workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
-
-  const isSubmitted =
-    workflowStatus === 'Submitted' || workflowStatus === 'Resubmitted'
 
   const currentEmail = user?.email?.toLowerCase().trim() || ''
 
@@ -123,28 +113,13 @@ export default function ReportsPage() {
       selectedReportAny?.reporting_officer_email?.toLowerCase().trim() === currentEmail
     )
 
-  const canCreatorEdit =
+  const canEditSelectedReport =
     Boolean(selectedReport) &&
-    isCreator &&
-    !canReview &&
     !isLocked &&
     !isApproved &&
-    !isSubmitted
+    (isCreator || canReview)
 
-  const canCreatorSubmit =
-    Boolean(selectedReport) &&
-    isCreator &&
-    !canReview &&
-    !isLocked &&
-    !isApproved &&
-    (workflowStatus === 'Draft' || workflowStatus === 'Returned')
-
-  const canReviewerAct =
-    Boolean(selectedReport) &&
-    canReview &&
-    isSubmitted &&
-    !isLocked &&
-    !isApproved
+  const canAddActivity = canEditSelectedReport
 
   const [reportForm, setReportForm] = useState({
     report_date: new Date().toISOString().slice(0, 10),
@@ -179,13 +154,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     loadReportPhotos()
-    loadReviewHistory()
   }, [selectedReport?.id])
-
-  function notify(type: 'success' | 'error' | 'info', text: string) {
-    setNotice({ type, text })
-    setTimeout(() => setNotice(null), 4500)
-  }
 
   async function loadPackages() {
     if (!projectId) {
@@ -230,35 +199,22 @@ export default function ReportsPage() {
     setReportPhotos(data || [])
   }
 
-  async function loadReviewHistory() {
-    if (!selectedReport?.id) {
-      setReviewHistory([])
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('report_review_history')
-      .select('*')
-      .eq('report_id', selectedReport.id)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      console.error(error.message)
-      setReviewHistory([])
-      return
-    }
-
-    setReviewHistory(data || [])
-  }
-
   async function loadAllPrintData() {
     if (!reports.length) return
 
     const reportIds = reports.map((report: any) => report.id)
 
     const [photoResult, activityResult] = await Promise.all([
-      supabase.from('report_photos').select('*').in('report_id', reportIds),
-      supabase.from('weekly_activities').select('*').in('report_id', reportIds),
+      supabase
+        .from('report_photos')
+        .select('*')
+        .in('report_id', reportIds)
+        .order('created_at', { ascending: true }),
+
+      supabase
+        .from('weekly_activities')
+        .select('*')
+        .in('report_id', reportIds),
     ])
 
     const photoMap: Record<string, any[]> = {}
@@ -305,7 +261,9 @@ export default function ReportsPage() {
   const pendingApprovals = approvals.filter(
     approval => approval.status !== 'Approved' && approval.status !== 'Rejected'
   ).length
-  const pendingProcurement = procurement.filter(item => item.status !== 'Delivered').length
+  const pendingProcurement = procurement.filter(
+    item => item.status !== 'Delivered'
+  ).length
   const contractSum = financial
     .filter(item => item.type === 'Contract Sum')
     .reduce((sum, item) => sum + item.amount, 0)
@@ -378,7 +336,9 @@ export default function ReportsPage() {
     if (savedReport.id) return savedReport.id
     if (Array.isArray(savedReport) && savedReport[0]?.id) return savedReport[0].id
     if (savedReport.data?.id) return savedReport.data.id
-    if (Array.isArray(savedReport.data) && savedReport.data[0]?.id) return savedReport.data[0].id
+    if (Array.isArray(savedReport.data) && savedReport.data[0]?.id) {
+      return savedReport.data[0].id
+    }
     return null
   }
 
@@ -411,10 +371,13 @@ export default function ReportsPage() {
 
       const { error: uploadError } = await supabase.storage
         .from('report-photos')
-        .upload(filePath, photo, { cacheControl: '3600', upsert: false })
+        .upload(filePath, photo, {
+          cacheControl: '3600',
+          upsert: false,
+        })
 
       if (uploadError) {
-        notify('error', `Photo upload failed: ${uploadError.message}`)
+        alert(`Photo upload failed: ${uploadError.message}`)
         setUploadingPhotos(false)
         return
       }
@@ -423,17 +386,19 @@ export default function ReportsPage() {
         data: { publicUrl },
       } = supabase.storage.from('report-photos').getPublicUrl(filePath)
 
-      const { error: photoInsertError } = await supabase.from('report_photos').insert({
-        report_id: reportId,
-        photo_url: publicUrl,
-        photo_name: photo.name,
-        caption: photoCaptions[photo.name] || null,
-        uploaded_by: user?.full_name || user?.email || 'User',
-        created_by: user?.id || null,
-        report_type: 'IPD',
-      })
+      const { error: photoInsertError } = await supabase
+        .from('report_photos')
+        .insert({
+          report_id: reportId,
+          photo_url: publicUrl,
+          photo_name: photo.name,
+          caption: photoCaptions[photo.name] || null,
+          uploaded_by: user?.full_name || user?.email || 'User',
+          created_by: user?.id || null,
+          report_type: 'IPD',
+        })
 
-      if (photoInsertError) notify('error', photoInsertError.message)
+      if (photoInsertError) alert(photoInsertError.message)
     }
 
     setUploadingPhotos(false)
@@ -446,7 +411,8 @@ export default function ReportsPage() {
         id: selectedReportId || undefined,
         ...reportForm,
         discipline: reportForm.department,
-        reporting_officer_email: reportForm.reporting_officer_email || user?.email || '',
+        reporting_officer_email:
+          reportForm.reporting_officer_email || user?.email || '',
         created_by_role: role,
         created_by: selectedReportId
           ? selectedReportAny?.created_by || user?.id || null
@@ -464,7 +430,7 @@ export default function ReportsPage() {
         (await findReportIdFallback())
 
       if (!reportId) {
-        notify('error', 'Report saved, but report ID could not be found for photo upload.')
+        alert('Report saved, but report ID could not be found for photo upload.')
         return
       }
 
@@ -476,9 +442,8 @@ export default function ReportsPage() {
       setPhotoCaptions({})
 
       setTimeout(loadReportPhotos, 300)
-      notify('success', 'Report saved successfully.')
     } catch (error: any) {
-      notify('error', error?.message || 'Failed to save report.')
+      alert(error?.message || 'Failed to save report.')
     }
   }
 
@@ -515,37 +480,19 @@ export default function ReportsPage() {
     })
 
     setShowActivityModal(false)
-    notify('success', 'Activity added successfully.')
   }
 
-  async function insertHistory(action: string, comment?: string | null) {
-    if (!selectedReport?.id) return
-
-    await supabase.from('report_review_history').insert({
-      report_id: selectedReport.id,
-      action,
-      comment: comment || null,
-      acted_by: user?.id || null,
-      acted_by_name: user?.full_name || user?.email || 'User',
-      acted_by_role: role || null,
-    })
-  }
-
-  async function updateWorkflow(status: string, comment?: string | null) {
+  async function updateWorkflow(status: string) {
     if (!selectedReport?.id) return
 
     const now = new Date().toISOString()
 
     const payload: any = {
       workflow_status: status,
-      workflow_comment: comment || null,
-      workflow_updated_at: now,
-      workflow_updated_by: user?.id || null,
-      workflow_updated_by_name: user?.full_name || user?.email || 'User',
       updated_by: user?.id || null,
     }
 
-    if (status === 'Submitted' || status === 'Resubmitted') {
+    if (status === 'Submitted') {
       payload.submitted_at = now
       payload.submitted_by = user?.id || null
     }
@@ -560,13 +507,7 @@ export default function ReportsPage() {
     if (status === 'Returned') {
       payload.returned_at = now
       payload.returned_by = user?.id || null
-      payload.return_comment = comment || null
-    }
-
-    if (status === 'Rejected') {
-      payload.rejected_at = now
-      payload.rejected_by = user?.id || null
-      payload.rejected_comment = comment || null
+      payload.return_comment = returnComment || null
     }
 
     if (status === 'Locked') {
@@ -580,22 +521,12 @@ export default function ReportsPage() {
       .eq('id', selectedReport.id)
 
     if (error) {
-      notify('error', error.message)
+      alert(error.message)
       return
     }
 
-    await insertHistory(status, comment)
-    await loadReviewHistory()
-
-    if (status === 'Returned') setShowReturnModal(false)
-    if (status === 'Rejected') setShowRejectModal(false)
-
-    setWorkflowComment('')
-
-    notify(
-      status === 'Returned' || status === 'Rejected' ? 'info' : 'success',
-      `Report ${status.toLowerCase()} successfully.`
-    )
+    setReturnComment('')
+    alert(`Report marked as ${status}. Please refresh if the badge does not update immediately.`)
   }
 
   function printHtml(html: string, title: string) {
@@ -643,20 +574,6 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      {notice && (
-        <div
-          className={`fixed top-5 right-5 z-[100] rounded-xl px-4 py-3 shadow-xl text-sm border ${
-            notice.type === 'success'
-              ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-200'
-              : notice.type === 'error'
-              ? 'bg-red-500/15 border-red-400/30 text-red-200'
-              : 'bg-amber-500/15 border-amber-400/30 text-amber-200'
-          }`}
-        >
-          {notice.text}
-        </div>
-      )}
-
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-xl font-semibold text-[#ede8de]">IPD Reports</div>
@@ -676,7 +593,7 @@ export default function ReportsPage() {
             Print All IPD
           </button>
 
-          {canExport && !canReview && (
+          {canExport && (
             <button className="btn-gold btn-sm btn" onClick={openNewReport}>
               <Plus size={13} />
               New IPD Report
@@ -767,62 +684,44 @@ export default function ReportsPage() {
             </div>
           ) : (
             <>
-              {workflowStatus === 'Returned' && isCreator && (
-                <div className="card p-4 border border-amber-400/30 bg-amber-500/10">
-                  <div className="text-sm font-semibold text-amber-300 mb-2">
-                    PMO Review Comment
-                  </div>
-                  <div className="text-sm text-[#ede8de] whitespace-pre-wrap">
-                    {selectedReportAny.workflow_comment ||
-                      selectedReportAny.return_comment ||
-                      'No return comment provided.'}
-                  </div>
-                </div>
-              )}
-
               <div className="card p-3 flex flex-wrap gap-2">
-                {canCreatorEdit && (
-                  <>
-                    <button className="btn-ghost btn-sm btn" onClick={() => openEditReport(selectedReport)}>
-                      Edit Report
-                    </button>
-
-                    <button className="btn-gold btn-sm btn" onClick={() => setShowActivityModal(true)}>
-                      <Plus size={13} />
-                      Add Activity
-                    </button>
-                  </>
+                {canEditSelectedReport && (
+                  <button className="btn-ghost btn-sm btn" onClick={() => openEditReport(selectedReport)}>
+                    Edit Report
+                  </button>
                 )}
 
-                {canCreatorSubmit && workflowStatus === 'Draft' && (
+                {canAddActivity && (
+                  <button className="btn-gold btn-sm btn" onClick={() => setShowActivityModal(true)}>
+                    <Plus size={13} />
+                    Add Activity
+                  </button>
+                )}
+
+                {!isLocked && !isApproved && isCreator && workflowStatus === 'Draft' && (
                   <button className="btn-ghost btn-sm btn" onClick={() => updateWorkflow('Submitted')}>
                     <Send size={13} />
                     Submit
                   </button>
                 )}
 
-                {canCreatorSubmit && workflowStatus === 'Returned' && (
-                  <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Resubmitted')}>
-                    <Send size={13} />
-                    Resubmit for Approval
-                  </button>
-                )}
-
-                {canReviewerAct && (
+                {canReview && workflowStatus === 'Submitted' && (
                   <>
                     <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Approved')}>
                       <CheckCircle size={13} />
                       Approve
                     </button>
 
-                    <button className="btn-ghost btn-sm btn" onClick={() => setShowReturnModal(true)}>
+                    <input
+                      className="form-control max-w-xs"
+                      placeholder="Return comment"
+                      value={returnComment}
+                      onChange={e => setReturnComment(e.target.value)}
+                    />
+
+                    <button className="btn-ghost btn-sm btn" onClick={() => updateWorkflow('Returned')}>
                       <RotateCcw size={13} />
                       Return
-                    </button>
-
-                    <button className="btn-ghost btn-sm btn" onClick={() => setShowRejectModal(true)}>
-                      <XCircle size={13} />
-                      Reject
                     </button>
                   </>
                 )}
@@ -835,23 +734,19 @@ export default function ReportsPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-4">
-                <div ref={reportRef}>
-                  <ReportDocument
-                    report={selectedReport}
-                    projectName={projectName}
-                    selectedPackage={selectedPackage}
-                    activities={activities}
-                    photos={reportPhotos}
-                    contractSum={contractSum}
-                    openSnags={openSnags}
-                    criticalSnags={criticalSnags}
-                    openRisks={openRisks}
-                    pendingProcurement={pendingProcurement}
-                  />
-                </div>
-
-                <WorkflowTimeline history={reviewHistory} />
+              <div ref={reportRef}>
+                <ReportDocument
+                  report={selectedReport}
+                  projectName={projectName}
+                  selectedPackage={selectedPackage}
+                  activities={activities}
+                  photos={reportPhotos}
+                  contractSum={contractSum}
+                  openSnags={openSnags}
+                  criticalSnags={criticalSnags}
+                  openRisks={openRisks}
+                  pendingProcurement={pendingProcurement}
+                />
               </div>
             </>
           )}
@@ -878,40 +773,6 @@ export default function ReportsPage() {
           ))}
         </div>
       </div>
-
-      {showReturnModal && (
-        <CommentModal
-          title="Return Report"
-          actionLabel="Return Report"
-          value={workflowComment}
-          onChange={setWorkflowComment}
-          onClose={() => setShowReturnModal(false)}
-          onSubmit={() => {
-            if (!workflowComment.trim()) {
-              notify('error', 'Return comment is required.')
-              return
-            }
-            updateWorkflow('Returned', workflowComment)
-          }}
-        />
-      )}
-
-      {showRejectModal && (
-        <CommentModal
-          title="Reject Report"
-          actionLabel="Reject Report"
-          value={workflowComment}
-          onChange={setWorkflowComment}
-          onClose={() => setShowRejectModal(false)}
-          onSubmit={() => {
-            if (!workflowComment.trim()) {
-              notify('error', 'Rejection comment is required.')
-              return
-            }
-            updateWorkflow('Rejected', workflowComment)
-          }}
-        />
-      )}
 
       {showReportModal && (
         <Modal
@@ -1133,38 +994,6 @@ export default function ReportsPage() {
   )
 }
 
-function WorkflowTimeline({ history }: { history: any[] }) {
-  return (
-    <div className="card p-4 h-fit">
-      <div className="text-sm font-semibold text-[#ede8de] mb-4">
-        Workflow History
-      </div>
-
-      {history.length === 0 ? (
-        <div className="text-xs text-[#6e7d8c]">No workflow history yet.</div>
-      ) : (
-        <div className="space-y-4">
-          {history.map(item => (
-            <div key={item.id} className="border-l border-[#c49e48]/30 pl-3">
-              <div className="text-xs font-semibold text-[#c49e48]">
-                {item.action}
-              </div>
-              <div className="text-[11px] text-[#6e7d8c] mt-1">
-                {item.acted_by_name || 'User'} · {fdate(item.created_at)}
-              </div>
-              {item.comment && (
-                <div className="mt-2 rounded-lg bg-white/[0.04] border border-white/10 p-2 text-xs text-[#bfb9ae] whitespace-pre-wrap">
-                  {item.comment}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function Metric({ title, value, color }: { title: string; value: number; color: string }) {
   return (
     <div className="card p-3">
@@ -1173,45 +1002,6 @@ function Metric({ title, value, color }: { title: string; value: number; color: 
         {title}
       </div>
     </div>
-  )
-}
-
-function CommentModal({
-  title,
-  actionLabel,
-  value,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  title: string
-  actionLabel: string
-  value: string
-  onChange: (value: string) => void
-  onClose: () => void
-  onSubmit: () => void
-}) {
-  return (
-    <Modal title={title} onClose={onClose}>
-      <div className="space-y-4">
-        <textarea
-          className="form-control"
-          rows={6}
-          placeholder="Enter review comment..."
-          value={value}
-          onChange={event => onChange(event.target.value)}
-        />
-
-        <div className="flex justify-end gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-gold" onClick={onSubmit}>
-            {actionLabel}
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }
 
