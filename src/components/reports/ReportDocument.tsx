@@ -17,21 +17,17 @@ export default function ReportDocument({
   criticalSnags = 0,
   openRisks = 0,
   pendingProcurement = 0,
+  projectHealth,
 }: any) {
   if (!report) return null
-
-  const workflowStatus = report.workflow_status || 'Draft'
 
   return (
     <div className="report-document">
       <style>{`
-        @page {
-          size: A4 portrait;
-          margin: 0;
-        }
+        @page { size: A4 portrait; margin: 0; }
 
         .report-document {
-          background: #ffffff;
+          background: #fff;
           color: #111827;
           width: 210mm;
           min-height: 297mm;
@@ -41,24 +37,34 @@ export default function ReportDocument({
           font-size: 11px;
           line-height: 1.4;
           margin: 0 auto;
-          overflow: visible;
         }
 
         .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
           border-bottom: 3px solid #c49e48;
           padding-bottom: 10px;
           margin-bottom: 14px;
         }
 
-        .report-title {
-          font-size: 20px;
+        .project-name {
+          font-size: 26px;
           font-weight: 800;
           margin: 0;
         }
 
-        .report-subtitle {
-          color: #555;
+        .report-date {
           margin-top: 4px;
+          color: #555;
+          font-size: 12px;
+        }
+
+        .brand {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .18em;
+          color: #7a5a12;
         }
 
         .report-section {
@@ -85,6 +91,13 @@ export default function ReportDocument({
           width: 100%;
         }
 
+        .health-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 7px;
+          width: 100%;
+        }
+
         .report-info-box {
           border: 1px solid #ddd;
           padding: 7px;
@@ -104,6 +117,9 @@ export default function ReportDocument({
           margin-top: 3px;
           word-break: break-word;
         }
+
+        .delay-red { color: #b91c1c; }
+        .delay-green { color: #047857; }
 
         .report-table {
           width: 100%;
@@ -184,8 +200,7 @@ export default function ReportDocument({
         }
 
         @media print {
-          html,
-          body {
+          html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
@@ -203,6 +218,31 @@ export default function ReportDocument({
         }
       `}</style>
 
+      <div className="report-header">
+        <div>
+          <h1 className="project-name">{projectName || 'Project'}</h1>
+          <div className="report-date">{fdate(report.report_date)}</div>
+        </div>
+        <div className="brand">PMOCOREX</div>
+      </div>
+
+      <Section title="Project Health">
+        <div className="health-grid">
+          <Info label="Project Start" value={projectHealth?.startDate ? fdate(projectHealth.startDate) : '—'} />
+          <Info label="Planned Finish" value={projectHealth?.finishDate ? fdate(projectHealth.finishDate) : '—'} />
+          <Info label="Overall Progress" value={`${projectHealth?.overallProgress ?? 0}%`} />
+          <Info
+            label="Schedule Delay"
+            value={
+              projectHealth?.delayDays > 0
+                ? `${projectHealth.delayDays} Days Behind`
+                : 'On Schedule'
+            }
+            valueClass={projectHealth?.delayDays > 0 ? 'delay-red' : 'delay-green'}
+          />
+        </div>
+      </Section>
+
       <Section title="Project / Package Information">
         <div className="report-grid">
           <Info label="Project" value={projectName || '—'} />
@@ -219,9 +259,9 @@ export default function ReportDocument({
           <Info label="Contractor" value={report.contractor_name || selectedPackage?.contractor_name || '—'} />
           <Info label="Reporting Officer" value={report.reporting_officer || '—'} />
           <Info label="Officer Email" value={report.reporting_officer_email || '—'} />
-          <Info label="Report Status" value={report.status || 'On Track'} />
-          <Info label="Workflow Status" value={workflowStatus} />
+          <Info label="Report Status" value={projectHealth?.status || report.status || 'On Track'} />
           <Info label="Contract Sum" value={contractSum ? formatCurrency(contractSum) : 'TBC'} />
+          <Info label="Generated Date" value={new Date().toLocaleDateString('en-GB')} />
         </div>
       </Section>
 
@@ -232,7 +272,7 @@ export default function ReportDocument({
           <Info label="Open Risks" value={openRisks} />
           <Info label="Pending Procurement" value={pendingProcurement} />
           <Info label="Next Site Meeting" value={report.next_meeting ? fdate(report.next_meeting) : 'Not set'} />
-          <Info label="Generated Date" value={new Date().toLocaleDateString('en-GB')} />
+          <Info label="Workflow Status" value={report.workflow_status || 'Draft'} />
         </div>
       </Section>
 
@@ -337,11 +377,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Info({ label, value }: { label: string; value: any }) {
+function Info({
+  label,
+  value,
+  valueClass = '',
+}: {
+  label: string
+  value: any
+  valueClass?: string
+}) {
   return (
     <div className="report-info-box">
       <div className="report-label">{label}</div>
-      <div className="report-value">{value || '—'}</div>
+      <div className={`report-value ${valueClass}`}>{value || '—'}</div>
     </div>
   )
 }
