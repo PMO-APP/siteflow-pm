@@ -203,14 +203,6 @@ export default function ReportDocument({
         }
       `}</style>
 
-      <div className="report-header">
-        <div className="report-label">PMOCorex</div>
-        <h1 className="report-title">Internal Project Delivery Weekly Report</h1>
-        <div className="report-subtitle">
-          {projectName || 'Project'} · {fdate(report.report_date)}
-        </div>
-      </div>
-
       <Section title="Project / Package Information">
         <div className="report-grid">
           <Info label="Project" value={projectName || '—'} />
