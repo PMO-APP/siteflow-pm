@@ -1,4 +1,3 @@
-import { CalendarDays } from 'lucide-react'
 import { fdate, formatCurrency } from '@/lib/utils'
 
 function getActivityStatus(thisWeek: number, planned: number) {
@@ -26,19 +25,33 @@ export default function ReportDocument({
   return (
     <div className="report-document">
       <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
+
         .report-document {
-          background: white;
+          background: #ffffff;
           color: #111827;
           width: 210mm;
           min-height: 297mm;
-          padding: 18mm;
+          padding: 12mm;
+          box-sizing: border-box;
           font-family: Arial, sans-serif;
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 11px;
+          line-height: 1.4;
+          margin: 0 auto;
+          overflow: visible;
+        }
+
+        .report-header {
+          border-bottom: 3px solid #c49e48;
+          padding-bottom: 10px;
+          margin-bottom: 14px;
         }
 
         .report-title {
-          font-size: 22px;
+          font-size: 20px;
           font-weight: 800;
           margin: 0;
         }
@@ -48,42 +61,39 @@ export default function ReportDocument({
           margin-top: 4px;
         }
 
-        .report-header {
-          border-bottom: 3px solid #c49e48;
-          padding-bottom: 12px;
-          margin-bottom: 18px;
-        }
-
         .report-section {
-          margin-top: 18px;
+          margin-top: 14px;
+          break-inside: avoid;
           page-break-inside: avoid;
         }
 
         .report-section-title {
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 800;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
           color: #7a5a12;
           border-bottom: 1px solid #d6c38a;
           padding-bottom: 5px;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
 
         .report-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
+          gap: 7px;
+          width: 100%;
         }
 
         .report-info-box {
           border: 1px solid #ddd;
-          padding: 8px;
-          border-radius: 6px;
+          padding: 7px;
+          border-radius: 5px;
+          min-height: 38px;
         }
 
         .report-label {
-          font-size: 9px;
+          font-size: 8.5px;
           color: #666;
           text-transform: uppercase;
           letter-spacing: 0.08em;
@@ -92,19 +102,22 @@ export default function ReportDocument({
         .report-value {
           font-weight: 700;
           margin-top: 3px;
+          word-break: break-word;
         }
 
         .report-table {
           width: 100%;
           border-collapse: collapse;
+          table-layout: fixed;
         }
 
         .report-table th,
         .report-table td {
           border: 1px solid #333;
-          padding: 6px;
+          padding: 5px;
           vertical-align: top;
-          font-size: 11px;
+          font-size: 10.5px;
+          word-break: break-word;
         }
 
         .report-table th {
@@ -114,69 +127,78 @@ export default function ReportDocument({
 
         .report-text-box {
           border: 1px solid #ddd;
-          border-radius: 6px;
-          padding: 10px;
-          min-height: 40px;
+          border-radius: 5px;
+          padding: 8px;
+          min-height: 34px;
           white-space: pre-wrap;
+          word-break: break-word;
         }
 
         .photo-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
+          gap: 10px;
         }
 
         .photo-card {
           border: 1px solid #ddd;
-          border-radius: 6px;
+          border-radius: 5px;
           overflow: hidden;
+          break-inside: avoid;
           page-break-inside: avoid;
         }
 
         .photo-card img {
           width: 100%;
-          max-height: 260px;
-          object-fit: contain;
+          height: 58mm;
+          object-fit: cover;
           background: #f9fafb;
           display: block;
         }
 
         .photo-caption {
-          padding: 8px;
-          font-size: 11px;
+          padding: 7px;
+          font-size: 10.5px;
           color: #555;
         }
 
         .signature-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-          margin-top: 28px;
+          gap: 14px;
+          margin-top: 24px;
         }
 
         .signature-box {
           border-top: 1px solid #111;
           padding-top: 6px;
-          min-height: 50px;
+          min-height: 45px;
         }
 
         .footer {
           border-top: 1px solid #ddd;
-          margin-top: 24px;
+          margin-top: 20px;
           padding-top: 8px;
-          font-size: 10px;
+          font-size: 9.5px;
           color: #666;
         }
 
         @media print {
-          .report-document {
-            width: auto;
-            min-height: auto;
-            padding: 0;
+          html,
+          body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            width: 210mm !important;
           }
 
-          .report-section {
-            page-break-inside: avoid;
+          .report-document {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            padding: 12mm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            max-width: none !important;
           }
         }
       `}</style>
@@ -217,10 +239,7 @@ export default function ReportDocument({
           <Info label="Critical Snags" value={criticalSnags} />
           <Info label="Open Risks" value={openRisks} />
           <Info label="Pending Procurement" value={pendingProcurement} />
-          <Info
-            label="Next Site Meeting"
-            value={report.next_meeting ? fdate(report.next_meeting) : 'Not set'}
-          />
+          <Info label="Next Site Meeting" value={report.next_meeting ? fdate(report.next_meeting) : 'Not set'} />
           <Info label="Generated Date" value={new Date().toLocaleDateString('en-GB')} />
         </div>
       </Section>
@@ -246,10 +265,7 @@ export default function ReportDocument({
               activities.map((activity: any) => {
                 const status =
                   activity.activity_status ||
-                  getActivityStatus(
-                    Number(activity.this_week || 0),
-                    Number(activity.planned || 0)
-                  )
+                  getActivityStatus(Number(activity.this_week || 0), Number(activity.planned || 0))
 
                 return (
                   <tr key={activity.id}>
@@ -267,29 +283,12 @@ export default function ReportDocument({
         </table>
       </Section>
 
-      <Section title="Pending Issues">
-        <TextBox value={report.pending_issues} />
-      </Section>
-
-      <Section title="Matters Arising">
-        <TextBox value={report.matters_arising} />
-      </Section>
-
-      <Section title="Look Ahead">
-        <TextBox value={report.look_ahead} />
-      </Section>
-
-      <Section title="Quality Tracking">
-        <TextBox value={report.quality_tracking} />
-      </Section>
-
-      <Section title="Procurement Tracking">
-        <TextBox value={report.procurement_tracking} />
-      </Section>
-
-      <Section title="Safety Tracking">
-        <TextBox value={report.safety_tracking} />
-      </Section>
+      <Section title="Pending Issues"><TextBox value={report.pending_issues} /></Section>
+      <Section title="Matters Arising"><TextBox value={report.matters_arising} /></Section>
+      <Section title="Look Ahead"><TextBox value={report.look_ahead} /></Section>
+      <Section title="Quality Tracking"><TextBox value={report.quality_tracking} /></Section>
+      <Section title="Procurement Tracking"><TextBox value={report.procurement_tracking} /></Section>
+      <Section title="Safety Tracking"><TextBox value={report.safety_tracking} /></Section>
 
       <Section title="Progress Photos">
         {photos.length === 0 ? (
