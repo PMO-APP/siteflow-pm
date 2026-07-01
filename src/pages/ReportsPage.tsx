@@ -687,12 +687,12 @@ export default function ReportsPage() {
             Print All IPD
           </button>
 
-          {canExport && !canReview && (
-            <button className="btn-gold btn-sm btn" onClick={openNewReport}>
-              <Plus size={13} />
-              New IPD Report
-            </button>
-          )}
+          {canExport && (
+  <button className="btn-gold btn-sm btn" onClick={openNewReport}>
+    <Plus size={13} />
+    New IPD Report
+  </button>
+)}
         </div>
       </div>
 
