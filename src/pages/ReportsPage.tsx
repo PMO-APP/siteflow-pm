@@ -20,8 +20,6 @@ import ReportDocument from '@/components/reports/ReportDocument'
 import {
   useWeeklyReports,
   useUpsertWeeklyReport,
-  useWeeklyActivities,
-  useUpsertWeeklyActivity,
   useRisks,
   useSnags,
   useApprovals,
@@ -45,17 +43,30 @@ function inferDiscipline(role?: string | null) {
   return ''
 }
 
-function getActivityStatus(thisWeek: number, planned: number) {
-  if (thisWeek >= planned) return 'On Track'
-  if (planned - thisWeek <= 10) return 'Behind'
-  return 'Stuck'
-}
-
 function workflowBadge(status?: string | null) {
   if (status === 'Approved' || status === 'Locked') return 'badge-green'
   if (status === 'Submitted' || status === 'Resubmitted') return 'badge-amber'
   if (status === 'Returned' || status === 'Rejected') return 'badge-red'
   return 'badge-muted'
+}
+
+function getWeekRange(dateValue?: string | null) {
+  const date = dateValue ? new Date(dateValue) : new Date()
+  const day = date.getDay()
+  const diffToMonday = day === 0 ? -6 : 1 - day
+
+  const start = new Date(date)
+  start.setDate(date.getDate() + diffToMonday)
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  end.setHours(23, 59, 59, 999)
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  }
 }
 
 export default function ReportsPage() {
@@ -77,12 +88,10 @@ export default function ReportsPage() {
   const { data: financial = [] } = useFinancial()
 
   const upsertReport = useUpsertWeeklyReport()
-  const upsertActivity = useUpsertWeeklyActivity()
 
   const [packages, setPackages] = useState<any[]>([])
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
-  const [showActivityModal, setShowActivityModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
 
@@ -91,6 +100,7 @@ export default function ReportsPage() {
   const [reportPhotos, setReportPhotos] = useState<any[]>([])
   const [allReportPhotos, setAllReportPhotos] = useState<Record<string, any[]>>({})
   const [allReportActivities, setAllReportActivities] = useState<Record<string, any[]>>({})
+  const [scheduleActivities, setScheduleActivities] = useState<any[]>([])
   const [reviewHistory, setReviewHistory] = useState<any[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [workflowComment, setWorkflowComment] = useState('')
@@ -99,19 +109,12 @@ export default function ReportsPage() {
   const selectedReport =
     reports.find(report => report.id === selectedReportId) || reports[0]
 
-  const { data: activities = [] } = useWeeklyActivities(selectedReport?.id)
-
   const selectedReportAny = selectedReport as any
   const workflowStatus = selectedReportAny?.workflow_status || 'Draft'
 
-  const isLocked =
-    workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
-
-  const isApproved =
-    workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
-
-  const isSubmitted =
-    workflowStatus === 'Submitted' || workflowStatus === 'Resubmitted'
+  const isLocked = workflowStatus === 'Locked' || Boolean(selectedReportAny?.locked_at)
+  const isApproved = workflowStatus === 'Approved' || Boolean(selectedReportAny?.approved_at)
+  const isSubmitted = workflowStatus === 'Submitted' || workflowStatus === 'Resubmitted'
 
   const currentEmail = user?.email?.toLowerCase().trim() || ''
 
@@ -119,35 +122,29 @@ export default function ReportsPage() {
     Boolean(user?.id) &&
     (
       selectedReportAny?.created_by === user?.id ||
-      !selectedReportAny?.created_by ||
       selectedReportAny?.reporting_officer_email?.toLowerCase().trim() === currentEmail
     )
 
   const canCreatorEdit =
     Boolean(selectedReport) &&
     isCreator &&
-    !canReview &&
-    !isLocked &&
-    !isApproved &&
-    !isSubmitted
+    (workflowStatus === 'Draft' || workflowStatus === 'Returned')
 
   const canCreatorSubmit =
     Boolean(selectedReport) &&
     isCreator &&
     !canReview &&
-    !isLocked &&
-    !isApproved &&
     (workflowStatus === 'Draft' || workflowStatus === 'Returned')
 
   const canReviewerAct =
     Boolean(selectedReport) &&
     canReview &&
+    !isCreator &&
     isSubmitted &&
     !isLocked &&
     !isApproved
 
   const [reportForm, setReportForm] = useState({
-    report_date: new Date().toISOString().slice(0, 10),
     department: inferDiscipline(role),
     block_id: '',
     package_name: '',
@@ -164,22 +161,14 @@ export default function ReportsPage() {
     safety_tracking: '',
   })
 
-  const [activityForm, setActivityForm] = useState({
-    activity: '',
-    last_week: 0,
-    this_week: 0,
-    planned: 0,
-    activity_status: 'On Track',
-    remarks: '',
-  })
-
   useEffect(() => {
     loadPackages()
   }, [projectId])
 
   useEffect(() => {
-    loadReportPhotos()
+    loadReportPhotos(selectedReport?.id)
     loadReviewHistory()
+    loadScheduleActivities()
   }, [selectedReport?.id])
 
   function notify(type: 'success' | 'error' | 'info', text: string) {
@@ -209,8 +198,8 @@ export default function ReportsPage() {
     setPackages(data || [])
   }
 
-  async function loadReportPhotos() {
-    if (!selectedReport?.id) {
+  async function loadReportPhotos(reportId?: string | null) {
+    if (!reportId) {
       setReportPhotos([])
       return
     }
@@ -218,7 +207,7 @@ export default function ReportsPage() {
     const { data, error } = await supabase
       .from('report_photos')
       .select('*')
-      .eq('report_id', selectedReport.id)
+      .eq('report_id', reportId)
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -251,28 +240,113 @@ export default function ReportsPage() {
     setReviewHistory(data || [])
   }
 
+  async function loadScheduleActivities() {
+    if (!selectedReport?.id || !projectId) {
+      setScheduleActivities([])
+      return
+    }
+
+    const reportAny = selectedReport as any
+    const { start, end } = getWeekRange(reportAny.report_date)
+
+    let query = supabase
+      .from('task_progress_logs')
+      .select('*, tasks(*)')
+      .eq('project_id', projectId)
+      .gte('created_at', start)
+      .lte('created_at', end)
+      .order('created_at', { ascending: true })
+
+    if (reportAny.block_id) {
+      query = query.eq('block_id', reportAny.block_id)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error(error.message)
+      setScheduleActivities([])
+      return
+    }
+
+    const mapped = (data || []).map((item: any) => ({
+      id: item.id,
+      activity:
+        item.tasks?.task_name ||
+        item.tasks?.name ||
+        item.tasks?.activity ||
+        item.tasks?.title ||
+        `Task ${item.task_id || ''}`,
+      last_week: Number(item.previous_progress || 0),
+      this_week: Number(item.new_progress || 0),
+      planned: Number(item.tasks?.planned_progress || item.tasks?.progress_pct || item.new_progress || 0),
+      activity_status:
+        Number(item.new_progress || 0) >= Number(item.previous_progress || 0)
+          ? 'Updated'
+          : 'Reduced',
+      remarks:
+        item.comments ||
+        item.recovery_action ||
+        item.delay_reason ||
+        'Progress updated from schedule.',
+    }))
+
+    setScheduleActivities(mapped)
+  }
+
   async function loadAllPrintData() {
-    if (!reports.length) return
+    if (!reports.length || !projectId) return
 
     const reportIds = reports.map((report: any) => report.id)
 
-    const [photoResult, activityResult] = await Promise.all([
-      supabase.from('report_photos').select('*').in('report_id', reportIds),
-      supabase.from('weekly_activities').select('*').in('report_id', reportIds),
-    ])
+    const photoResult = await supabase
+      .from('report_photos')
+      .select('*')
+      .in('report_id', reportIds)
+      .order('created_at', { ascending: true })
 
     const photoMap: Record<string, any[]> = {}
-    const activityMap: Record<string, any[]> = {}
-
     ;(photoResult.data || []).forEach((photo: any) => {
       if (!photoMap[photo.report_id]) photoMap[photo.report_id] = []
       photoMap[photo.report_id].push(photo)
     })
 
-    ;(activityResult.data || []).forEach((activity: any) => {
-      if (!activityMap[activity.report_id]) activityMap[activity.report_id] = []
-      activityMap[activity.report_id].push(activity)
-    })
+    const activityMap: Record<string, any[]> = {}
+
+    for (const report of reports as any[]) {
+      const { start, end } = getWeekRange(report.report_date)
+
+      let query = supabase
+        .from('task_progress_logs')
+        .select('*, tasks(*)')
+        .eq('project_id', projectId)
+        .gte('created_at', start)
+        .lte('created_at', end)
+        .order('created_at', { ascending: true })
+
+      if (report.block_id) query = query.eq('block_id', report.block_id)
+
+      const { data } = await query
+
+      activityMap[report.id] = (data || []).map((item: any) => ({
+        id: item.id,
+        activity:
+          item.tasks?.task_name ||
+          item.tasks?.name ||
+          item.tasks?.activity ||
+          item.tasks?.title ||
+          `Task ${item.task_id || ''}`,
+        last_week: Number(item.previous_progress || 0),
+        this_week: Number(item.new_progress || 0),
+        planned: Number(item.tasks?.planned_progress || item.tasks?.progress_pct || item.new_progress || 0),
+        activity_status: 'Updated',
+        remarks:
+          item.comments ||
+          item.recovery_action ||
+          item.delay_reason ||
+          'Progress updated from schedule.',
+      }))
+    }
 
     setAllReportPhotos(photoMap)
     setAllReportActivities(activityMap)
@@ -312,7 +386,6 @@ export default function ReportsPage() {
 
   function openNewReport() {
     setReportForm({
-      report_date: new Date().toISOString().slice(0, 10),
       department: inferDiscipline(role),
       block_id: '',
       package_name: '',
@@ -339,7 +412,6 @@ export default function ReportsPage() {
     const reportAny = report as any
 
     setReportForm({
-      report_date: report.report_date || new Date().toISOString().slice(0, 10),
       department: reportAny.department || reportAny.discipline || '',
       block_id: reportAny.block_id || '',
       package_name: reportAny.package_name || '',
@@ -369,7 +441,7 @@ export default function ReportsPage() {
       ...current,
       block_id: packageId,
       package_name: pkg?.package_name || pkg?.block_name || '',
-      contractor_name: pkg?.contractor_name || '',
+      contractor_name: pkg?.contractor_name || current.contractor_name || '',
     }))
   }
 
@@ -385,18 +457,14 @@ export default function ReportsPage() {
   async function findReportIdFallback() {
     if (!projectId) return null
 
-    let query = supabase
+    const { data } = await supabase
       .from('weekly_reports')
       .select('id')
       .eq('project_id', projectId)
-      .eq('report_date', reportForm.report_date)
       .order('created_at', { ascending: false })
       .limit(1)
+      .maybeSingle()
 
-    if (reportForm.department) query = query.eq('department', reportForm.department)
-    if (reportForm.block_id) query = query.eq('block_id', reportForm.block_id)
-
-    const { data } = await query.maybeSingle()
     return data?.id || null
   }
 
@@ -442,32 +510,53 @@ export default function ReportsPage() {
 
   async function saveReport() {
     try {
-     const savedReport = await upsertReport.mutateAsync({
-  id: selectedReportId || undefined,
+      const now = new Date().toISOString()
+      const isNewReport = !selectedReportId
+      const initialWorkflowStatus = canReview ? 'Approved' : 'Draft'
 
-  ...reportForm,
+      const savedReport = await upsertReport.mutateAsync({
+        id: selectedReportId || undefined,
 
-  block_id: reportForm.block_id || null,
+        ...reportForm,
 
-  next_meeting: reportForm.next_meeting || null,
+        report_date: isNewReport
+          ? new Date().toISOString().slice(0, 10)
+          : selectedReportAny?.report_date,
 
-  discipline: reportForm.department,
+        block_id: reportForm.block_id || null,
+        next_meeting: reportForm.next_meeting || null,
 
-  reporting_officer_email:
-    reportForm.reporting_officer_email || user?.email || '',
+        discipline: reportForm.department,
 
-  created_by_role: role,
+        reporting_officer_email:
+          reportForm.reporting_officer_email || user?.email || '',
 
-  created_by: selectedReportId
-    ? selectedReportAny?.created_by || user?.id || null
-    : user?.id || null,
+        created_by_role: selectedReportId
+          ? selectedReportAny?.created_by_role || role
+          : role,
 
-  updated_by: user?.id || null,
+        created_by: selectedReportId
+          ? selectedReportAny?.created_by || user?.id || null
+          : user?.id || null,
 
-  workflow_status: selectedReportId
-    ? selectedReportAny?.workflow_status || 'Draft'
-    : 'Draft',
-} as any)
+        updated_by: user?.id || null,
+
+        workflow_status: selectedReportId
+          ? selectedReportAny?.workflow_status || initialWorkflowStatus
+          : initialWorkflowStatus,
+
+        ...(isNewReport && canReview
+          ? {
+              approved_at: now,
+              approved_by: user?.id || null,
+              reviewed_at: now,
+              reviewed_by: user?.id || null,
+              workflow_updated_at: now,
+              workflow_updated_by: user?.id || null,
+              workflow_updated_by_name: user?.full_name || user?.email || 'PMO/Admin',
+            }
+          : {}),
+      } as any)
 
       const reportId =
         selectedReportId ||
@@ -481,52 +570,22 @@ export default function ReportsPage() {
 
       if (photos.length > 0) await uploadReportPhotos(reportId)
 
+      await loadReportPhotos(reportId)
+
       setSelectedReportId(reportId)
       setShowReportModal(false)
       setPhotos([])
       setPhotoCaptions({})
 
-      setTimeout(loadReportPhotos, 300)
-      notify('success', 'Report saved successfully.')
+      notify(
+        'success',
+        canReview && isNewReport
+          ? 'PMO report created and approved automatically.'
+          : 'Report saved successfully.'
+      )
     } catch (error: any) {
       notify('error', error?.message || 'Failed to save report.')
     }
-  }
-
-  async function saveActivity() {
-    if (!selectedReport?.id || !activityForm.activity.trim()) return
-
-    const reportAny = selectedReport as any
-    const status = getActivityStatus(
-      Number(activityForm.this_week || 0),
-      Number(activityForm.planned || 0)
-    )
-
-    await upsertActivity.mutateAsync({
-      report_id: selectedReport.id,
-      activity: activityForm.activity,
-      last_week: Number(activityForm.last_week || 0),
-      this_week: Number(activityForm.this_week || 0),
-      planned: Number(activityForm.planned || 0),
-      activity_status: status,
-      remarks: activityForm.remarks || undefined,
-      block_id: reportAny.block_id || null,
-      package_name: reportAny.package_name || null,
-      contractor_name: reportAny.contractor_name || null,
-      discipline: reportAny.department || reportAny.discipline || null,
-    } as any)
-
-    setActivityForm({
-      activity: '',
-      last_week: 0,
-      this_week: 0,
-      planned: 0,
-      activity_status: 'On Track',
-      remarks: '',
-    })
-
-    setShowActivityModal(false)
-    notify('success', 'Activity added successfully.')
   }
 
   async function insertHistory(action: string, comment?: string | null) {
@@ -688,11 +747,11 @@ export default function ReportsPage() {
           </button>
 
           {canExport && (
-  <button className="btn-gold btn-sm btn" onClick={openNewReport}>
-    <Plus size={13} />
-    New IPD Report
-  </button>
-)}
+            <button className="btn-gold btn-sm btn" onClick={openNewReport}>
+              <Plus size={13} />
+              New IPD Report
+            </button>
+          )}
         </div>
       </div>
 
@@ -793,16 +852,9 @@ export default function ReportsPage() {
 
               <div className="card p-3 flex flex-wrap gap-2">
                 {canCreatorEdit && (
-                  <>
-                    <button className="btn-ghost btn-sm btn" onClick={() => openEditReport(selectedReport)}>
-                      Edit Report
-                    </button>
-
-                    <button className="btn-gold btn-sm btn" onClick={() => setShowActivityModal(true)}>
-                      <Plus size={13} />
-                      Add Activity
-                    </button>
-                  </>
+                  <button className="btn-ghost btn-sm btn" onClick={() => openEditReport(selectedReport)}>
+                    Edit Report
+                  </button>
                 )}
 
                 {canCreatorSubmit && workflowStatus === 'Draft' && (
@@ -838,7 +890,7 @@ export default function ReportsPage() {
                   </>
                 )}
 
-                {canReview && isApproved && !isLocked && (
+                {canReview && !isCreator && isApproved && !isLocked && (
                   <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Locked')}>
                     <Lock size={13} />
                     Lock
@@ -852,7 +904,7 @@ export default function ReportsPage() {
                     report={selectedReport}
                     projectName={projectName}
                     selectedPackage={selectedPackage}
-                    activities={activities}
+                    activities={scheduleActivities}
                     photos={reportPhotos}
                     contractSum={contractSum}
                     openSnags={openSnags}
@@ -933,14 +985,9 @@ export default function ReportsPage() {
           }}
         >
           <div className="space-y-3">
-            <input
-              type="date"
-              className="form-control"
-              value={reportForm.report_date}
-              onChange={event =>
-                setReportForm(current => ({ ...current, report_date: event.target.value }))
-              }
-            />
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-[#9aa6b2]">
+              Report date is generated automatically on submission date and cannot be backdated.
+            </div>
 
             <select
               className="form-control"
@@ -1085,61 +1132,6 @@ export default function ReportsPage() {
           </div>
         </Modal>
       )}
-
-      {showActivityModal && (
-        <Modal title="Add Weekly Activity" onClose={() => setShowActivityModal(false)}>
-          <div className="space-y-3">
-            <input
-              className="form-control"
-              placeholder="Activity"
-              value={activityForm.activity}
-              onChange={event =>
-                setActivityForm(current => ({ ...current, activity: event.target.value }))
-              }
-            />
-
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                ['last_week', 'Last Week %'],
-                ['this_week', 'This Week %'],
-                ['planned', 'Planned %'],
-              ].map(([key, label]) => (
-                <input
-                  key={key}
-                  type="number"
-                  className="form-control"
-                  placeholder={label}
-                  value={(activityForm as any)[key]}
-                  onChange={event =>
-                    setActivityForm(current => ({
-                      ...current,
-                      [key]: Number(event.target.value),
-                    }))
-                  }
-                />
-              ))}
-            </div>
-
-            <textarea
-              className="form-control"
-              rows={2}
-              placeholder="Remarks"
-              value={activityForm.remarks}
-              onChange={event =>
-                setActivityForm(current => ({ ...current, remarks: event.target.value }))
-              }
-            />
-
-            <button
-              className="btn-gold btn w-full justify-center"
-              onClick={saveActivity}
-              disabled={upsertActivity.isPending}
-            >
-              {upsertActivity.isPending ? 'Saving…' : 'Save Activity'}
-            </button>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }
@@ -1236,7 +1228,7 @@ function Modal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <div className="card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
