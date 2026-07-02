@@ -369,22 +369,7 @@ export default function ReportDocument({
         </div>
       </div>
 
-      <Section title="Project Health">
-        <div className="health-grid">
-          <Info label="Project Start" value={projectHealth?.startDate ? fdate(projectHealth.startDate) : '—'} />
-          <Info label="Planned Finish" value={projectHealth?.finishDate ? fdate(projectHealth.finishDate) : '—'} />
-          <Info label="Planned Progress" value={`${plannedProgress}%`} />
-          <Info label="Actual Progress" value={`${progress}%`} />
-          <Info
-            label="Variance"
-            value={varianceLabel}
-            valueClass={Number(projectHealth?.varianceDays || 0) < 0 ? 'delay-red' : 'delay-green'}
-          />
-          <Info label="Project Health" value={status} valueClass={healthClass(status)} />
-          <Info label="Open Risks" value={openRisks} />
-          <Info label="Critical Snags" value={criticalSnags} />
-        </div>
-      </Section>
+      
 
       <Section title="Status Summary">
         <TextBox value={report.status_summary || projectHealth?.statusSummary} />
