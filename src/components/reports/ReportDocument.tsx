@@ -16,6 +16,7 @@ function healthClass(status?: string) {
   if (value.includes('critical') || value.includes('behind')) return 'health-red'
   if (value.includes('risk')) return 'health-amber'
   if (value.includes('complete')) return 'health-blue'
+  if (value.includes('ahead')) return 'health-green'
   return 'health-green'
 }
 
@@ -43,7 +44,9 @@ export default function ReportDocument({
   if (!report) return null
 
   const progress = Number(projectHealth?.overallProgress || 0)
+  const plannedProgress = Number(projectHealth?.plannedProgress || 0)
   const status = projectHealth?.status || report.status || 'On Track'
+  const varianceLabel = projectHealth?.varianceLabel || 'On Schedule'
 
   return (
     <div className="report-document">
@@ -114,7 +117,7 @@ export default function ReportDocument({
 
         .cover-item {
           display: grid;
-          grid-template-columns: 105px 1fr;
+          grid-template-columns: 112px 1fr;
           gap: 8px;
         }
 
@@ -247,6 +250,13 @@ export default function ReportDocument({
           word-break: break-word;
         }
 
+        .lookahead-grid {
+          display: grid;
+          grid-template-columns: 120px 1fr;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
         .photo-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
@@ -341,14 +351,7 @@ export default function ReportDocument({
           <CoverItem label="Contractor:" value={report.contractor_name || selectedPackage?.contractor_name || '—'} />
           <CoverItem label="Project Start:" value={projectHealth?.startDate ? fdate(projectHealth.startDate) : '—'} />
           <CoverItem label="Planned Finish:" value={projectHealth?.finishDate ? fdate(projectHealth.finishDate) : '—'} />
-          <CoverItem
-            label="Current Delay:"
-            value={
-              projectHealth?.delayDays > 0
-                ? `${projectHealth.delayDays} Days Behind Schedule`
-                : 'On Schedule'
-            }
-          />
+          <CoverItem label="Variance:" value={varianceLabel} />
         </div>
 
         <div className="progress-wrap">
@@ -370,17 +373,21 @@ export default function ReportDocument({
         <div className="health-grid">
           <Info label="Project Start" value={projectHealth?.startDate ? fdate(projectHealth.startDate) : '—'} />
           <Info label="Planned Finish" value={projectHealth?.finishDate ? fdate(projectHealth.finishDate) : '—'} />
-          <Info label="Overall Progress" value={`${projectHealth?.overallProgress ?? 0}%`} />
+          <Info label="Planned Progress" value={`${plannedProgress}%`} />
+          <Info label="Actual Progress" value={`${progress}%`} />
           <Info
-            label="Schedule Delay"
-            value={
-              projectHealth?.delayDays > 0
-                ? `${projectHealth.delayDays} Days Behind`
-                : 'On Schedule'
-            }
-            valueClass={projectHealth?.delayDays > 0 ? 'delay-red' : 'delay-green'}
+            label="Variance"
+            value={varianceLabel}
+            valueClass={Number(projectHealth?.varianceDays || 0) < 0 ? 'delay-red' : 'delay-green'}
           />
+          <Info label="Project Health" value={status} valueClass={healthClass(status)} />
+          <Info label="Open Risks" value={openRisks} />
+          <Info label="Critical Snags" value={criticalSnags} />
         </div>
+      </Section>
+
+      <Section title="Status Summary">
+        <TextBox value={report.status_summary || projectHealth?.statusSummary} />
       </Section>
 
       <Section title="Project / Package Information">
@@ -399,7 +406,7 @@ export default function ReportDocument({
           <Info label="Contractor" value={report.contractor_name || selectedPackage?.contractor_name || '—'} />
           <Info label="Reporting Officer" value={report.reporting_officer || '—'} />
           <Info label="Officer Email" value={report.reporting_officer_email || '—'} />
-          <Info label="Report Status" value={projectHealth?.status || report.status || 'On Track'} />
+          <Info label="Report Status" value={status} />
           <Info label="Contract Sum" value={contractSum ? formatCurrency(contractSum) : 'TBC'} />
           <Info label="Generated Date" value={new Date().toLocaleDateString('en-GB')} />
         </div>
@@ -457,10 +464,21 @@ export default function ReportDocument({
 
       <Section title="Pending Issues"><TextBox value={report.pending_issues} /></Section>
       <Section title="Matters Arising"><TextBox value={report.matters_arising} /></Section>
-      <Section title="Look Ahead"><TextBox value={report.look_ahead} /></Section>
+
+      <Section title="Look Ahead">
+        <div className="lookahead-grid">
+          <Info label="Target %" value={`${report.look_ahead_percentage || 0}%`} />
+          <Info label="Timeline" value={report.look_ahead_timeline || '—'} />
+        </div>
+        <TextBox value={report.look_ahead} />
+      </Section>
+
       <Section title="Quality Tracking"><TextBox value={report.quality_tracking} /></Section>
       <Section title="Procurement Tracking"><TextBox value={report.procurement_tracking} /></Section>
       <Section title="Safety Tracking"><TextBox value={report.safety_tracking} /></Section>
+      <Section title="Infrastructure / Landscaping Tracking"><TextBox value={report.infrastructure_landscaping_tracking} /></Section>
+      <Section title="Site Presentation / Cleanliness"><TextBox value={report.site_presentation_cleanliness} /></Section>
+      <Section title="Payment Issues"><TextBox value={report.payment_issues} /></Section>
 
       <Section title="Progress Photos">
         {photos.length === 0 ? (
