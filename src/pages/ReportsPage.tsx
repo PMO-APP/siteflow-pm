@@ -9,6 +9,7 @@ import ReportDocument from '@/components/reports/ReportDocument'
 import { useWeeklyReports, useUpsertWeeklyReport, useRisks, useSnags, useApprovals, useProcurement, useFinancial } from '@/hooks/useData'
 import { fdate } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
+import { useProjectHealth } from '@/hooks/useProjectHealth'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
 const PMO_ROLES = ['workspace_admin', 'admin', 'pmo']
@@ -38,13 +39,6 @@ function getWeekRange(dateValue?: string | null) {
   end.setHours(23, 59, 59, 999)
   return { start: start.toISOString(), end: end.toISOString() }
 }
-function diffDays(from: Date, to: Date) {
-  const a = new Date(from); const b = new Date(to)
-  a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0)
-  return Math.ceil((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
-}
-function clamp(value: number, min = 0, max = 100) { return Math.min(max, Math.max(min, value)) }
-
 export default function ReportsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
@@ -77,7 +71,7 @@ export default function ReportsPage() {
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [workflowComment, setWorkflowComment] = useState('')
   const [notice, setNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
-  const [projectHealth, setProjectHealth] = useState<any>(null)
+  const projectHealth = useProjectHealth(projectId)
 
   const selectedReport = reports.find(report => report.id === selectedReportId) || reports[0]
   const selectedReportAny = selectedReport as any
@@ -100,7 +94,7 @@ export default function ReportsPage() {
   }
   const [reportForm, setReportForm] = useState(emptyForm)
 
-  useEffect(() => { loadPackages(); loadProjectHealth() }, [projectId])
+  useEffect(() => { loadPackages() }, [projectId])
   useEffect(() => { loadReportPhotos(selectedReport?.id); loadReviewHistory(); loadScheduleActivities() }, [selectedReport?.id])
 
   function notify(type: 'success' | 'error' | 'info', text: string) {
@@ -112,39 +106,6 @@ export default function ReportsPage() {
     const { data, error } = await supabase.from('project_blocks').select('*').eq('project_id', projectId).eq('is_active', true).order('sort_order', { ascending: true })
     if (error) { console.error(error.message); setPackages([]); return }
     setPackages(data || [])
-  }
-
-  async function loadProjectHealth() {
-    if (!projectId) { setProjectHealth(null); return }
-    const { data, error } = await supabase.from('tasks').select(`id,name,task_name,task_number,phase,discipline,start_date,finish_date,planned_start,planned_finish,progress_pct,weight_pct,status`).eq('project_id', projectId)
-    if (error) { console.error(error.message); setProjectHealth(null); return }
-    const tasks = data || []
-    const validStartDates = tasks.map((t: any) => t.start_date || t.planned_start).filter(Boolean).map((d: string) => new Date(d))
-    const validFinishDates = tasks.map((t: any) => t.finish_date || t.planned_finish).filter(Boolean).map((d: string) => new Date(d))
-    const projectStart = validStartDates.length ? new Date(Math.min(...validStartDates.map((d: Date) => d.getTime()))) : null
-    const plannedFinish = validFinishDates.length ? new Date(Math.max(...validFinishDates.map((d: Date) => d.getTime()))) : null
-    const totalWeight = tasks.reduce((sum: number, t: any) => sum + Number(t.weight_pct || 0), 0)
-    const actualProgress = totalWeight > 0
-      ? tasks.reduce((sum: number, t: any) => sum + Number(t.progress_pct || 0) * Number(t.weight_pct || 0), 0) / totalWeight
-      : tasks.length ? tasks.reduce((sum: number, t: any) => sum + Number(t.progress_pct || 0), 0) / tasks.length : 0
-    let plannedProgress = 0, varianceDays = 0, varianceLabel = 'On Schedule', status = 'On Track'
-    if (projectStart && plannedFinish) {
-      const totalDuration = Math.max(1, diffDays(plannedFinish, projectStart))
-      const elapsedDays = clamp(diffDays(new Date(), projectStart), 0, totalDuration)
-      plannedProgress = clamp((elapsedDays / totalDuration) * 100)
-      const progressVariance = actualProgress - plannedProgress
-      varianceDays = Math.round(progressVariance * (totalDuration / 100))
-      if (varianceDays < 0) { varianceLabel = `${Math.abs(varianceDays)} Days Behind`; status = 'Behind Schedule' }
-      else if (varianceDays > 0) { varianceLabel = `+${varianceDays} Days Ahead`; status = 'Ahead of Schedule' }
-      if (actualProgress >= 100) status = 'Completed'
-      else if (varianceDays <= -15) status = 'Critical Delay'
-    }
-    const activeTasks = tasks.filter((t: any) => Number(t.progress_pct || 0) > 0 && Number(t.progress_pct || 0) < 100).sort((a: any, b: any) => Number(b.progress_pct || 0) - Number(a.progress_pct || 0))
-    const leadingTask = activeTasks[0]
-    const statusSummary = leadingTask
-      ? `${leadingTask.name || leadingTask.task_name || `Task ${leadingTask.task_number}`} is currently at ${Math.round(Number(leadingTask.progress_pct || 0))}% completion.`
-      : actualProgress >= 100 ? 'Project activities are fully completed.' : 'No active in-progress schedule activity has been recorded yet.'
-    setProjectHealth({ startDate: projectStart?.toISOString() || null, finishDate: plannedFinish?.toISOString() || null, plannedProgress: Math.round(plannedProgress), overallProgress: Math.round(actualProgress), varianceDays, varianceLabel, status, statusSummary })
   }
 
   async function loadReportPhotos(reportId?: string | null) {
@@ -201,6 +162,13 @@ export default function ReportsPage() {
   }
 
   const selectedPackage = packages.find(item => item.id === selectedReportAny?.block_id)
+  const reportProjectHealth = {
+    ...projectHealth,
+    startDate: projectHealth?.projectStartIso || projectHealth?.startDate || null,
+    finishDate: projectHealth?.plannedFinishIso || projectHealth?.finishDate || null,
+    status: projectHealth?.projectHealth || projectHealth?.status || 'On Track',
+  }
+
   const reportGroups = useMemo(() => {
     const map: Record<string, any[]> = {}
     reports.forEach(r => { const key = r.report_date || 'No date'; if (!map[key]) map[key] = []; map[key].push(r) })
@@ -282,7 +250,7 @@ export default function ReportsPage() {
       const reportId = selectedReportId || getSavedReportId(savedReport) || (await findReportIdFallback())
       if (!reportId) { notify('error', 'Report saved, but report ID could not be found for photo upload.'); return }
       if (photos.length > 0) await uploadReportPhotos(reportId)
-      await loadReportPhotos(reportId); await loadProjectHealth()
+      await loadReportPhotos(reportId)
       setSelectedReportId(reportId); setShowReportModal(false); setPhotos([]); setPhotoCaptions({})
       notify('success', canReview && isNewReport ? 'PMO report created and approved automatically.' : 'Report saved successfully.')
     } catch (error: any) { notify('error', error?.message || 'Failed to save report.') }
@@ -362,11 +330,11 @@ export default function ReportsPage() {
               {canReview && !isCreator && isApproved && !isLocked && <button className="btn-gold btn-sm btn" onClick={() => updateWorkflow('Locked')}><Lock size={13} />Lock Report</button>}
               <button className="btn-ghost btn-sm btn" onClick={printSelectedReport}><Printer size={13} />Print Report</button>
             </div>
-            <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-4"><div ref={reportRef}><ReportDocument report={{ ...selectedReport, status_summary: selectedReportAny.status_summary || projectHealth?.statusSummary, look_ahead_percentage: selectedReportAny.look_ahead_percentage, look_ahead_timeline: selectedReportAny.look_ahead_timeline, infrastructure_landscaping_tracking: selectedReportAny.infrastructure_landscaping_tracking, site_presentation_cleanliness: selectedReportAny.site_presentation_cleanliness, payment_issues: selectedReportAny.payment_issues }} projectName={projectName} selectedPackage={selectedPackage} activities={scheduleActivities} photos={reportPhotos} contractSum={contractSum} openSnags={openSnags} criticalSnags={criticalSnags} openRisks={openRisks} pendingProcurement={pendingProcurement} projectHealth={projectHealth} /></div><WorkflowTimeline history={reviewHistory} /></div>
+            <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-4"><div ref={reportRef}><ReportDocument report={{ ...selectedReport, status_summary: selectedReportAny.status_summary || projectHealth?.statusSummary, look_ahead_percentage: selectedReportAny.look_ahead_percentage, look_ahead_timeline: selectedReportAny.look_ahead_timeline, infrastructure_landscaping_tracking: selectedReportAny.infrastructure_landscaping_tracking, site_presentation_cleanliness: selectedReportAny.site_presentation_cleanliness, payment_issues: selectedReportAny.payment_issues }} projectName={projectName} selectedPackage={selectedPackage} activities={scheduleActivities} photos={reportPhotos} contractSum={contractSum} openSnags={openSnags} criticalSnags={criticalSnags} openRisks={openRisks} pendingProcurement={pendingProcurement} projectHealth={reportProjectHealth} /></div><WorkflowTimeline history={reviewHistory} /></div>
           </>}
         </div>
       </div>
-      <div style={{ display: 'none' }}><div ref={allReportsRef}>{reports.map((report: any) => <div key={report.id} className="page-break"><ReportDocument report={{ ...report, status_summary: report.status_summary || projectHealth?.statusSummary, look_ahead_percentage: report.look_ahead_percentage, look_ahead_timeline: report.look_ahead_timeline, infrastructure_landscaping_tracking: report.infrastructure_landscaping_tracking, site_presentation_cleanliness: report.site_presentation_cleanliness, payment_issues: report.payment_issues }} projectName={projectName} selectedPackage={packages.find(item => item.id === report.block_id)} activities={allReportActivities[report.id] || []} photos={allReportPhotos[report.id] || []} contractSum={contractSum} openSnags={openSnags} criticalSnags={criticalSnags} openRisks={openRisks} pendingProcurement={pendingProcurement} projectHealth={projectHealth} /></div>)}</div></div>
+      <div style={{ display: 'none' }}><div ref={allReportsRef}>{reports.map((report: any) => <div key={report.id} className="page-break"><ReportDocument report={{ ...report, status_summary: report.status_summary || projectHealth?.statusSummary, look_ahead_percentage: report.look_ahead_percentage, look_ahead_timeline: report.look_ahead_timeline, infrastructure_landscaping_tracking: report.infrastructure_landscaping_tracking, site_presentation_cleanliness: report.site_presentation_cleanliness, payment_issues: report.payment_issues }} projectName={projectName} selectedPackage={packages.find(item => item.id === report.block_id)} activities={allReportActivities[report.id] || []} photos={allReportPhotos[report.id] || []} contractSum={contractSum} openSnags={openSnags} criticalSnags={criticalSnags} openRisks={openRisks} pendingProcurement={pendingProcurement} projectHealth={reportProjectHealth} /></div>)}</div></div>
       {showReturnModal && <CommentModal title="Return Report" actionLabel="Return Report" value={workflowComment} onChange={setWorkflowComment} onClose={() => setShowReturnModal(false)} onSubmit={() => { if (!workflowComment.trim()) { notify('error', 'Return comment is required.'); return } updateWorkflow('Returned', workflowComment) }} />}
       {showRejectModal && <CommentModal title="Reject Report" actionLabel="Reject Report" value={workflowComment} onChange={setWorkflowComment} onClose={() => setShowRejectModal(false)} onSubmit={() => { if (!workflowComment.trim()) { notify('error', 'Rejection comment is required.'); return } updateWorkflow('Rejected', workflowComment) }} />}
       {showReportModal && <Modal title={selectedReportId ? 'Edit IPD Report' : 'New IPD Report'} onClose={() => { setShowReportModal(false); setSelectedReportId(null) }}>
