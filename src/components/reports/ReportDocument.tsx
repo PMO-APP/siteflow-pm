@@ -6,6 +6,27 @@ function getActivityStatus(thisWeek: number, planned: number) {
   return 'Stuck'
 }
 
+function progressBar(value: number) {
+  const safe = Math.max(0, Math.min(100, Number(value || 0)))
+  return `${safe}%`
+}
+
+function healthClass(status?: string) {
+  const value = String(status || '').toLowerCase()
+  if (value.includes('critical') || value.includes('behind')) return 'health-red'
+  if (value.includes('risk')) return 'health-amber'
+  if (value.includes('complete')) return 'health-blue'
+  return 'health-green'
+}
+
+function healthIcon(status?: string) {
+  const value = String(status || '').toLowerCase()
+  if (value.includes('critical') || value.includes('behind')) return '🔴'
+  if (value.includes('risk')) return '🟡'
+  if (value.includes('complete')) return '🔵'
+  return '🟢'
+}
+
 export default function ReportDocument({
   report,
   projectName,
@@ -20,6 +41,9 @@ export default function ReportDocument({
   projectHealth,
 }: any) {
   if (!report) return null
+
+  const progress = Number(projectHealth?.overallProgress || 0)
+  const status = projectHealth?.status || report.status || 'On Track'
 
   return (
     <div className="report-document">
@@ -39,33 +63,106 @@ export default function ReportDocument({
           margin: 0 auto;
         }
 
-        .report-header {
+        .executive-cover {
+          border: 2px solid #c49e48;
+          padding: 12px 14px;
+          margin-bottom: 16px;
+        }
+
+        .brand-row {
           display: flex;
           justify-content: space-between;
-          align-items: flex-end;
-          border-bottom: 3px solid #c49e48;
-          padding-bottom: 10px;
+          align-items: center;
           margin-bottom: 14px;
         }
 
-        .project-name {
-          font-size: 26px;
-          font-weight: 800;
-          margin: 0;
+        .mixta-logo {
+          font-size: 15px;
+          font-weight: 900;
+          letter-spacing: .08em;
+          color: #111827;
         }
 
-        .report-date {
-          margin-top: 4px;
-          color: #555;
-          font-size: 12px;
-        }
-
-        .brand {
+        .pmo-logo {
           font-size: 11px;
           font-weight: 800;
           letter-spacing: .18em;
           color: #7a5a12;
         }
+
+        .cover-title {
+          text-align: center;
+          border-top: 1px solid #d6c38a;
+          border-bottom: 1px solid #d6c38a;
+          padding: 12px 0;
+          margin-bottom: 14px;
+        }
+
+        .project-name {
+          font-size: 24px;
+          font-weight: 900;
+          margin: 0;
+          text-transform: uppercase;
+        }
+
+        .cover-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px 18px;
+          margin-bottom: 14px;
+        }
+
+        .cover-item {
+          display: grid;
+          grid-template-columns: 105px 1fr;
+          gap: 8px;
+        }
+
+        .cover-label {
+          font-weight: 800;
+          color: #555;
+        }
+
+        .cover-value {
+          font-weight: 700;
+        }
+
+        .progress-wrap {
+          margin-top: 10px;
+        }
+
+        .progress-label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-weight: 800;
+          margin-bottom: 6px;
+        }
+
+        .progress-track {
+          height: 12px;
+          background: #e5e7eb;
+          border-radius: 999px;
+          overflow: hidden;
+          border: 1px solid #d1d5db;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: #c49e48;
+          width: ${progressBar(progress)};
+        }
+
+        .health-status {
+          margin-top: 10px;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .health-red { color: #b91c1c; }
+        .health-amber { color: #b45309; }
+        .health-green { color: #047857; }
+        .health-blue { color: #1d4ed8; }
 
         .report-section {
           margin-top: 14px;
@@ -218,12 +315,55 @@ export default function ReportDocument({
         }
       `}</style>
 
-      <div className="report-header">
-        <div>
-          <h1 className="project-name">{projectName || 'Project'}</h1>
-          <div className="report-date">{fdate(report.report_date)}</div>
+      <div className="executive-cover">
+        <div className="brand-row">
+          <div className="mixta-logo">MIXTA AFRICA</div>
+          <div className="pmo-logo">PMOCOREX</div>
         </div>
-        <div className="brand">PMOCOREX</div>
+
+        <div className="cover-title">
+          <h1 className="project-name">{projectName || 'Project'}</h1>
+        </div>
+
+        <div className="cover-grid">
+          <CoverItem label="Reporting Week:" value={fdate(report.report_date)} />
+          <CoverItem label="Prepared By:" value={report.reporting_officer || '—'} />
+          <CoverItem label="Discipline:" value={report.department || report.discipline || '—'} />
+          <CoverItem
+            label="Package:"
+            value={
+              report.package_name ||
+              selectedPackage?.package_name ||
+              selectedPackage?.block_name ||
+              'Project Wide'
+            }
+          />
+          <CoverItem label="Contractor:" value={report.contractor_name || selectedPackage?.contractor_name || '—'} />
+          <CoverItem label="Project Start:" value={projectHealth?.startDate ? fdate(projectHealth.startDate) : '—'} />
+          <CoverItem label="Planned Finish:" value={projectHealth?.finishDate ? fdate(projectHealth.finishDate) : '—'} />
+          <CoverItem
+            label="Current Delay:"
+            value={
+              projectHealth?.delayDays > 0
+                ? `${projectHealth.delayDays} Days Behind Schedule`
+                : 'On Schedule'
+            }
+          />
+        </div>
+
+        <div className="progress-wrap">
+          <div className="progress-label-row">
+            <span>Overall Project Progress</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" />
+          </div>
+        </div>
+
+        <div className={`health-status ${healthClass(status)}`}>
+          Project Health: {healthIcon(status)} {status}
+        </div>
       </div>
 
       <Section title="Project Health">
@@ -295,7 +435,7 @@ export default function ReportDocument({
               </tr>
             ) : (
               activities.map((activity: any) => {
-                const status =
+                const rowStatus =
                   activity.activity_status ||
                   getActivityStatus(Number(activity.this_week || 0), Number(activity.planned || 0))
 
@@ -305,7 +445,7 @@ export default function ReportDocument({
                     <td>{activity.last_week || 0}%</td>
                     <td>{activity.this_week || 0}%</td>
                     <td>{activity.planned || 0}%</td>
-                    <td>{status}</td>
+                    <td>{rowStatus}</td>
                     <td>{activity.remarks || '—'}</td>
                   </tr>
                 )
@@ -362,8 +502,17 @@ export default function ReportDocument({
       </Section>
 
       <div className="footer">
-        Generated by PMOCorex · Confidential · {new Date().toLocaleDateString('en-GB')}
+        Mixta Africa · Generated by PMOCorex · Confidential · {new Date().toLocaleDateString('en-GB')}
       </div>
+    </div>
+  )
+}
+
+function CoverItem({ label, value }: { label: string; value: any }) {
+  return (
+    <div className="cover-item">
+      <div className="cover-label">{label}</div>
+      <div className="cover-value">{value || '—'}</div>
     </div>
   )
 }
