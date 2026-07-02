@@ -163,11 +163,12 @@ export default function ReportsPage() {
 
   const selectedPackage = packages.find(item => item.id === selectedReportAny?.block_id)
   const reportProjectHealth = {
-    ...projectHealth,
-    startDate: projectHealth?.projectStartIso || projectHealth?.startDate || null,
-    finishDate: projectHealth?.plannedFinishIso || projectHealth?.finishDate || null,
-    status: projectHealth?.projectHealth || projectHealth?.status || 'On Track',
-  }
+  ...projectHealth,
+  startDate: projectHealth?.projectStartIso || null,
+  finishDate: projectHealth?.plannedFinishIso || null,
+  forecastFinish: projectHealth?.forecastFinishIso || null,
+  status: projectHealth?.projectHealth || 'On Track',
+}
 
   const reportGroups = useMemo(() => {
     const map: Record<string, any[]> = {}
