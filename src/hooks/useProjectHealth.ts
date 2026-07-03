@@ -21,7 +21,12 @@ function calcWeightedProgress(tasks: any[]) {
     0
   )
 
-  if (totalWeight === 0) return 0
+  if (totalWeight === 0) {
+    return Math.round(
+      tasks.reduce((sum, task) => sum + getTaskProgress(task), 0) /
+        tasks.length
+    )
+  }
 
   const earnedWeight = tasks.reduce(
     (sum, task) =>
@@ -32,120 +37,118 @@ function calcWeightedProgress(tasks: any[]) {
   return Math.round((earnedWeight / totalWeight) * 100)
 }
 
+function getTaskDate(task: any, key: 'start' | 'finish') {
+  const value =
+    key === 'start'
+      ? task.planned_start || task.start_date
+      : task.planned_finish || task.finish_date
+
+  if (!value) return null
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export function useProjectHealth(projectId?: string | number | null) {
   const { data: taskData = [] } = useTasks()
   const { data: projectData = [] } = useProjects()
 
   return useMemo(() => {
-    const tasks = (taskData as any[]).filter(
-      task => !projectId || String(task.project_id) === String(projectId)
-    )
+    const today = new Date()
 
-    const projects = projectData as any[]
-    const project = projects.find(
+    const tasks = (taskData as any[])
+      .filter(task => !projectId || String(task.project_id) === String(projectId))
+      .sort((a, b) => Number(a.task_number || 0) - Number(b.task_number || 0))
+
+    const project = (projectData as any[]).find(
       item => String(item.id) === String(projectId)
     )
 
-    const today = new Date()
-
-    const projectStart = project?.start_date
-      ? new Date(project.start_date)
-      : null
-
+    const projectStart = project?.start_date ? new Date(project.start_date) : null
     const plannedFinish = project?.handover_date
       ? new Date(project.handover_date)
       : null
 
-    const hasTimeline = Boolean(projectStart && plannedFinish)
+    const totalDays =
+      projectStart && plannedFinish
+        ? Math.max(1, differenceInDays(plannedFinish, projectStart))
+        : 0
 
-    const totalDays = hasTimeline
-      ? Math.max(1, differenceInDays(plannedFinish!, projectStart!))
-      : 0
-
-    const elapsedDays = hasTimeline
-      ? clamp(differenceInDays(today, projectStart!), 0, totalDays)
-      : 0
+    const elapsedDays =
+      projectStart && plannedFinish
+        ? clamp(differenceInDays(today, projectStart), 0, totalDays)
+        : 0
 
     const daysRemaining = plannedFinish
       ? Math.max(0, differenceInDays(plannedFinish, today))
       : null
 
-    const plannedProgress = hasTimeline
-      ? clamp(Math.round((elapsedDays / totalDays) * 100))
-      : 0
+    const plannedProgress =
+      totalDays > 0 ? clamp(Math.round((elapsedDays / totalDays) * 100)) : 0
 
     const actualProgress = calcWeightedProgress(tasks)
 
-    const variancePct =
-      hasTimeline && tasks.length > 0
-        ? actualProgress - plannedProgress
-        : null
+    const delayedTasks = tasks.filter(task => {
+      const finish = getTaskDate(task, 'finish')
+      return finish && finish < today && getTaskProgress(task) < 100
+    })
 
-    const varianceDays =
-      variancePct !== null && totalDays > 0
-        ? Math.round((variancePct / 100) * totalDays)
-        : null
+    const activeDelayedTask =
+      delayedTasks.sort((a, b) => {
+        const aFinish = getTaskDate(a, 'finish')?.getTime() || 0
+        const bFinish = getTaskDate(b, 'finish')?.getTime() || 0
+        return aFinish - bFinish
+      })[0] || null
+
+    const currentPlannedTask =
+      tasks.find(task => {
+        const start = getTaskDate(task, 'start')
+        const finish = getTaskDate(task, 'finish')
+        return start && finish && start <= today && finish >= today
+      }) || null
+
+    const varianceDays = activeDelayedTask
+      ? -Math.max(
+          0,
+          differenceInDays(today, getTaskDate(activeDelayedTask, 'finish')!)
+        )
+      : 0
 
     const varianceLabel =
-      varianceDays === null
-        ? 'No Baseline'
-        : varianceDays < 0
-        ? `${varianceDays} Days Behind`
+      varianceDays < 0
+        ? `${Math.abs(varianceDays)} Days Behind`
         : varianceDays > 0
         ? `+${varianceDays} Days Ahead`
         : 'On Schedule'
 
     const varianceStatus =
-      varianceDays === null
-        ? 'NO BASELINE'
-        : varianceDays < 0
-        ? 'BEHIND'
-        : varianceDays > 0
-        ? 'AHEAD'
-        : 'ON TRACK'
+      varianceDays < 0 ? 'BEHIND' : varianceDays > 0 ? 'AHEAD' : 'ON TRACK'
 
     let projectHealth = 'On Track'
 
     if (actualProgress >= 100) {
       projectHealth = 'Completed'
-    } else if (varianceDays !== null && varianceDays <= -15) {
+    } else if (varianceDays <= -15) {
       projectHealth = 'Behind Schedule'
-    } else if (varianceDays !== null && varianceDays < 0) {
+    } else if (varianceDays < 0) {
       projectHealth = 'At Risk'
-    } else if (varianceDays !== null && varianceDays > 0) {
-      projectHealth = 'Ahead of Programme'
     }
 
     const inProgressTasks = tasks
-      .filter(
-        task =>
-          Number(getTaskProgress(task)) > 0 &&
-          Number(getTaskProgress(task)) < 100
-      )
-      .sort(
-        (a, b) =>
-          Number(getTaskProgress(b)) - Number(getTaskProgress(a))
-      )
+      .filter(task => getTaskProgress(task) > 0 && getTaskProgress(task) < 100)
+      .sort((a, b) => Number(b.task_number || 0) - Number(a.task_number || 0))
 
     const leadingTask = inProgressTasks[0]
 
-    const statusSummary = leadingTask
+    const statusSummary = activeDelayedTask
+      ? `${activeDelayedTask.name || `Task ${activeDelayedTask.task_number}`} should have finished by ${
+          getTaskDate(activeDelayedTask, 'finish')?.toLocaleDateString('en-GB') || 'the planned date'
+        }, but is currently at ${getTaskProgress(activeDelayedTask)}%.`
+      : leadingTask
       ? `${leadingTask.name || `Task ${leadingTask.task_number}`} is currently at ${getTaskProgress(leadingTask)}% completion.`
       : actualProgress >= 100
       ? 'Project activities are fully completed.'
       : 'No active in-progress schedule activity has been recorded yet.'
-
-    const housebuildProgress = calcWeightedProgress(
-      tasks.filter(task => task.discipline === 'Housebuild')
-    )
-
-    const mepProgress = calcWeightedProgress(
-      tasks.filter(task => task.discipline === 'MEP')
-    )
-
-    const infrastructureProgress = calcWeightedProgress(
-      tasks.filter(task => task.discipline === 'Infrastructure')
-    )
 
     return {
       project,
@@ -156,6 +159,7 @@ export function useProjectHealth(projectId?: string | number | null) {
 
       projectStartIso: projectStart ? projectStart.toISOString() : null,
       plannedFinishIso: plannedFinish ? plannedFinish.toISOString() : null,
+
       forecastFinish: null,
       forecastFinishIso: null,
 
@@ -167,7 +171,7 @@ export function useProjectHealth(projectId?: string | number | null) {
       actualProgress,
       overallProgress: actualProgress,
 
-      variancePct,
+      variancePct: actualProgress - plannedProgress,
       varianceDays,
       varianceLabel,
       varianceStatus,
@@ -176,9 +180,18 @@ export function useProjectHealth(projectId?: string | number | null) {
       status: projectHealth,
       statusSummary,
 
-      housebuildProgress,
-      mepProgress,
-      infrastructureProgress,
+      delayedTask: activeDelayedTask,
+      currentPlannedTask,
+
+      housebuildProgress: calcWeightedProgress(
+        tasks.filter(task => task.discipline === 'Housebuild')
+      ),
+      mepProgress: calcWeightedProgress(
+        tasks.filter(task => task.discipline === 'MEP')
+      ),
+      infrastructureProgress: calcWeightedProgress(
+        tasks.filter(task => task.discipline === 'Infrastructure')
+      ),
     }
   }, [taskData, projectData, projectId])
 }
