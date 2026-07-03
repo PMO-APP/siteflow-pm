@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { differenceInDays, addDays } from 'date-fns'
+import { differenceInDays } from 'date-fns'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useData'
 
@@ -77,43 +77,30 @@ export function useProjectHealth(projectId?: string | number | null) {
     const actualProgress = calcWeightedProgress(tasks)
 
     const variancePct =
-      hasTimeline && tasks.length > 0 ? actualProgress - plannedProgress : null
-
-    const progressRate =
-      elapsedDays > 0 && actualProgress > 0
-        ? actualProgress / elapsedDays
-        : 0
-
-    const forecastDuration =
-      progressRate > 0
-        ? Math.ceil(100 / progressRate)
-        : totalDays
-
-    const forecastFinish =
-      hasTimeline && projectStart
-        ? addDays(projectStart, forecastDuration)
+      hasTimeline && tasks.length > 0
+        ? actualProgress - plannedProgress
         : null
 
     const varianceDays =
-      forecastFinish && plannedFinish
-        ? differenceInDays(forecastFinish, plannedFinish)
+      variancePct !== null && totalDays > 0
+        ? Math.round((variancePct / 100) * totalDays)
         : null
 
     const varianceLabel =
       varianceDays === null
         ? 'No Baseline'
-        : varianceDays > 0
-        ? `+${varianceDays} Days`
         : varianceDays < 0
-        ? `${varianceDays} Days`
+        ? `${varianceDays} Days Behind`
+        : varianceDays > 0
+        ? `+${varianceDays} Days Ahead`
         : 'On Schedule'
 
     const varianceStatus =
       varianceDays === null
         ? 'NO BASELINE'
-        : varianceDays > 0
-        ? 'BEHIND'
         : varianceDays < 0
+        ? 'BEHIND'
+        : varianceDays > 0
         ? 'AHEAD'
         : 'ON TRACK'
 
@@ -121,11 +108,11 @@ export function useProjectHealth(projectId?: string | number | null) {
 
     if (actualProgress >= 100) {
       projectHealth = 'Completed'
-    } else if (varianceDays !== null && varianceDays >= 15) {
+    } else if (varianceDays !== null && varianceDays <= -15) {
       projectHealth = 'Behind Schedule'
-    } else if (varianceDays !== null && varianceDays > 0) {
-      projectHealth = 'At Risk'
     } else if (varianceDays !== null && varianceDays < 0) {
+      projectHealth = 'At Risk'
+    } else if (varianceDays !== null && varianceDays > 0) {
       projectHealth = 'Ahead of Programme'
     }
 
@@ -166,11 +153,11 @@ export function useProjectHealth(projectId?: string | number | null) {
 
       projectStart,
       plannedFinish,
-      forecastFinish,
 
       projectStartIso: projectStart ? projectStart.toISOString() : null,
       plannedFinishIso: plannedFinish ? plannedFinish.toISOString() : null,
-      forecastFinishIso: forecastFinish ? forecastFinish.toISOString() : null,
+      forecastFinish: null,
+      forecastFinishIso: null,
 
       totalDays,
       elapsedDays,
