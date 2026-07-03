@@ -169,7 +169,41 @@ export default function ReportsPage() {
   forecastFinish: projectHealth?.forecastFinishIso || null,
   status: projectHealth?.projectHealth || 'On Track',
 }
+const reportSnapshot = {
+  ...reportProjectHealth,
 
+  startDate:
+    selectedReportAny?.snapshot_project_start ??
+    reportProjectHealth.startDate,
+
+  finishDate:
+    selectedReportAny?.snapshot_planned_finish ??
+    reportProjectHealth.finishDate,
+
+  plannedProgress:
+    selectedReportAny?.snapshot_planned_progress ??
+    reportProjectHealth.plannedProgress,
+
+  overallProgress:
+    selectedReportAny?.snapshot_actual_progress ??
+    reportProjectHealth.overallProgress,
+
+  varianceDays:
+    selectedReportAny?.snapshot_variance_days ??
+    reportProjectHealth.varianceDays,
+
+  varianceLabel:
+    selectedReportAny?.snapshot_variance_label ??
+    reportProjectHealth.varianceLabel,
+
+  status:
+    selectedReportAny?.snapshot_project_health ??
+    reportProjectHealth.status,
+
+  statusSummary:
+    selectedReportAny?.snapshot_status_summary ??
+    reportProjectHealth.statusSummary,
+}
   const reportGroups = useMemo(() => {
     const map: Record<string, any[]> = {}
     reports.forEach(r => { const key = r.report_date || 'No date'; if (!map[key]) map[key] = []; map[key].push(r) })
@@ -242,6 +276,25 @@ export default function ReportsPage() {
         next_meeting: reportForm.next_meeting || null,
         discipline: reportForm.department,
         reporting_officer_email: reportForm.reporting_officer_email || user?.email || '',
+        // ===============================
+// PROJECT SNAPSHOT
+// ===============================
+
+snapshot_project_start: reportProjectHealth.startDate,
+
+snapshot_planned_finish: reportProjectHealth.finishDate,
+
+snapshot_planned_progress: reportProjectHealth.plannedProgress,
+
+snapshot_actual_progress: reportProjectHealth.overallProgress,
+
+snapshot_variance_days: reportProjectHealth.varianceDays,
+
+snapshot_variance_label: reportProjectHealth.varianceLabel,
+
+snapshot_project_health: reportProjectHealth.status,
+
+snapshot_status_summary: reportProjectHealth.statusSummary,
         created_by_role: selectedReportId ? selectedReportAny?.created_by_role || role : role,
         created_by: selectedReportId ? selectedReportAny?.created_by || user?.id || null : user?.id || null,
         updated_by: user?.id || null,
