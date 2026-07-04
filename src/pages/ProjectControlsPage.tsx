@@ -94,6 +94,16 @@ function statusColor(status: string) {
   return 'text-slate-400'
 }
 
+function getLogActor(log: any) {
+  return (
+    log.profiles?.full_name ||
+    log.profiles?.email ||
+    log.updated_by_name ||
+    log.updated_by_role ||
+    '—'
+  )
+}
+
 export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
@@ -147,8 +157,8 @@ export default function ProjectControlsPage() {
         .order('created_at', { ascending: false }),
 
       supabase
-  .from('task_progress_logs')
-  .select('*, profiles:updated_by(full_name)')
+        .from('task_progress_logs')
+        .select('*, profiles:updated_by(full_name, email)')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false }),
     ])
@@ -177,7 +187,9 @@ export default function ProjectControlsPage() {
 
   async function saveTaskProgress(task: any) {
     if (!canEdit) {
-      setNotice('View only. Only Project Owners, PMO and Administrators can update project controls.')
+      setNotice(
+        'View only. Only Project Owners, PMO and Administrators can update project controls.'
+      )
       return
     }
 
@@ -261,8 +273,11 @@ export default function ProjectControlsPage() {
     const delayed = tasks.filter(task => getStatus(task) === 'Behind').length
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
+
+    // This now matches your dashboard/report logic:
+    // completed tasks divided by total tasks.
     const overallProgress =
-  total === 0 ? 0 : Math.round((completed / total) * 100)
+      total === 0 ? 0 : Math.round((completed / total) * 100)
 
     return { total, completed, delayed, blocked, onHold, overallProgress }
   }, [tasks])
@@ -327,7 +342,7 @@ export default function ProjectControlsPage() {
         <Metric title="Tasks" value={metrics.total} />
         <Metric
           title="Overall Progress"
-          value={`${metrics.overallProgress.toFixed(1)}%`}
+          value={`${metrics.overallProgress}%`}
         />
         <Metric title="Completed" value={metrics.completed} />
         <Metric title="Delayed" value={metrics.delayed} />
@@ -386,7 +401,11 @@ export default function ProjectControlsPage() {
           {activeTab === 'Recovery' && <RecoveryTab tasks={delayedTasks} />}
 
           {activeTab === 'History' && (
-            <HistoryTab logs={logs} tasks={allTasks} disciplineTab={disciplineTab} />
+            <HistoryTab
+              logs={logs}
+              tasks={allTasks}
+              disciplineTab={disciplineTab}
+            />
           )}
         </>
       )}
@@ -419,12 +438,12 @@ function ExecutionTab({
       )}
 
       <div className="card overflow-x-auto">
-  <table className="tbl min-w-[1500px]">
+        <table className="tbl min-w-[1500px]">
           <thead>
             <tr>
               <th>Activity</th>
               <th>Package</th>
-              <th>Updated By</th>
+              <th>Discipline</th>
               <th>Planned Start</th>
               <th>Planned Finish</th>
               <th>Progress %</th>
@@ -603,8 +622,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
     <div className="space-y-4">
       {!canUpload && (
         <div className="card p-4 text-sm text-amber-400">
-          You can view schedules, but only PMO/Admin can upload or activate
-          schedules.
+          You can view schedules, but only PMO/Admin can upload or activate schedules.
         </div>
       )}
 
@@ -614,7 +632,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
         </div>
       ) : (
         <div className="card overflow-x-auto">
-  <table className="tbl min-w-[1500px]">
+          <table className="tbl min-w-[1200px]">
             <thead>
               <tr>
                 <th>Revision</th>
@@ -659,9 +677,16 @@ function ProgressTab({ tasks, metrics }: any) {
   const byDiscipline = Object.values(
     tasks.reduce((acc: any, task: any) => {
       const key = task.discipline || 'Unassigned'
-      if (!acc[key]) acc[key] = { discipline: key, count: 0, progress: 0 }
+      if (!acc[key]) {
+        acc[key] = { discipline: key, count: 0, completed: 0 }
+      }
+
       acc[key].count += 1
-      acc[key].progress += getProgress(task)
+
+      if (getProgress(task) >= 100) {
+        acc[key].completed += 1
+      }
+
       return acc
     }, {})
   ) as any[]
@@ -670,16 +695,17 @@ function ProgressTab({ tasks, metrics }: any) {
     <div className="space-y-4">
       <Metric
         title="Overall Progress"
-        value={`${metrics.avgProgress.toFixed(1)}%`}
+        value={`${metrics.overallProgress}%`}
       />
 
       <div className="card overflow-x-auto">
-  <table className="tbl min-w-[1500px]">
+        <table className="tbl min-w-[900px]">
           <thead>
             <tr>
               <th>Discipline</th>
               <th>Tasks</th>
-              <th>Average Progress</th>
+              <th>Completed</th>
+              <th>Overall Progress</th>
             </tr>
           </thead>
 
@@ -690,7 +716,12 @@ function ProgressTab({ tasks, metrics }: any) {
                   {item.discipline}
                 </td>
                 <td>{item.count}</td>
-                <td>{(item.progress / item.count).toFixed(1)}%</td>
+                <td>{item.completed}</td>
+                <td>
+                  {item.count > 0
+                    ? `${Math.round((item.completed / item.count) * 100)}%`
+                    : '0%'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -711,7 +742,7 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
 
   return (
     <div className="card overflow-x-auto">
-  <table className="tbl min-w-[1500px]">
+      <table className="tbl min-w-[1200px]">
         <thead>
           <tr>
             <th>Activity</th>
@@ -806,12 +837,12 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
 
   return (
     <div className="card overflow-x-auto">
-  <table className="tbl min-w-[1500px]">
+      <table className="tbl min-w-[1200px]">
         <thead>
           <tr>
             <th>Date</th>
             <th>Activity</th>
-            <th>Discipline</th>
+            <th>Updated By</th>
             <th>Progress Change</th>
             <th>Delay Reason</th>
             <th>Recovery Action</th>
@@ -829,11 +860,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
                 <td className="font-medium text-[#ede8de]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
-                <td>
-  {log.profiles?.full_name ||
-    log.updated_by_role ||
-    '—'}
-</td>
+                <td>{getLogActor(log)}</td>
                 <td>
                   {Number(log.previous_progress || 0)}% →{' '}
                   {Number(log.new_progress || 0)}%
