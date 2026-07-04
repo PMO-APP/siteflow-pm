@@ -416,14 +416,13 @@ export default function ReportDocument({
               <th>Last Week %</th>
               <th>This Week %</th>
               <th>Planned %</th>
-              <th>Status</th>
               <th>Remarks</th>
             </tr>
           </thead>
           <tbody>
             {activities.length === 0 ? (
               <tr>
-                <td colSpan={6}>No activities added yet.</td>
+                <td colSpan={5}>No activity recorded for this week.</td>
               </tr>
             ) : (
               activities.map((activity: any) => {
@@ -437,7 +436,6 @@ export default function ReportDocument({
                     <td>{activity.last_week || 0}%</td>
                     <td>{activity.this_week || 0}%</td>
                     <td>{activity.planned || 0}%</td>
-                    <td>{rowStatus}</td>
                     <td>{activity.remarks || '—'}</td>
                   </tr>
                 )
