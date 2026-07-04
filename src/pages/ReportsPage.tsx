@@ -359,33 +359,56 @@ export default function ReportsPage() {
   }
 
   function mapActivity(item: any) {
-    return {
-      id: item.id,
-      activity:
-        item.tasks?.task_name ||
-        item.tasks?.name ||
-        item.tasks?.activity ||
-        item.tasks?.title ||
-        `Task ${item.task_id || ''}`,
-      last_week: Number(item.previous_progress || 0),
-      this_week: Number(item.new_progress || 0),
-      planned: Number(
-        item.tasks?.planned_progress ||
-        item.tasks?.progress_pct ||
-        item.new_progress ||
-        0
-      ),
-      activity_status:
-        Number(item.new_progress || 0) >= Number(item.previous_progress || 0)
-          ? 'Updated'
-          : 'Reduced',
-      remarks:
-        item.comments ||
-        item.recovery_action ||
-        item.delay_reason ||
-        'Progress updated from schedule.',
-    }
+  const previous = Number(item.previous_progress || 0)
+  const current = Number(item.new_progress || 0)
+
+  return {
+    id: item.id,
+    taskId: item.task_id,
+    activity:
+      item.tasks?.task_name ||
+      item.tasks?.name ||
+      item.tasks?.activity ||
+      item.tasks?.title ||
+      `Task ${item.task_id || ''}`,
+    last_week: previous,
+    this_week: current,
+    planned: Number(
+      item.tasks?.planned_progress ||
+      item.tasks?.progress_pct ||
+      current ||
+      0
+    ),
+    remarks:
+      item.comments ||
+      item.recovery_action ||
+      item.delay_reason ||
+      `Progress updated from ${previous}% to ${current}%`,
   }
+}
+  function dedupeActivities(items: any[]) {
+  const map = new Map<string, any>()
+
+  items.forEach(item => {
+    const key = item.taskId || item.activity
+
+    if (!map.has(key)) {
+      map.set(key, item)
+      return
+    }
+
+    const existing = map.get(key)
+
+    map.set(key, {
+      ...existing,
+      this_week: item.this_week,
+      planned: item.planned,
+      remarks: item.remarks || existing.remarks,
+    })
+  })
+
+  return Array.from(map.values())
+}
 
   async function loadScheduleActivities() {
     if (!selectedReport?.id || !projectId) {
@@ -415,7 +438,7 @@ export default function ReportsPage() {
       return
     }
 
-    setScheduleActivities((data || []).map(mapActivity))
+   setScheduleActivities(dedupeActivities((data || []).map(mapActivity)))
   }
 
   async function loadAllPrintData() {
@@ -453,7 +476,7 @@ export default function ReportsPage() {
 
       const { data } = await query
 
-      activityMap[report.id] = (data || []).map(mapActivity)
+      activityMap[report.id] = dedupeActivities((data || []).map(mapActivity))
     }
 
     setAllReportPhotos(photoMap)
