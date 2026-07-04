@@ -147,8 +147,8 @@ export default function ProjectControlsPage() {
         .order('created_at', { ascending: false }),
 
       supabase
-        .from('task_progress_logs')
-        .select('*')
+  .from('task_progress_logs')
+  .select('*, profiles:updated_by(full_name)')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false }),
     ])
@@ -261,12 +261,10 @@ export default function ProjectControlsPage() {
     const delayed = tasks.filter(task => getStatus(task) === 'Behind').length
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
-    const avgProgress =
-      total === 0
-        ? 0
-        : tasks.reduce((sum, task) => sum + getProgress(task), 0) / total
+    const overallProgress =
+  total === 0 ? 0 : Math.round((completed / total) * 100)
 
-    return { total, completed, delayed, blocked, onHold, avgProgress }
+    return { total, completed, delayed, blocked, onHold, overallProgress }
   }, [tasks])
 
   const delayedTasks = tasks.filter(task =>
@@ -328,8 +326,8 @@ export default function ProjectControlsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
         <Metric
-          title="Average Progress"
-          value={`${metrics.avgProgress.toFixed(1)}%`}
+          title="Overall Progress"
+          value={`${metrics.overallProgress.toFixed(1)}%`}
         />
         <Metric title="Completed" value={metrics.completed} />
         <Metric title="Delayed" value={metrics.delayed} />
@@ -420,13 +418,13 @@ function ExecutionTab({
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <table className="tbl">
+      <div className="card overflow-x-auto">
+  <table className="tbl min-w-[1500px]">
           <thead>
             <tr>
               <th>Activity</th>
               <th>Package</th>
-              <th>Discipline</th>
+              <th>Updated By</th>
               <th>Planned Start</th>
               <th>Planned Finish</th>
               <th>Progress %</th>
@@ -615,8 +613,8 @@ function ScheduleTab({ schedules, canUpload }: any) {
           No schedule revisions found.
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="tbl">
+        <div className="card overflow-x-auto">
+  <table className="tbl min-w-[1500px]">
             <thead>
               <tr>
                 <th>Revision</th>
@@ -675,8 +673,8 @@ function ProgressTab({ tasks, metrics }: any) {
         value={`${metrics.avgProgress.toFixed(1)}%`}
       />
 
-      <div className="card overflow-hidden">
-        <table className="tbl">
+      <div className="card overflow-x-auto">
+  <table className="tbl min-w-[1500px]">
           <thead>
             <tr>
               <th>Discipline</th>
@@ -712,8 +710,8 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
   }
 
   return (
-    <div className="card overflow-hidden">
-      <table className="tbl">
+    <div className="card overflow-x-auto">
+  <table className="tbl min-w-[1500px]">
         <thead>
           <tr>
             <th>Activity</th>
@@ -807,8 +805,8 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
   }
 
   return (
-    <div className="card overflow-hidden">
-      <table className="tbl">
+    <div className="card overflow-x-auto">
+  <table className="tbl min-w-[1500px]">
         <thead>
           <tr>
             <th>Date</th>
@@ -831,7 +829,11 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
                 <td className="font-medium text-[#ede8de]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
-                <td>{task?.discipline || '—'}</td>
+                <td>
+  {log.profiles?.full_name ||
+    log.updated_by_role ||
+    '—'}
+</td>
                 <td>
                   {Number(log.previous_progress || 0)}% →{' '}
                   {Number(log.new_progress || 0)}%
