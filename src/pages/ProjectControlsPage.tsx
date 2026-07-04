@@ -157,10 +157,10 @@ export default function ProjectControlsPage() {
         .order('created_at', { ascending: false }),
 
       supabase
-        .from('task_progress_logs')
-        .select('*, profiles:updated_by(full_name, email)')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false }),
+  .from('task_progress_logs')
+  .select('*')
+  .eq('project_id', projectId)
+  .order('created_at', { ascending: false }),
     ])
 
     if (taskResult.error) setNotice(taskResult.error.message)
