@@ -17,12 +17,44 @@ const DISCIPLINE_TABS: DisciplineTab[] = [
   'Infrastructure',
 ]
 
-const DELAY_REASONS = ['', 'Material Delay', 'Heavy Rain', 'Variation', 'Awaiting Drawing', 'Awaiting Approval', 'Cashflow', 'Labour Shortage', 'Equipment Issue', 'Client Instruction', 'Other']
+const DELAY_REASONS = [
+  '',
+  'Material Delay',
+  'Heavy Rain',
+  'Variation',
+  'Awaiting Drawing',
+  'Awaiting Approval',
+  'Cashflow',
+  'Labour Shortage',
+  'Equipment Issue',
+  'Client Instruction',
+  'Other',
+]
 
-const RECOVERY_ACTIONS = ['', 'Additional Labour', 'Weekend Work', 'Night Shift', 'Additional Equipment', 'Resequencing', 'Expedited Procurement', 'Awaiting Approval', 'No Recovery Plan']
+const RECOVERY_ACTIONS = [
+  '',
+  'Additional Labour',
+  'Weekend Work',
+  'Night Shift',
+  'Additional Equipment',
+  'Resequencing',
+  'Expedited Procurement',
+  'Awaiting Approval',
+  'No Recovery Plan',
+]
 
 function canManageSchedule(role?: string | null) {
   return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+}
+
+function canEditProjectControls(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_owner',
+    'overall_project_owner',
+  ].includes(role || '')
 }
 
 function getTaskName(task: any) {
@@ -66,6 +98,9 @@ export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
+
+  const canEdit = canEditProjectControls(role)
+  const canUploadSchedule = canManageSchedule(role)
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
@@ -129,6 +164,8 @@ export default function ProjectControlsPage() {
   }
 
   function updateEdit(taskId: string, key: string, value: any) {
+    if (!canEdit) return
+
     setEdits(current => ({
       ...current,
       [taskId]: {
@@ -139,6 +176,11 @@ export default function ProjectControlsPage() {
   }
 
   async function saveTaskProgress(task: any) {
+    if (!canEdit) {
+      setNotice('View only. Only Project Owners, PMO and Administrators can update project controls.')
+      return
+    }
+
     const taskId = task.id
     const edit = edits[taskId] || {}
     const previousProgress = getProgress(task)
@@ -245,8 +287,8 @@ export default function ProjectControlsPage() {
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-3xl">
-          PMO/Admin controls schedule uploads. Project Owners only update
-          progress, delay reason, recovery action and comments.
+          PMO/Admin controls schedule uploads. Project Owners update progress,
+          delay reason, recovery action and comments. Other roles are view only.
         </p>
 
         <div className="text-xs text-[#6e7d8c] mt-4">
@@ -255,6 +297,12 @@ export default function ProjectControlsPage() {
             {projectName || 'No project selected'}
           </span>
         </div>
+
+        {!canEdit && (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            View Only. Only Project Owners, PMO and Administrators can update project controls.
+          </div>
+        )}
 
         <div className="flex gap-2 mt-4 flex-wrap">
           {DISCIPLINE_TABS.map(tab => (
@@ -316,13 +364,14 @@ export default function ProjectControlsPage() {
               updateEdit={updateEdit}
               saveTaskProgress={saveTaskProgress}
               savingId={savingId}
+              canEdit={canEdit}
             />
           )}
 
           {activeTab === 'Schedule' && (
             <ScheduleTab
               schedules={schedules}
-              canUpload={canManageSchedule(role)}
+              canUpload={canUploadSchedule}
             />
           )}
 
@@ -353,6 +402,7 @@ function ExecutionTab({
   updateEdit,
   saveTaskProgress,
   savingId,
+  canEdit,
 }: any) {
   if (!tasks.length) {
     return (
@@ -363,169 +413,189 @@ function ExecutionTab({
   }
 
   return (
-    <div className="card overflow-hidden">
-      <table className="tbl">
-        <thead>
-          <tr>
-            <th>Activity</th>
-            <th>Package</th>
-            <th>Discipline</th>
-            <th>Planned Start</th>
-            <th>Planned Finish</th>
-            <th>Progress %</th>
-            <th>Status</th>
-            <th>Delay Reason</th>
-            <th>Recovery Action</th>
-            <th>Comments</th>
-            <th></th>
-          </tr>
-        </thead>
+    <div className="space-y-4">
+      {!canEdit && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+          View Only. Only Project Owners, PMO and Administrators can update project controls.
+        </div>
+      )}
 
-        <tbody>
-          {tasks.map((task: any) => {
-            const taskId = task.id
-            const edit = edits[taskId] || {}
-            const progress = edit.progress_pct ?? getProgress(task)
-            const status = getStatus({
-              ...task,
-              ...edit,
-              progress_pct: progress,
-            })
+      <div className="card overflow-hidden">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Package</th>
+              <th>Discipline</th>
+              <th>Planned Start</th>
+              <th>Planned Finish</th>
+              <th>Progress %</th>
+              <th>Status</th>
+              <th>Delay Reason</th>
+              <th>Recovery Action</th>
+              <th>Comments</th>
+              <th></th>
+            </tr>
+          </thead>
 
-            return (
-              <tr key={taskId}>
-                <td className="font-medium text-[#ede8de] min-w-[220px]">
-                  {getTaskName(task)}
-                </td>
+          <tbody>
+            {tasks.map((task: any) => {
+              const taskId = task.id
+              const edit = edits[taskId] || {}
+              const progress = edit.progress_pct ?? getProgress(task)
+              const status = getStatus({
+                ...task,
+                ...edit,
+                progress_pct: progress,
+              })
 
-                <td>{task.package_name || 'Project Wide'}</td>
-                <td>{task.discipline || '—'}</td>
+              return (
+                <tr key={taskId}>
+                  <td className="font-medium text-[#ede8de] min-w-[220px]">
+                    {getTaskName(task)}
+                  </td>
 
-                <td>
-                  {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
-                </td>
+                  <td>{task.package_name || 'Project Wide'}</td>
+                  <td>{task.discipline || '—'}</td>
 
-                <td>
-                  {getPlannedFinish(task)
-                    ? fdate(getPlannedFinish(task))
-                    : '—'}
-                </td>
+                  <td>
+                    {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
+                  </td>
 
-                <td>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="form-control w-24"
-                    value={progress}
-                    onChange={e =>
-                      updateEdit(
-                        taskId,
-                        'progress_pct',
-                        Number(e.target.value)
-                      )
-                    }
-                  />
-                </td>
+                  <td>
+                    {getPlannedFinish(task)
+                      ? fdate(getPlannedFinish(task))
+                      : '—'}
+                  </td>
 
-                <td>
-                  <span
-                    className={`text-[10px] font-semibold ${statusColor(
-                      status
-                    )}`}
-                  >
-                    {status}
-                  </span>
-                </td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="form-control w-24 disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={progress}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(
+                          taskId,
+                          'progress_pct',
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </td>
 
-                <td>
-                  <select
-                    className="form-control min-w-[150px]"
-                    value={edit.delay_reason ?? task.delay_reason ?? ''}
-                    onChange={e =>
-                      updateEdit(taskId, 'delay_reason', e.target.value)
-                    }
-                  >
-                    {DELAY_REASONS.map(reason => (
-                      <option key={reason} value={reason}>
-                        {reason || 'None'}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+                  <td>
+                    <span
+                      className={`text-[10px] font-semibold ${statusColor(
+                        status
+                      )}`}
+                    >
+                      {status}
+                    </span>
+                  </td>
 
-                <td>
-                  <select
-                    className="form-control min-w-[170px]"
-                    value={edit.recovery_action ?? task.recovery_action ?? ''}
-                    onChange={e =>
-                      updateEdit(taskId, 'recovery_action', e.target.value)
-                    }
-                  >
-                    {RECOVERY_ACTIONS.map(action => (
-                      <option key={action} value={action}>
-                        {action || 'None'}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+                  <td>
+                    <select
+                      className="form-control min-w-[150px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={edit.delay_reason ?? task.delay_reason ?? ''}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(taskId, 'delay_reason', e.target.value)
+                      }
+                    >
+                      {DELAY_REASONS.map(reason => (
+                        <option key={reason} value={reason}>
+                          {reason || 'None'}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                <td>
-                  <input
-                    className="form-control min-w-[180px]"
-                    value={
-                      edit.progress_comments ?? task.progress_comments ?? ''
-                    }
-                    onChange={e =>
-                      updateEdit(
-                        taskId,
-                        'progress_comments',
-                        e.target.value
-                      )
-                    }
-                    placeholder="Comment"
-                  />
+                  <td>
+                    <select
+                      className="form-control min-w-[170px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={edit.recovery_action ?? task.recovery_action ?? ''}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(taskId, 'recovery_action', e.target.value)
+                      }
+                    >
+                      {RECOVERY_ACTIONS.map(action => (
+                        <option key={action} value={action}>
+                          {action || 'None'}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                  <div className="flex gap-3 mt-2 text-[10px] text-slate-400">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={edit.is_on_hold ?? task.is_on_hold ?? false}
-                        onChange={e =>
-                          updateEdit(taskId, 'is_on_hold', e.target.checked)
-                        }
-                      />{' '}
-                      On Hold
-                    </label>
+                  <td>
+                    <input
+                      className="form-control min-w-[180px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={
+                        edit.progress_comments ?? task.progress_comments ?? ''
+                      }
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(
+                          taskId,
+                          'progress_comments',
+                          e.target.value
+                        )
+                      }
+                      placeholder="Comment"
+                    />
 
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={edit.is_blocked ?? task.is_blocked ?? false}
-                        onChange={e =>
-                          updateEdit(taskId, 'is_blocked', e.target.checked)
-                        }
-                      />{' '}
-                      Blocked
-                    </label>
-                  </div>
-                </td>
+                    <div className="flex gap-3 mt-2 text-[10px] text-slate-400">
+                      <label className={!canEdit ? 'opacity-60' : ''}>
+                        <input
+                          type="checkbox"
+                          checked={edit.is_on_hold ?? task.is_on_hold ?? false}
+                          disabled={!canEdit}
+                          onChange={e =>
+                            updateEdit(taskId, 'is_on_hold', e.target.checked)
+                          }
+                        />{' '}
+                        On Hold
+                      </label>
 
-                <td>
-                  <button
-                    className="btn btn-gold btn-sm"
-                    onClick={() => saveTaskProgress(task)}
-                    disabled={savingId === taskId}
-                  >
-                    <Save size={13} />
-                    {savingId === taskId ? 'Saving…' : 'Save'}
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      <label className={!canEdit ? 'opacity-60' : ''}>
+                        <input
+                          type="checkbox"
+                          checked={edit.is_blocked ?? task.is_blocked ?? false}
+                          disabled={!canEdit}
+                          onChange={e =>
+                            updateEdit(taskId, 'is_blocked', e.target.checked)
+                          }
+                        />{' '}
+                        Blocked
+                      </label>
+                    </div>
+                  </td>
+
+                  <td>
+                    {canEdit ? (
+                      <button
+                        className="btn btn-gold btn-sm"
+                        onClick={() => saveTaskProgress(task)}
+                        disabled={savingId === taskId}
+                      >
+                        <Save size={13} />
+                        {savingId === taskId ? 'Saving…' : 'Save'}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                        View Only
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
