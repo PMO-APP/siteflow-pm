@@ -96,10 +96,10 @@ function statusColor(status: string) {
 
 function getLogActor(log: any) {
   return (
-    log.profiles?.full_name ||
-    log.profiles?.email ||
     log.updated_by_name ||
+    log.updated_by_email ||
     log.updated_by_role ||
+    log.updated_by ||
     '—'
   )
 }
@@ -156,11 +156,13 @@ export default function ProjectControlsPage() {
         .eq('project_id', projectId)
         .order('created_at', { ascending: false }),
 
+      // No join here. Supabase threw a relationship error because
+      // task_progress_logs.updated_by has no FK relationship to profiles.
       supabase
-  .from('task_progress_logs')
-  .select('*')
-  .eq('project_id', projectId)
-  .order('created_at', { ascending: false }),
+        .from('task_progress_logs')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
     ])
 
     if (taskResult.error) setNotice(taskResult.error.message)
@@ -254,6 +256,8 @@ export default function ProjectControlsPage() {
       recovery_action: payload.recovery_action,
       comments: payload.progress_comments,
       updated_by: user?.id || null,
+      updated_by_name: user?.full_name || user?.email || null,
+      updated_by_email: user?.email || null,
       updated_by_role: role || null,
     })
 
@@ -274,8 +278,6 @@ export default function ProjectControlsPage() {
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
 
-    // This now matches your dashboard/report logic:
-    // completed tasks divided by total tasks.
     const overallProgress =
       total === 0 ? 0 : Math.round((completed / total) * 100)
 
@@ -340,10 +342,7 @@ export default function ProjectControlsPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
-        <Metric
-          title="Overall Progress"
-          value={`${metrics.overallProgress}%`}
-        />
+        <Metric title="Overall Progress" value={`${metrics.overallProgress}%`} />
         <Metric title="Completed" value={metrics.completed} />
         <Metric title="Delayed" value={metrics.delayed} />
         <Metric title="Blocked" value={metrics.blocked} />
