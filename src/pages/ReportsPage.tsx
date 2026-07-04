@@ -95,10 +95,11 @@ function buildSnapshotHealth(report: any, liveHealth: any) {
       liveHealth?.plannedProgress ??
       0,
 
-    overallProgress:
-      report?.snapshot_actual_progress ??
-      liveHealth?.overallProgress ??
-      0,
+   overallProgress:
+  report?.snapshot_actual_progress !== null &&
+  report?.snapshot_actual_progress !== undefined
+    ? Number(report.snapshot_actual_progress)
+    : liveHealth?.overallProgress ?? 0,
 
     varianceDays:
       report?.snapshot_variance_days ??
@@ -588,8 +589,16 @@ export default function ReportsPage() {
       const isNewReport = !selectedReportId
       const initialWorkflowStatus = canReview ? 'Approved' : 'Draft'
 
-      const savedSnapshot = buildSnapshotHealth(selectedReportAny, reportProjectHealth)
-
+      const snapshot = {
+  startDate: reportProjectHealth.startDate,
+  finishDate: reportProjectHealth.finishDate,
+  plannedProgress: reportProjectHealth.plannedProgress,
+  overallProgress: reportProjectHealth.overallProgress,
+  varianceDays: reportProjectHealth.varianceDays,
+  varianceLabel: reportProjectHealth.varianceLabel,
+  status: reportProjectHealth.status,
+  statusSummary: reportProjectHealth.statusSummary,
+}
       const savedReport = await upsertReport.mutateAsync({
         id: selectedReportId || undefined,
 
@@ -607,14 +616,14 @@ export default function ReportsPage() {
           reportForm.reporting_officer_email || user?.email || '',
 
         // Project health snapshot. This freezes the report at the point it was saved.
-        snapshot_project_start: savedSnapshot.startDate,
-        snapshot_planned_finish: savedSnapshot.finishDate,
-        snapshot_planned_progress: savedSnapshot.plannedProgress,
-        snapshot_actual_progress: savedSnapshot.overallProgress,
-        snapshot_variance_days: savedSnapshot.varianceDays,
-        snapshot_variance_label: savedSnapshot.varianceLabel,
-        snapshot_project_health: savedSnapshot.status,
-        snapshot_status_summary: savedSnapshot.statusSummary,
+        snapshot_project_start: snapshot.startDate,
+        snapshot_planned_finish: snapshot.finishDate,
+        snapshot_planned_progress: snapshot.plannedProgress,
+        snapshot_actual_progress: snapshot.overallProgress,
+        snapshot_variance_days: snapshot.varianceDays,
+        snapshot_variance_label: snapshot.varianceLabel,
+        snapshot_project_health: snapshot.status,
+        snapshot_status_summary: snapshot.statusSummary,
 
         created_by_role: selectedReportId
           ? selectedReportAny?.created_by_role || role
