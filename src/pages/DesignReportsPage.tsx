@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, PenTool, FileText } from 'lucide-react'
+import { Plus, Trash2, PenTool } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
+import { useMembershipStore } from '@/store/membership'
 
 const TABS = [
   ['overview', 'Overview'],
@@ -22,10 +23,25 @@ const MANUAL_CATEGORIES = [
 
 const STATUSES = ['Open', 'In Progress', 'Pending', 'Approved', 'Closed']
 
+function canEditDesignReports(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_owner',
+    'overall_project_owner',
+    'design_project_owner',
+    'design',
+  ].includes(role || '')
+}
+
 export default function DesignReportsPage() {
   const { user } = useAuthStore()
+  const role = useMembershipStore(state => state.role)
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
+
+  const canEdit = canEditDesignReports(role)
 
   const [activeTab, setActiveTab] = useState('overview')
   const [drawings, setDrawings] = useState<any[]>([])
@@ -93,6 +109,13 @@ export default function DesignReportsPage() {
   async function addItem() {
     setNotice('')
 
+    if (!canEdit) {
+      setNotice(
+        'View only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.'
+      )
+      return
+    }
+
     if (!projectId) {
       setNotice('No project selected.')
       return
@@ -138,6 +161,13 @@ export default function DesignReportsPage() {
   }
 
   async function deleteItem(id: string) {
+    if (!canEdit) {
+      setNotice(
+        'View only. Only Admin, PMO and assigned Design Project Owners can delete Design Report items.'
+      )
+      return
+    }
+
     const confirmed = window.confirm('Delete this design report item?')
     if (!confirmed) return
 
@@ -251,6 +281,12 @@ export default function DesignReportsPage() {
             {projectName || 'No project selected'}
           </span>
         </div>
+
+        {!canEdit && (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            View Only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.
+          </div>
+        )}
       </section>
 
       {notice && (
@@ -308,6 +344,7 @@ export default function DesignReportsPage() {
               setForm={setForm}
               addItem={addItem}
               deleteItem={deleteItem}
+              canEdit={canEdit}
             />
           )}
 
@@ -320,6 +357,7 @@ export default function DesignReportsPage() {
               setForm={setForm}
               addItem={addItem}
               deleteItem={deleteItem}
+              canEdit={canEdit}
             />
           )}
 
@@ -332,6 +370,7 @@ export default function DesignReportsPage() {
               setForm={setForm}
               addItem={addItem}
               deleteItem={deleteItem}
+              canEdit={canEdit}
             />
           )}
         </>
@@ -444,7 +483,7 @@ function DrawingRegister({ drawings }: { drawings: any[] }) {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="tbl">
+          <table className="tbl min-w-[1100px]">
             <thead>
               <tr>
                 <th>Drawing No.</th>
@@ -499,6 +538,7 @@ function ConsultantsTab({
   setForm,
   addItem,
   deleteItem,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -529,8 +569,8 @@ function ConsultantsTab({
         ]}
       />
 
-      <div className="card overflow-hidden">
-        <table className="tbl">
+      <div className="card overflow-x-auto">
+        <table className="tbl min-w-[900px]">
           <thead>
             <tr>
               <th>Consultant</th>
@@ -565,6 +605,7 @@ function ConsultantsTab({
         setForm={setForm}
         addItem={addItem}
         deleteItem={deleteItem}
+        canEdit={canEdit}
       />
     </div>
   )
@@ -578,6 +619,7 @@ function ManualTab({
   setForm,
   addItem,
   deleteItem,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -587,10 +629,17 @@ function ManualTab({
           <h2 className="font-bold text-[#ede8de]">{title}</h2>
         </div>
 
+        {!canEdit && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            View Only. You can read this report, but cannot add, edit or delete updates.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             value={form.category}
+            disabled={!canEdit}
             onChange={e => setForm({ ...form, category: e.target.value })}
           >
             {MANUAL_CATEGORIES.map(category => (
@@ -599,9 +648,10 @@ function ManualTab({
           </select>
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="Title"
             value={form.title}
+            disabled={!canEdit}
             onChange={e =>
               setForm({
                 ...form,
@@ -612,9 +662,10 @@ function ManualTab({
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="Consultant / responsible party"
             value={form.consultant_name}
+            disabled={!canEdit}
             onChange={e =>
               setForm({ ...form, consultant_name: e.target.value })
             }
@@ -623,8 +674,9 @@ function ManualTab({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             value={form.status}
+            disabled={!canEdit}
             onChange={e => setForm({ ...form, status: e.target.value })}
           >
             {STATUSES.map(status => (
@@ -634,24 +686,27 @@ function ManualTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             value={form.due_date}
+            disabled={!canEdit}
             onChange={e => setForm({ ...form, due_date: e.target.value })}
           />
         </div>
 
         <textarea
-          className="form-control mt-3"
+          className="form-control mt-3 disabled:opacity-60 disabled:cursor-not-allowed"
           rows={3}
           placeholder="Update / description"
           value={form.description}
+          disabled={!canEdit}
           onChange={e => setForm({ ...form, description: e.target.value })}
         />
 
-        <label className="flex items-center gap-2 text-sm text-slate-400 mt-3">
+        <label className={`flex items-center gap-2 text-sm text-slate-400 mt-3 ${!canEdit ? 'opacity-60' : ''}`}>
           <input
             type="checkbox"
             checked={form.management_attention}
+            disabled={!canEdit}
             onChange={e =>
               setForm({ ...form, management_attention: e.target.checked })
             }
@@ -659,9 +714,11 @@ function ManualTab({
           Requires management attention
         </label>
 
-        <button className="btn btn-gold mt-4" onClick={addItem}>
-          Save Update
-        </button>
+        {canEdit && (
+          <button className="btn btn-gold mt-4" onClick={addItem}>
+            Save Update
+          </button>
+        )}
       </div>
 
       {items.length === 0 ? (
@@ -669,8 +726,8 @@ function ManualTab({
           No manual updates submitted yet.
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="tbl">
+        <div className="card overflow-x-auto">
+          <table className="tbl min-w-[1200px]">
             <thead>
               <tr>
                 <th>Category</th>
@@ -699,12 +756,18 @@ function ManualTab({
                     {item.description || '—'}
                   </td>
                   <td>
-                    <button
-                      className="tbl-action text-red-400"
-                      onClick={() => deleteItem(item.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        className="tbl-action text-red-400"
+                        onClick={() => deleteItem(item.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                        View Only
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -726,7 +789,7 @@ function MetricGrid({ values }: { values: [string, string | number][] }) {
   )
 }
 
-function Metric({ title, value }: { title: string; value: string | number }) {
+function Metric({ title, value }: { title: string | number; value: string | number }) {
   return (
     <div className="card p-4">
       <PenTool size={18} className="text-[#c49e48]" />
