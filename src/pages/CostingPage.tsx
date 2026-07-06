@@ -128,6 +128,63 @@ function viewOnlyMessage() {
   return 'View only. Only the Costing team and Administrators can add, submit, update or delete costing records.'
 }
 
+function getReportWeekFridayDeadline(reportWeek: string) {
+  const selected = new Date(`${reportWeek}T00:00:00`)
+  if (Number.isNaN(selected.getTime())) return null
+
+  const day = selected.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() + mondayOffset)
+  monday.setHours(0, 0, 0, 0)
+
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() + 4)
+  friday.setHours(23, 0, 0, 0)
+
+  return friday
+}
+
+function getReportSubmissionLock(reportWeek: string) {
+  const deadline = getReportWeekFridayDeadline(reportWeek)
+
+  if (!deadline) {
+    return {
+      deadline: null,
+      isAllowed: false,
+      message: 'Invalid report week selected.',
+      deadlineLabel: 'Invalid date',
+    }
+  }
+
+  const now = new Date()
+  const isAllowed = now.getTime() <= deadline.getTime()
+
+  return {
+    deadline,
+    isAllowed,
+    deadlineLabel: deadline.toLocaleString('en-GB', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    message: isAllowed
+      ? `Submission open until ${deadline.toLocaleString('en-GB', {
+          weekday: 'short',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}.`
+      : `Submission locked. Reports can only be submitted latest 11:00 PM on Friday of the selected report week.`,
+  }
+}
+
 function getFinancialAmount(item: any) {
   const amount = Number(item.amount || 0)
   if ((item.direction || '').toLowerCase() === 'omit') return -Math.abs(amount)
@@ -207,6 +264,9 @@ export default function CostingPage() {
 
   const canEdit = canEditCosting(role)
   const reportRef = useRef<HTMLDivElement>(null)
+
+  const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
+  const canSubmitReport = canEdit && reportLock.isAllowed
 
   const [activeTab, setActiveTab] = useState('report')
   const [items, setItems] = useState<any[]>([])
@@ -829,6 +889,11 @@ export default function CostingPage() {
       return
     }
 
+    if (!reportLock.isAllowed) {
+      setNotice(reportLock.message)
+      return
+    }
+
     const snapshotData = {
       projectName,
       reportWeek,
@@ -1153,6 +1218,14 @@ export default function CostingPage() {
               setReportWeek(e.target.value)
             }}
           />
+
+          <div
+            className={`mt-2 text-xs ${
+              reportLock.isAllowed ? 'text-emerald-400' : 'text-red-400'
+            }`}
+          >
+            {reportLock.message}
+          </div>
         </div>
 
         <div className="flex gap-2 items-center">
@@ -1287,6 +1360,9 @@ export default function CostingPage() {
             onDelete={deleteItem}
             onSubmit={submitReport}
             canEdit={canEdit}
+            canSubmitReport={canSubmitReport}
+            submissionLockMessage={reportLock.message}
+            submissionDeadlineLabel={reportLock.deadlineLabel}
           />
         </>
       )}
@@ -2039,6 +2115,9 @@ function WeeklyReportTab({
   onDelete,
   onSubmit,
   canEdit,
+  canSubmitReport,
+  submissionLockMessage,
+  submissionDeadlineLabel,
 }: any) {
   return (
     <>
@@ -2053,13 +2132,34 @@ function WeeklyReportTab({
           />
         </div>
 
-        {canEdit ? (
-          <button className="btn btn-gold ml-auto" onClick={onSubmit}>
-            Submit Weekly Report
-          </button>
-        ) : (
-          <div className="ml-auto text-sm text-amber-300">{viewOnlyMessage()}</div>
-        )}
+        <div className="ml-auto flex flex-col items-end gap-2">
+          <div
+            className={`text-xs ${
+              canSubmitReport ? 'text-emerald-400' : 'text-red-400'
+            }`}
+          >
+            Deadline: {submissionDeadlineLabel}
+          </div>
+
+          {canEdit ? (
+            <button
+              className="btn btn-gold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!canSubmitReport}
+              onClick={onSubmit}
+              title={submissionLockMessage}
+            >
+              Submit Weekly Report
+            </button>
+          ) : (
+            <div className="text-sm text-amber-300">{viewOnlyMessage()}</div>
+          )}
+
+          {!canSubmitReport && canEdit && (
+            <div className="max-w-md text-right text-xs text-red-400">
+              {submissionLockMessage}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card p-5">
