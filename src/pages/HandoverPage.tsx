@@ -189,20 +189,44 @@ async function uploadHandoverFile({
   packageId: string
   folder: string
 }) {
+  const bucketName = 'project-files'
   const safeName = sanitizeFileName(file.name)
   const filePath = `handover/${projectId}/${packageId}/${folder}/${Date.now()}-${safeName}`
 
-  const { error } = await supabase.storage
-    .from('project-files')
+  const { error: uploadError } = await supabase.storage
+    .from(bucketName)
     .upload(filePath, file, {
+      cacheControl: '3600',
       upsert: true,
     })
 
-  if (error) throw error
+  if (uploadError) {
+    console.error('Handover upload error:', uploadError)
+    throw new Error(
+      uploadError.message ||
+        'Upload failed. Confirm the project-files bucket exists and storage policies allow authenticated uploads.'
+    )
+  }
 
-  const { data } = supabase.storage.from('project-files').getPublicUrl(filePath)
+  const { data: publicData } = supabase.storage.from(bucketName).getPublicUrl(filePath)
 
-  return data.publicUrl
+  if (publicData?.publicUrl) {
+    return publicData.publicUrl
+  }
+
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from(bucketName)
+    .createSignedUrl(filePath, 60 * 60 * 24 * 7)
+
+  if (signedError) {
+    console.error('Handover signed URL error:', signedError)
+    throw new Error(
+      signedError.message ||
+        'File uploaded, but PMOCorex could not generate a view link for it.'
+    )
+  }
+
+  return signedData.signedUrl
 }
 
 export default function HandoverPage() {
@@ -596,12 +620,18 @@ export default function HandoverPage() {
   }
 
   async function uploadEvidence(table: string, row: any, file: File, type: 'document' | 'certificate' | 'checklist' | 'utility') {
-    if (!canEdit || !projectId || !selectedPackageId) {
+    if (!canEdit) {
       setNotice('You do not have permission to upload evidence.')
       return
     }
 
+    if (!projectId || !selectedPackageId) {
+      setNotice('Select a project and handover package before uploading evidence.')
+      return
+    }
+
     try {
+      setNotice('')
       setUploadingId(row.id)
 
       const publicUrl = await uploadHandoverFile({
@@ -611,22 +641,30 @@ export default function HandoverPage() {
         folder: type,
       })
 
-      const updates: Record<string, any> = {
-        uploaded_by: user?.id || null,
-        uploaded_by_name: user?.full_name || user?.email || null,
-        uploaded_at: new Date().toISOString(),
-      }
+      const now = new Date().toISOString()
+      const actorName = user?.full_name || user?.email || null
+
+      const updates: Record<string, any> = {}
 
       if (type === 'document' || type === 'certificate') {
         updates.file_url = publicUrl
         updates.status = 'Uploaded'
+        updates.uploaded_by = user?.id || null
+        updates.uploaded_by_name = actorName
+        updates.uploaded_at = now
       } else {
         updates.evidence_url = publicUrl
       }
 
-      const { error } = await supabase.from(table).update(updates).eq('id', row.id)
+      const { error: updateError } = await supabase
+        .from(table)
+        .update(updates)
+        .eq('id', row.id)
 
-      if (error) throw error
+      if (updateError) {
+        console.error('Handover evidence DB update error:', updateError)
+        throw new Error(updateError.message || 'Evidence uploaded but record could not be updated.')
+      }
 
       await logHistory(
         `${type.toUpperCase()} EVIDENCE UPLOADED`,
@@ -636,7 +674,8 @@ export default function HandoverPage() {
       await loadPackageDetails(selectedPackageId)
       setNotice('Evidence uploaded successfully.')
     } catch (error: any) {
-      setNotice(error.message || 'Could not upload evidence.')
+      console.error('Handover evidence upload failed:', error)
+      setNotice(error.message || 'Could not upload evidence. Check the project-files bucket and storage policies.')
     } finally {
       setUploadingId('')
     }
