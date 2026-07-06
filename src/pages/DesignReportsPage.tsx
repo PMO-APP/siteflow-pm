@@ -106,7 +106,7 @@ export default function DesignReportsPage() {
     setLoading(false)
   }
 
-  async function addItem() {
+  async function addItem(forcedCategory?: string) {
     setNotice('')
 
     if (!canEdit) {
@@ -131,7 +131,9 @@ export default function DesignReportsPage() {
       portfolio_id: portfolioId,
       project_id: projectId,
       report_week: reportWeek,
-      category: form.category,
+     category: form.category || activeTab === 'weekly'
+  ? defaultCategory
+  : forcedCategory || form.category,
       title: form.title.trim(),
       description: form.description.trim() || null,
       consultant_name: form.consultant_name.trim() || null,
@@ -638,7 +640,7 @@ function ManualTab({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select
             className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
-            value={form.category}
+            value={defaultCategory}
             disabled={!canEdit}
             onChange={e => setForm({ ...form, category: e.target.value })}
           >
@@ -715,7 +717,10 @@ function ManualTab({
         </label>
 
         {canEdit && (
-          <button className="btn btn-gold mt-4" onClick={addItem}>
+          <button
+  className="btn btn-gold mt-4"
+  onClick={() => addItem(defaultCategory)}
+>
             Save Update
           </button>
         )}
