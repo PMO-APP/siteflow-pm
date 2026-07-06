@@ -234,7 +234,7 @@ export default function CostingPage() {
       .eq('project_id', projectId)
       .eq('report_week', reportWeek)
       .order('section')
-      .order('submitted_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -258,7 +258,7 @@ export default function CostingPage() {
       .from('cost_contracts')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -282,7 +282,7 @@ export default function CostingPage() {
       .from('cost_payments')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -301,7 +301,7 @@ export default function CostingPage() {
       .from('cost_variations')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -318,7 +318,7 @@ export default function CostingPage() {
       .from('cost_procurements')
       .select('*')
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -336,7 +336,7 @@ export default function CostingPage() {
       .select('*')
       .eq('project_id', projectId)
       .order('report_week', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
