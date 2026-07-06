@@ -61,7 +61,7 @@ const VIEWER_ALLOWED_ROUTES = [
   '/app',
   '/app/recovery',
   '/app/team',
-  '/app/financial',
+  '/app/costing',
 ]
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
