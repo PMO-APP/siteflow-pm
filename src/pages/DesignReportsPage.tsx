@@ -102,7 +102,7 @@ export default function DesignReportsPage() {
       .select('*')
       .eq('project_id', projectId)
       .eq('report_week', reportWeek)
-      .order('created_at', { ascending: false })
+      .order('submitted_at', { ascending: false })
 
     if (reportError) {
       setNotice(reportError.message)
@@ -627,7 +627,7 @@ function DesignReportHistoryTab({
                 </span>
               </td>
               <td>{submission.submitted_by_name || '—'}</td>
-              <td>{fdate(submission.created_at)}</td>
+              <td>{fdate(submission.submitted_at)}</td>
               <td>
                 {submission.snapshot_data ? (
                   <span className="text-emerald-400">Saved</span>
