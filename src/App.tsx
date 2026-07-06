@@ -23,6 +23,8 @@ import CostingPage from '@/pages/CostingPage'
 import DesignReportsPage from '@/pages/DesignReportsPage'
 import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
 import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
+import HandoverPage from '@/pages/HandoverPage'
+
 
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
@@ -420,6 +422,7 @@ export default function App() {
           <Route path="project-packages" element={<ProjectPackagesPage />} />
           <Route path="project-controls" element={<ProjectControlsPage />} />
           <Route path="schedule-revisions" element={<ScheduleRevisionsPage />} />
+          <Route path="handover" element={<HandoverPage />} />
           <Route
             path="external-communication"
             element={<ExternalCommunicationReviewPage />}
