@@ -294,6 +294,14 @@ export default function CostingPage() {
     loadSubmissions()
   }, [projectId, reportWeek])
 
+  useEffect(() => {
+    const matchedReport = submissions.find(
+      submission => submission.report_week === reportWeek
+    )
+
+    setSelectedSubmission(matchedReport || null)
+  }, [reportWeek, submissions])
+
   async function loadCostReports() {
     if (!projectId) {
       setLoading(false)
@@ -874,8 +882,8 @@ export default function CostingPage() {
       return
     }
 
-    setSelectedSubmission(null)
     await loadSubmissions()
+    setActiveTab('report')
     setNotice('Weekly cost report submitted successfully and saved to history.')
   }
 
@@ -1160,7 +1168,18 @@ export default function CostingPage() {
             </button>
           )}
 
-          <button className="btn btn-gold" onClick={printReport}>
+          <button
+            className="btn btn-gold disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!selectedSubmission}
+            onClick={() => {
+              if (!selectedSubmission) {
+                setNotice('No cost report has been submitted for the selected week yet.')
+                return
+              }
+
+              printReport()
+            }}
+          >
             <Printer size={15} />
             Print / Download Cost Report
           </button>
@@ -1189,40 +1208,44 @@ export default function CostingPage() {
       </div>
 
       {activeTab === 'report' && (
-        <div ref={reportRef}>
-          <CostReportDocument
-            projectName={reportProjectName}
-            reportWeek={reportWeekForDocument}
-            preparedBy={reportPreparedBy}
-            groupedItems={reportGroupedItems}
-            items={reportItems}
-            contracts={reportContracts}
-            payments={reportPayments}
-            variations={reportVariations}
-            procurements={reportProcurements}
-            financialItems={reportFinancialItems}
-            financialTotals={reportFinancialTotals}
-            sourceContractValue={reportSourceContractValue}
-            sourceApprovedVariations={reportSourceApprovedVariations}
-            sourcePendingVariations={reportSourcePendingVariations}
-            sourcePaidAmount={reportSourcePaidAmount}
-            sourcePendingPayments={reportSourcePendingPayments}
-            sourceForecastFinalCost={reportSourceForecastFinalCost}
-            sourceOutstandingBalance={reportSourceOutstandingBalance}
-            totalAmount={reportTotalAmount}
-            pendingAmount={reportPendingAmount}
-            paidAmount={reportPaidAmount}
-            totalContractValue={reportTotalContractValue}
-            totalPaidOnContracts={reportTotalPaidOnContracts}
-            outstandingContractValue={reportOutstandingContractValue}
-            totalPayments={reportTotalPayments}
-            pendingPayments={reportPendingPayments}
-            paidPayments={reportPaidPayments}
-            approvedVariationValue={reportApprovedVariationValue}
-            pendingVariationValue={reportPendingVariationValue}
-            forecastFinalCost={reportForecastFinalCost}
-          />
-        </div>
+        selectedSubmission ? (
+          <div ref={reportRef}>
+            <CostReportDocument
+              projectName={reportProjectName}
+              reportWeek={reportWeekForDocument}
+              preparedBy={reportPreparedBy}
+              groupedItems={reportGroupedItems}
+              items={reportItems}
+              contracts={reportContracts}
+              payments={reportPayments}
+              variations={reportVariations}
+              procurements={reportProcurements}
+              financialItems={reportFinancialItems}
+              financialTotals={reportFinancialTotals}
+              sourceContractValue={reportSourceContractValue}
+              sourceApprovedVariations={reportSourceApprovedVariations}
+              sourcePendingVariations={reportSourcePendingVariations}
+              sourcePaidAmount={reportSourcePaidAmount}
+              sourcePendingPayments={reportSourcePendingPayments}
+              sourceForecastFinalCost={reportSourceForecastFinalCost}
+              sourceOutstandingBalance={reportSourceOutstandingBalance}
+              totalAmount={reportTotalAmount}
+              pendingAmount={reportPendingAmount}
+              paidAmount={reportPaidAmount}
+              totalContractValue={reportTotalContractValue}
+              totalPaidOnContracts={reportTotalPaidOnContracts}
+              outstandingContractValue={reportOutstandingContractValue}
+              totalPayments={reportTotalPayments}
+              pendingPayments={reportPendingPayments}
+              paidPayments={reportPaidPayments}
+              approvedVariationValue={reportApprovedVariationValue}
+              pendingVariationValue={reportPendingVariationValue}
+              forecastFinalCost={reportForecastFinalCost}
+            />
+          </div>
+        ) : (
+          <NoSubmittedCostReport reportWeek={reportWeek} canEdit={canEdit} />
+        )
       )}
 
       {activeTab === 'overview' && (
@@ -1354,6 +1377,43 @@ export default function CostingPage() {
   )
 }
 
+
+
+function NoSubmittedCostReport({
+  reportWeek,
+  canEdit,
+}: {
+  reportWeek: string
+  canEdit: boolean
+}) {
+  return (
+    <div className="card p-8 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48]">
+        <Wallet size={22} />
+      </div>
+
+      <h3 className="text-lg font-semibold text-[#ede8de]">
+        No cost report submitted for {fdate(reportWeek)}
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-xl text-sm text-[#6e7d8c]">
+        This tab only displays locked weekly report snapshots. Use the Weekly Updates,
+        Contracts, Payments, Variations, Procurement and Financial Register tabs to update
+        the live records, then submit the weekly report to generate the snapshot for this date.
+      </p>
+
+      {canEdit ? (
+        <p className="mt-4 text-sm text-amber-300">
+          Go to Weekly Updates and click Submit Weekly Report when this week's cost information is ready.
+        </p>
+      ) : (
+        <p className="mt-4 text-sm text-amber-300">
+          You can view submitted reports only. No report has been submitted for this week yet.
+        </p>
+      )}
+    </div>
+  )
+}
 
 
 function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
