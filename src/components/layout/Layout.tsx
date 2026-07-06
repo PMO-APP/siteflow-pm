@@ -66,7 +66,6 @@ const NAV = [
   { to: '/app/hse', icon: HardHat, label: 'HSE', },
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
-  { to: '/app/financial', icon: DollarSign, label: 'Financial' },
   { to: '/app/costing', icon: Wallet, label: 'Costing' },
   { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
@@ -123,8 +122,8 @@ const VIEWER_NAV = [
   '/app/recovery',
   '/app/planner',
   '/app/team',
+  '/app/costing',
 ]
-
 function formatRoleLabel(role: string | null) {
   if (!role) return 'Team Member'
 
