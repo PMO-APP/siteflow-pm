@@ -88,6 +88,7 @@ const TABS = [
   ['payments', 'Payments'],
   ['variations', 'Variations'],
   ['procurement', 'Procurement'],
+  ['history', 'History'],
 ]
 
 function formatCurrency(value: any) {
@@ -130,6 +131,8 @@ export default function CostingPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [variations, setVariations] = useState<any[]>([])
   const [procurements, setProcurements] = useState<any[]>([])
+  const [submissions, setSubmissions] = useState<any[]>([])
+  const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [contractsLoading, setContractsLoading] = useState(true)
@@ -203,6 +206,7 @@ export default function CostingPage() {
     loadPayments()
     loadVariations()
     loadProcurements()
+    loadSubmissions()
   }, [projectId, reportWeek])
 
   async function loadCostReports() {
@@ -311,6 +315,24 @@ export default function CostingPage() {
     }
 
     setProcurements(data || [])
+  }
+
+  async function loadSubmissions() {
+    if (!projectId) return
+
+    const { data, error } = await supabase
+      .from('cost_report_submissions')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('report_week', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setSubmissions(data || [])
   }
 
   async function addItem() {
@@ -638,6 +660,34 @@ export default function CostingPage() {
       return
     }
 
+    const snapshotData = {
+      projectName,
+      reportWeek,
+      preparedBy: user?.full_name || user?.email || '—',
+      generatedAt: new Date().toISOString(),
+
+      items,
+      contracts,
+      payments,
+      variations,
+      procurements,
+
+      totals: {
+        totalAmount,
+        pendingAmount,
+        paidAmount,
+        totalContractValue,
+        totalPaidOnContracts,
+        outstandingContractValue,
+        totalPayments,
+        pendingPayments,
+        paidPayments,
+        approvedVariationValue,
+        pendingVariationValue,
+        forecastFinalCost,
+      },
+    }
+
     const { error } = await supabase.from('cost_report_submissions').insert({
       organization_id: organizationId,
       portfolio_id: portfolioId,
@@ -646,6 +696,7 @@ export default function CostingPage() {
       submitted_by: user?.id || null,
       submitted_by_name: user?.full_name || user?.email || null,
       status: 'Submitted',
+      snapshot_data: snapshotData,
     })
 
     if (error) {
@@ -653,7 +704,9 @@ export default function CostingPage() {
       return
     }
 
-    setNotice('Weekly cost report submitted successfully.')
+    setSelectedSubmission(null)
+    await loadSubmissions()
+    setNotice('Weekly cost report submitted successfully and saved to history.')
   }
 
   function printReport() {
@@ -742,6 +795,76 @@ export default function CostingPage() {
   const forecastFinalCost =
     totalContractValue + approvedVariationValue + pendingVariationValue
 
+  const snapshot = selectedSubmission?.snapshot_data || null
+  const snapshotTotals = snapshot?.totals || {}
+
+  const reportProjectName = snapshot?.projectName || projectName
+  const reportPreparedBy =
+    snapshot?.preparedBy || selectedSubmission?.submitted_by_name || user?.full_name || user?.email || '—'
+  const reportWeekForDocument = snapshot?.reportWeek || selectedSubmission?.report_week || reportWeek
+
+  const reportItems = snapshot?.items || items
+  const reportContracts = snapshot?.contracts || contracts
+  const reportPayments = snapshot?.payments || payments
+  const reportVariations = snapshot?.variations || variations
+  const reportProcurements = snapshot?.procurements || procurements
+
+  const reportGroupedItems = SECTIONS.map(section => ({
+    section,
+    items: reportItems.filter((item: any) => item.section === section),
+  }))
+
+  const reportTotalAmount =
+    snapshotTotals.totalAmount ?? reportItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportPendingAmount =
+    snapshotTotals.pendingAmount ??
+    reportItems
+      .filter((item: any) => ['Open', 'Pending', 'In Progress'].includes(item.status))
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportPaidAmount =
+    snapshotTotals.paidAmount ??
+    reportItems
+      .filter((item: any) => item.status === 'Paid')
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+
+  const reportTotalContractValue =
+    snapshotTotals.totalContractValue ??
+    reportContracts.reduce((sum: number, item: any) => sum + Number(item.contract_value || 0), 0)
+  const reportTotalPaidOnContracts =
+    snapshotTotals.totalPaidOnContracts ??
+    reportContracts.reduce((sum: number, item: any) => sum + Number(item.amount_paid || 0), 0)
+  const reportOutstandingContractValue =
+    snapshotTotals.outstandingContractValue ??
+    reportTotalContractValue - reportTotalPaidOnContracts
+
+  const reportTotalPayments =
+    snapshotTotals.totalPayments ??
+    reportPayments.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportPendingPayments =
+    snapshotTotals.pendingPayments ??
+    reportPayments
+      .filter((item: any) => item.payment_status === 'Pending')
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportPaidPayments =
+    snapshotTotals.paidPayments ??
+    reportPayments
+      .filter((item: any) => item.payment_status === 'Paid')
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+
+  const reportApprovedVariationValue =
+    snapshotTotals.approvedVariationValue ??
+    reportVariations
+      .filter((item: any) => item.status === 'Approved')
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportPendingVariationValue =
+    snapshotTotals.pendingVariationValue ??
+    reportVariations
+      .filter((item: any) => item.status === 'Pending')
+      .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+  const reportForecastFinalCost =
+    snapshotTotals.forecastFinalCost ??
+    reportTotalContractValue + reportApprovedVariationValue + reportPendingVariationValue
+
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
@@ -779,15 +902,39 @@ export default function CostingPage() {
             type="date"
             className="form-control"
             value={reportWeek}
-            onChange={e => setReportWeek(e.target.value)}
+            onChange={e => {
+              setSelectedSubmission(null)
+              setReportWeek(e.target.value)
+            }}
           />
         </div>
 
-        <button className="btn btn-gold" onClick={printReport}>
-          <Printer size={15} />
-          Print / Download Cost Report
-        </button>
+        <div className="flex gap-2 items-center">
+          {selectedSubmission && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setSelectedSubmission(null)
+                setReportWeek(new Date().toISOString().slice(0, 10))
+              }}
+            >
+              Back to Current Report
+            </button>
+          )}
+
+          <button className="btn btn-gold" onClick={printReport}>
+            <Printer size={15} />
+            Print / Download Cost Report
+          </button>
+        </div>
       </div>
+
+      {selectedSubmission && (
+        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+          Viewing historical cost report for {fdate(selectedSubmission.report_week)}.
+          This report is a saved snapshot and will not change when new costing records are added.
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {TABS.map(([value, label]) => (
@@ -806,27 +953,27 @@ export default function CostingPage() {
       {activeTab === 'report' && (
         <div ref={reportRef}>
           <CostReportDocument
-            projectName={projectName}
-            reportWeek={reportWeek}
-            preparedBy={user?.full_name || user?.email || '—'}
-            groupedItems={groupedItems}
-            items={items}
-            contracts={contracts}
-            payments={payments}
-            variations={variations}
-            procurements={procurements}
-            totalAmount={totalAmount}
-            pendingAmount={pendingAmount}
-            paidAmount={paidAmount}
-            totalContractValue={totalContractValue}
-            totalPaidOnContracts={totalPaidOnContracts}
-            outstandingContractValue={outstandingContractValue}
-            totalPayments={totalPayments}
-            pendingPayments={pendingPayments}
-            paidPayments={paidPayments}
-            approvedVariationValue={approvedVariationValue}
-            pendingVariationValue={pendingVariationValue}
-            forecastFinalCost={forecastFinalCost}
+            projectName={reportProjectName}
+            reportWeek={reportWeekForDocument}
+            preparedBy={reportPreparedBy}
+            groupedItems={reportGroupedItems}
+            items={reportItems}
+            contracts={reportContracts}
+            payments={reportPayments}
+            variations={reportVariations}
+            procurements={reportProcurements}
+            totalAmount={reportTotalAmount}
+            pendingAmount={reportPendingAmount}
+            paidAmount={reportPaidAmount}
+            totalContractValue={reportTotalContractValue}
+            totalPaidOnContracts={reportTotalPaidOnContracts}
+            outstandingContractValue={reportOutstandingContractValue}
+            totalPayments={reportTotalPayments}
+            pendingPayments={reportPendingPayments}
+            paidPayments={reportPaidPayments}
+            approvedVariationValue={reportApprovedVariationValue}
+            pendingVariationValue={reportPendingVariationValue}
+            forecastFinalCost={reportForecastFinalCost}
           />
         </div>
       )}
@@ -934,6 +1081,83 @@ export default function CostingPage() {
           onDelete={deleteProcurement}
         />
       )}
+
+      {activeTab === 'history' && (
+        <CostReportHistoryTab
+          submissions={submissions}
+          onOpenReport={(submission: any) => {
+            setSelectedSubmission(submission)
+            setReportWeek(submission.report_week)
+            setActiveTab('report')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+
+function CostReportHistoryTab({
+  submissions,
+  onOpenReport,
+}: {
+  submissions: any[]
+  onOpenReport: (submission: any) => void
+}) {
+  if (!submissions.length) {
+    return (
+      <div className="card p-8 text-center text-[#6e7d8c]">
+        No submitted cost reports yet. Submit a weekly report to save it into history.
+      </div>
+    )
+  }
+
+  return (
+    <div className="card overflow-x-auto">
+      <table className="tbl min-w-[1000px]">
+        <thead>
+          <tr>
+            <th>Report Week</th>
+            <th>Status</th>
+            <th>Submitted By</th>
+            <th>Submitted On</th>
+            <th>Snapshot</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {submissions.map(submission => (
+            <tr key={submission.id}>
+              <td className="font-medium text-[#ede8de]">
+                {fdate(submission.report_week)}
+              </td>
+              <td>
+                <span className={`badge ${statusBadge(submission.status)}`}>
+                  {submission.status || 'Submitted'}
+                </span>
+              </td>
+              <td>{submission.submitted_by_name || '—'}</td>
+              <td>{fdate(submission.created_at)}</td>
+              <td>
+                {submission.snapshot_data ? (
+                  <span className="text-emerald-400">Saved</span>
+                ) : (
+                  <span className="text-amber-400">Legacy report</span>
+                )}
+              </td>
+              <td>
+                <button
+                  className="btn btn-gold btn-sm"
+                  onClick={() => onOpenReport(submission)}
+                >
+                  View / Download
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
