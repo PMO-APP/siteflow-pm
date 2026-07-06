@@ -29,6 +29,58 @@ function viewOnlyMessage() {
   return 'View only. Only the Design team and Administrators can add, submit, update or delete design records.'
 }
 
+function getReportWeekFridayDeadline(reportWeek: string) {
+  const selected = new Date(`${reportWeek}T00:00:00`)
+  if (Number.isNaN(selected.getTime())) return null
+
+  const day = selected.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+
+  const monday = new Date(selected)
+  monday.setDate(selected.getDate() + mondayOffset)
+  monday.setHours(0, 0, 0, 0)
+
+  const friday = new Date(monday)
+  friday.setDate(monday.getDate() + 4)
+  friday.setHours(23, 0, 0, 0)
+
+  return friday
+}
+
+function getReportSubmissionLock(reportWeek: string) {
+  const deadline = getReportWeekFridayDeadline(reportWeek)
+
+  if (!deadline) {
+    return {
+      deadline: null,
+      isAllowed: false,
+      message: 'Invalid report week selected.',
+      deadlineLabel: 'Invalid date',
+    }
+  }
+
+  const now = new Date()
+  const isAllowed = now.getTime() <= deadline.getTime()
+
+  const deadlineLabel = deadline.toLocaleString('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  return {
+    deadline,
+    isAllowed,
+    deadlineLabel,
+    message: isAllowed
+      ? `Submission open until ${deadlineLabel}.`
+      : 'Submission locked. Design reports can only be submitted latest 11:00 PM on Friday of the selected report week.',
+  }
+}
+
 function fdate(value?: string | null) {
   if (!value) return '—'
   const date = new Date(value)
@@ -50,6 +102,9 @@ export default function DesignReportsPage() {
 
   const canEdit = canEditDesignReports(role)
   const reportRef = useRef<HTMLDivElement>(null)
+
+  const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
+  const canSubmitReport = canEdit && reportLock.isAllowed
 
   const [activeTab, setActiveTab] = useState('report')
   const [drawings, setDrawings] = useState<any[]>([])
@@ -74,6 +129,14 @@ export default function DesignReportsPage() {
     loadData()
     loadSubmissions()
   }, [projectId, reportWeek])
+
+  useEffect(() => {
+    const matchedReport = submissions.find(
+      submission => submission.report_week === reportWeek
+    )
+
+    setSelectedSubmission(matchedReport || null)
+  }, [reportWeek, submissions])
 
   async function loadData() {
     if (!projectId) {
@@ -145,6 +208,11 @@ export default function DesignReportsPage() {
       return
     }
 
+    if (!reportLock.isAllowed) {
+      setNotice(reportLock.message)
+      return
+    }
+
     const snapshotData = {
       projectName,
       reportWeek,
@@ -184,8 +252,8 @@ export default function DesignReportsPage() {
       return
     }
 
-    setSelectedSubmission(null)
     await loadSubmissions()
+    setActiveTab('report')
     setNotice('Design report submitted successfully and saved to history.')
   }
 
@@ -458,6 +526,14 @@ export default function DesignReportsPage() {
               setReportWeek(e.target.value)
             }}
           />
+
+          <div
+            className={`mt-2 text-xs ${
+              reportLock.isAllowed ? 'text-emerald-400' : 'text-red-400'
+            }`}
+          >
+            {reportLock.message}
+          </div>
         </div>
 
         <div className="flex gap-2 items-center">
@@ -474,12 +550,28 @@ export default function DesignReportsPage() {
           )}
 
           {canEdit && !selectedSubmission && (
-            <button className="btn btn-ghost" onClick={submitReport}>
+            <button
+              className="btn btn-ghost disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!canSubmitReport}
+              onClick={submitReport}
+              title={reportLock.message}
+            >
               Submit Weekly Report
             </button>
           )}
 
-          <button className="btn btn-gold" onClick={printReport}>
+          <button
+            className="btn btn-gold disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!selectedSubmission}
+            onClick={() => {
+              if (!selectedSubmission) {
+                setNotice('No design report has been submitted for the selected week yet.')
+                return
+              }
+
+              printReport()
+            }}
+          >
             <Printer size={15} />
             Print / Download Design Report
           </button>
@@ -490,6 +582,12 @@ export default function DesignReportsPage() {
         <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
           Viewing historical design report for {fdate(selectedSubmission.report_week)}.
           This report is a saved snapshot and will not change when new design records are added.
+        </div>
+      )}
+
+      {!selectedSubmission && canEdit && !reportLock.isAllowed && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+          {reportLock.message}
         </div>
       )}
 
@@ -510,23 +608,32 @@ export default function DesignReportsPage() {
       ) : (
         <>
           {activeTab === 'report' && (
-            <div ref={reportRef}>
-              <DesignReportDocument
-                projectName={reportProjectName}
-                reportWeek={reportWeekForDocument}
-                preparedBy={reportPreparedBy}
-                drawings={reportDrawings}
-                approvedDrawings={reportApprovedDrawings}
-                pendingDrawings={reportPendingDrawings}
-                rejectedDrawings={reportRejectedDrawings}
-                consultantUpdates={reportConsultantUpdates}
-                designIssues={reportDesignIssues}
-                weeklyAchievements={reportWeeklyAchievements}
-                weeklyChallenges={reportWeeklyChallenges}
-                nextWeekFocus={reportNextWeekFocus}
-                managementAttention={reportManagementAttention}
+            selectedSubmission ? (
+              <div ref={reportRef}>
+                <DesignReportDocument
+                  projectName={reportProjectName}
+                  reportWeek={reportWeekForDocument}
+                  preparedBy={reportPreparedBy}
+                  drawings={reportDrawings}
+                  approvedDrawings={reportApprovedDrawings}
+                  pendingDrawings={reportPendingDrawings}
+                  rejectedDrawings={reportRejectedDrawings}
+                  consultantUpdates={reportConsultantUpdates}
+                  designIssues={reportDesignIssues}
+                  weeklyAchievements={reportWeeklyAchievements}
+                  weeklyChallenges={reportWeeklyChallenges}
+                  nextWeekFocus={reportNextWeekFocus}
+                  managementAttention={reportManagementAttention}
+                />
+              </div>
+            ) : (
+              <NoSubmittedDesignReport
+                reportWeek={reportWeek}
+                canEdit={canEdit}
+                canSubmitReport={canSubmitReport}
+                submissionLockMessage={reportLock.message}
               />
-            </div>
+            )
           )}
 
           {activeTab === 'drawings' && <DrawingRegister drawings={drawings} />}
@@ -580,6 +687,53 @@ export default function DesignReportsPage() {
             />
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+
+function NoSubmittedDesignReport({
+  reportWeek,
+  canEdit,
+  canSubmitReport,
+  submissionLockMessage,
+}: {
+  reportWeek: string
+  canEdit: boolean
+  canSubmitReport: boolean
+  submissionLockMessage: string
+}) {
+  return (
+    <div className="card p-8 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48]">
+        <PenTool size={22} />
+      </div>
+
+      <h3 className="text-lg font-semibold text-[#ede8de]">
+        No design report submitted for {fdate(reportWeek)}
+      </h3>
+
+      <p className="mx-auto mt-2 max-w-xl text-sm text-[#6e7d8c]">
+        This tab only displays locked weekly design report snapshots. Use the Drawing Register,
+        Consultants, Design Issues and Weekly Commentary tabs to update live records, then submit
+        the weekly report to generate the snapshot for this date.
+      </p>
+
+      {canEdit ? (
+        canSubmitReport ? (
+          <p className="mt-4 text-sm text-amber-300">
+            Click Submit Weekly Report when this week's design information is ready.
+          </p>
+        ) : (
+          <p className="mt-4 text-sm text-red-400">
+            {submissionLockMessage}
+          </p>
+        )
+      ) : (
+        <p className="mt-4 text-sm text-amber-300">
+          You can view submitted reports only. No report has been submitted for this week yet.
+        </p>
       )}
     </div>
   )
