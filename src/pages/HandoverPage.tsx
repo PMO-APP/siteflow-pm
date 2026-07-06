@@ -149,6 +149,22 @@ function calcPercent(done: number, total: number) {
   return Math.round((done / total) * 100)
 }
 
+function statusBadge(status?: string | null) {
+  if (['Passed', 'Approved', 'Uploaded', 'Handed Over', 'Issued'].includes(status || '')) {
+    return 'badge-green'
+  }
+
+  if (['Failed', 'Rejected', 'Blocked', 'Missing', 'Not Issued'].includes(status || '')) {
+    return 'badge-red'
+  }
+
+  if (['Pending', 'In Progress', 'Ready For Review'].includes(status || '')) {
+    return 'badge-amber'
+  }
+
+  return 'badge-muted'
+}
+
 function hasEvidence(row: any) {
   return Boolean(row.file_url || row.evidence_url)
 }
