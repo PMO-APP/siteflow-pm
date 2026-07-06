@@ -102,7 +102,7 @@ export default function DesignReportsPage() {
       .select('*')
       .eq('project_id', projectId)
       .eq('report_week', reportWeek)
-      .order('submitted_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (reportError) {
       setNotice(reportError.message)
@@ -124,7 +124,7 @@ export default function DesignReportsPage() {
       .select('*')
       .eq('project_id', projectId)
       .order('report_week', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
 
     if (error) {
       setNotice(error.message)
