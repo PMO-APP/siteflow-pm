@@ -54,6 +54,7 @@ export default function HandoverPage() {
   const [keys, setKeys] = useState<any[]>([])
   const [signoffs, setSignoffs] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
+  const [projectSnags, setProjectSnags] = useState<any[]>([])
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -98,15 +99,27 @@ export default function HandoverPage() {
       calcPercent(signoffsDone, signoffs.length),
     ].reduce((sum, value) => sum + value, 0) / 6)
 
+    const openSnags = projectSnags.filter(item => {
+      const status = String(item.status || '').toLowerCase()
+      return !['closed', 'resolved', 'completed', 'done'].includes(status)
+    })
+
+    const criticalOpenSnags = openSnags.filter(item => {
+      const severity = String(item.severity || item.priority || '').toLowerCase()
+      return ['critical', 'high'].includes(severity)
+    })
+
     const blockers = [
       failedChecklist > 0 ? `${failedChecklist} failed checklist item(s)` : null,
+      checklistDone < requiredChecklist.length ? `${requiredChecklist.length - checklistDone} checklist item(s) pending` : null,
       certMissing > 0 ? `${certMissing} missing/rejected certificate(s)` : null,
       docMissing > 0 ? `${docMissing} missing/rejected document(s)` : null,
       utilityFailed > 0 ? `${utilityFailed} failed utility item(s)` : null,
       keysIssued < keys.length ? `${keys.length - keysIssued} key item(s) not issued` : null,
       signoffsRejected > 0 ? `${signoffsRejected} rejected sign-off(s)` : null,
       signoffsDone < signoffs.length ? `${signoffs.length - signoffsDone} pending sign-off(s)` : null,
-      checklistDone < requiredChecklist.length ? `${requiredChecklist.length - checklistDone} checklist item(s) pending` : null,
+      criticalOpenSnags.length > 0 ? `${criticalOpenSnags.length} critical/high snag(s) still open` : null,
+      openSnags.length > 0 ? `${openSnags.length} total open snag(s) still unresolved` : null,
     ].filter(Boolean)
 
     return {
@@ -123,10 +136,12 @@ export default function HandoverPage() {
       keysTotal: keys.length,
       signoffsDone,
       signoffsTotal: signoffs.length,
+      openSnags: openSnags.length,
+      criticalOpenSnags: criticalOpenSnags.length,
       blockers,
       isReady: blockers.length === 0 && readiness === 100,
     }
-  }, [checklist, certificates, documents, utilities, keys, signoffs])
+  }, [checklist, certificates, documents, utilities, keys, signoffs, projectSnags])
 
   async function loadPackages() {
     if (!projectId) {
@@ -299,11 +314,12 @@ export default function HandoverPage() {
 function DashboardTab({ selectedPackage, stats, canApprove, approvePackage }: any) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <Metric title="Readiness" value={`${stats.readiness}%`} />
         <Metric title="Checklist" value={`${stats.checklistDone}/${stats.requiredChecklist}`} />
         <Metric title="Certificates" value={`${stats.certDone}/${stats.certTotal}`} />
         <Metric title="Sign-offs" value={`${stats.signoffsDone}/${stats.signoffsTotal}`} />
+        <Metric title="Open Snags" value={stats.openSnags} />
       </div>
       <div className="card p-6">
         <div className="flex flex-col lg:flex-row gap-5 lg:items-center lg:justify-between">
