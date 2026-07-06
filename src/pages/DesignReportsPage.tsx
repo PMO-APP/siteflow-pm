@@ -103,6 +103,10 @@ export default function DesignReportsPage() {
   const canEdit = canEditDesignReports(role)
   const reportRef = useRef<HTMLDivElement>(null)
 
+  const [reportWeek, setReportWeek] = useState(
+    new Date().toISOString().slice(0, 10)
+  )
+
   const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
   const canSubmitReport = canEdit && reportLock.isAllowed
 
@@ -113,7 +117,6 @@ export default function DesignReportsPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
-  const [reportWeek, setReportWeek] = useState(new Date().toISOString().slice(0, 10))
 
   const [form, setForm] = useState({
     category: 'Consultant Update',
