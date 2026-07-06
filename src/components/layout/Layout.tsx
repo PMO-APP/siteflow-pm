@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { PackageCheck } from 'lucide-react'
+
 
 import {
   canViewInternalPages,
@@ -70,6 +72,8 @@ const NAV = [
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
   { to: '/app/reports', icon: FileText, label: 'IPD Reports' },
+  { to: '/app/handover', icon: PackageCheck, label: 'Handover' },
+
    {
   to: '/app/project-packages',
   icon: Building2,
