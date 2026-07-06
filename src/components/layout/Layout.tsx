@@ -24,7 +24,6 @@ import {
   HardHat,
   AlertTriangle,
   FolderOpen,
-  DollarSign,
   Shield,
   ClipboardList,
   Users,
@@ -124,6 +123,7 @@ const VIEWER_NAV = [
   '/app/team',
   '/app/costing',
 ]
+
 function formatRoleLabel(role: string | null) {
   if (!role) return 'Team Member'
 
