@@ -265,6 +265,10 @@ export default function CostingPage() {
   const canEdit = canEditCosting(role)
   const reportRef = useRef<HTMLDivElement>(null)
 
+  const [reportWeek, setReportWeek] = useState(
+    new Date().toISOString().slice(0, 10)
+  )
+
   const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
   const canSubmitReport = canEdit && reportLock.isAllowed
 
@@ -282,10 +286,6 @@ export default function CostingPage() {
   const [contractsLoading, setContractsLoading] = useState(true)
   const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [notice, setNotice] = useState('')
-
-  const [reportWeek, setReportWeek] = useState(
-    new Date().toISOString().slice(0, 10)
-  )
 
   const [form, setForm] = useState({
     section: 'Pre-Contract',
