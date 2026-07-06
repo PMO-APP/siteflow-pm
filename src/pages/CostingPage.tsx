@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Printer, Trash2, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
@@ -81,20 +81,50 @@ const PROCUREMENT_STATUSES = [
 ]
 
 const TABS = [
+  ['report', 'Cost Report'],
   ['overview', 'Overview'],
-  ['weekly', 'Weekly Report'],
+  ['weekly', 'Weekly Updates'],
   ['contracts', 'Contracts'],
   ['payments', 'Payments'],
   ['variations', 'Variations'],
   ['procurement', 'Procurement'],
 ]
 
+function formatCurrency(value: any) {
+  return `₦${Number(value || 0).toLocaleString()}`
+}
+
+function fdate(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-GB')
+}
+
+function statusBadge(status?: string | null) {
+  if (['Approved', 'Paid', 'Completed', 'Delivered', 'Installed', 'Active'].includes(status || '')) {
+    return 'badge-green'
+  }
+
+  if (['Rejected', 'Delayed', 'Terminated', 'Cancelled'].includes(status || '')) {
+    return 'badge-red'
+  }
+
+  if (['Pending', 'Open', 'In Progress', 'On Hold', 'Ordered'].includes(status || '')) {
+    return 'badge-amber'
+  }
+
+  return 'badge-muted'
+}
+
 export default function CostingPage() {
   const { user } = useAuthStore()
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
-  const [activeTab, setActiveTab] = useState('overview')
+  const reportRef = useRef<HTMLDivElement>(null)
+
+  const [activeTab, setActiveTab] = useState('report')
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
@@ -307,6 +337,7 @@ export default function CostingPage() {
       amount: Number(form.amount || 0),
       status: form.status,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -352,6 +383,7 @@ export default function CostingPage() {
       status: contractForm.status,
       remarks: contractForm.remarks.trim() || null,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -401,6 +433,7 @@ export default function CostingPage() {
       paid_date: paymentForm.paid_date || null,
       remarks: paymentForm.remarks.trim() || null,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -450,6 +483,7 @@ export default function CostingPage() {
       reason: variationForm.reason.trim() || null,
       remarks: variationForm.remarks.trim() || null,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -501,6 +535,7 @@ export default function CostingPage() {
       actual_delivery_date: procurementForm.actual_delivery_date || null,
       remarks: procurementForm.remarks.trim() || null,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -609,6 +644,7 @@ export default function CostingPage() {
       project_id: projectId,
       report_week: reportWeek,
       submitted_by: user?.id || null,
+      submitted_by_name: user?.full_name || user?.email || null,
       status: 'Submitted',
     })
 
@@ -618,6 +654,36 @@ export default function CostingPage() {
     }
 
     setNotice('Weekly cost report submitted successfully.')
+  }
+
+  function printReport() {
+    if (!reportRef.current) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Cost Report</title>
+          <style>
+            body { margin: 0; background: white; }
+            @page { size: A4; margin: 0; }
+            img { max-width: 100%; }
+          </style>
+        </head>
+        <body>${reportRef.current.innerHTML}</body>
+      </html>
+    `)
+
+    printWindow.document.close()
+
+    setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }, 700)
   }
 
   const groupedItems = useMemo(() => {
@@ -706,6 +772,23 @@ export default function CostingPage() {
         </div>
       )}
 
+      <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <label className="form-label">Report Week</label>
+          <input
+            type="date"
+            className="form-control"
+            value={reportWeek}
+            onChange={e => setReportWeek(e.target.value)}
+          />
+        </div>
+
+        <button className="btn btn-gold" onClick={printReport}>
+          <Printer size={15} />
+          Print / Download Cost Report
+        </button>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {TABS.map(([value, label]) => (
           <button
@@ -719,6 +802,34 @@ export default function CostingPage() {
           </button>
         ))}
       </div>
+
+      {activeTab === 'report' && (
+        <div ref={reportRef}>
+          <CostReportDocument
+            projectName={projectName}
+            reportWeek={reportWeek}
+            preparedBy={user?.full_name || user?.email || '—'}
+            groupedItems={groupedItems}
+            items={items}
+            contracts={contracts}
+            payments={payments}
+            variations={variations}
+            procurements={procurements}
+            totalAmount={totalAmount}
+            pendingAmount={pendingAmount}
+            paidAmount={paidAmount}
+            totalContractValue={totalContractValue}
+            totalPaidOnContracts={totalPaidOnContracts}
+            outstandingContractValue={outstandingContractValue}
+            totalPayments={totalPayments}
+            pendingPayments={pendingPayments}
+            paidPayments={paidPayments}
+            approvedVariationValue={approvedVariationValue}
+            pendingVariationValue={pendingVariationValue}
+            forecastFinalCost={forecastFinalCost}
+          />
+        </div>
+      )}
 
       {activeTab === 'overview' && (
         <CostOverviewTab
@@ -740,9 +851,9 @@ export default function CostingPage() {
           <MetricGrid
             values={[
               ['Total Items', items.length],
-              ['Total Amount', `₦${totalAmount.toLocaleString()}`],
-              ['Pending Amount', `₦${pendingAmount.toLocaleString()}`],
-              ['Paid Amount', `₦${paidAmount.toLocaleString()}`],
+              ['Total Amount', formatCurrency(totalAmount)],
+              ['Pending Amount', formatCurrency(pendingAmount)],
+              ['Paid Amount', formatCurrency(paidAmount)],
             ]}
           />
 
@@ -765,9 +876,9 @@ export default function CostingPage() {
           <MetricGrid
             values={[
               ['Contracts', contracts.length],
-              ['Contract Value', `₦${totalContractValue.toLocaleString()}`],
-              ['Amount Paid', `₦${totalPaidOnContracts.toLocaleString()}`],
-              ['Outstanding', `₦${outstandingContractValue.toLocaleString()}`],
+              ['Contract Value', formatCurrency(totalContractValue)],
+              ['Amount Paid', formatCurrency(totalPaidOnContracts)],
+              ['Outstanding', formatCurrency(outstandingContractValue)],
             ]}
           />
 
@@ -787,9 +898,9 @@ export default function CostingPage() {
           <MetricGrid
             values={[
               ['Payments', payments.length],
-              ['Total Value', `₦${totalPayments.toLocaleString()}`],
-              ['Pending', `₦${pendingPayments.toLocaleString()}`],
-              ['Paid', `₦${paidPayments.toLocaleString()}`],
+              ['Total Value', formatCurrency(totalPayments)],
+              ['Pending', formatCurrency(pendingPayments)],
+              ['Paid', formatCurrency(paidPayments)],
             ]}
           />
 
@@ -826,6 +937,357 @@ export default function CostingPage() {
     </div>
   )
 }
+
+function CostReportDocument({
+  projectName,
+  reportWeek,
+  preparedBy,
+  groupedItems,
+  items,
+  contracts,
+  payments,
+  variations,
+  procurements,
+  totalAmount,
+  pendingAmount,
+  paidAmount,
+  totalContractValue,
+  totalPaidOnContracts,
+  outstandingContractValue,
+  totalPayments,
+  pendingPayments,
+  paidPayments,
+  approvedVariationValue,
+  pendingVariationValue,
+  forecastFinalCost,
+}: any) {
+  const activeContracts = contracts.filter((item: any) => item.status === 'Active')
+  const pendingPaymentRows = payments.filter((item: any) => item.payment_status === 'Pending')
+  const pendingVariations = variations.filter((item: any) => item.status === 'Pending')
+  const pendingProcurements = procurements.filter((item: any) => item.status === 'Pending' || item.status === 'Ordered')
+
+  return (
+    <div className="cost-report-document">
+      <style>{`
+        .cost-report-document {
+          background: white;
+          color: #111827;
+          width: 210mm;
+          min-height: 297mm;
+          padding: 16mm;
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          line-height: 1.45;
+          box-sizing: border-box;
+        }
+
+        .cr-border {
+          border: 2px solid #c49e48;
+          padding: 12px;
+          margin-bottom: 16px;
+        }
+
+        .cr-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #d6c38a;
+          padding-bottom: 10px;
+          margin-bottom: 14px;
+          letter-spacing: 0.12em;
+          font-weight: 800;
+        }
+
+        .cr-title {
+          text-align: center;
+          font-size: 26px;
+          font-weight: 900;
+          margin: 16px 0;
+          text-transform: uppercase;
+        }
+
+        .cr-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+
+        .cr-info {
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 8px;
+        }
+
+        .cr-label {
+          font-size: 9px;
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .cr-value {
+          font-weight: 700;
+          margin-top: 3px;
+        }
+
+        .cr-section {
+          margin-top: 16px;
+          page-break-inside: avoid;
+        }
+
+        .cr-section-title {
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #7a5a12;
+          border-bottom: 1px solid #d6c38a;
+          padding-bottom: 5px;
+          margin-bottom: 10px;
+        }
+
+        .cr-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .cr-table th,
+        .cr-table td {
+          border: 1px solid #333;
+          padding: 6px;
+          vertical-align: top;
+          font-size: 11px;
+        }
+
+        .cr-table th {
+          background: #f3f4f6;
+          font-weight: 800;
+        }
+
+        .cr-box {
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 10px;
+          min-height: 36px;
+          white-space: pre-wrap;
+        }
+
+        .cr-footer {
+          border-top: 1px solid #ddd;
+          margin-top: 24px;
+          padding-top: 8px;
+          font-size: 10px;
+          color: #666;
+        }
+
+        @media print {
+          .cost-report-document {
+            width: auto;
+            min-height: auto;
+            padding: 14mm;
+          }
+        }
+      `}</style>
+
+      <div className="cr-border">
+        <div className="cr-top">
+          <div>MIXTA AFRICA</div>
+          <div>PMOCOREX</div>
+        </div>
+
+        <div className="cr-title">{projectName || 'Project'}</div>
+
+        <div className="cr-grid">
+          <CostInfo label="Report Type" value="Cost Weekly Report" />
+          <CostInfo label="Report Week" value={fdate(reportWeek)} />
+          <CostInfo label="Prepared By" value={preparedBy} />
+        </div>
+      </div>
+
+      <CostSection title="Executive Cost Summary">
+        <div className="cr-grid">
+          <CostInfo label="Contract Value" value={formatCurrency(totalContractValue)} />
+          <CostInfo label="Paid on Contracts" value={formatCurrency(totalPaidOnContracts)} />
+          <CostInfo label="Outstanding Contract Balance" value={formatCurrency(outstandingContractValue)} />
+          <CostInfo label="Approved Variations" value={formatCurrency(approvedVariationValue)} />
+          <CostInfo label="Pending Variations" value={formatCurrency(pendingVariationValue)} />
+          <CostInfo label="Forecast Final Cost" value={formatCurrency(forecastFinalCost)} />
+          <CostInfo label="Weekly Report Items" value={items.length} />
+          <CostInfo label="Weekly Pending Amount" value={formatCurrency(pendingAmount)} />
+          <CostInfo label="Weekly Paid Amount" value={formatCurrency(paidAmount)} />
+          <CostInfo label="Payment Records" value={payments.length} />
+          <CostInfo label="Pending Payments" value={formatCurrency(pendingPayments)} />
+          <CostInfo label="Paid Payments" value={formatCurrency(paidPayments)} />
+        </div>
+      </CostSection>
+
+      <CostSection title="Weekly Cost Updates">
+        {groupedItems.every((group: any) => group.items.length === 0) ? (
+          <div className="cr-box">No weekly cost update recorded.</div>
+        ) : (
+          groupedItems.map((group: any) =>
+            group.items.length === 0 ? null : (
+              <div key={group.section} style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                  {group.section}
+                </div>
+
+                <CostSimpleTable
+                  columns={['Item', 'Description', 'Amount', 'Status']}
+                  rows={group.items.map((item: any) => [
+                    item.item_title || '—',
+                    item.description || '—',
+                    formatCurrency(item.amount),
+                    item.status || '—',
+                  ])}
+                />
+              </div>
+            )
+          )
+        )}
+      </CostSection>
+
+      <CostSimpleTableSection
+        title="Contracts"
+        empty="No contract records available."
+        columns={['Contract', 'Contractor', 'Type', 'Value', 'Paid', 'Status']}
+        rows={contracts.map((item: any) => [
+          item.contract_title || '—',
+          item.contractor_name || '—',
+          item.contract_type || '—',
+          formatCurrency(item.contract_value),
+          formatCurrency(item.amount_paid),
+          item.status || '—',
+        ])}
+      />
+
+      <CostSimpleTableSection
+        title="Pending Payments"
+        empty="No pending payment records."
+        columns={['Payment', 'Vendor', 'Category', 'Amount', 'Due Date', 'Status']}
+        rows={pendingPaymentRows.map((item: any) => [
+          item.payment_title || '—',
+          item.vendor_name || '—',
+          item.payment_category || '—',
+          formatCurrency(item.amount),
+          fdate(item.due_date),
+          item.payment_status || '—',
+        ])}
+      />
+
+      <CostSimpleTableSection
+        title="Variations"
+        empty="No variation records available."
+        columns={['Variation', 'Contractor', 'Type', 'Amount', 'Status']}
+        rows={variations.map((item: any) => [
+          item.variation_title || '—',
+          item.contractor_name || '—',
+          item.variation_type || '—',
+          formatCurrency(item.amount),
+          item.status || '—',
+        ])}
+      />
+
+      <CostSimpleTableSection
+        title="Pending / Ordered Procurement"
+        empty="No pending procurement records."
+        columns={['Item', 'Vendor', 'Category', 'Estimated', 'Actual', 'Status']}
+        rows={pendingProcurements.map((item: any) => [
+          item.item_name || '—',
+          item.vendor_name || '—',
+          item.procurement_category || '—',
+          formatCurrency(item.estimated_cost),
+          formatCurrency(item.actual_cost),
+          item.status || '—',
+        ])}
+      />
+
+      <CostSection title="Sign-off">
+        <div className="cr-grid">
+          <CostInfo label="Prepared By" value={preparedBy} />
+          <CostInfo label="Reviewed By" value="—" />
+          <CostInfo label="Approved By" value="—" />
+        </div>
+      </CostSection>
+
+      <div className="cr-footer">
+        Mixta Africa · Generated by PMOCorex · Confidential ·{' '}
+        {new Date().toLocaleDateString('en-GB')}
+      </div>
+    </div>
+  )
+}
+
+function CostSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="cr-section">
+      <div className="cr-section-title">{title}</div>
+      {children}
+    </section>
+  )
+}
+
+function CostInfo({ label, value }: { label: string; value: any }) {
+  return (
+    <div className="cr-info">
+      <div className="cr-label">{label}</div>
+      <div className="cr-value">{value ?? '—'}</div>
+    </div>
+  )
+}
+
+function CostSimpleTableSection({
+  title,
+  empty,
+  columns,
+  rows,
+}: {
+  title: string
+  empty: string
+  columns: string[]
+  rows: any[][]
+}) {
+  return (
+    <CostSection title={title}>
+      {rows.length === 0 ? (
+        <div className="cr-box">{empty}</div>
+      ) : (
+        <CostSimpleTable columns={columns} rows={rows} />
+      )}
+    </CostSection>
+  )
+}
+
+function CostSimpleTable({
+  columns,
+  rows,
+}: {
+  columns: string[]
+  rows: any[][]
+}) {
+  return (
+    <table className="cr-table">
+      <thead>
+        <tr>
+          {columns.map(column => (
+            <th key={column}>{column}</th>
+          ))}
+        </tr>
+      </thead>
+
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={index}>
+            {row.map((cell, cellIndex) => (
+              <td key={cellIndex}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 
 function CostOverviewTab({
   totalContractValue,
