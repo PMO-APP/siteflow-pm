@@ -3,6 +3,7 @@ import { Plus, Printer, Trash2, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
+import { useMembershipStore } from '@/store/membership'
 
 const SECTIONS = [
   'Pre-Contract',
@@ -118,11 +119,21 @@ function statusBadge(status?: string | null) {
   return 'badge-muted'
 }
 
+function canEditCosting(role?: string | null) {
+  return ['workspace_admin', 'admin', 'costing'].includes(role || '')
+}
+
+function viewOnlyMessage() {
+  return 'View only. Only the Costing team and Administrators can add, submit, update or delete costing records.'
+}
+
 export default function CostingPage() {
   const { user } = useAuthStore()
+  const role = useMembershipStore(state => state.role)
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
+  const canEdit = canEditCosting(role)
   const reportRef = useRef<HTMLDivElement>(null)
 
   const [activeTab, setActiveTab] = useState('report')
@@ -336,6 +347,11 @@ export default function CostingPage() {
   }
 
   async function addItem() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     setNotice('')
 
     if (!projectId) {
@@ -379,6 +395,11 @@ export default function CostingPage() {
   }
 
   async function addContract() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     setNotice('')
 
     if (!projectId) {
@@ -429,6 +450,11 @@ export default function CostingPage() {
   }
 
   async function addPayment() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     setNotice('')
 
     if (!projectId) {
@@ -479,6 +505,11 @@ export default function CostingPage() {
   }
 
   async function addVariation() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     setNotice('')
 
     if (!projectId) {
@@ -529,6 +560,11 @@ export default function CostingPage() {
   }
 
   async function addProcurement() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     setNotice('')
 
     if (!projectId) {
@@ -582,6 +618,11 @@ export default function CostingPage() {
   }
 
   async function deleteItem(id: string) {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     const confirmed = window.confirm('Delete this cost report item?')
     if (!confirmed) return
 
@@ -596,6 +637,11 @@ export default function CostingPage() {
   }
 
   async function deleteContract(id: string) {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     const confirmed = window.confirm('Delete this contract?')
     if (!confirmed) return
 
@@ -610,6 +656,11 @@ export default function CostingPage() {
   }
 
   async function deletePayment(id: string) {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     const confirmed = window.confirm('Delete this payment record?')
     if (!confirmed) return
 
@@ -624,6 +675,11 @@ export default function CostingPage() {
   }
 
   async function deleteVariation(id: string) {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     const confirmed = window.confirm('Delete this variation?')
     if (!confirmed) return
 
@@ -638,6 +694,11 @@ export default function CostingPage() {
   }
 
   async function deleteProcurement(id: string) {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     const confirmed = window.confirm('Delete this procurement item?')
     if (!confirmed) return
 
@@ -655,6 +716,11 @@ export default function CostingPage() {
   }
 
   async function submitReport() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     if (!projectId) {
       setNotice('No project selected.')
       return
@@ -887,6 +953,12 @@ export default function CostingPage() {
             {projectName || 'No project selected'}
           </span>
         </div>
+
+        {!canEdit && (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            {viewOnlyMessage()}
+          </div>
+        )}
       </section>
 
       {notice && (
@@ -1014,6 +1086,7 @@ export default function CostingPage() {
             onAdd={addItem}
             onDelete={deleteItem}
             onSubmit={submitReport}
+            canEdit={canEdit}
           />
         </>
       )}
@@ -1036,6 +1109,7 @@ export default function CostingPage() {
             setForm={setContractForm}
             onAdd={addContract}
             onDelete={deleteContract}
+            canEdit={canEdit}
           />
         </>
       )}
@@ -1058,6 +1132,7 @@ export default function CostingPage() {
             setForm={setPaymentForm}
             onAdd={addPayment}
             onDelete={deletePayment}
+            canEdit={canEdit}
           />
         </>
       )}
@@ -1069,6 +1144,7 @@ export default function CostingPage() {
           setForm={setVariationForm}
           onAdd={addVariation}
           onDelete={deleteVariation}
+          canEdit={canEdit}
         />
       )}
 
@@ -1079,6 +1155,7 @@ export default function CostingPage() {
           setForm={setProcurementForm}
           onAdd={addProcurement}
           onDelete={deleteProcurement}
+          canEdit={canEdit}
         />
       )}
 
@@ -1609,6 +1686,7 @@ function WeeklyReportTab({
   onAdd,
   onDelete,
   onSubmit,
+  canEdit,
 }: any) {
   return (
     <>
@@ -1623,9 +1701,13 @@ function WeeklyReportTab({
           />
         </div>
 
-        <button className="btn btn-gold ml-auto" onClick={onSubmit}>
-          Submit Weekly Report
-        </button>
+        {canEdit ? (
+          <button className="btn btn-gold ml-auto" onClick={onSubmit}>
+            Submit Weekly Report
+          </button>
+        ) : (
+          <div className="ml-auto text-sm text-amber-300">{viewOnlyMessage()}</div>
+        )}
       </div>
 
       <div className="card p-5">
@@ -1636,7 +1718,8 @@ function WeeklyReportTab({
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.section}
             onChange={e => setForm({ ...form, section: e.target.value })}
           >
@@ -1646,14 +1729,16 @@ function WeeklyReportTab({
           </select>
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Item title"
             value={form.item_title}
             onChange={e => setForm({ ...form, item_title: e.target.value })}
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Amount"
             type="number"
             value={form.amount}
@@ -1661,7 +1746,8 @@ function WeeklyReportTab({
           />
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.status}
             onChange={e => setForm({ ...form, status: e.target.value })}
           >
@@ -1670,13 +1756,16 @@ function WeeklyReportTab({
             ))}
           </select>
 
-          <button className="btn btn-gold" onClick={onAdd}>
-            Add Item
-          </button>
+          {canEdit && (
+            <button className="btn btn-gold" onClick={onAdd}>
+              Add Item
+            </button>
+          )}
         </div>
 
         <textarea
-          className="form-control mt-3"
+          className="form-control mt-3 disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={!canEdit}
           rows={2}
           placeholder="Description / update"
           value={form.description}
@@ -1705,7 +1794,7 @@ function WeeklyReportTab({
                   No entries for this section.
                 </div>
               ) : (
-                <ReportTable items={group.items} onDelete={onDelete} />
+                <ReportTable items={group.items} onDelete={onDelete} canEdit={canEdit} />
               )}
             </div>
           ))}
@@ -1718,9 +1807,11 @@ function WeeklyReportTab({
 function ReportTable({
   items,
   onDelete,
+  canEdit,
 }: {
   items: any[]
   onDelete: (id: string) => void
+  canEdit: boolean
 }) {
   return (
     <div className="overflow-x-auto">
@@ -1757,12 +1848,18 @@ function ReportTable({
               </td>
 
               <td>
-                <button
-                  className="tbl-action text-red-400"
-                  onClick={() => onDelete(item.id)}
-                >
-                  <Trash2 size={13} />
-                </button>
+                {canEdit ? (
+                  <button
+                    className="tbl-action text-red-400"
+                    onClick={() => onDelete(item.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                    View Only
+                  </span>
+                )}
               </td>
             </tr>
           ))}
@@ -1779,6 +1876,7 @@ function ContractsTab({
   setForm,
   onAdd,
   onDelete,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -1788,23 +1886,32 @@ function ContractsTab({
           <h2 className="font-bold text-[#ede8de]">Add Contract</h2>
         </div>
 
+        {!canEdit && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            {viewOnlyMessage()}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Contract title"
             value={form.contract_title}
             onChange={e => setForm({ ...form, contract_title: e.target.value })}
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Contractor / consultant"
             value={form.contractor_name}
             onChange={e => setForm({ ...form, contractor_name: e.target.value })}
           />
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.contract_type}
             onChange={e => setForm({ ...form, contract_type: e.target.value })}
           >
@@ -1814,7 +1921,8 @@ function ContractsTab({
           </select>
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.status}
             onChange={e => setForm({ ...form, status: e.target.value })}
           >
@@ -1826,7 +1934,8 @@ function ContractsTab({
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Contract value"
             type="number"
             value={form.contract_value}
@@ -1834,7 +1943,8 @@ function ContractsTab({
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Amount paid"
             type="number"
             value={form.amount_paid}
@@ -1843,14 +1953,16 @@ function ContractsTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.start_date}
             onChange={e => setForm({ ...form, start_date: e.target.value })}
           />
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.end_date}
             onChange={e => setForm({ ...form, end_date: e.target.value })}
           />
@@ -1864,9 +1976,11 @@ function ContractsTab({
           onChange={e => setForm({ ...form, remarks: e.target.value })}
         />
 
-        <button className="btn btn-gold mt-3" onClick={onAdd}>
-          Add Contract
-        </button>
+        {canEdit && (
+          <button className="btn btn-gold mt-3" onClick={onAdd}>
+            Add Contract
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -1908,12 +2022,16 @@ function ContractsTab({
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="tbl-action text-red-400"
-                      onClick={() => onDelete(contract.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        className="tbl-action text-red-400"
+                        onClick={() => onDelete(contract.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1932,6 +2050,7 @@ function PaymentsTab({
   setForm,
   onAdd,
   onDelete,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -1941,23 +2060,32 @@ function PaymentsTab({
           <h2 className="font-bold text-[#ede8de]">Add Payment</h2>
         </div>
 
+        {!canEdit && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            {viewOnlyMessage()}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Payment title"
             value={form.payment_title}
             onChange={e => setForm({ ...form, payment_title: e.target.value })}
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Vendor / contractor"
             value={form.vendor_name}
             onChange={e => setForm({ ...form, vendor_name: e.target.value })}
           />
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.payment_category}
             onChange={e =>
               setForm({ ...form, payment_category: e.target.value })
@@ -1969,7 +2097,8 @@ function PaymentsTab({
           </select>
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.payment_status}
             onChange={e => setForm({ ...form, payment_status: e.target.value })}
           >
@@ -1981,7 +2110,8 @@ function PaymentsTab({
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Amount"
             type="number"
             value={form.amount}
@@ -1990,21 +2120,24 @@ function PaymentsTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.request_date}
             onChange={e => setForm({ ...form, request_date: e.target.value })}
           />
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.due_date}
             onChange={e => setForm({ ...form, due_date: e.target.value })}
           />
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.paid_date}
             onChange={e => setForm({ ...form, paid_date: e.target.value })}
           />
@@ -2018,9 +2151,11 @@ function PaymentsTab({
           onChange={e => setForm({ ...form, remarks: e.target.value })}
         />
 
-        <button className="btn btn-gold mt-3" onClick={onAdd}>
-          Add Payment
-        </button>
+        {canEdit && (
+          <button className="btn btn-gold mt-3" onClick={onAdd}>
+            Add Payment
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -2062,12 +2197,16 @@ function PaymentsTab({
                   </td>
                   <td>{payment.due_date || '—'}</td>
                   <td>
-                    <button
-                      className="tbl-action text-red-400"
-                      onClick={() => onDelete(payment.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        className="tbl-action text-red-400"
+                        onClick={() => onDelete(payment.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2085,6 +2224,7 @@ function VariationsTab({
   setForm,
   onAdd,
   onDelete,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -2122,9 +2262,16 @@ function VariationsTab({
       <div className="card p-5">
         <h2 className="font-bold text-white mb-4">Add Variation</h2>
 
+        {!canEdit && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            {viewOnlyMessage()}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Variation title"
             value={form.variation_title}
             onChange={e =>
@@ -2133,7 +2280,8 @@ function VariationsTab({
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Contractor"
             value={form.contractor_name}
             onChange={e =>
@@ -2142,7 +2290,8 @@ function VariationsTab({
           />
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.variation_type}
             onChange={e =>
               setForm({ ...form, variation_type: e.target.value })
@@ -2164,7 +2313,8 @@ function VariationsTab({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.status}
             onChange={e => setForm({ ...form, status: e.target.value })}
           >
@@ -2175,14 +2325,16 @@ function VariationsTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.request_date}
             onChange={e => setForm({ ...form, request_date: e.target.value })}
           />
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.approval_date}
             onChange={e => setForm({ ...form, approval_date: e.target.value })}
           />
@@ -2204,9 +2356,11 @@ function VariationsTab({
           onChange={e => setForm({ ...form, remarks: e.target.value })}
         />
 
-        <button onClick={onAdd} className="btn btn-gold mt-4">
-          Save Variation
-        </button>
+        {canEdit && (
+          <button onClick={onAdd} className="btn btn-gold mt-4">
+            Save Variation
+          </button>
+        )}
       </div>
 
       {variations.length > 0 && (
@@ -2240,12 +2394,16 @@ function VariationsTab({
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="tbl-action text-red-400"
-                      onClick={() => onDelete(variation.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        className="tbl-action text-red-400"
+                        onClick={() => onDelete(variation.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2263,6 +2421,7 @@ function ProcurementTab({
   setForm,
   onAdd,
   onDelete,
+  canEdit,
 }: any) {
   return (
     <div className="space-y-5">
@@ -2290,23 +2449,32 @@ function ProcurementTab({
       <div className="card p-5">
         <h2 className="font-bold text-white mb-4">Add Procurement Item</h2>
 
+        {!canEdit && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            {viewOnlyMessage()}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Item name"
             value={form.item_name}
             onChange={e => setForm({ ...form, item_name: e.target.value })}
           />
 
           <input
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             placeholder="Vendor"
             value={form.vendor_name}
             onChange={e => setForm({ ...form, vendor_name: e.target.value })}
           />
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.procurement_category}
             onChange={e =>
               setForm({ ...form, procurement_category: e.target.value })
@@ -2318,7 +2486,8 @@ function ProcurementTab({
           </select>
 
           <select
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.status}
             onChange={e => setForm({ ...form, status: e.target.value })}
           >
@@ -2349,7 +2518,8 @@ function ProcurementTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.expected_delivery_date}
             onChange={e =>
               setForm({
@@ -2361,7 +2531,8 @@ function ProcurementTab({
 
           <input
             type="date"
-            className="form-control"
+            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={!canEdit}
             value={form.actual_delivery_date}
             onChange={e =>
               setForm({
@@ -2380,9 +2551,11 @@ function ProcurementTab({
           onChange={e => setForm({ ...form, remarks: e.target.value })}
         />
 
-        <button onClick={onAdd} className="btn btn-gold mt-4">
-          Save Procurement
-        </button>
+        {canEdit && (
+          <button onClick={onAdd} className="btn btn-gold mt-4">
+            Save Procurement
+          </button>
+        )}
       </div>
 
       {procurements.length > 0 && (
@@ -2418,12 +2591,16 @@ function ProcurementTab({
                     </span>
                   </td>
                   <td>
-                    <button
-                      className="tbl-action text-red-400"
-                      onClick={() => onDelete(item.id)}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit ? (
+                      <button
+                        className="tbl-action text-red-400"
+                        onClick={() => onDelete(item.id)}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                    )}
                   </td>
                 </tr>
               ))}
