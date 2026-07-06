@@ -234,7 +234,7 @@ export default function CostingPage() {
       .eq('project_id', projectId)
       .eq('report_week', reportWeek)
       .order('section')
-      .order('created_at', { ascending: false })
+      .order('submitted_at', { ascending: false })
 
     if (error) {
       setNotice(error.message)
@@ -1215,7 +1215,7 @@ function CostReportHistoryTab({
                 </span>
               </td>
               <td>{submission.submitted_by_name || '—'}</td>
-              <td>{fdate(submission.created_at)}</td>
+              <td>{fdate(submission.submitted_at)}</td>
               <td>
                 {submission.snapshot_data ? (
                   <span className="text-emerald-400">Saved</span>
