@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle,
+  Eye,
   PackageCheck,
   Plus,
   ShieldCheck,
+  UploadCloud,
   XCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -125,7 +127,7 @@ function canEditHandover(role?: string | null) {
   ].includes(role || '')
 }
 
-function canApproveHandover(role?: string | null) {
+function canReviewHandover(role?: string | null) {
   return [
     'workspace_admin',
     'admin',
@@ -147,20 +149,44 @@ function calcPercent(done: number, total: number) {
   return Math.round((done / total) * 100)
 }
 
-function statusBadge(status?: string | null) {
-  if (['Passed', 'Approved', 'Uploaded', 'Handed Over'].includes(status || '')) {
-    return 'badge-green'
-  }
+function hasEvidence(row: any) {
+  return Boolean(row.file_url || row.evidence_url)
+}
 
-  if (['Failed', 'Rejected', 'Blocked', 'Missing'].includes(status || '')) {
-    return 'badge-red'
-  }
+function requireComment(message = 'Please enter a comment/reason.') {
+  const comment = window.prompt(message)
+  return comment?.trim() || ''
+}
 
-  if (['Pending', 'In Progress', 'Ready For Review'].includes(status || '')) {
-    return 'badge-amber'
-  }
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
 
-  return 'badge-muted'
+async function uploadHandoverFile({
+  file,
+  projectId,
+  packageId,
+  folder,
+}: {
+  file: File
+  projectId: string | number
+  packageId: string
+  folder: string
+}) {
+  const safeName = sanitizeFileName(file.name)
+  const filePath = `handover/${projectId}/${packageId}/${folder}/${Date.now()}-${safeName}`
+
+  const { error } = await supabase.storage
+    .from('project-files')
+    .upload(filePath, file, {
+      upsert: true,
+    })
+
+  if (error) throw error
+
+  const { data } = supabase.storage.from('project-files').getPublicUrl(filePath)
+
+  return data.publicUrl
 }
 
 export default function HandoverPage() {
@@ -169,7 +195,7 @@ export default function HandoverPage() {
   const { projectId, projectName, organizationId, portfolioId } = useProjectStore()
 
   const canEdit = canEditHandover(role)
-  const canApprove = canApproveHandover(role)
+  const canReview = canReviewHandover(role)
 
   const [activeTab, setActiveTab] = useState('dashboard')
   const [packages, setPackages] = useState<any[]>([])
@@ -184,6 +210,7 @@ export default function HandoverPage() {
   const [projectSnags, setProjectSnags] = useState<any[]>([])
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
+  const [uploadingId, setUploadingId] = useState('')
 
   const [packageForm, setPackageForm] = useState({
     package_name: '',
@@ -214,10 +241,16 @@ export default function HandoverPage() {
     const certMissing = certificates.filter(item =>
       ['Missing', 'Rejected'].includes(item.status)
     ).length
+    const certWithoutEvidence = certificates.filter(item =>
+      ['Uploaded', 'Approved'].includes(item.status) && !hasEvidence(item)
+    ).length
 
     const docDone = documents.filter(item => item.status === 'Approved').length
     const docMissing = documents.filter(item =>
       ['Missing', 'Rejected'].includes(item.status)
+    ).length
+    const docWithoutEvidence = documents.filter(item =>
+      ['Uploaded', 'Approved'].includes(item.status) && !hasEvidence(item)
     ).length
 
     const utilityDone = utilities.filter(item =>
@@ -260,7 +293,9 @@ export default function HandoverPage() {
         ? `${requiredChecklist.length - checklistDone} checklist item(s) pending`
         : null,
       certMissing > 0 ? `${certMissing} missing/rejected certificate(s)` : null,
+      certWithoutEvidence > 0 ? `${certWithoutEvidence} certificate(s) marked uploaded/approved without file evidence` : null,
       docMissing > 0 ? `${docMissing} missing/rejected document(s)` : null,
+      docWithoutEvidence > 0 ? `${docWithoutEvidence} document(s) marked uploaded/approved without file evidence` : null,
       utilityFailed > 0 ? `${utilityFailed} failed utility item(s)` : null,
       keysIssued < keys.length ? `${keys.length - keysIssued} key item(s) not issued` : null,
       signoffsRejected > 0 ? `${signoffsRejected} rejected sign-off(s)` : null,
@@ -389,8 +424,8 @@ export default function HandoverPage() {
       package_id: packageId,
       certificate_type,
       status: 'Missing',
-      uploaded_by: user?.id || null,
-      uploaded_by_name: actor,
+      uploaded_by: null,
+      uploaded_by_name: null,
     }))
 
     const documentRows = DOCUMENT_DEFAULTS.map(([document_type, title]) => ({
@@ -398,8 +433,8 @@ export default function HandoverPage() {
       document_type,
       title,
       status: 'Missing',
-      uploaded_by: user?.id || null,
-      uploaded_by_name: actor,
+      uploaded_by: null,
+      uploaded_by_name: null,
     }))
 
     const utilityRows = UTILITY_DEFAULTS.map(utility_name => ({
@@ -544,8 +579,98 @@ export default function HandoverPage() {
     await loadPackageDetails(selectedPackageId)
   }
 
+  async function uploadEvidence(table: string, row: any, file: File, type: 'document' | 'certificate' | 'checklist' | 'utility') {
+    if (!canEdit || !projectId || !selectedPackageId) {
+      setNotice('You do not have permission to upload evidence.')
+      return
+    }
+
+    try {
+      setUploadingId(row.id)
+
+      const publicUrl = await uploadHandoverFile({
+        file,
+        projectId,
+        packageId: selectedPackageId,
+        folder: type,
+      })
+
+      const updates: Record<string, any> = {
+        uploaded_by: user?.id || null,
+        uploaded_by_name: user?.full_name || user?.email || null,
+        uploaded_at: new Date().toISOString(),
+      }
+
+      if (type === 'document' || type === 'certificate') {
+        updates.file_url = publicUrl
+        updates.status = 'Uploaded'
+      } else {
+        updates.evidence_url = publicUrl
+      }
+
+      const { error } = await supabase.from(table).update(updates).eq('id', row.id)
+
+      if (error) throw error
+
+      await logHistory(
+        `${type.toUpperCase()} EVIDENCE UPLOADED`,
+        `${row.title || row.certificate_type || row.item_title || row.utility_name} evidence uploaded.`
+      )
+
+      await loadPackageDetails(selectedPackageId)
+      setNotice('Evidence uploaded successfully.')
+    } catch (error: any) {
+      setNotice(error.message || 'Could not upload evidence.')
+    } finally {
+      setUploadingId('')
+    }
+  }
+
+  async function reviewEvidence(table: string, row: any, status: 'Approved' | 'Rejected') {
+    if (!canReview) {
+      setNotice('Only PMO/Admin/Project Owner can approve or reject evidence.')
+      return
+    }
+
+    if (!hasEvidence(row)) {
+      setNotice('You cannot approve this item until evidence has been uploaded.')
+      return
+    }
+
+    let remarks = row.remarks || null
+
+    if (status === 'Rejected') {
+      const comment = requireComment('Why is this being rejected?')
+      if (!comment) {
+        setNotice('Rejection comment is required.')
+        return
+      }
+      remarks = comment
+    }
+
+    const { error } = await supabase
+      .from(table)
+      .update({
+        status,
+        remarks,
+      })
+      .eq('id', row.id)
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    await logHistory(
+      `${status.toUpperCase()}`,
+      `${row.title || row.certificate_type || row.item_title || row.utility_name} ${status.toLowerCase()}.`
+    )
+
+    await loadPackageDetails(selectedPackageId)
+  }
+
   async function approvePackage() {
-    if (!canApprove) {
+    if (!canReview) {
       setNotice('Only PMO/Admin/Project Owner can approve handover.')
       return
     }
@@ -618,8 +743,7 @@ export default function HandoverPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-slate-400">
-          Workflow: Site team closes checklist items → certificates/documents/utilities/keys
-          are verified → departments sign off → PMO/Admin/Project Owner gives final handover approval.
+          Evidence rule: users upload proof first → status becomes Uploaded → only PMO/Admin/Project Owner can approve or reject.
         </div>
       </section>
 
@@ -718,29 +842,51 @@ export default function HandoverPage() {
             <DashboardTab
               selectedPackage={selectedPackage}
               stats={stats}
-              canApprove={canApprove}
+              canApprove={canReview}
               approvePackage={approvePackage}
             />
           )}
 
           {activeTab === 'checklist' && (
-            <ChecklistTab checklist={checklist} updateRow={updateRow} canEdit={canEdit} />
+            <ChecklistTab
+              checklist={checklist}
+              updateRow={updateRow}
+              uploadEvidence={uploadEvidence}
+              canEdit={canEdit}
+              uploadingId={uploadingId}
+            />
           )}
 
           {activeTab === 'certificates' && (
             <CertificatesTab
               certificates={certificates}
-              updateRow={updateRow}
+              uploadEvidence={uploadEvidence}
+              reviewEvidence={reviewEvidence}
               canEdit={canEdit}
+              canReview={canReview}
+              uploadingId={uploadingId}
             />
           )}
 
           {activeTab === 'documents' && (
-            <DocumentsTab documents={documents} updateRow={updateRow} canEdit={canEdit} />
+            <DocumentsTab
+              documents={documents}
+              uploadEvidence={uploadEvidence}
+              reviewEvidence={reviewEvidence}
+              canEdit={canEdit}
+              canReview={canReview}
+              uploadingId={uploadingId}
+            />
           )}
 
           {activeTab === 'utilities' && (
-            <UtilitiesTab utilities={utilities} updateRow={updateRow} canEdit={canEdit} />
+            <UtilitiesTab
+              utilities={utilities}
+              updateRow={updateRow}
+              uploadEvidence={uploadEvidence}
+              canEdit={canEdit}
+              uploadingId={uploadingId}
+            />
           )}
 
           {activeTab === 'keys' && (
@@ -837,8 +983,7 @@ function DashboardTab({ selectedPackage, stats, canApprove, approvePackage }: an
           )}
 
           <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
-            The Approve Handover button stays locked until checklist, certificates,
-            documents, utilities, keys, sign-offs and project snags are fully closed.
+            Approval is locked until all required evidence, approvals, sign-offs and project snags are closed.
           </div>
         </div>
       )}
@@ -846,93 +991,191 @@ function DashboardTab({ selectedPackage, stats, canApprove, approvePackage }: an
   )
 }
 
-function ChecklistTab({ checklist, updateRow, canEdit }: any) {
+function EvidenceCell({ row, table, type, canEdit, uploadEvidence, uploadingId }: any) {
+  return (
+    <div className="flex items-center gap-2">
+      {hasEvidence(row) ? (
+        <a
+          href={row.file_url || row.evidence_url}
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-sm btn-ghost"
+        >
+          <Eye size={13} />
+          View
+        </a>
+      ) : (
+        <span className="text-xs text-red-400">No evidence</span>
+      )}
+
+      {canEdit && (
+        <label className="btn btn-sm btn-gold cursor-pointer">
+          <UploadCloud size={13} />
+          {uploadingId === row.id ? 'Uploading…' : 'Upload'}
+          <input
+            type="file"
+            className="hidden"
+            disabled={uploadingId === row.id}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) uploadEvidence(table, row, file, type)
+              e.currentTarget.value = ''
+            }}
+          />
+        </label>
+      )}
+    </div>
+  )
+}
+
+function ReviewButtons({ row, table, canReview, reviewEvidence }: any) {
+  if (!canReview) {
+    return <span className="text-xs text-[#6e7d8c]">Reviewer only</span>
+  }
+
+  return (
+    <div className="flex gap-2">
+      <button
+        className="btn btn-sm btn-gold"
+        disabled={!hasEvidence(row) || row.status !== 'Uploaded'}
+        onClick={() => reviewEvidence(table, row, 'Approved')}
+      >
+        <CheckCircle size={13} />
+        Approve
+      </button>
+
+      <button
+        className="btn btn-sm btn-ghost"
+        disabled={!hasEvidence(row) || row.status !== 'Uploaded'}
+        onClick={() => reviewEvidence(table, row, 'Rejected')}
+      >
+        Reject
+      </button>
+    </div>
+  )
+}
+
+function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploadingId }: any) {
   return (
     <GenericTable
       title="Handover Checklist"
       rows={checklist}
-      columns={['Discipline', 'Category', 'Item', 'Required', 'Status', 'Remarks']}
+      columns={['Discipline', 'Category', 'Item', 'Required', 'Evidence', 'Action', 'Remarks']}
       renderRow={(item: any) => [
         item.discipline,
         item.category,
         item.item_title,
         item.is_required ? 'Yes' : 'No',
-        <StatusSelect
-          value={item.status}
-          options={['Pending', 'Passed', 'Failed', 'N/A']}
-          disabled={!canEdit}
-          onChange={(status: string) =>
-            updateRow(
-              'handover_checklist_items',
-              item.id,
-              {
-                status,
-                closed_at: ['Passed', 'Failed', 'N/A'].includes(status)
-                  ? new Date().toISOString()
-                  : null,
-              },
-              `Checklist updated: ${item.item_title} → ${status}`
-            )
-          }
+        <EvidenceCell
+          row={item}
+          table="handover_checklist_items"
+          type="checklist"
+          canEdit={canEdit}
+          uploadEvidence={uploadEvidence}
+          uploadingId={uploadingId}
         />,
+        <div className="flex gap-2">
+          <button
+            className="btn btn-sm btn-gold"
+            disabled={!canEdit || !hasEvidence(item)}
+            onClick={() => {
+              const comment = requireComment('Add inspection comment for passing this item.')
+              if (!comment) return
+              updateRow(
+                'handover_checklist_items',
+                item.id,
+                {
+                  status: 'Passed',
+                  remarks: comment,
+                  closed_at: new Date().toISOString(),
+                },
+                `Checklist passed: ${item.item_title}`
+              )
+            }}
+          >
+            Pass
+          </button>
+
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() => {
+              const comment = requireComment('Why did this checklist item fail?')
+              if (!comment) return
+              updateRow(
+                'handover_checklist_items',
+                item.id,
+                {
+                  status: 'Failed',
+                  remarks: comment,
+                  closed_at: new Date().toISOString(),
+                },
+                `Checklist failed: ${item.item_title}`
+              )
+            }}
+          >
+            Fail
+          </button>
+        </div>,
         item.remarks || '—',
       ]}
     />
   )
 }
 
-function CertificatesTab({ certificates, updateRow, canEdit }: any) {
+function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId }: any) {
   return (
     <GenericTable
       title="Certificates"
       rows={certificates}
-      columns={['Certificate', 'Number', 'Issued By', 'Issue Date', 'Expiry', 'Status']}
+      columns={['Certificate', 'Status', 'Evidence', 'Review', 'Issued By', 'Remarks']}
       renderRow={(item: any) => [
         item.certificate_type,
-        item.certificate_number || '—',
-        item.issued_by || '—',
-        fdate(item.issue_date),
-        fdate(item.expiry_date),
-        <StatusSelect
-          value={item.status}
-          options={['Missing', 'Uploaded', 'Approved', 'Rejected']}
-          disabled={!canEdit}
-          onChange={(status: string) =>
-            updateRow(
-              'handover_certificates',
-              item.id,
-              { status },
-              `Certificate updated: ${item.certificate_type} → ${status}`
-            )
-          }
+        <span className={statusBadge(item.status)}>{item.status}</span>,
+        <EvidenceCell
+          row={item}
+          table="handover_certificates"
+          type="certificate"
+          canEdit={canEdit}
+          uploadEvidence={uploadEvidence}
+          uploadingId={uploadingId}
         />,
+        <ReviewButtons
+          row={item}
+          table="handover_certificates"
+          canReview={canReview}
+          reviewEvidence={reviewEvidence}
+        />,
+        item.issued_by || '—',
+        item.remarks || '—',
       ]}
     />
   )
 }
 
-function DocumentsTab({ documents, updateRow, canEdit }: any) {
+function DocumentsTab({ documents, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId }: any) {
   return (
     <GenericTable
       title="Handover Documents"
       rows={documents}
-      columns={['Type', 'Title', 'Revision', 'Status', 'Remarks']}
+      columns={['Type', 'Title', 'Status', 'Evidence', 'Review', 'Remarks']}
       renderRow={(item: any) => [
         item.document_type,
         item.title,
-        item.revision || '—',
-        <StatusSelect
-          value={item.status}
-          options={['Missing', 'Uploaded', 'Approved', 'Rejected']}
-          disabled={!canEdit}
-          onChange={(status: string) =>
-            updateRow(
-              'handover_documents',
-              item.id,
-              { status },
-              `Document updated: ${item.title} → ${status}`
-            )
-          }
+        <span className={statusBadge(item.status)}>{item.status}</span>,
+        <EvidenceCell
+          row={item}
+          table="handover_documents"
+          type="document"
+          canEdit={canEdit}
+          uploadEvidence={uploadEvidence}
+          uploadingId={uploadingId}
+        />,
+        <ReviewButtons
+          row={item}
+          table="handover_documents"
+          canReview={canReview}
+          reviewEvidence={reviewEvidence}
         />,
         item.remarks || '—',
       ]}
@@ -940,27 +1183,66 @@ function DocumentsTab({ documents, updateRow, canEdit }: any) {
   )
 }
 
-function UtilitiesTab({ utilities, updateRow, canEdit }: any) {
+function UtilitiesTab({ utilities, updateRow, uploadEvidence, canEdit, uploadingId }: any) {
   return (
     <GenericTable
       title="Utilities & Commissioning"
       rows={utilities}
-      columns={['Utility', 'Status', 'Remarks']}
+      columns={['Utility', 'Evidence', 'Action', 'Status', 'Remarks']}
       renderRow={(item: any) => [
         item.utility_name,
-        <StatusSelect
-          value={item.status}
-          options={['Pending', 'Passed', 'Failed', 'N/A']}
-          disabled={!canEdit}
-          onChange={(status: string) =>
-            updateRow(
-              'handover_utilities',
-              item.id,
-              { status },
-              `Utility updated: ${item.utility_name} → ${status}`
-            )
-          }
+        <EvidenceCell
+          row={item}
+          table="handover_utilities"
+          type="utility"
+          canEdit={canEdit}
+          uploadEvidence={uploadEvidence}
+          uploadingId={uploadingId}
         />,
+        <div className="flex gap-2">
+          <button
+            className="btn btn-sm btn-gold"
+            disabled={!canEdit || !hasEvidence(item)}
+            onClick={() => {
+              const comment = requireComment('Add commissioning/utility test comment.')
+              if (!comment) return
+              updateRow(
+                'handover_utilities',
+                item.id,
+                {
+                  status: 'Passed',
+                  remarks: comment,
+                  verified_at: new Date().toISOString(),
+                },
+                `Utility passed: ${item.utility_name}`
+              )
+            }}
+          >
+            Pass
+          </button>
+
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() => {
+              const comment = requireComment('Why did this utility fail?')
+              if (!comment) return
+              updateRow(
+                'handover_utilities',
+                item.id,
+                {
+                  status: 'Failed',
+                  remarks: comment,
+                  verified_at: new Date().toISOString(),
+                },
+                `Utility failed: ${item.utility_name}`
+              )
+            }}
+          >
+            Fail
+          </button>
+        </div>,
+        <span className={statusBadge(item.status)}>{item.status}</span>,
         item.remarks || '—',
       ]}
     />
@@ -972,29 +1254,49 @@ function KeysTab({ keys, updateRow, canEdit }: any) {
     <GenericTable
       title="Keys"
       rows={keys}
-      columns={['Key', 'Quantity', 'Issued', 'Issued To', 'Remarks']}
+      columns={['Key', 'Quantity', 'Issued', 'Issued To / Comment', 'Action']}
       renderRow={(item: any) => [
         item.key_name,
         item.quantity,
+        item.issued ? 'Yes' : 'No',
+        item.issued_to || item.remarks || '—',
         <button
           className={`btn btn-sm ${item.issued ? 'btn-gold' : 'btn-ghost'}`}
           disabled={!canEdit}
-          onClick={() =>
+          onClick={() => {
+            if (!item.issued) {
+              const recipient = requireComment('Who received this key/item?')
+              if (!recipient) return
+              updateRow(
+                'handover_keys',
+                item.id,
+                {
+                  issued: true,
+                  issued_to: recipient,
+                  issued_at: new Date().toISOString(),
+                },
+                `Key issued: ${item.key_name} to ${recipient}`
+              )
+              return
+            }
+
+            const comment = requireComment('Why are you reversing this key issuance?')
+            if (!comment) return
             updateRow(
               'handover_keys',
               item.id,
               {
-                issued: !item.issued,
-                issued_at: !item.issued ? new Date().toISOString() : null,
+                issued: false,
+                remarks: comment,
+                issued_to: null,
+                issued_at: null,
               },
-              `Key status updated: ${item.key_name}`
+              `Key issuance reversed: ${item.key_name}`
             )
-          }
+          }}
         >
-          {item.issued ? 'Issued' : 'Not Issued'}
+          {item.issued ? 'Reverse' : 'Issue'}
         </button>,
-        item.issued_to || '—',
-        item.remarks || '—',
       ]}
     />
   )
@@ -1005,30 +1307,59 @@ function SignoffsTab({ signoffs, updateRow, canEdit, user }: any) {
     <GenericTable
       title="Sign-offs"
       rows={signoffs}
-      columns={['Role', 'Status', 'Signed By', 'Signed At', 'Comments']}
+      columns={['Role', 'Status', 'Signed By', 'Signed At', 'Action', 'Comments']}
       renderRow={(item: any) => [
         item.role,
-        <StatusSelect
-          value={item.status}
-          options={['Pending', 'Approved', 'Rejected']}
-          disabled={!canEdit}
-          onChange={(status: string) =>
-            updateRow(
-              'handover_signoffs',
-              item.id,
-              {
-                status,
-                signed_by: status === 'Pending' ? null : user?.id || null,
-                signed_by_name:
-                  status === 'Pending' ? null : user?.full_name || user?.email || null,
-                signed_at: status === 'Pending' ? null : new Date().toISOString(),
-              },
-              `Sign-off updated: ${item.role} → ${status}`
-            )
-          }
-        />,
+        <span className={statusBadge(item.status)}>{item.status}</span>,
         item.signed_by_name || '—',
         fdate(item.signed_at),
+        <div className="flex gap-2">
+          <button
+            className="btn btn-sm btn-gold"
+            disabled={!canEdit || item.status === 'Approved'}
+            onClick={() => {
+              const comment = requireComment('Add sign-off comment.')
+              if (!comment) return
+              updateRow(
+                'handover_signoffs',
+                item.id,
+                {
+                  status: 'Approved',
+                  signed_by: user?.id || null,
+                  signed_by_name: user?.full_name || user?.email || null,
+                  signed_at: new Date().toISOString(),
+                  comments: comment,
+                },
+                `Sign-off approved: ${item.role}`
+              )
+            }}
+          >
+            Approve
+          </button>
+
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() => {
+              const comment = requireComment('Why is this sign-off rejected?')
+              if (!comment) return
+              updateRow(
+                'handover_signoffs',
+                item.id,
+                {
+                  status: 'Rejected',
+                  signed_by: user?.id || null,
+                  signed_by_name: user?.full_name || user?.email || null,
+                  signed_at: new Date().toISOString(),
+                  comments: comment,
+                },
+                `Sign-off rejected: ${item.role}`
+              )
+            }}
+          >
+            Reject
+          </button>
+        </div>,
         item.comments || '—',
       ]}
     />
@@ -1051,21 +1382,6 @@ function HistoryTab({ history }: any) {
   )
 }
 
-function StatusSelect({ value, options, onChange, disabled }: any) {
-  return (
-    <select
-      className={`form-control min-w-[150px] ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      value={value}
-      disabled={disabled}
-      onChange={e => onChange(e.target.value)}
-    >
-      {options.map((option: string) => (
-        <option key={option}>{option}</option>
-      ))}
-    </select>
-  )
-}
-
 function GenericTable({ title, rows, columns, renderRow }: any) {
   return (
     <div className="card overflow-hidden">
@@ -1077,7 +1393,7 @@ function GenericTable({ title, rows, columns, renderRow }: any) {
         <div className="p-6 text-sm text-[#6e7d8c]">No records found.</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="tbl min-w-[1100px]">
+          <table className="tbl min-w-[1200px]">
             <thead>
               <tr>
                 {columns.map((column: string) => (
