@@ -435,7 +435,7 @@ export default function DesignReportsPage() {
 
         {!canEdit && (
           <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
-            View Only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.
+            {viewOnlyMessage()}
           </div>
         )}
       </section>
