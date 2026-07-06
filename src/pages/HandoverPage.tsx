@@ -248,31 +248,31 @@ export default function HandoverPage() {
 
   const stats = useMemo(() => {
     const requiredChecklist = checklist.filter(item => item.is_required)
-    const checklistDone = requiredChecklist.filter(item =>
-      ['Passed', 'N/A'].includes(item.status)
-    ).length
-    const failedChecklist = checklist.filter(item => item.status === 'Failed').length
+    const applicableChecklist = requiredChecklist.filter(item => item.status !== 'N/A')
+    const checklistDone = applicableChecklist.filter(item => item.status === 'Passed').length
+    const failedChecklist = applicableChecklist.filter(item => item.status === 'Failed').length
 
-    const certDone = certificates.filter(item => item.status === 'Approved').length
-    const certMissing = certificates.filter(item =>
+    const applicableCertificates = certificates.filter(item => item.status !== 'N/A')
+    const certDone = applicableCertificates.filter(item => item.status === 'Approved').length
+    const certMissing = applicableCertificates.filter(item =>
       ['Missing', 'Rejected'].includes(item.status)
     ).length
-    const certWithoutEvidence = certificates.filter(item =>
+    const certWithoutEvidence = applicableCertificates.filter(item =>
       ['Uploaded', 'Approved'].includes(item.status) && !hasEvidence(item)
     ).length
 
-    const docDone = documents.filter(item => item.status === 'Approved').length
-    const docMissing = documents.filter(item =>
+    const applicableDocuments = documents.filter(item => item.status !== 'N/A')
+    const docDone = applicableDocuments.filter(item => item.status === 'Approved').length
+    const docMissing = applicableDocuments.filter(item =>
       ['Missing', 'Rejected'].includes(item.status)
     ).length
-    const docWithoutEvidence = documents.filter(item =>
+    const docWithoutEvidence = applicableDocuments.filter(item =>
       ['Uploaded', 'Approved'].includes(item.status) && !hasEvidence(item)
     ).length
 
-    const utilityDone = utilities.filter(item =>
-      ['Passed', 'N/A'].includes(item.status)
-    ).length
-    const utilityFailed = utilities.filter(item => item.status === 'Failed').length
+    const applicableUtilities = utilities.filter(item => item.status !== 'N/A')
+    const utilityDone = applicableUtilities.filter(item => item.status === 'Passed').length
+    const utilityFailed = applicableUtilities.filter(item => item.status === 'Failed').length
 
     const keysIssued = keys.filter(item => item.issued).length
 
@@ -290,10 +290,10 @@ export default function HandoverPage() {
     })
 
     const categories = [
-      calcPercent(checklistDone, requiredChecklist.length),
-      calcPercent(certDone, certificates.length),
-      calcPercent(docDone, documents.length),
-      calcPercent(utilityDone, utilities.length),
+      calcPercent(checklistDone, applicableChecklist.length),
+      calcPercent(certDone, applicableCertificates.length),
+      calcPercent(docDone, applicableDocuments.length),
+      calcPercent(utilityDone, applicableUtilities.length),
       calcPercent(keysIssued, keys.length),
       calcPercent(signoffsDone, signoffs.length),
       openSnags.length === 0 ? 100 : 0,
@@ -305,8 +305,8 @@ export default function HandoverPage() {
 
     const blockers = [
       failedChecklist > 0 ? `${failedChecklist} failed checklist item(s)` : null,
-      checklistDone < requiredChecklist.length
-        ? `${requiredChecklist.length - checklistDone} checklist item(s) pending`
+      checklistDone < applicableChecklist.length
+        ? `${applicableChecklist.length - checklistDone} checklist item(s) pending`
         : null,
       certMissing > 0 ? `${certMissing} missing/rejected certificate(s)` : null,
       certWithoutEvidence > 0 ? `${certWithoutEvidence} certificate(s) marked uploaded/approved without file evidence` : null,
@@ -325,13 +325,13 @@ export default function HandoverPage() {
     return {
       readiness,
       checklistDone,
-      requiredChecklist: requiredChecklist.length,
+      requiredChecklist: applicableChecklist.length,
       certDone,
-      certTotal: certificates.length,
+      certTotal: applicableCertificates.length,
       docDone,
-      docTotal: documents.length,
+      docTotal: applicableDocuments.length,
       utilityDone,
-      utilityTotal: utilities.length,
+      utilityTotal: applicableUtilities.length,
       keysIssued,
       keysTotal: keys.length,
       signoffsDone,
@@ -878,6 +878,7 @@ export default function HandoverPage() {
               certificates={certificates}
               uploadEvidence={uploadEvidence}
               reviewEvidence={reviewEvidence}
+              updateRow={updateRow}
               canEdit={canEdit}
               canReview={canReview}
               uploadingId={uploadingId}
@@ -889,6 +890,7 @@ export default function HandoverPage() {
               documents={documents}
               uploadEvidence={uploadEvidence}
               reviewEvidence={reviewEvidence}
+              updateRow={updateRow}
               canEdit={canEdit}
               canReview={canReview}
               uploadingId={uploadingId}
@@ -1008,6 +1010,10 @@ function DashboardTab({ selectedPackage, stats, canApprove, approvePackage }: an
 }
 
 function EvidenceCell({ row, table, type, canEdit, uploadEvidence, uploadingId }: any) {
+  if (row.status === 'N/A') {
+    return <span className="badge-muted">N/A</span>
+  }
+
   return (
     <div className="flex items-center gap-2">
       {hasEvidence(row) ? (
@@ -1076,7 +1082,7 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
     <GenericTable
       title="Handover Checklist"
       rows={checklist}
-      columns={['Discipline', 'Category', 'Item', 'Required', 'Evidence', 'Action', 'Remarks']}
+      columns={['Discipline', 'Category', 'Item', 'Required', 'Evidence', 'Status', 'Action', 'Remarks']}
       renderRow={(item: any) => [
         item.discipline,
         item.category,
@@ -1090,48 +1096,95 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
           uploadEvidence={uploadEvidence}
           uploadingId={uploadingId}
         />,
-        <div className="flex gap-2">
-          <button
-            className="btn btn-sm btn-gold"
-            disabled={!canEdit || !hasEvidence(item)}
-            onClick={() => {
-              const comment = requireComment('Add inspection comment for passing this item.')
-              if (!comment) return
-              updateRow(
-                'handover_checklist_items',
-                item.id,
-                {
-                  status: 'Passed',
-                  remarks: comment,
-                  closed_at: new Date().toISOString(),
-                },
-                `Checklist passed: ${item.item_title}`
-              )
-            }}
-          >
-            Pass
-          </button>
+        <span className={statusBadge(item.status)}>{item.status}</span>,
+        <div className="flex flex-wrap gap-2">
+          {item.status === 'Passed' ? (
+            <span className="text-xs text-emerald-400">✓ Passed</span>
+          ) : item.status === 'N/A' ? (
+            <button
+              className="btn btn-sm btn-ghost"
+              disabled={!canEdit}
+              onClick={() =>
+                updateRow(
+                  'handover_checklist_items',
+                  item.id,
+                  {
+                    status: 'Pending',
+                    remarks: null,
+                    closed_at: null,
+                  },
+                  `Checklist N/A reversed: ${item.item_title}`
+                )
+              }
+            >
+              Undo N/A
+            </button>
+          ) : (
+            <>
+              <button
+                className="btn btn-sm btn-gold"
+                disabled={!canEdit || !hasEvidence(item)}
+                onClick={() => {
+                  const comment = requireComment('Add inspection comment for passing this item.')
+                  if (!comment) return
+                  updateRow(
+                    'handover_checklist_items',
+                    item.id,
+                    {
+                      status: 'Passed',
+                      remarks: comment,
+                      closed_at: new Date().toISOString(),
+                    },
+                    `Checklist passed: ${item.item_title}`
+                  )
+                }}
+              >
+                Pass
+              </button>
 
-          <button
-            className="btn btn-sm btn-ghost"
-            disabled={!canEdit}
-            onClick={() => {
-              const comment = requireComment('Why did this checklist item fail?')
-              if (!comment) return
-              updateRow(
-                'handover_checklist_items',
-                item.id,
-                {
-                  status: 'Failed',
-                  remarks: comment,
-                  closed_at: new Date().toISOString(),
-                },
-                `Checklist failed: ${item.item_title}`
-              )
-            }}
-          >
-            Fail
-          </button>
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={!canEdit}
+                onClick={() => {
+                  const comment = requireComment('Why did this checklist item fail?')
+                  if (!comment) return
+                  updateRow(
+                    'handover_checklist_items',
+                    item.id,
+                    {
+                      status: 'Failed',
+                      remarks: comment,
+                      closed_at: new Date().toISOString(),
+                    },
+                    `Checklist failed: ${item.item_title}`
+                  )
+                }}
+              >
+                Fail
+              </button>
+
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={!canEdit}
+                onClick={() => {
+                  const comment = requireComment('Why is this item not applicable?')
+                  if (!comment) return
+                  updateRow(
+                    'handover_checklist_items',
+                    item.id,
+                    {
+                      status: 'N/A',
+                      remarks: comment,
+                      closed_at: new Date().toISOString(),
+                    },
+                    `Checklist marked N/A: ${item.item_title}`
+                  )
+                }}
+              >
+                N/A
+              </button>
+            </>
+          )}
         </div>,
         item.remarks || '—',
       ]}
@@ -1139,12 +1192,12 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
   )
 }
 
-function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId }: any) {
+function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId, updateRow }: any) {
   return (
     <GenericTable
       title="Certificates"
       rows={certificates}
-      columns={['Certificate', 'Status', 'Evidence', 'Review', 'Issued By', 'Remarks']}
+      columns={['Certificate', 'Status', 'Evidence', 'Review', 'N/A', 'Issued By', 'Remarks']}
       renderRow={(item: any) => [
         item.certificate_type,
         <span className={statusBadge(item.status)}>{item.status}</span>,
@@ -1162,6 +1215,39 @@ function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit
           canReview={canReview}
           reviewEvidence={reviewEvidence}
         />,
+        item.status === 'N/A' ? (
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() =>
+              updateRow(
+                'handover_certificates',
+                item.id,
+                { status: 'Missing', remarks: null },
+                `Certificate N/A reversed: ${item.certificate_type}`
+              )
+            }
+          >
+            Undo N/A
+          </button>
+        ) : (
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() => {
+              const comment = requireComment('Why is this certificate not applicable?')
+              if (!comment) return
+              updateRow(
+                'handover_certificates',
+                item.id,
+                { status: 'N/A', remarks: comment },
+                `Certificate marked N/A: ${item.certificate_type}`
+              )
+            }}
+          >
+            N/A
+          </button>
+        ),
         item.issued_by || '—',
         item.remarks || '—',
       ]}
@@ -1169,12 +1255,12 @@ function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit
   )
 }
 
-function DocumentsTab({ documents, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId }: any) {
+function DocumentsTab({ documents, uploadEvidence, reviewEvidence, canEdit, canReview, uploadingId, updateRow }: any) {
   return (
     <GenericTable
       title="Handover Documents"
       rows={documents}
-      columns={['Type', 'Title', 'Status', 'Evidence', 'Review', 'Remarks']}
+      columns={['Type', 'Title', 'Status', 'Evidence', 'Review', 'N/A', 'Remarks']}
       renderRow={(item: any) => [
         item.document_type,
         item.title,
@@ -1193,6 +1279,39 @@ function DocumentsTab({ documents, uploadEvidence, reviewEvidence, canEdit, canR
           canReview={canReview}
           reviewEvidence={reviewEvidence}
         />,
+        item.status === 'N/A' ? (
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() =>
+              updateRow(
+                'handover_documents',
+                item.id,
+                { status: 'Missing', remarks: null },
+                `Document N/A reversed: ${item.title}`
+              )
+            }
+          >
+            Undo N/A
+          </button>
+        ) : (
+          <button
+            className="btn btn-sm btn-ghost"
+            disabled={!canEdit}
+            onClick={() => {
+              const comment = requireComment('Why is this document not applicable?')
+              if (!comment) return
+              updateRow(
+                'handover_documents',
+                item.id,
+                { status: 'N/A', remarks: comment },
+                `Document marked N/A: ${item.title}`
+              )
+            }}
+          >
+            N/A
+          </button>
+        ),
         item.remarks || '—',
       ]}
     />
@@ -1215,48 +1334,90 @@ function UtilitiesTab({ utilities, updateRow, uploadEvidence, canEdit, uploading
           uploadEvidence={uploadEvidence}
           uploadingId={uploadingId}
         />,
-        <div className="flex gap-2">
-          <button
-            className="btn btn-sm btn-gold"
-            disabled={!canEdit || !hasEvidence(item)}
-            onClick={() => {
-              const comment = requireComment('Add commissioning/utility test comment.')
-              if (!comment) return
-              updateRow(
-                'handover_utilities',
-                item.id,
-                {
-                  status: 'Passed',
-                  remarks: comment,
-                  verified_at: new Date().toISOString(),
-                },
-                `Utility passed: ${item.utility_name}`
-              )
-            }}
-          >
-            Pass
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {item.status === 'Passed' ? (
+            <span className="text-xs text-emerald-400">✓ Passed</span>
+          ) : item.status === 'N/A' ? (
+            <button
+              className="btn btn-sm btn-ghost"
+              disabled={!canEdit}
+              onClick={() =>
+                updateRow(
+                  'handover_utilities',
+                  item.id,
+                  { status: 'Pending', remarks: null, verified_at: null },
+                  `Utility N/A reversed: ${item.utility_name}`
+                )
+              }
+            >
+              Undo N/A
+            </button>
+          ) : (
+            <>
+              <button
+                className="btn btn-sm btn-gold"
+                disabled={!canEdit || !hasEvidence(item)}
+                onClick={() => {
+                  const comment = requireComment('Add commissioning/utility test comment.')
+                  if (!comment) return
+                  updateRow(
+                    'handover_utilities',
+                    item.id,
+                    {
+                      status: 'Passed',
+                      remarks: comment,
+                      verified_at: new Date().toISOString(),
+                    },
+                    `Utility passed: ${item.utility_name}`
+                  )
+                }}
+              >
+                Pass
+              </button>
 
-          <button
-            className="btn btn-sm btn-ghost"
-            disabled={!canEdit}
-            onClick={() => {
-              const comment = requireComment('Why did this utility fail?')
-              if (!comment) return
-              updateRow(
-                'handover_utilities',
-                item.id,
-                {
-                  status: 'Failed',
-                  remarks: comment,
-                  verified_at: new Date().toISOString(),
-                },
-                `Utility failed: ${item.utility_name}`
-              )
-            }}
-          >
-            Fail
-          </button>
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={!canEdit}
+                onClick={() => {
+                  const comment = requireComment('Why did this utility fail?')
+                  if (!comment) return
+                  updateRow(
+                    'handover_utilities',
+                    item.id,
+                    {
+                      status: 'Failed',
+                      remarks: comment,
+                      verified_at: new Date().toISOString(),
+                    },
+                    `Utility failed: ${item.utility_name}`
+                  )
+                }}
+              >
+                Fail
+              </button>
+
+              <button
+                className="btn btn-sm btn-ghost"
+                disabled={!canEdit}
+                onClick={() => {
+                  const comment = requireComment('Why is this utility not applicable?')
+                  if (!comment) return
+                  updateRow(
+                    'handover_utilities',
+                    item.id,
+                    {
+                      status: 'N/A',
+                      remarks: comment,
+                      verified_at: new Date().toISOString(),
+                    },
+                    `Utility marked N/A: ${item.utility_name}`
+                  )
+                }}
+              >
+                N/A
+              </button>
+            </>
+          )}
         </div>,
         <span className={statusBadge(item.status)}>{item.status}</span>,
         item.remarks || '—',
