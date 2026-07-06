@@ -411,7 +411,6 @@ export default function App() {
           <Route path="site" element={<SitePage />} />
           <Route path="snags" element={<SnagsPage />} />
           <Route path="documents" element={<DocumentsPage />} />
-          <Route path="financial" element={<FinancialPage />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="external-review" element={<ExternalReviewDashboard />} />
