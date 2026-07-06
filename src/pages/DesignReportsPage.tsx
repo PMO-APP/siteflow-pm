@@ -20,12 +20,13 @@ function canEditDesignReports(role?: string | null) {
   return [
     'workspace_admin',
     'admin',
-    'pmo',
-    'project_owner',
-    'overall_project_owner',
-    'design_project_owner',
     'design',
+    'design_project_owner',
   ].includes(role || '')
+}
+
+function viewOnlyMessage() {
+  return 'View only. Only the Design team and Administrators can add, submit, update or delete design records.'
 }
 
 function fdate(value?: string | null) {
@@ -134,6 +135,11 @@ export default function DesignReportsPage() {
   }
 
   async function submitReport() {
+    if (!canEdit) {
+      setNotice(viewOnlyMessage())
+      return
+    }
+
     if (!projectId) {
       setNotice('No project selected.')
       return
@@ -187,7 +193,7 @@ export default function DesignReportsPage() {
     setNotice('')
 
     if (!canEdit) {
-      setNotice('View only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.')
+      setNotice('View only. Only the Design team and Administrators can add, submit, update or delete design records.')
       return
     }
 
@@ -239,7 +245,7 @@ export default function DesignReportsPage() {
 
   async function deleteItem(id: string) {
     if (!canEdit) {
-      setNotice('View only. Only Admin, PMO and assigned Design Project Owners can delete Design Report items.')
+      setNotice('View only. Only the Design team and Administrators can add, submit, update or delete design records.')
       return
     }
 
@@ -940,7 +946,7 @@ function ManualTab({
 
         {!canEdit && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
-            View Only. You can read this report, but cannot add, edit or delete updates.
+            {viewOnlyMessage()}
           </div>
         )}
 
