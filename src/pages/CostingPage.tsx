@@ -89,6 +89,7 @@ const TABS = [
   ['payments', 'Payments'],
   ['variations', 'Variations'],
   ['procurement', 'Procurement'],
+  ['financial-register', 'Financial Register'],
   ['history', 'History'],
 ]
 
@@ -127,6 +128,77 @@ function viewOnlyMessage() {
   return 'View only. Only the Costing team and Administrators can add, submit, update or delete costing records.'
 }
 
+function getFinancialAmount(item: any) {
+  const amount = Number(item.amount || 0)
+  if ((item.direction || '').toLowerCase() === 'omit') return -Math.abs(amount)
+  return amount
+}
+
+function calcFinancialTotals(financialItems: any[]) {
+  const byType = (type: string) =>
+    financialItems.filter(item => String(item.type || '').toLowerCase() === type.toLowerCase())
+
+  const contractSum = byType('Contract Sum').reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
+  const provisionalSum = byType('Provisional Sum').reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
+  const contingency = byType('Contingency').reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
+  const retention = byType('Retention').reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  )
+
+  const approvedVariations = byType('Variation')
+    .filter(item => ['Approved', 'Implemented'].includes(item.status || ''))
+    .reduce((sum, item) => sum + getFinancialAmount(item), 0)
+
+  const pendingVariations = byType('Variation')
+    .filter(item => ['Pending', 'Open', 'In Progress'].includes(item.status || ''))
+    .reduce((sum, item) => sum + getFinancialAmount(item), 0)
+
+  const payments = byType('Payment')
+  const paidPayments = payments
+    .filter(item => item.status === 'Paid')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const pendingPayments = payments
+    .filter(item => ['Pending', 'Open', 'In Progress'].includes(item.status || ''))
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const certified = financialItems
+    .filter(item => Boolean(item.certified_date) || item.status === 'Certified')
+    .reduce((sum, item) => sum + Number(item.amount || 0), 0)
+
+  const revisedContract = contractSum + approvedVariations
+  const projectedFinalCost = revisedContract + pendingVariations
+  const outstandingBalance = projectedFinalCost - paidPayments
+
+  return {
+    contractSum,
+    provisionalSum,
+    contingency,
+    retention,
+    approvedVariations,
+    pendingVariations,
+    revisedContract,
+    projectedFinalCost,
+    paidPayments,
+    pendingPayments,
+    certified,
+    outstandingBalance,
+  }
+}
+
 export default function CostingPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
@@ -142,6 +214,7 @@ export default function CostingPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [variations, setVariations] = useState<any[]>([])
   const [procurements, setProcurements] = useState<any[]>([])
+  const [financialItems, setFinancialItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
 
@@ -217,6 +290,7 @@ export default function CostingPage() {
     loadPayments()
     loadVariations()
     loadProcurements()
+    loadFinancialItems()
     loadSubmissions()
   }, [projectId, reportWeek])
 
@@ -326,6 +400,27 @@ export default function CostingPage() {
     }
 
     setProcurements(data || [])
+  }
+
+  async function loadFinancialItems() {
+    if (!projectId) {
+      setFinancialItems([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('financial_items')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      setFinancialItems([])
+      return
+    }
+
+    setFinancialItems(data || [])
   }
 
   async function loadSubmissions() {
@@ -737,6 +832,7 @@ export default function CostingPage() {
       payments,
       variations,
       procurements,
+      financialItems,
 
       totals: {
         totalAmount,
@@ -751,6 +847,14 @@ export default function CostingPage() {
         approvedVariationValue,
         pendingVariationValue,
         forecastFinalCost,
+        financialTotals,
+        sourceContractValue,
+        sourceApprovedVariations,
+        sourcePendingVariations,
+        sourcePaidAmount,
+        sourcePendingPayments,
+        sourceForecastFinalCost,
+        sourceOutstandingBalance,
       },
     }
 
@@ -861,6 +965,31 @@ export default function CostingPage() {
   const forecastFinalCost =
     totalContractValue + approvedVariationValue + pendingVariationValue
 
+  const financialTotals = calcFinancialTotals(financialItems)
+
+  const sourceContractValue =
+    financialTotals.contractSum > 0 ? financialTotals.contractSum : totalContractValue
+  const sourceApprovedVariations =
+    financialTotals.approvedVariations !== 0
+      ? financialTotals.approvedVariations
+      : approvedVariationValue
+  const sourcePendingVariations =
+    financialTotals.pendingVariations !== 0
+      ? financialTotals.pendingVariations
+      : pendingVariationValue
+  const sourcePaidAmount =
+    financialTotals.paidPayments > 0 ? financialTotals.paidPayments : paidPayments
+  const sourcePendingPayments =
+    financialTotals.pendingPayments > 0 ? financialTotals.pendingPayments : pendingPayments
+  const sourceForecastFinalCost =
+    financialTotals.projectedFinalCost > 0
+      ? financialTotals.projectedFinalCost
+      : forecastFinalCost
+  const sourceOutstandingBalance =
+    financialTotals.projectedFinalCost > 0
+      ? financialTotals.outstandingBalance
+      : sourceForecastFinalCost - sourcePaidAmount
+
   const snapshot = selectedSubmission?.snapshot_data || null
   const snapshotTotals = snapshot?.totals || {}
 
@@ -874,6 +1003,7 @@ export default function CostingPage() {
   const reportPayments = snapshot?.payments || payments
   const reportVariations = snapshot?.variations || variations
   const reportProcurements = snapshot?.procurements || procurements
+  const reportFinancialItems = snapshot?.financialItems || financialItems
 
   const reportGroupedItems = SECTIONS.map(section => ({
     section,
@@ -930,6 +1060,42 @@ export default function CostingPage() {
   const reportForecastFinalCost =
     snapshotTotals.forecastFinalCost ??
     reportTotalContractValue + reportApprovedVariationValue + reportPendingVariationValue
+
+  const reportFinancialTotals =
+    snapshotTotals.financialTotals || calcFinancialTotals(reportFinancialItems)
+  const reportSourceContractValue =
+    snapshotTotals.sourceContractValue ??
+    (reportFinancialTotals.contractSum > 0
+      ? reportFinancialTotals.contractSum
+      : reportTotalContractValue)
+  const reportSourceApprovedVariations =
+    snapshotTotals.sourceApprovedVariations ??
+    (reportFinancialTotals.approvedVariations !== 0
+      ? reportFinancialTotals.approvedVariations
+      : reportApprovedVariationValue)
+  const reportSourcePendingVariations =
+    snapshotTotals.sourcePendingVariations ??
+    (reportFinancialTotals.pendingVariations !== 0
+      ? reportFinancialTotals.pendingVariations
+      : reportPendingVariationValue)
+  const reportSourcePaidAmount =
+    snapshotTotals.sourcePaidAmount ??
+    (reportFinancialTotals.paidPayments > 0
+      ? reportFinancialTotals.paidPayments
+      : reportPaidPayments)
+  const reportSourcePendingPayments =
+    snapshotTotals.sourcePendingPayments ??
+    (reportFinancialTotals.pendingPayments > 0
+      ? reportFinancialTotals.pendingPayments
+      : reportPendingPayments)
+  const reportSourceForecastFinalCost =
+    snapshotTotals.sourceForecastFinalCost ??
+    (reportFinancialTotals.projectedFinalCost > 0
+      ? reportFinancialTotals.projectedFinalCost
+      : reportForecastFinalCost)
+  const reportSourceOutstandingBalance =
+    snapshotTotals.sourceOutstandingBalance ??
+    (reportSourceForecastFinalCost - reportSourcePaidAmount)
 
   return (
     <div className="space-y-6">
@@ -1034,6 +1200,15 @@ export default function CostingPage() {
             payments={reportPayments}
             variations={reportVariations}
             procurements={reportProcurements}
+            financialItems={reportFinancialItems}
+            financialTotals={reportFinancialTotals}
+            sourceContractValue={reportSourceContractValue}
+            sourceApprovedVariations={reportSourceApprovedVariations}
+            sourcePendingVariations={reportSourcePendingVariations}
+            sourcePaidAmount={reportSourcePaidAmount}
+            sourcePendingPayments={reportSourcePendingPayments}
+            sourceForecastFinalCost={reportSourceForecastFinalCost}
+            sourceOutstandingBalance={reportSourceOutstandingBalance}
             totalAmount={reportTotalAmount}
             pendingAmount={reportPendingAmount}
             paidAmount={reportPaidAmount}
@@ -1052,16 +1227,18 @@ export default function CostingPage() {
 
       {activeTab === 'overview' && (
         <CostOverviewTab
-          totalContractValue={totalContractValue}
-          totalPaidOnContracts={totalPaidOnContracts}
-          outstandingContractValue={outstandingContractValue}
-          pendingPayments={pendingPayments}
-          paidPayments={paidPayments}
+          totalContractValue={sourceContractValue}
+          totalPaidOnContracts={sourcePaidAmount}
+          outstandingContractValue={sourceOutstandingBalance}
+          pendingPayments={sourcePendingPayments}
+          paidPayments={sourcePaidAmount}
           contracts={contracts}
           payments={payments}
-          approvedVariationValue={approvedVariationValue}
-          pendingVariationValue={pendingVariationValue}
-          forecastFinalCost={forecastFinalCost}
+          approvedVariationValue={sourceApprovedVariations}
+          pendingVariationValue={sourcePendingVariations}
+          forecastFinalCost={sourceForecastFinalCost}
+          financialItems={financialItems}
+          financialTotals={financialTotals}
         />
       )}
 
@@ -1159,6 +1336,10 @@ export default function CostingPage() {
         />
       )}
 
+      {activeTab === 'financial-register' && (
+        <FinancialRegisterTab financialItems={financialItems} />
+      )}
+
       {activeTab === 'history' && (
         <CostReportHistoryTab
           submissions={submissions}
@@ -1173,6 +1354,93 @@ export default function CostingPage() {
   )
 }
 
+
+
+function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
+  const totals = calcFinancialTotals(financialItems)
+
+  return (
+    <div className="space-y-5">
+      <MetricGrid
+        values={[
+          ['Contract Sum', formatCurrency(totals.contractSum)],
+          ['Approved Variations', formatCurrency(totals.approvedVariations)],
+          ['Paid To Date', formatCurrency(totals.paidPayments)],
+          ['Outstanding Balance', formatCurrency(totals.outstandingBalance)],
+        ]}
+      />
+
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.06]">
+          <div className="font-bold text-[#ede8de]">Financial Register</div>
+          <div className="text-xs text-[#6e7d8c]">
+            Read-only source of truth imported from the former Financial module.
+          </div>
+        </div>
+
+        {financialItems.length === 0 ? (
+          <div className="p-6 text-sm text-[#6e7d8c]">
+            No financial register records found for this project.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl min-w-[1200px]">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                  <th>Direction</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th>Approved</th>
+                  <th>Certified</th>
+                  <th>Paid</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {financialItems.map(item => (
+                  <tr key={item.id}>
+                    <td className="font-mono text-[#c49e48]">
+                      {item.reference || '—'}
+                    </td>
+                    <td>
+                      <span className="badge badge-muted">
+                        {item.type || '—'}
+                      </span>
+                    </td>
+                    <td className="font-medium text-[#ede8de]">
+                      {item.description || '—'}
+                    </td>
+                    <td>{item.direction || '—'}</td>
+                    <td className="text-[#c49e48] font-semibold">
+                      {formatCurrency(item.amount)}
+                    </td>
+                    <td>
+                      <span className={`badge ${statusBadge(item.status)}`}>
+                        {item.status || '—'}
+                      </span>
+                    </td>
+                    <td>{fdate(item.submitted_date)}</td>
+                    <td>{fdate(item.approved_date)}</td>
+                    <td>{fdate(item.certified_date)}</td>
+                    <td>{fdate(item.payment_date)}</td>
+                    <td className="max-w-[280px] text-slate-400">
+                      {item.notes || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function CostReportHistoryTab({
   submissions,
@@ -1249,6 +1517,15 @@ function CostReportDocument({
   payments,
   variations,
   procurements,
+  financialItems,
+  financialTotals,
+  sourceContractValue,
+  sourceApprovedVariations,
+  sourcePendingVariations,
+  sourcePaidAmount,
+  sourcePendingPayments,
+  sourceForecastFinalCost,
+  sourceOutstandingBalance,
   totalAmount,
   pendingAmount,
   paidAmount,
@@ -1262,9 +1539,7 @@ function CostReportDocument({
   pendingVariationValue,
   forecastFinalCost,
 }: any) {
-  const activeContracts = contracts.filter((item: any) => item.status === 'Active')
   const pendingPaymentRows = payments.filter((item: any) => item.payment_status === 'Pending')
-  const pendingVariations = variations.filter((item: any) => item.status === 'Pending')
   const pendingProcurements = procurements.filter((item: any) => item.status === 'Pending' || item.status === 'Ordered')
 
   return (
@@ -1407,18 +1682,20 @@ function CostReportDocument({
 
       <CostSection title="Executive Cost Summary">
         <div className="cr-grid">
-          <CostInfo label="Contract Value" value={formatCurrency(totalContractValue)} />
-          <CostInfo label="Paid on Contracts" value={formatCurrency(totalPaidOnContracts)} />
-          <CostInfo label="Outstanding Contract Balance" value={formatCurrency(outstandingContractValue)} />
-          <CostInfo label="Approved Variations" value={formatCurrency(approvedVariationValue)} />
-          <CostInfo label="Pending Variations" value={formatCurrency(pendingVariationValue)} />
-          <CostInfo label="Forecast Final Cost" value={formatCurrency(forecastFinalCost)} />
+          <CostInfo label="Contract Value" value={formatCurrency(sourceContractValue)} />
+          <CostInfo label="Paid To Date" value={formatCurrency(sourcePaidAmount)} />
+          <CostInfo label="Outstanding Balance" value={formatCurrency(sourceOutstandingBalance)} />
+          <CostInfo label="Approved Variations" value={formatCurrency(sourceApprovedVariations)} />
+          <CostInfo label="Pending Variations" value={formatCurrency(sourcePendingVariations)} />
+          <CostInfo label="Forecast Final Cost" value={formatCurrency(sourceForecastFinalCost)} />
           <CostInfo label="Weekly Report Items" value={items.length} />
           <CostInfo label="Weekly Pending Amount" value={formatCurrency(pendingAmount)} />
           <CostInfo label="Weekly Paid Amount" value={formatCurrency(paidAmount)} />
           <CostInfo label="Payment Records" value={payments.length} />
-          <CostInfo label="Pending Payments" value={formatCurrency(pendingPayments)} />
-          <CostInfo label="Paid Payments" value={formatCurrency(paidPayments)} />
+          <CostInfo label="Pending Payments" value={formatCurrency(sourcePendingPayments)} />
+          <CostInfo label="Paid Payments" value={formatCurrency(sourcePaidAmount)} />
+          <CostInfo label="Retention Held" value={formatCurrency(financialTotals?.retention || 0)} />
+          <CostInfo label="Certified Value" value={formatCurrency(financialTotals?.certified || 0)} />
         </div>
       </CostSection>
 
@@ -1500,6 +1777,21 @@ function CostReportDocument({
           formatCurrency(item.estimated_cost),
           formatCurrency(item.actual_cost),
           item.status || '—',
+        ])}
+      />
+
+      <CostSimpleTableSection
+        title="Financial Register"
+        empty="No financial register records available."
+        columns={['Reference', 'Type', 'Description', 'Direction', 'Amount', 'Status', 'Date']}
+        rows={financialItems.map((item: any) => [
+          item.reference || '—',
+          item.type || '—',
+          item.description || '—',
+          item.direction || '—',
+          formatCurrency(item.amount),
+          item.status || '—',
+          fdate(item.payment_date || item.certified_date || item.approved_date || item.submitted_date || item.created_at),
         ])}
       />
 
