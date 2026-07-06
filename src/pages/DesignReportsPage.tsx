@@ -1,24 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, PenTool } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { PenTool, Plus, Printer, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 
 const TABS = [
-  ['overview', 'Overview'],
+  ['report', 'Design Report'],
   ['drawings', 'Drawing Register'],
   ['consultants', 'Consultants'],
   ['issues', 'Design Issues'],
   ['weekly', 'Weekly Commentary'],
-]
-
-const MANUAL_CATEGORIES = [
-  'Consultant Update',
-  'Design Issue',
-  'Weekly Achievement',
-  'Weekly Challenge',
-  'Next Week Focus',
 ]
 
 const STATUSES = ['Open', 'In Progress', 'Pending', 'Approved', 'Closed']
@@ -35,23 +27,34 @@ function canEditDesignReports(role?: string | null) {
   ].includes(role || '')
 }
 
+function fdate(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-GB')
+}
+
+function statusBadge(status?: string | null) {
+  if (status === 'Approved' || status === 'Closed') return 'badge-green'
+  if (status === 'Rejected') return 'badge-red'
+  if (status === 'Pending' || status === 'Pending Review') return 'badge-amber'
+  return 'badge-muted'
+}
+
 export default function DesignReportsPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
-  const { projectId, projectName, organizationId, portfolioId } =
-    useProjectStore()
+  const { projectId, projectName, organizationId, portfolioId } = useProjectStore()
 
   const canEdit = canEditDesignReports(role)
+  const reportRef = useRef<HTMLDivElement>(null)
 
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('report')
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
-
-  const [reportWeek, setReportWeek] = useState(
-    new Date().toISOString().slice(0, 10)
-  )
+  const [reportWeek, setReportWeek] = useState(new Date().toISOString().slice(0, 10))
 
   const [form, setForm] = useState({
     category: 'Consultant Update',
@@ -74,6 +77,7 @@ export default function DesignReportsPage() {
     }
 
     setLoading(true)
+    setNotice('')
 
     const { data: drawingData, error: drawingError } = await supabase
       .from('documents')
@@ -106,13 +110,11 @@ export default function DesignReportsPage() {
     setLoading(false)
   }
 
-  async function addItem(forcedCategory?: string) {
+  async function addItem(category: string) {
     setNotice('')
 
     if (!canEdit) {
-      setNotice(
-        'View only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.'
-      )
+      setNotice('View only. Only Admin, PMO and assigned Design Project Owners can update Design Reports.')
       return
     }
 
@@ -131,9 +133,7 @@ export default function DesignReportsPage() {
       portfolio_id: portfolioId,
       project_id: projectId,
       report_week: reportWeek,
-     category: form.category || activeTab === 'weekly'
-  ? defaultCategory
-  : forcedCategory || form.category,
+      category,
       title: form.title.trim(),
       description: form.description.trim() || null,
       consultant_name: form.consultant_name.trim() || null,
@@ -142,6 +142,7 @@ export default function DesignReportsPage() {
       source: 'Manual',
       management_attention: form.management_attention,
       created_by: user?.id || null,
+      created_by_name: user?.full_name || user?.email || null,
     })
 
     if (error) {
@@ -150,7 +151,7 @@ export default function DesignReportsPage() {
     }
 
     setForm({
-      category: 'Consultant Update',
+      category,
       title: '',
       description: '',
       consultant_name: '',
@@ -160,13 +161,12 @@ export default function DesignReportsPage() {
     })
 
     await loadData()
+    setNotice('Design report item saved successfully.')
   }
 
   async function deleteItem(id: string) {
     if (!canEdit) {
-      setNotice(
-        'View only. Only Admin, PMO and assigned Design Project Owners can delete Design Report items.'
-      )
+      setNotice('View only. Only Admin, PMO and assigned Design Project Owners can delete Design Report items.')
       return
     }
 
@@ -183,11 +183,38 @@ export default function DesignReportsPage() {
     await loadData()
   }
 
+  function printReport() {
+    if (!reportRef.current) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Design Report</title>
+          <style>
+            body { margin: 0; background: white; }
+            @page { size: A4; margin: 0; }
+            img { max-width: 100%; }
+          </style>
+        </head>
+        <body>${reportRef.current.innerHTML}</body>
+      </html>
+    `)
+
+    printWindow.document.close()
+
+    setTimeout(() => {
+      printWindow.focus()
+      printWindow.print()
+      printWindow.close()
+    }, 700)
+  }
+
   const approvedDrawings = drawings.filter(
-    item =>
-      item.status === 'Approved' ||
-      item.approval_status === 'Approved' ||
-      item.status === 'Current'
+    item => item.status === 'Approved' || item.approval_status === 'Approved' || item.status === 'Current'
   )
 
   const pendingDrawings = drawings.filter(
@@ -202,12 +229,18 @@ export default function DesignReportsPage() {
     item => item.status === 'Rejected' || item.approval_status === 'Rejected'
   )
 
+  const consultantUpdates = items.filter(item => item.category === 'Consultant Update')
+  const designIssues = items.filter(item => item.category === 'Design Issue')
+  const weeklyAchievements = items.filter(item => item.category === 'Weekly Achievement')
+  const weeklyChallenges = items.filter(item => item.category === 'Weekly Challenge')
+  const nextWeekFocus = items.filter(item => item.category === 'Next Week Focus')
+  const managementAttention = items.filter(item => item.management_attention === true)
+
   const consultantSummary = useMemo(() => {
     const map: Record<string, any> = {}
 
     drawings.forEach(drawing => {
-      const name =
-        drawing.consultant_name || drawing.issued_by || 'Unassigned Consultant'
+      const name = drawing.consultant_name || drawing.issued_by || 'Unassigned Consultant'
 
       if (!map[name]) {
         map[name] = {
@@ -237,28 +270,13 @@ export default function DesignReportsPage() {
         map[name].pending += 1
       }
 
-      if (
-        drawing.status === 'Rejected' ||
-        drawing.approval_status === 'Rejected'
-      ) {
+      if (drawing.status === 'Rejected' || drawing.approval_status === 'Rejected') {
         map[name].rejected += 1
       }
     })
 
     return Object.values(map)
   }, [drawings])
-
-  const consultantUpdates = items.filter(
-    item => item.category === 'Consultant Update'
-  )
-
-  const designIssues = items.filter(item => item.category === 'Design Issue')
-
-  const weeklyItems = items.filter(item =>
-    ['Weekly Achievement', 'Weekly Challenge', 'Next Week Focus'].includes(
-      item.category
-    )
-  )
 
   return (
     <div className="space-y-6">
@@ -268,20 +286,15 @@ export default function DesignReportsPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Design Management
+          Design Reports
         </h1>
 
         <p className="text-slate-400 mt-3 max-w-2xl">
-          Drawing status is automatically pulled from Document Control. Manual
-          input is only for consultant updates, design issues and weekly
-          commentary.
+          Weekly design reporting, consultant updates, drawing register, design issues and management attention items.
         </p>
 
         <div className="text-xs text-[#6e7d8c] mt-4">
-          Project:{' '}
-          <span className="text-[#c49e48]">
-            {projectName || 'No project selected'}
-          </span>
+          Project: <span className="text-[#c49e48]">{projectName || 'No project selected'}</span>
         </div>
 
         {!canEdit && (
@@ -297,14 +310,21 @@ export default function DesignReportsPage() {
         </div>
       )}
 
-      <div className="card p-4">
-        <label className="form-label">Report Week</label>
-        <input
-          type="date"
-          className="form-control max-w-xs"
-          value={reportWeek}
-          onChange={e => setReportWeek(e.target.value)}
-        />
+      <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <label className="form-label">Report Week</label>
+          <input
+            type="date"
+            className="form-control max-w-xs"
+            value={reportWeek}
+            onChange={e => setReportWeek(e.target.value)}
+          />
+        </div>
+
+        <button className="btn btn-gold" onClick={printReport}>
+          <Printer size={15} />
+          Print / Download Design Report
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -312,9 +332,7 @@ export default function DesignReportsPage() {
           <button
             key={value}
             onClick={() => setActiveTab(value)}
-            className={`btn btn-sm ${
-              activeTab === value ? 'btn-gold' : 'btn-ghost'
-            }`}
+            className={`btn btn-sm ${activeTab === value ? 'btn-gold' : 'btn-ghost'}`}
           >
             {label}
           </button>
@@ -325,15 +343,24 @@ export default function DesignReportsPage() {
         <div className="card p-6 text-slate-400">Loading design data…</div>
       ) : (
         <>
-          {activeTab === 'overview' && (
-            <OverviewTab
-              drawings={drawings}
-              approvedDrawings={approvedDrawings}
-              pendingDrawings={pendingDrawings}
-              rejectedDrawings={rejectedDrawings}
-              designIssues={designIssues}
-              weeklyItems={weeklyItems}
-            />
+          {activeTab === 'report' && (
+            <div ref={reportRef}>
+              <DesignReportDocument
+                projectName={projectName}
+                reportWeek={reportWeek}
+                preparedBy={user?.full_name || user?.email || '—'}
+                drawings={drawings}
+                approvedDrawings={approvedDrawings}
+                pendingDrawings={pendingDrawings}
+                rejectedDrawings={rejectedDrawings}
+                consultantUpdates={consultantUpdates}
+                designIssues={designIssues}
+                weeklyAchievements={weeklyAchievements}
+                weeklyChallenges={weeklyChallenges}
+                nextWeekFocus={nextWeekFocus}
+                managementAttention={managementAttention}
+              />
+            </div>
           )}
 
           {activeTab === 'drawings' && <DrawingRegister drawings={drawings} />}
@@ -353,7 +380,7 @@ export default function DesignReportsPage() {
           {activeTab === 'issues' && (
             <ManualTab
               title="Design Issues / Blockers"
-              defaultCategory="Design Issue"
+              category="Design Issue"
               items={designIssues}
               form={form}
               setForm={setForm}
@@ -364,10 +391,10 @@ export default function DesignReportsPage() {
           )}
 
           {activeTab === 'weekly' && (
-            <ManualTab
-              title="Weekly Commentary"
-              defaultCategory="Weekly Achievement"
-              items={weeklyItems}
+            <WeeklyTab
+              weeklyAchievements={weeklyAchievements}
+              weeklyChallenges={weeklyChallenges}
+              nextWeekFocus={nextWeekFocus}
               form={form}
               setForm={setForm}
               addItem={addItem}
@@ -381,90 +408,147 @@ export default function DesignReportsPage() {
   )
 }
 
-function OverviewTab({
+function DesignReportDocument({
+  projectName,
+  reportWeek,
+  preparedBy,
   drawings,
   approvedDrawings,
   pendingDrawings,
   rejectedDrawings,
+  consultantUpdates,
   designIssues,
-  weeklyItems,
+  weeklyAchievements,
+  weeklyChallenges,
+  nextWeekFocus,
+  managementAttention,
 }: any) {
   return (
-    <div className="space-y-5">
-      <MetricGrid
-        values={[
-          ['Total Drawings', drawings.length],
-          ['Approved', approvedDrawings.length],
-          ['Pending Review', pendingDrawings.length],
-          ['Rejected', rejectedDrawings.length],
-        ]}
-      />
+    <div className="design-report-document">
+      <style>{`
+        .design-report-document {
+          background: white;
+          color: #111827;
+          width: 210mm;
+          min-height: 297mm;
+          padding: 16mm;
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          line-height: 1.45;
+          box-sizing: border-box;
+        }
+        .dr-border { border: 2px solid #c49e48; padding: 12px; margin-bottom: 16px; }
+        .dr-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d6c38a; padding-bottom: 10px; margin-bottom: 14px; letter-spacing: 0.12em; font-weight: 800; }
+        .dr-title { text-align: center; font-size: 26px; font-weight: 900; margin: 16px 0; text-transform: uppercase; }
+        .dr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .dr-info { border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+        .dr-label { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; }
+        .dr-value { font-weight: 700; margin-top: 3px; }
+        .dr-section { margin-top: 16px; page-break-inside: avoid; }
+        .dr-section-title { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #7a5a12; border-bottom: 1px solid #d6c38a; padding-bottom: 5px; margin-bottom: 10px; }
+        .dr-table { width: 100%; border-collapse: collapse; }
+        .dr-table th, .dr-table td { border: 1px solid #333; padding: 6px; vertical-align: top; font-size: 11px; }
+        .dr-table th { background: #f3f4f6; font-weight: 800; }
+        .dr-box { border: 1px solid #ddd; border-radius: 6px; padding: 10px; min-height: 36px; white-space: pre-wrap; }
+        .dr-footer { border-top: 1px solid #ddd; margin-top: 24px; padding-top: 8px; font-size: 10px; color: #666; }
+        @media print { .design-report-document { width: auto; min-height: auto; padding: 14mm; } }
+      `}</style>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="card p-5">
-          <h2 className="font-bold text-[#ede8de] mb-3">
-            Design Executive Summary
-          </h2>
-
-          <div className="space-y-3 text-sm text-slate-400">
-            <p>
-              Total drawings in Document Control:{' '}
-              <span className="text-[#c49e48] font-semibold">
-                {drawings.length}
-              </span>
-              .
-            </p>
-
-            <p>
-              Approved drawings:{' '}
-              <span className="text-emerald-400 font-semibold">
-                {approvedDrawings.length}
-              </span>
-              .
-            </p>
-
-            <p>
-              Pending review:{' '}
-              <span className="text-amber-400 font-semibold">
-                {pendingDrawings.length}
-              </span>
-              .
-            </p>
-
-            <p>
-              Open design issues:{' '}
-              <span className="text-red-400 font-semibold">
-                {designIssues.filter((item: any) => item.status !== 'Closed')
-                  .length}
-              </span>
-              .
-            </p>
-          </div>
+      <div className="dr-border">
+        <div className="dr-top">
+          <div>MIXTA AFRICA</div>
+          <div>PMOCOREX</div>
         </div>
 
-        <div className="card p-5">
-          <h2 className="font-bold text-[#ede8de] mb-3">
-            Weekly Commentary
-          </h2>
+        <div className="dr-title">{projectName || 'Project'}</div>
 
-          {weeklyItems.length === 0 ? (
-            <div className="text-sm text-[#6e7d8c]">
-              No weekly commentary submitted yet.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {weeklyItems.slice(0, 5).map((item: any) => (
-                <div key={item.id} className="text-sm">
-                  <div className="text-[#c49e48] font-semibold">
-                    {item.category}
-                  </div>
-                  <div className="text-slate-400">{item.description}</div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="dr-grid">
+          <Info label="Report Type" value="Design Weekly Report" />
+          <Info label="Report Week" value={fdate(reportWeek)} />
+          <Info label="Prepared By" value={preparedBy} />
         </div>
       </div>
+
+      <Section title="Drawing Summary">
+        <div className="dr-grid">
+          <Info label="Total Drawings" value={drawings.length} />
+          <Info label="Approved" value={approvedDrawings.length} />
+          <Info label="Pending Review" value={pendingDrawings.length} />
+          <Info label="Rejected" value={rejectedDrawings.length} />
+          <Info label="Open Design Issues" value={designIssues.filter((item: any) => item.status !== 'Closed').length} />
+          <Info label="Management Attention" value={managementAttention.length} />
+        </div>
+      </Section>
+
+      <ReportTable title="Consultant Updates" items={consultantUpdates} />
+      <ReportTable title="Design Issues / Blockers" items={designIssues} />
+      <ReportTable title="Weekly Achievements" items={weeklyAchievements} />
+      <ReportTable title="Weekly Challenges" items={weeklyChallenges} />
+      <ReportTable title="Next Week Focus" items={nextWeekFocus} />
+      <ReportTable title="Items Requiring Management Attention" items={managementAttention} />
+
+      <Section title="Sign-off">
+        <div className="dr-grid">
+          <Info label="Prepared By" value={preparedBy} />
+          <Info label="Reviewed By" value="—" />
+          <Info label="Approved By" value="—" />
+        </div>
+      </Section>
+
+      <div className="dr-footer">
+        Mixta Africa · Generated by PMOCorex · Confidential · {new Date().toLocaleDateString('en-GB')}
+      </div>
+    </div>
+  )
+}
+
+function ReportTable({ title, items }: { title: string; items: any[] }) {
+  return (
+    <Section title={title}>
+      {items.length === 0 ? (
+        <div className="dr-box">No update recorded for this section.</div>
+      ) : (
+        <table className="dr-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Responsible</th>
+              <th>Status</th>
+              <th>Due Date</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(item => (
+              <tr key={item.id}>
+                <td>{item.title || '—'}</td>
+                <td>{item.consultant_name || '—'}</td>
+                <td>{item.status || '—'}</td>
+                <td>{item.due_date ? fdate(item.due_date) : '—'}</td>
+                <td>{item.description || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Section>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="dr-section">
+      <div className="dr-section-title">{title}</div>
+      {children}
+    </section>
+  )
+}
+
+function Info({ label, value }: { label: string; value: any }) {
+  return (
+    <div className="dr-info">
+      <div className="dr-label">{label}</div>
+      <div className="dr-value">{value ?? '—'}</div>
     </div>
   )
 }
@@ -474,9 +558,7 @@ function DrawingRegister({ drawings }: { drawings: any[] }) {
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-white/[0.06]">
         <div className="font-bold text-[#ede8de]">Drawing Register</div>
-        <div className="text-xs text-[#6e7d8c]">
-          Auto-filled from Document Control.
-        </div>
+        <div className="text-xs text-[#6e7d8c]">Auto-filled from Document Control.</div>
       </div>
 
       {drawings.length === 0 ? (
@@ -498,31 +580,21 @@ function DrawingRegister({ drawings }: { drawings: any[] }) {
                 <th>Rev Date</th>
               </tr>
             </thead>
-
             <tbody>
               {drawings.map(drawing => (
                 <tr key={drawing.id}>
-                  <td className="font-mono text-[#c49e48]">
-                    {drawing.drawing_number ||
-                      drawing.document_number ||
-                      '—'}
-                  </td>
-                  <td className="font-medium text-[#ede8de]">
-                    {drawing.title}
-                  </td>
+                  <td className="font-mono text-[#c49e48]">{drawing.drawing_number || drawing.document_number || '—'}</td>
+                  <td className="font-medium text-[#ede8de]">{drawing.title}</td>
                   <td>{drawing.discipline || '—'}</td>
                   <td>{drawing.revision_no || drawing.revision || '—'}</td>
                   <td>
-                    <span className="badge badge-muted">
-                      {drawing.approval_status ||
-                        drawing.review_status ||
-                        drawing.status ||
-                        '—'}
+                    <span className={`badge ${statusBadge(drawing.approval_status || drawing.review_status || drawing.status)}`}>
+                      {drawing.approval_status || drawing.review_status || drawing.status || '—'}
                     </span>
                   </td>
                   <td>{drawing.issued_for || '—'}</td>
                   <td>{drawing.consultant_name || drawing.issued_by || '—'}</td>
-                  <td>{drawing.revision_date || '—'}</td>
+                  <td>{drawing.revision_date ? fdate(drawing.revision_date) : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -547,27 +619,9 @@ function ConsultantsTab({
       <MetricGrid
         values={[
           ['Consultants', consultantSummary.length],
-          [
-            'Total Drawings',
-            consultantSummary.reduce(
-              (sum: number, item: any) => sum + item.total,
-              0
-            ),
-          ],
-          [
-            'Approved',
-            consultantSummary.reduce(
-              (sum: number, item: any) => sum + item.approved,
-              0
-            ),
-          ],
-          [
-            'Pending',
-            consultantSummary.reduce(
-              (sum: number, item: any) => sum + item.pending,
-              0
-            ),
-          ],
+          ['Total Drawings', consultantSummary.reduce((sum: number, item: any) => sum + item.total, 0)],
+          ['Approved', consultantSummary.reduce((sum: number, item: any) => sum + item.approved, 0)],
+          ['Pending', consultantSummary.reduce((sum: number, item: any) => sum + item.pending, 0)],
         ]}
       />
 
@@ -582,13 +636,10 @@ function ConsultantsTab({
               <th>Rejected</th>
             </tr>
           </thead>
-
           <tbody>
             {consultantSummary.map((item: any) => (
               <tr key={item.consultant}>
-                <td className="font-medium text-[#ede8de]">
-                  {item.consultant}
-                </td>
+                <td className="font-medium text-[#ede8de]">{item.consultant}</td>
                 <td>{item.total}</td>
                 <td>{item.approved}</td>
                 <td>{item.pending}</td>
@@ -601,7 +652,7 @@ function ConsultantsTab({
 
       <ManualTab
         title="Consultant Updates"
-        defaultCategory="Consultant Update"
+        category="Consultant Update"
         items={consultantUpdates}
         form={form}
         setForm={setForm}
@@ -613,9 +664,28 @@ function ConsultantsTab({
   )
 }
 
+function WeeklyTab({
+  weeklyAchievements,
+  weeklyChallenges,
+  nextWeekFocus,
+  form,
+  setForm,
+  addItem,
+  deleteItem,
+  canEdit,
+}: any) {
+  return (
+    <div className="space-y-5">
+      <ManualTab title="Weekly Achievements" category="Weekly Achievement" items={weeklyAchievements} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit} />
+      <ManualTab title="Weekly Challenges" category="Weekly Challenge" items={weeklyChallenges} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit} />
+      <ManualTab title="Next Week Focus" category="Next Week Focus" items={nextWeekFocus} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit} />
+    </div>
+  )
+}
+
 function ManualTab({
   title,
-  defaultCategory,
+  category,
   items,
   form,
   setForm,
@@ -638,29 +708,14 @@ function ManualTab({
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <select
-            className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
-            value={defaultCategory}
-            disabled={!canEdit}
-            onChange={e => setForm({ ...form, category: e.target.value })}
-          >
-            {MANUAL_CATEGORIES.map(category => (
-              <option key={category}>{category}</option>
-            ))}
-          </select>
+          <input className="form-control disabled:opacity-60 disabled:cursor-not-allowed" value={category} disabled />
 
           <input
             className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             placeholder="Title"
             value={form.title}
             disabled={!canEdit}
-            onChange={e =>
-              setForm({
-                ...form,
-                title: e.target.value,
-                category: form.category || defaultCategory,
-              })
-            }
+            onChange={e => setForm({ ...form, title: e.target.value, category })}
           />
 
           <input
@@ -668,9 +723,7 @@ function ManualTab({
             placeholder="Consultant / responsible party"
             value={form.consultant_name}
             disabled={!canEdit}
-            onChange={e =>
-              setForm({ ...form, consultant_name: e.target.value })
-            }
+            onChange={e => setForm({ ...form, consultant_name: e.target.value, category })}
           />
         </div>
 
@@ -679,7 +732,7 @@ function ManualTab({
             className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             value={form.status}
             disabled={!canEdit}
-            onChange={e => setForm({ ...form, status: e.target.value })}
+            onChange={e => setForm({ ...form, status: e.target.value, category })}
           >
             {STATUSES.map(status => (
               <option key={status}>{status}</option>
@@ -691,7 +744,7 @@ function ManualTab({
             className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             value={form.due_date}
             disabled={!canEdit}
-            onChange={e => setForm({ ...form, due_date: e.target.value })}
+            onChange={e => setForm({ ...form, due_date: e.target.value, category })}
           />
         </div>
 
@@ -701,7 +754,7 @@ function ManualTab({
           placeholder="Update / description"
           value={form.description}
           disabled={!canEdit}
-          onChange={e => setForm({ ...form, description: e.target.value })}
+          onChange={e => setForm({ ...form, description: e.target.value, category })}
         />
 
         <label className={`flex items-center gap-2 text-sm text-slate-400 mt-3 ${!canEdit ? 'opacity-60' : ''}`}>
@@ -709,27 +762,20 @@ function ManualTab({
             type="checkbox"
             checked={form.management_attention}
             disabled={!canEdit}
-            onChange={e =>
-              setForm({ ...form, management_attention: e.target.checked })
-            }
+            onChange={e => setForm({ ...form, management_attention: e.target.checked, category })}
           />
           Requires management attention
         </label>
 
         {canEdit && (
-          <button
-  className="btn btn-gold mt-4"
-  onClick={() => addItem(defaultCategory)}
->
+          <button className="btn btn-gold mt-4" onClick={() => addItem(category)}>
             Save Update
           </button>
         )}
       </div>
 
       {items.length === 0 ? (
-        <div className="card p-6 text-sm text-[#6e7d8c]">
-          No manual updates submitted yet.
-        </div>
+        <div className="card p-6 text-sm text-[#6e7d8c]">No updates submitted yet.</div>
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl min-w-[1200px]">
@@ -744,7 +790,6 @@ function ManualTab({
                 <th></th>
               </tr>
             </thead>
-
             <tbody>
               {items.map((item: any) => (
                 <tr key={item.id}>
@@ -752,26 +797,17 @@ function ManualTab({
                   <td className="font-medium text-[#ede8de]">{item.title}</td>
                   <td>{item.consultant_name || '—'}</td>
                   <td>
-                    <span className="badge badge-muted">
-                      {item.status || 'Open'}
-                    </span>
+                    <span className={`badge ${statusBadge(item.status)}`}>{item.status || 'Open'}</span>
                   </td>
-                  <td>{item.due_date || '—'}</td>
-                  <td className="max-w-[360px] text-slate-400">
-                    {item.description || '—'}
-                  </td>
+                  <td>{item.due_date ? fdate(item.due_date) : '—'}</td>
+                  <td className="max-w-[360px] text-slate-400">{item.description || '—'}</td>
                   <td>
                     {canEdit ? (
-                      <button
-                        className="tbl-action text-red-400"
-                        onClick={() => deleteItem(item.id)}
-                      >
+                      <button className="tbl-action text-red-400" onClick={() => deleteItem(item.id)}>
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">
-                        View Only
-                      </span>
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -799,9 +835,7 @@ function Metric({ title, value }: { title: string | number; value: string | numb
     <div className="card p-4">
       <PenTool size={18} className="text-[#c49e48]" />
       <div className="text-2xl font-black text-white mt-3">{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
-        {title}
-      </div>
+      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">{title}</div>
     </div>
   )
 }
