@@ -11,6 +11,7 @@ const TABS = [
   ['consultants', 'Consultants'],
   ['issues', 'Design Issues'],
   ['weekly', 'Weekly Commentary'],
+  ['history', 'History'],
 ]
 
 const STATUSES = ['Open', 'In Progress', 'Pending', 'Approved', 'Closed']
@@ -52,6 +53,8 @@ export default function DesignReportsPage() {
   const [activeTab, setActiveTab] = useState('report')
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
+  const [submissions, setSubmissions] = useState<any[]>([])
+  const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
   const [reportWeek, setReportWeek] = useState(new Date().toISOString().slice(0, 10))
@@ -68,6 +71,7 @@ export default function DesignReportsPage() {
 
   useEffect(() => {
     loadData()
+    loadSubmissions()
   }, [projectId, reportWeek])
 
   async function loadData() {
@@ -108,6 +112,75 @@ export default function DesignReportsPage() {
     setDrawings(drawingData || [])
     setItems(reportData || [])
     setLoading(false)
+  }
+
+
+  async function loadSubmissions() {
+    if (!projectId) return
+
+    const { data, error } = await supabase
+      .from('design_report_submissions')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('report_week', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setSubmissions(data || [])
+  }
+
+  async function submitReport() {
+    if (!projectId) {
+      setNotice('No project selected.')
+      return
+    }
+
+    const snapshotData = {
+      projectName,
+      reportWeek,
+      preparedBy: user?.full_name || user?.email || '—',
+      generatedAt: new Date().toISOString(),
+
+      drawings,
+      items,
+
+      stats: {
+        totalDrawings: drawings.length,
+        approvedDrawings: approvedDrawings.length,
+        pendingDrawings: pendingDrawings.length,
+        rejectedDrawings: rejectedDrawings.length,
+        consultantUpdates: consultantUpdates.length,
+        designIssues: designIssues.length,
+        weeklyAchievements: weeklyAchievements.length,
+        weeklyChallenges: weeklyChallenges.length,
+        nextWeekFocus: nextWeekFocus.length,
+        managementAttention: managementAttention.length,
+      },
+    }
+
+    const { error } = await supabase.from('design_report_submissions').insert({
+      organization_id: organizationId,
+      portfolio_id: portfolioId,
+      project_id: projectId,
+      report_week: reportWeek,
+      submitted_by: user?.id || null,
+      submitted_by_name: user?.full_name || user?.email || null,
+      status: 'Submitted',
+      snapshot_data: snapshotData,
+    })
+
+    if (error) {
+      setNotice(error.message)
+      return
+    }
+
+    setSelectedSubmission(null)
+    await loadSubmissions()
+    setNotice('Design report submitted successfully and saved to history.')
   }
 
   async function addItem(category: string) {
@@ -278,6 +351,63 @@ export default function DesignReportsPage() {
     return Object.values(map)
   }, [drawings])
 
+  const snapshot = selectedSubmission?.snapshot_data || null
+  const snapshotStats = snapshot?.stats || {}
+
+  const reportProjectName = snapshot?.projectName || projectName
+  const reportWeekForDocument = snapshot?.reportWeek || selectedSubmission?.report_week || reportWeek
+  const reportPreparedBy =
+    snapshot?.preparedBy || selectedSubmission?.submitted_by_name || user?.full_name || user?.email || '—'
+
+  const reportDrawings = snapshot?.drawings || drawings
+  const reportItems = snapshot?.items || items
+
+  const reportApprovedDrawings = snapshot
+    ? reportDrawings.filter(
+        (item: any) =>
+          item.status === 'Approved' ||
+          item.approval_status === 'Approved' ||
+          item.status === 'Current'
+      )
+    : approvedDrawings
+
+  const reportPendingDrawings = snapshot
+    ? reportDrawings.filter(
+        (item: any) =>
+          item.status === 'Pending Review' ||
+          item.status === 'For Review' ||
+          item.approval_status === 'Pending Review' ||
+          item.review_status === 'Pending Review'
+      )
+    : pendingDrawings
+
+  const reportRejectedDrawings = snapshot
+    ? reportDrawings.filter(
+        (item: any) =>
+          item.status === 'Rejected' ||
+          item.approval_status === 'Rejected'
+      )
+    : rejectedDrawings
+
+  const reportConsultantUpdates = reportItems.filter(
+    (item: any) => item.category === 'Consultant Update'
+  )
+  const reportDesignIssues = reportItems.filter(
+    (item: any) => item.category === 'Design Issue'
+  )
+  const reportWeeklyAchievements = reportItems.filter(
+    (item: any) => item.category === 'Weekly Achievement'
+  )
+  const reportWeeklyChallenges = reportItems.filter(
+    (item: any) => item.category === 'Weekly Challenge'
+  )
+  const reportNextWeekFocus = reportItems.filter(
+    (item: any) => item.category === 'Next Week Focus'
+  )
+  const reportManagementAttention = reportItems.filter(
+    (item: any) => item.management_attention === true
+  )
+
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
@@ -317,15 +447,45 @@ export default function DesignReportsPage() {
             type="date"
             className="form-control max-w-xs"
             value={reportWeek}
-            onChange={e => setReportWeek(e.target.value)}
+            onChange={e => {
+              setSelectedSubmission(null)
+              setReportWeek(e.target.value)
+            }}
           />
         </div>
 
-        <button className="btn btn-gold" onClick={printReport}>
-          <Printer size={15} />
-          Print / Download Design Report
-        </button>
+        <div className="flex gap-2 items-center">
+          {selectedSubmission && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setSelectedSubmission(null)
+                setReportWeek(new Date().toISOString().slice(0, 10))
+              }}
+            >
+              Back to Current Report
+            </button>
+          )}
+
+          {canEdit && !selectedSubmission && (
+            <button className="btn btn-ghost" onClick={submitReport}>
+              Submit Weekly Report
+            </button>
+          )}
+
+          <button className="btn btn-gold" onClick={printReport}>
+            <Printer size={15} />
+            Print / Download Design Report
+          </button>
+        </div>
       </div>
+
+      {selectedSubmission && (
+        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+          Viewing historical design report for {fdate(selectedSubmission.report_week)}.
+          This report is a saved snapshot and will not change when new design records are added.
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {TABS.map(([value, label]) => (
@@ -346,19 +506,19 @@ export default function DesignReportsPage() {
           {activeTab === 'report' && (
             <div ref={reportRef}>
               <DesignReportDocument
-                projectName={projectName}
-                reportWeek={reportWeek}
-                preparedBy={user?.full_name || user?.email || '—'}
-                drawings={drawings}
-                approvedDrawings={approvedDrawings}
-                pendingDrawings={pendingDrawings}
-                rejectedDrawings={rejectedDrawings}
-                consultantUpdates={consultantUpdates}
-                designIssues={designIssues}
-                weeklyAchievements={weeklyAchievements}
-                weeklyChallenges={weeklyChallenges}
-                nextWeekFocus={nextWeekFocus}
-                managementAttention={managementAttention}
+                projectName={reportProjectName}
+                reportWeek={reportWeekForDocument}
+                preparedBy={reportPreparedBy}
+                drawings={reportDrawings}
+                approvedDrawings={reportApprovedDrawings}
+                pendingDrawings={reportPendingDrawings}
+                rejectedDrawings={reportRejectedDrawings}
+                consultantUpdates={reportConsultantUpdates}
+                designIssues={reportDesignIssues}
+                weeklyAchievements={reportWeeklyAchievements}
+                weeklyChallenges={reportWeeklyChallenges}
+                nextWeekFocus={reportNextWeekFocus}
+                managementAttention={reportManagementAttention}
               />
             </div>
           )}
@@ -402,8 +562,85 @@ export default function DesignReportsPage() {
               canEdit={canEdit}
             />
           )}
+
+          {activeTab === 'history' && (
+            <DesignReportHistoryTab
+              submissions={submissions}
+              onOpenReport={(submission: any) => {
+                setSelectedSubmission(submission)
+                setReportWeek(submission.report_week)
+                setActiveTab('report')
+              }}
+            />
+          )}
         </>
       )}
+    </div>
+  )
+}
+
+
+function DesignReportHistoryTab({
+  submissions,
+  onOpenReport,
+}: {
+  submissions: any[]
+  onOpenReport: (submission: any) => void
+}) {
+  if (!submissions.length) {
+    return (
+      <div className="card p-8 text-center text-[#6e7d8c]">
+        No submitted design reports yet. Submit a weekly report to save it into history.
+      </div>
+    )
+  }
+
+  return (
+    <div className="card overflow-x-auto">
+      <table className="tbl min-w-[1000px]">
+        <thead>
+          <tr>
+            <th>Report Week</th>
+            <th>Status</th>
+            <th>Submitted By</th>
+            <th>Submitted On</th>
+            <th>Snapshot</th>
+            <th></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {submissions.map(submission => (
+            <tr key={submission.id}>
+              <td className="font-medium text-[#ede8de]">
+                {fdate(submission.report_week)}
+              </td>
+              <td>
+                <span className={`badge ${statusBadge(submission.status)}`}>
+                  {submission.status || 'Submitted'}
+                </span>
+              </td>
+              <td>{submission.submitted_by_name || '—'}</td>
+              <td>{fdate(submission.created_at)}</td>
+              <td>
+                {submission.snapshot_data ? (
+                  <span className="text-emerald-400">Saved</span>
+                ) : (
+                  <span className="text-amber-400">Legacy report</span>
+                )}
+              </td>
+              <td>
+                <button
+                  className="btn btn-gold btn-sm"
+                  onClick={() => onOpenReport(submission)}
+                >
+                  View / Download
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
