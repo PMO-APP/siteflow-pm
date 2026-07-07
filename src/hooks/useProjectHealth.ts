@@ -10,7 +10,7 @@ function clamp(value: number, min = 0, max = 100) {
 function getTaskProgress(task: any): number {
   if (task.status === 'Completed') return 100
   if (task.status === 'Not Started') return 0
-  return Number(task.progress_pct || 0)
+  return clamp(Number(task.progress_pct || 0))
 }
 
 function calcWeightedProgress(tasks: any[]) {
@@ -40,13 +40,37 @@ function calcWeightedProgress(tasks: any[]) {
 function getTaskDate(task: any, key: 'start' | 'finish') {
   const value =
     key === 'start'
-      ? task.planned_start || task.start_date
-      : task.planned_finish || task.finish_date
+      ? task?.planned_start || task?.start_date
+      : task?.planned_finish || task?.finish_date
 
   if (!value) return null
 
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
+}
+
+function getLastScheduleTask(tasks: any[]) {
+  return (
+    [...tasks]
+      .filter(task => getTaskDate(task, 'finish'))
+      .sort((a, b) => {
+        const aFinish = getTaskDate(a, 'finish')?.getTime() || 0
+        const bFinish = getTaskDate(b, 'finish')?.getTime() || 0
+        return bFinish - aFinish
+      })[0] || null
+  )
+}
+
+function getFirstScheduleTask(tasks: any[]) {
+  return (
+    [...tasks]
+      .filter(task => getTaskDate(task, 'start'))
+      .sort((a, b) => {
+        const aStart = getTaskDate(a, 'start')?.getTime() || 0
+        const bStart = getTaskDate(b, 'start')?.getTime() || 0
+        return aStart - bStart
+      })[0] || null
+  )
 }
 
 export function useProjectHealth(projectId?: string | number | null) {
@@ -64,10 +88,28 @@ export function useProjectHealth(projectId?: string | number | null) {
       item => String(item.id) === String(projectId)
     )
 
-    const projectStart = project?.start_date ? new Date(project.start_date) : null
+    const firstScheduleTask = getFirstScheduleTask(tasks)
+    const lastScheduleTask = getLastScheduleTask(tasks)
+
+    const projectStart = project?.start_date
+      ? new Date(project.start_date)
+      : getTaskDate(firstScheduleTask, 'start')
+
     const plannedFinish = project?.handover_date
       ? new Date(project.handover_date)
-      : null
+      : getTaskDate(lastScheduleTask, 'finish')
+
+    const handoverDate = plannedFinish
+
+    const handoverDateSource = project?.handover_date
+      ? 'Project handover date'
+      : lastScheduleTask
+      ? `Last schedule task: ${
+          lastScheduleTask.name ||
+          lastScheduleTask.activity ||
+          `Task ${lastScheduleTask.task_number}`
+        }`
+      : 'Not set'
 
     const totalDays =
       projectStart && plannedFinish
@@ -94,7 +136,7 @@ export function useProjectHealth(projectId?: string | number | null) {
     })
 
     const activeDelayedTask =
-      delayedTasks.sort((a, b) => {
+      [...delayedTasks].sort((a, b) => {
         const aFinish = getTaskDate(a, 'finish')?.getTime() || 0
         const bFinish = getTaskDate(b, 'finish')?.getTime() || 0
         return aFinish - bFinish
@@ -154,11 +196,17 @@ export function useProjectHealth(projectId?: string | number | null) {
       project,
       tasks,
 
+      firstScheduleTask,
+      lastScheduleTask,
+
       projectStart,
       plannedFinish,
+      handoverDate,
+      handoverDateSource,
 
       projectStartIso: projectStart ? projectStart.toISOString() : null,
       plannedFinishIso: plannedFinish ? plannedFinish.toISOString() : null,
+      handoverDateIso: handoverDate ? handoverDate.toISOString() : null,
 
       forecastFinish: null,
       forecastFinishIso: null,
