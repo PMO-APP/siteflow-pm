@@ -249,8 +249,34 @@ export default function Dashboard() {
     {}
 
   const projectStartDate = toDate(project?.start_date)
-  const targetDate = toDate(project?.handover_date || project?.planned_finish)
-  const hasTimeline = Boolean(projectStartDate && targetDate)
+
+// Find the last scheduled activity
+const lastScheduleTask =
+  [...tasks]
+    .filter(task => getTaskFinish(task))
+    .sort((a, b) => {
+      const aDate = toDate(getTaskFinish(a))!.getTime()
+      const bDate = toDate(getTaskFinish(b))!.getTime()
+      return bDate - aDate
+    })[0] || null
+
+// Use Project handover date first,
+// otherwise use the last task finish.
+const targetDate =
+  toDate(project?.handover_date) ||
+  toDate(project?.planned_finish) ||
+  toDate(getTaskFinish(lastScheduleTask))
+
+const handoverSource =
+  project?.handover_date
+    ? 'Project Handover Date'
+    : project?.planned_finish
+    ? 'Project Planned Finish'
+    : lastScheduleTask
+    ? `Schedule (${lastScheduleTask.name})`
+    : null
+
+const hasTimeline = Boolean(projectStartDate && targetDate)
 
   const daysLeft = targetDate
     ? Math.max(0, differenceInDays(targetDate, today))
