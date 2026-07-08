@@ -295,7 +295,11 @@ export default function Layout() {
           safeParseDate(task.finish_date),
       }))
       .filter(task => task.finishDate)
-      .sort((a, b) => b.finishDate.getTime() - a.finishDate.getTime())[0]
+      .sort((a, b) => {
+    const aTime = a.finishDate?.getTime() ?? 0
+    const bTime = b.finishDate?.getTime() ?? 0
+    return bTime - aTime
+})
 
     setHandoverDate(lastTask?.finishDate || null)
   }
