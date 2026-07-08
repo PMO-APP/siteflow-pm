@@ -248,35 +248,43 @@ export default function Dashboard() {
     projects.find((p: any) => p.name === projectName) ||
     {}
 
-  const projectStartDate = toDate(project?.start_date)
+  const firstScheduleTask =
+    [...tasks]
+      .filter(task => toDate(getTaskStart(task)))
+      .sort((a, b) => {
+        const aDate = toDate(getTaskStart(a))?.getTime() ?? 0
+        const bDate = toDate(getTaskStart(b))?.getTime() ?? 0
+        return aDate - bDate
+      })[0] ?? null
 
-// Find the last scheduled activity
-const lastScheduleTask =
-  [...tasks]
-    .filter(task => getTaskFinish(task))
-    .sort((a, b) => {
-      const aDate = toDate(getTaskFinish(a))!.getTime()
-      const bDate = toDate(getTaskFinish(b))!.getTime()
-      return bDate - aDate
-    })[0] || null
+  const lastScheduleTask =
+    [...tasks]
+      .filter(task => toDate(getTaskFinish(task)))
+      .sort((a, b) => {
+        const aDate = toDate(getTaskFinish(a))?.getTime() ?? 0
+        const bDate = toDate(getTaskFinish(b))?.getTime() ?? 0
+        return bDate - aDate
+      })[0] ?? null
 
-// Use Project handover date first,
-// otherwise use the last task finish.
-const targetDate =
-  toDate(project?.handover_date) ||
-  toDate(project?.planned_finish) ||
-  toDate(getTaskFinish(lastScheduleTask))
+  const projectStartDate =
+    toDate(project?.start_date) ??
+    (firstScheduleTask ? toDate(getTaskStart(firstScheduleTask)) : null)
 
-const handoverSource =
-  project?.handover_date
-    ? 'Project Handover Date'
-    : project?.planned_finish
-    ? 'Project Planned Finish'
-    : lastScheduleTask
-    ? `Schedule (${lastScheduleTask.name})`
-    : null
+  const targetDate =
+    toDate(project?.handover_date) ??
+    toDate(project?.planned_finish) ??
+    (lastScheduleTask ? toDate(getTaskFinish(lastScheduleTask)) : null)
 
-const hasTimeline = Boolean(projectStartDate && targetDate)
+  const handoverSource =
+    project?.handover_date
+      ? 'Project Handover Date'
+      : project?.planned_finish
+      ? 'Project Planned Finish'
+      : lastScheduleTask
+      ? `Schedule (${lastScheduleTask.name || lastScheduleTask.activity || 'Last Task'})`
+      : null
+
+  const hasTimeline = Boolean(projectStartDate && targetDate)
 
   const daysLeft = targetDate
     ? Math.max(0, differenceInDays(targetDate, today))
@@ -854,6 +862,12 @@ const hasTimeline = Boolean(projectStartDate && targetDate)
                   })
                 : 'No handover date set'}
             </div>
+
+            {handoverSource && (
+              <div className="text-[10px] text-[#6e7d8c] mt-1">
+                Source: {handoverSource}
+              </div>
+            )}
 
             <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
               <div
