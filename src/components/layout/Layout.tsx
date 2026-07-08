@@ -296,10 +296,10 @@ export default function Layout() {
       }))
       .filter(task => task.finishDate)
       .sort((a, b) => {
-    const aTime = a.finishDate?.getTime() ?? 0
-    const bTime = b.finishDate?.getTime() ?? 0
-    return bTime - aTime
-})
+        const aTime = a.finishDate?.getTime() ?? 0
+        const bTime = b.finishDate?.getTime() ?? 0
+        return bTime - aTime
+      })[0]
 
     setHandoverDate(lastTask?.finishDate || null)
   }
