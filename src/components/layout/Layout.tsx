@@ -233,19 +233,47 @@ export default function Layout() {
   }, [queryClient])
 
   async function loadProject() {
-    if (!projectName) {
-      setHandoverDate(null)
-      return
-    }
-
-    const { data } = await supabase
-      .from('projects')
-      .select('handover_date')
-      .eq('project_name', projectName)
-      .maybeSingle()
-
-    setHandoverDate(data?.handover_date ? parseISO(data.handover_date) : null)
+  if (!projectId) {
+    setHandoverDate(null)
+    return
   }
+
+  // Get project
+  const { data: project } = await supabase
+    .from('projects')
+    .select('handover_date, planned_finish')
+    .eq('id', projectId)
+    .maybeSingle()
+
+  // 1. Explicit handover date
+  if (project?.handover_date) {
+    setHandoverDate(parseISO(project.handover_date))
+    return
+  }
+
+  // 2. Planned finish
+  if (project?.planned_finish) {
+    setHandoverDate(parseISO(project.planned_finish))
+    return
+  }
+
+  // 3. Last task finish
+  const { data: lastTask } = await supabase
+    .from('tasks')
+    .select('planned_finish, finish_date')
+    .eq('project_id', projectId)
+    .order('planned_finish', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const fallback =
+    lastTask?.planned_finish ||
+    lastTask?.finish_date
+
+  setHandoverDate(
+    fallback ? parseISO(fallback) : null
+  )
+}
 
   async function loadWorkspaceContext() {
     if (organizationId) {
