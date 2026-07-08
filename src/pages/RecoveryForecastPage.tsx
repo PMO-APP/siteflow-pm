@@ -122,7 +122,7 @@ export default function RecoveryForecastPage() {
   const engine = useMemo(() => {
     const today = new Date()
 
-    const safeDate = (value?: string) => {
+    const safeDate = (value?: string | null) => {
       if (!value) return null
       const d = new Date(value)
       return isNaN(d.getTime()) ? null : d
@@ -131,35 +131,181 @@ export default function RecoveryForecastPage() {
     const daysBetween = (a: Date, b: Date) =>
       Math.ceil((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
 
+    const normalizeScope = (value?: string | null) => {
+      const raw = value || 'Fully Finished'
+      const allowed = [
+        'Carcass',
+        'Shell & Core',
+        'Fully Finished',
+        'Infrastructure',
+        'MEP Only',
+        'External Works',
+        'Custom',
+      ]
+
+      return allowed.includes(raw) ? raw : 'Fully Finished'
+    }
+
+    const getTaskName = (task: any) =>
+      String(task.name || task.activity || task.task_name || task.title || '')
+
+    const getTaskStart = (task: any) =>
+      task.planned_start || task.start_date || null
+
+    const getTaskFinish = (task: any) =>
+      task.planned_finish || task.finish_date || null
+
+    const getTaskProgress = (task: any) => {
+      const status = String(task.status || '').toLowerCase()
+      if (status === 'completed' || status === 'done') return 100
+      if (status === 'not started') return 0
+      return Math.min(100, Math.max(0, Number(task.progress_pct || 0)))
+    }
+
+    const projectScope = normalizeScope(project?.project_scope)
+
+    const scopeKeywords: Record<string, string[]> = {
+      Carcass: [
+        'excavation',
+        'foundation',
+        'blinding',
+        'ground beam',
+        'ground floor',
+        'slab',
+        'column',
+        'beam',
+        'blockwork',
+        'floor',
+        'roof',
+        'parapet',
+        'staircase',
+        'external plastering',
+        'cleaning',
+        'practical completion',
+      ],
+      'Shell & Core': [
+        'excavation',
+        'foundation',
+        'structure',
+        'slab',
+        'column',
+        'beam',
+        'blockwork',
+        'roof',
+        'external wall',
+        'external plastering',
+        'facade',
+        'mep first fix',
+        'core',
+        'staircase',
+        'practical completion',
+      ],
+      Infrastructure: [
+        'road',
+        'drain',
+        'stormwater',
+        'water',
+        'sewer',
+        'electrical',
+        'streetlight',
+        'paving',
+        'kerb',
+        'infrastructure',
+      ],
+      'MEP Only': [
+        'mep',
+        'mechanical',
+        'electrical',
+        'plumbing',
+        'hvac',
+        'fire',
+        'elv',
+        'first fix',
+        'second fix',
+        'testing',
+        'commissioning',
+      ],
+      'External Works': [
+        'external',
+        'landscape',
+        'driveway',
+        'paving',
+        'fence',
+        'gate',
+        'road',
+        'drain',
+        'kerb',
+        'walkway',
+      ],
+      'Fully Finished': [],
+      Custom: [],
+    }
+
     const validTasks = tasks.filter(
-      task => safeDate(task.start_date) && safeDate(task.finish_date)
+      task => safeDate(getTaskStart(task)) && safeDate(getTaskFinish(task))
     )
 
-    const totalTasks = validTasks.length
+    const applicableTasks =
+      projectScope === 'Fully Finished' || projectScope === 'Custom'
+        ? validTasks
+        : validTasks.filter(task => {
+            const keywords = scopeKeywords[projectScope] || []
+            const haystack = [
+              getTaskName(task),
+              task.phase,
+              task.package,
+              task.discipline,
+              task.description,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()
 
-    const delayedTasks = validTasks.filter(task => {
-      const finish = safeDate(task.finish_date)
+            return keywords.some(keyword =>
+              haystack.includes(keyword.toLowerCase())
+            )
+          })
+
+    const scopedTasks = applicableTasks.length ? applicableTasks : validTasks
+    const totalTasks = scopedTasks.length
+
+    const firstTask =
+      [...scopedTasks]
+        .filter(task => safeDate(getTaskStart(task)))
+        .sort((a, b) => {
+          const aDate = safeDate(getTaskStart(a))?.getTime() ?? 0
+          const bDate = safeDate(getTaskStart(b))?.getTime() ?? 0
+          return aDate - bDate
+        })[0] || null
+
+    const lastTask =
+      [...scopedTasks]
+        .filter(task => safeDate(getTaskFinish(task)))
+        .sort((a, b) => {
+          const aDate = safeDate(getTaskFinish(a))?.getTime() ?? 0
+          const bDate = safeDate(getTaskFinish(b))?.getTime() ?? 0
+          return bDate - aDate
+        })[0] || null
+
+    const delayedTasks = scopedTasks.filter(task => {
+      const finish = safeDate(getTaskFinish(task))
 
       return (
         !!finish &&
         finish < today &&
-        Number(task.progress_pct || 0) < 100 &&
-        task.status !== 'Completed'
+        getTaskProgress(task) < 100 &&
+        !['completed', 'done'].includes(String(task.status || '').toLowerCase())
       )
     })
 
-    const completedTasks = validTasks.filter(
-      t => Number(t.progress_pct || 0) >= 100 || t.status === 'Completed'
-    ).length
+    const completedTasks = scopedTasks.filter(t => getTaskProgress(t) >= 100).length
 
     const calculatedProgress =
       totalTasks === 0
         ? Number(project?.completion_percent || 0)
         : Math.round(
-            validTasks.reduce((sum, t) => {
-              if (t.status === 'Completed') return sum + 100
-              return sum + Number(t.progress_pct || 0)
-            }, 0) / totalTasks
+            scopedTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
+              totalTasks
           )
 
     const progressPct =
@@ -168,26 +314,24 @@ export default function RecoveryForecastPage() {
         : calculatedProgress
 
     const taskDelayDays = delayedTasks.map(task => {
-      const finish = safeDate(task.finish_date)
+      const finish = safeDate(getTaskFinish(task))
       return finish ? Math.max(0, daysBetween(today, finish)) : 0
     })
 
-    const worstDelay =
-      taskDelayDays.length === 0 ? 0 : Math.max(...taskDelayDays)
+    const worstDelay = taskDelayDays.length === 0 ? 0 : Math.max(...taskDelayDays)
 
     const avgTaskDelay =
       taskDelayDays.length === 0
         ? 0
         : Math.round(
-            taskDelayDays.reduce((sum, d) => sum + d, 0) /
-              taskDelayDays.length
+            taskDelayDays.reduce((sum, d) => sum + d, 0) / taskDelayDays.length
           )
 
-    const redTasks = validTasks.filter(t => t.rag === 'RED').length
-    const amberTasks = validTasks.filter(t => t.rag === 'AMBER').length
+    const redTasks = scopedTasks.filter(t => t.rag === 'RED').length
+    const amberTasks = scopedTasks.filter(t => t.rag === 'AMBER').length
 
-    const activeTasks = validTasks.filter(
-      t => t.status === 'In Progress' || Number(t.progress_pct || 0) > 0
+    const activeTasks = scopedTasks.filter(
+      t => t.status === 'In Progress' || getTaskProgress(t) > 0
     ).length
 
     const openRisks = risks.filter(r => r.status === 'Open').length
@@ -223,8 +367,22 @@ export default function RecoveryForecastPage() {
       return daysToOrder <= 14
     }).length
 
-    const projectStartDate = safeDate(project?.start_date)
-    const targetDate = safeDate(project?.handover_date)
+    const projectStartDate =
+      safeDate(project?.start_date) ||
+      (firstTask ? safeDate(getTaskStart(firstTask)) : null)
+
+    const targetDate =
+      safeDate(project?.handover_date) ||
+      safeDate(project?.planned_finish) ||
+      (lastTask ? safeDate(getTaskFinish(lastTask)) : null)
+
+    const targetDateSource = project?.handover_date
+      ? 'Project Handover Date'
+      : project?.planned_finish
+      ? 'Project Planned Finish'
+      : lastTask
+      ? `Schedule (${getTaskName(lastTask) || 'Last Task'})`
+      : 'Not Set'
 
     const hasTimeline = !!projectStartDate && !!targetDate
 
@@ -243,8 +401,7 @@ export default function RecoveryForecastPage() {
           )
         : null
 
-    const variancePct =
-      plannedPct !== null ? progressPct - plannedPct : null
+    const variancePct = plannedPct !== null ? progressPct - plannedPct : null
 
     let confidenceScore = 100
 
@@ -269,17 +426,9 @@ export default function RecoveryForecastPage() {
       confidenceScore -= 10
     }
 
-    if (project?.health_status === 'Good') {
-      confidenceScore += 5
-    }
-
-    if (project?.health_status === 'At Risk') {
-      confidenceScore -= 10
-    }
-
-    if (project?.health_status === 'Critical') {
-      confidenceScore -= 20
-    }
+    if (project?.health_status === 'Good') confidenceScore += 5
+    if (project?.health_status === 'At Risk') confidenceScore -= 10
+    if (project?.health_status === 'Critical') confidenceScore -= 20
 
     confidenceScore = Math.max(5, Math.min(95, Math.round(confidenceScore)))
 
@@ -300,52 +449,38 @@ export default function RecoveryForecastPage() {
         ? '0%'
         : `${Math.min(50, Math.round(worstDelay * 1.8))}%`
 
-    const latestTask =
-      validTasks.length > 0
-        ? validTasks.reduce((latest, current) => {
-            const currentDate = safeDate(current.finish_date)
-            const latestDate = safeDate(latest.finish_date)
-
-            if (currentDate && latestDate && currentDate > latestDate) {
-              return current
-            }
-
-            return latest
-          })
-        : null
-
     const forecastFinish = targetDate
       ? new Date(targetDate)
-      : latestTask
-      ? new Date(latestTask.finish_date)
+      : lastTask
+      ? new Date(getTaskFinish(lastTask))
       : new Date()
 
     forecastFinish.setDate(forecastFinish.getDate() + worstDelay)
 
-    const phaseHeatmap = validTasks.reduce((acc: any, task) => {
+    const phaseHeatmap = scopedTasks.reduce((acc: any, task) => {
       const phase = task.phase || 'Unassigned Phase'
-      const finish = safeDate(task.finish_date)
+      const finish = safeDate(getTaskFinish(task))
 
       if (!acc[phase]) acc[phase] = 0
 
       const delayed =
         !!finish &&
         finish < today &&
-        Number(task.progress_pct || 0) < 100 &&
-        task.status !== 'Completed'
+        getTaskProgress(task) < 100 &&
+        !['completed', 'done'].includes(String(task.status || '').toLowerCase())
 
       if (delayed) acc[phase] += 1
 
       return acc
     }, {})
 
-    const criticalTasks = validTasks
+    const criticalTasks = scopedTasks
       .map(task => {
-        const finish = safeDate(task.finish_date)
-        const start = safeDate(task.start_date)
+        const finish = safeDate(getTaskFinish(task))
+        const start = safeDate(getTaskStart(task))
 
         const lateDays =
-          finish && finish < today && Number(task.progress_pct || 0) < 100
+          finish && finish < today && getTaskProgress(task) < 100
             ? Math.max(0, daysBetween(today, finish))
             : 0
 
@@ -357,10 +492,7 @@ export default function RecoveryForecastPage() {
           Math.round((elapsed / totalDur) * 100)
         )
 
-        const progressLag = Math.max(
-          0,
-          expectedProgress - Number(task.progress_pct || 0)
-        )
+        const progressLag = Math.max(0, expectedProgress - getTaskProgress(task))
 
         let score = 0
 
@@ -387,7 +519,7 @@ export default function RecoveryForecastPage() {
         'Project delivery performance is healthy. Current risks are manageable, but continued monitoring is required.'
     } else if (confidenceScore >= 65) {
       summary =
-        'Project is experiencing moderate delivery pressure. Recovery actions are required to protect the handover target.'
+        'Project is experiencing moderate delivery pressure. Recovery actions are required to protect the current scope target.'
     } else if (confidenceScore >= 45) {
       summary =
         'Project delivery is under significant stress. Procurement, risk, approval, snag, and schedule items require coordinated intervention.'
@@ -396,10 +528,19 @@ export default function RecoveryForecastPage() {
         'Project is in critical delivery condition. Executive intervention is required to protect completion, cost, and handover readiness.'
     }
 
+    const scopeNote =
+      projectScope === 'Carcass'
+        ? 'This forecast is based on carcass scope only. It should not be read as fully finished project handover.'
+        : projectScope === 'Shell & Core'
+        ? 'This forecast is based on shell and core scope.'
+        : projectScope === 'Fully Finished'
+        ? 'This forecast is based on full completion scope.'
+        : `This forecast is based on ${projectScope} scope.`
+
     const recommendations: string[] = []
 
     if (redTasks > 0) {
-      recommendations.push('Escalate all RED activities to executive monitoring.')
+      recommendations.push('Escalate all RED activities within the current project scope.')
     }
 
     if (worstDelay > 14) {
@@ -407,7 +548,7 @@ export default function RecoveryForecastPage() {
     }
 
     if (procurementRisks > 0) {
-      recommendations.push('Fast-track procurement items that may delay finishing activities.')
+      recommendations.push('Fast-track procurement items that may affect the current scope.')
     }
 
     if (highRisks > 0) {
@@ -431,6 +572,10 @@ export default function RecoveryForecastPage() {
     }
 
     return {
+      projectScope,
+      scopeNote,
+      targetDate,
+      targetDateSource,
       delayedTasks,
       criticalTasks,
       recommendations,
@@ -509,6 +654,44 @@ export default function RecoveryForecastPage() {
         <p className="text-sm text-slate-400 mt-1">
           Reads schedule, dashboard health, risks, approvals, procurement, and snags.
         </p>
+
+        <div className="mt-4 grid md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500">
+              Project Scope
+            </div>
+            <div className="font-bold text-[#c49e48] mt-1">
+              {engine.projectScope}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500">
+              Target Date
+            </div>
+            <div className="font-bold text-white mt-1">
+              {engine.targetDate
+                ? engine.targetDate.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })
+                : 'No target date'}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {engine.targetDateSource}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500">
+              Scope Note
+            </div>
+            <div className="text-xs text-slate-300 mt-1">
+              {engine.scopeNote}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
