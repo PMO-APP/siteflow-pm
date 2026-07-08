@@ -12,15 +12,26 @@ import { supabase } from '@/lib/supabase'
 
 type Task = {
   id: string
-  project_id?: number
+  project_id?: number | string
   task_number: number
   name: string
+  activity?: string
+  task_name?: string
+  title?: string
   phase: string
+  package?: string | null
+  discipline?: string | null
+  description?: string | null
   start_date: string
   finish_date: string
+  planned_start?: string | null
+  planned_finish?: string | null
+  baseline_start?: string | null
+  baseline_finish?: string | null
   duration_days: number
   dependencies: string | null
   progress_pct: number
+  progress?: number
   status: string
   rag: string
 }
