@@ -994,13 +994,25 @@ export default function RecoveryForecastPage() {
 
           <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
             <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-              Countdown
+              Days Behind
             </div>
-            <div className="mt-2 text-3xl font-black text-[#ede8de]">
-              {engine.remainingToTarget} Days
+            <div
+              className={`mt-2 text-4xl font-black ${
+                engine.daysBehind > 30
+                  ? 'text-red-400'
+                  : engine.daysBehind > 7
+                  ? 'text-amber-400'
+                  : engine.daysBehind > 0
+                  ? 'text-sky-400'
+                  : 'text-emerald-400'
+              }`}
+            >
+              {engine.daysBehind}
             </div>
             <div className="mt-1 text-sm text-[#6e7d8c]">
-              remaining to target date
+              {engine.daysBehind === 0
+                ? 'project is aligned with today’s schedule position'
+                : 'calendar day(s) behind current schedule position'}
             </div>
           </div>
         </div>
