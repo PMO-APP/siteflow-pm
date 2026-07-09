@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useProjectStore } from '@/store/project'
-import { useTasks } from '@/hooks/useTasks'
 import {
+  Activity,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
@@ -13,9 +12,11 @@ import {
   ShieldCheck,
   Target,
   TrendingUp,
-  Users,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useProjectStore } from '@/store/project'
+import { useTasks } from '@/hooks/useTasks'
+import type { Task } from '@/types'
 
 type ProjectScope =
   | 'Carcass'
@@ -27,42 +28,7 @@ type ProjectScope =
   | 'Custom'
 
 type RecoveryStatus = 'On Track' | 'Watch' | 'Recovery Required' | 'Critical'
-
-type Task = {
-  id: string
-  project_id?: number | string
-  task_number?: number | string | null
-  name?: string | null
-  phase?: string | null
-  category?: string | null
-  discipline?: string | null
-  package_name?: string | null
-  start_date?: string | null
-  finish_date?: string | null
-  planned_start?: string | null
-  planned_finish?: string | null
-  duration_days?: number | string | null
-  dependencies?: string | null
-  responsible?: string | null
-  status?: string | null
-  rag?: string | null
-  progress_pct?: number | string | null
-  procurement_deadline?: string | null
-  approval_deadline?: string | null
-  notes?: string | null
-  is_milestone?: boolean | null
-  actual_start?: string | null
-  actual_finish?: string | null
-  weight_pct?: number | string | null
-  schedule_source?: string | null
-  imported_batch_id?: string | null
-  schedule_revision_id?: string | null
-  block_id?: string | null
-  is_on_hold?: boolean | null
-  is_blocked?: boolean | null
-}
-
-type KpiTone = 'red' | 'amber' | 'green' | 'blue' | 'violet' | 'slate'
+type Tone = 'green' | 'amber' | 'red' | 'blue' | 'slate'
 
 const PROJECT_SCOPES: ProjectScope[] = [
   'Carcass',
@@ -76,10 +42,7 @@ const PROJECT_SCOPES: ProjectScope[] = [
 
 const SCOPE_KEYWORDS: Record<ProjectScope, string[]> = {
   Carcass: [
-    'excavation',
     'foundation',
-    'blinding',
-    'ground beam',
     'substructure',
     'superstructure',
     'ground floor',
@@ -88,19 +51,17 @@ const SCOPE_KEYWORDS: Record<ProjectScope, string[]> = {
     'beam',
     'blockwork',
     'staircase',
-    'floor',
     'roof',
     'parapet',
     'external plaster',
     'external plastering',
     'rendering',
-    'cleaning',
     'practical completion',
   ],
   'Shell & Core': [
-    'excavation',
     'foundation',
-    'structure',
+    'substructure',
+    'superstructure',
     'slab',
     'column',
     'beam',
@@ -174,7 +135,7 @@ const STAGE_ORDER = [
     keywords: ['blockwork', 'block work', 'walling', 'walls'],
   },
   {
-    key: 'roofing',
+    key: 'roof',
     label: 'Roofing / Watertightness',
     keywords: ['roof', 'roofing', 'roof carcass', 'roof covering', 'parapet'],
   },
@@ -195,13 +156,13 @@ const STAGE_ORDER = [
   },
   {
     key: 'ceiling',
-    label: 'Ceiling',
+    label: 'Ceiling Installation',
     keywords: ['ceiling', 'pop', 'gypsum'],
   },
   {
     key: 'finishes',
     label: 'Finishes',
-    keywords: ['tiling', 'tile', 'painting', 'paint', 'doors', 'window', 'ironmongery', 'sanitary', 'kitchen', 'wardrobe'],
+    keywords: ['tiling', 'tile', 'painting', 'paint', 'doors', 'window', 'ironmongery', 'sanitary', 'kitchen', 'wardrobe', 'joinery'],
   },
   {
     key: 'testing',
@@ -215,12 +176,11 @@ const STAGE_ORDER = [
   },
 ]
 
-function sameProject(a: any, b: any) {
-  return String(a) === String(b)
-}
-
-function sameId(a: any, b: any) {
-  return String(a) === String(b)
+function normalise(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
 }
 
 function safeDate(value?: string | null) {
@@ -229,14 +189,18 @@ function safeDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+function dateValue(value?: string | null) {
+  return safeDate(value)?.getTime() || 0
+}
+
 function daysBetween(later: Date, earlier: Date) {
   return Math.ceil((later.getTime() - earlier.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function addDays(date: Date, days: number) {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
 }
 
 function clamp(value: number, min = 0, max = 100) {
@@ -245,7 +209,6 @@ function clamp(value: number, min = 0, max = 100) {
 
 function formatDate(date?: Date | null) {
   if (!date) return '—'
-
   return date.toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -253,32 +216,35 @@ function formatDate(date?: Date | null) {
   })
 }
 
-function normalise(value?: string | null) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-}
-
 function getTaskName(task?: Task | null) {
   if (!task) return '—'
   return String(task.name || `Task ${task.task_number || ''}`).trim()
+}
+
+function getTaskStart(task: Task) {
+  return (task as any).planned_start || task.start_date || null
+}
+
+function getTaskFinish(task: Task) {
+  return (task as any).planned_finish || task.finish_date || null
 }
 
 function getTaskNumber(task?: Task | null) {
   return Number(task?.task_number || 0)
 }
 
-function getTaskStart(task: Task) {
-  return task.planned_start || task.start_date || null
-}
+function getTaskProgress(task?: Task | null) {
+  if (!task) return 0
+  const status = normalise(task.status)
 
-function getTaskFinish(task: Task) {
-  return task.planned_finish || task.finish_date || null
+  if (['completed', 'complete', 'done'].includes(status)) return 100
+  if (['not started', 'not-started'].includes(status)) return 0
+
+  return clamp(Number((task as any).progress_pct || 0))
 }
 
 function getTaskDuration(task: Task) {
-  const explicitDuration = Number(task.duration_days || 0)
+  const explicitDuration = Number((task as any).duration_days || 0)
   if (explicitDuration > 0) return explicitDuration
 
   const start = safeDate(getTaskStart(task))
@@ -286,15 +252,6 @@ function getTaskDuration(task: Task) {
 
   if (start && finish) return Math.max(1, daysBetween(finish, start))
   return 1
-}
-
-function getTaskProgress(task: Task) {
-  const status = normalise(task.status)
-
-  if (['completed', 'complete', 'done'].includes(status)) return 100
-  if (['not started', 'not-started'].includes(status)) return 0
-
-  return clamp(Number(task.progress_pct || 0))
 }
 
 function isComplete(task: Task) {
@@ -305,45 +262,22 @@ function isStarted(task: Task) {
   return getTaskProgress(task) > 0
 }
 
-function isNotStarted(task: Task) {
-  return getTaskProgress(task) === 0
+function sameId(a: any, b: any) {
+  return String(a) === String(b)
 }
 
-function isTaskActiveOnDate(task: Task, date: Date) {
-  const start = safeDate(getTaskStart(task))
-  const finish = safeDate(getTaskFinish(task))
-
-  return !!start && !!finish && start <= date && finish >= date
+function sameProject(a: any, b: any) {
+  return String(a) === String(b)
 }
 
-function sequenceSort(a: Task, b: Task) {
-  const aStart = safeDate(getTaskStart(a))?.getTime() ?? 0
-  const bStart = safeDate(getTaskStart(b))?.getTime() ?? 0
-  if (aStart !== bStart) return aStart - bStart
-
-  const aFinish = safeDate(getTaskFinish(a))?.getTime() ?? 0
-  const bFinish = safeDate(getTaskFinish(b))?.getTime() ?? 0
-  if (aFinish !== bFinish) return aFinish - bFinish
-
-  return getTaskNumber(a) - getTaskNumber(b)
-}
-
-function getScope(project: any): ProjectScope {
-  const raw = String(project?.project_scope || project?.scope || 'Fully Finished')
-
-  return PROJECT_SCOPES.includes(raw as ProjectScope)
-    ? (raw as ProjectScope)
-    : 'Fully Finished'
-}
-
-function taskSearchText(task: Task) {
+function taskText(task: Task) {
   return [
     getTaskName(task),
     task.phase,
-    task.category,
-    task.discipline,
-    task.package_name,
-    task.notes,
+    (task as any).category,
+    (task as any).discipline,
+    (task as any).package_name,
+    (task as any).notes,
   ]
     .filter(Boolean)
     .join(' ')
@@ -353,7 +287,6 @@ function taskSearchText(task: Task) {
 function isSummaryTask(task: Task) {
   const name = normalise(task.name)
   const phase = normalise(task.phase)
-
   return !!name && !!phase && name === phase
 }
 
@@ -363,21 +296,35 @@ function isScopeTask(task: Task, scope: ProjectScope) {
   const keywords = SCOPE_KEYWORDS[scope] || []
   if (!keywords.length) return true
 
-  const text = taskSearchText(task)
-
+  const text = taskText(task)
   return keywords.some(keyword => text.includes(keyword.toLowerCase()))
+}
+
+function sequenceSort(a: Task, b: Task) {
+  const aStart = dateValue(getTaskStart(a))
+  const bStart = dateValue(getTaskStart(b))
+  if (aStart !== bStart) return aStart - bStart
+
+  const aFinish = dateValue(getTaskFinish(a))
+  const bFinish = dateValue(getTaskFinish(b))
+  if (aFinish !== bFinish) return aFinish - bFinish
+
+  return getTaskNumber(a) - getTaskNumber(b)
+}
+
+function isActiveToday(task: Task, today: Date) {
+  const start = safeDate(getTaskStart(task))
+  const finish = safeDate(getTaskFinish(task))
+
+  return !!start && !!finish && start <= today && finish >= today
 }
 
 function getStageIndex(task?: Task | null) {
   if (!task) return -1
-
-  const text = taskSearchText(task)
-
-  const index = STAGE_ORDER.findIndex(stage =>
+  const text = taskText(task)
+  return STAGE_ORDER.findIndex(stage =>
     stage.keywords.some(keyword => text.includes(keyword))
   )
-
-  return index
 }
 
 function getStageLabel(task?: Task | null) {
@@ -385,16 +332,22 @@ function getStageLabel(task?: Task | null) {
   return index >= 0 ? STAGE_ORDER[index].label : task?.phase || 'Unclassified'
 }
 
-function toneClass(tone: KpiTone) {
-  if (tone === 'red') return 'text-red-400'
-  if (tone === 'amber') return 'text-amber-400'
+function getScope(project: any): ProjectScope {
+  const raw = String(project?.project_scope || project?.scope || 'Fully Finished')
+  return PROJECT_SCOPES.includes(raw as ProjectScope)
+    ? (raw as ProjectScope)
+    : 'Fully Finished'
+}
+
+function toneClass(tone: Tone) {
   if (tone === 'green') return 'text-emerald-400'
+  if (tone === 'amber') return 'text-amber-400'
+  if (tone === 'red') return 'text-red-400'
   if (tone === 'blue') return 'text-sky-400'
-  if (tone === 'violet') return 'text-violet-400'
   return 'text-slate-300'
 }
 
-function statusTone(status: RecoveryStatus): KpiTone {
+function statusTone(status: RecoveryStatus): Tone {
   if (status === 'On Track') return 'green'
   if (status === 'Watch') return 'blue'
   if (status === 'Recovery Required') return 'amber'
@@ -403,7 +356,7 @@ function statusTone(status: RecoveryStatus): KpiTone {
 
 function makeEmptyContext() {
   return {
-    project: null,
+    project: null as any,
     procurement: [] as any[],
     approvals: [] as any[],
     snags: [] as any[],
@@ -413,7 +366,7 @@ function makeEmptyContext() {
 
 export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
-  const { data: allTasks = [], isLoading: tasksLoading } = useTasks()
+  const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
   const [selectedScope, setSelectedScope] = useState<ProjectScope>('Fully Finished')
@@ -422,15 +375,16 @@ export default function RecoveryForecastPage() {
   const [notice, setNotice] = useState('')
 
   const projectTasks = useMemo(() => {
-    return (allTasks as Task[]).filter(task => sameProject(task.project_id, projectId))
-  }, [allTasks, projectId])
+    return (tasksFromHook as Task[]).filter(task =>
+      !projectId || sameProject(task.project_id, projectId)
+    )
+  }, [tasksFromHook, projectId])
 
   useEffect(() => {
     setContext(makeEmptyContext())
     setNotice('')
 
     if (!projectId) return
-
     fetchProjectContext(projectId)
   }, [projectId])
 
@@ -438,50 +392,44 @@ export default function RecoveryForecastPage() {
     setSelectedScope(getScope(context.project))
   }, [context.project])
 
+  async function fetchOptionalTable(table: string, activeProjectId: string | number) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .eq('project_id', activeProjectId)
+
+    if (error) {
+      console.warn(`${table}: ${error.message}`)
+      return []
+    }
+
+    return data || []
+  }
+
   async function fetchProjectContext(activeProjectId: string | number) {
     setContextLoading(true)
 
-    const [projectRes, procurementRes, approvalRes, snagRes, riskRes] =
-      await Promise.all([
-        supabase
-          .from('projects')
-          .select('*')
-          .eq('id', activeProjectId)
-          .maybeSingle(),
+    const projectRes = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', activeProjectId)
+      .maybeSingle()
 
-        supabase
-          .from('procurement_items')
-          .select('*')
-          .eq('project_id', activeProjectId),
+    if (projectRes.error) console.warn(projectRes.error.message)
 
-        supabase
-          .from('approvals')
-          .select('*')
-          .eq('project_id', activeProjectId),
-
-        supabase
-          .from('snags')
-          .select('*')
-          .eq('project_id', activeProjectId),
-
-        supabase
-          .from('risks')
-          .select('*')
-          .eq('project_id', activeProjectId),
-      ])
-
-    if (projectRes.error) console.error(projectRes.error.message)
-    if (procurementRes.error) console.error(procurementRes.error.message)
-    if (approvalRes.error) console.error(approvalRes.error.message)
-    if (snagRes.error) console.error(snagRes.error.message)
-    if (riskRes.error) console.error(riskRes.error.message)
+    const [procurement, approvals, snags, risks] = await Promise.all([
+      fetchOptionalTable('procurement_items', activeProjectId),
+      fetchOptionalTable('approvals', activeProjectId),
+      fetchOptionalTable('snags', activeProjectId),
+      fetchOptionalTable('risks', activeProjectId),
+    ])
 
     setContext({
       project: projectRes.data || null,
-      procurement: procurementRes.data || [],
-      approvals: approvalRes.data || [],
-      snags: snagRes.data || [],
-      risks: riskRes.data || [],
+      procurement,
+      approvals,
+      snags,
+      risks,
     })
 
     setContextLoading(false)
@@ -499,7 +447,7 @@ export default function RecoveryForecastPage() {
         project_scope: selectedScope,
         scope_notes:
           selectedScope === 'Carcass'
-            ? 'Current forecast is measured as carcass scope, not fully finished handover.'
+            ? 'Forecast is measured against carcass deliverables only.'
             : null,
       })
       .eq('id', projectId)
@@ -521,77 +469,60 @@ export default function RecoveryForecastPage() {
 
   const engine = useMemo(() => {
     const today = new Date()
-    const projectScope = getScope(context.project)
+    const project = context.project as any
+    const projectScope = getScope(project)
 
     const datedTasks = projectTasks
       .filter(task => safeDate(getTaskStart(task)) && safeDate(getTaskFinish(task)))
       .sort(sequenceSort)
 
-    const scopedTasks = datedTasks.filter(task => isScopeTask(task, projectScope))
-    const schedule = (scopedTasks.length > 0 ? scopedTasks : datedTasks).sort(sequenceSort)
+    const scopeFiltered = datedTasks.filter(task => isScopeTask(task, projectScope))
+    const schedule = (scopeFiltered.length ? scopeFiltered : datedTasks).sort(sequenceSort)
 
     const productionTasks = schedule.filter(task => !isSummaryTask(task)).sort(sequenceSort)
-    const workingTasks = productionTasks.length > 0 ? productionTasks : schedule
+    const workingTasks = productionTasks.length ? productionTasks : schedule
 
     const firstTask = workingTasks[0] || null
     const lastTask = workingTasks[workingTasks.length - 1] || null
 
     const targetDate =
-      safeDate(context.project?.handover_date) ||
-      safeDate(context.project?.planned_finish) ||
+      safeDate(project?.handover_date) ||
+      safeDate(project?.planned_finish) ||
+      safeDate(project?.finish_date) ||
+      safeDate(project?.target_date) ||
+      safeDate(project?.completion_date) ||
       (lastTask ? safeDate(getTaskFinish(lastTask)) : null)
 
-    const targetDateSource = context.project?.handover_date
+    const targetDateSource = project?.handover_date
       ? 'Project handover date'
-      : context.project?.planned_finish
-      ? 'Project planned finish'
+      : project?.planned_finish || project?.finish_date || project?.target_date || project?.completion_date
+      ? 'Project target date'
       : lastTask
-      ? `Last in-scope activity: ${getTaskName(lastTask)}`
-      : 'No target source'
+      ? `Last in-scope schedule activity: ${getTaskName(lastTask)}`
+      : 'No target date found'
 
-    const plannedTodayActivities = workingTasks.filter(task =>
-      isTaskActiveOnDate(task, today)
-    )
+    const plannedTodayActivities = workingTasks.filter(task => isActiveToday(task, today))
 
     const plannedPosition =
       plannedTodayActivities.length > 0
-        ? plannedTodayActivities.sort(sequenceSort)[plannedTodayActivities.length - 1]
+        ? [...plannedTodayActivities].sort(sequenceSort).slice(-1)[0]
         : [...workingTasks]
             .filter(task => {
               const finish = safeDate(getTaskFinish(task))
               return !!finish && finish < today
             })
-            .sort((a, b) => {
-              const aFinish = safeDate(getTaskFinish(a))?.getTime() ?? 0
-              const bFinish = safeDate(getTaskFinish(b))?.getTime() ?? 0
-              return bFinish - aFinish
-            })[0] || firstTask
+            .sort((a, b) => dateValue(getTaskFinish(b)) - dateValue(getTaskFinish(a)))[0] ||
+          firstTask
 
-    const activeSiteTasks = workingTasks
+    const activeIncomplete = workingTasks
       .filter(task => isStarted(task) && !isComplete(task))
       .sort(sequenceSort)
 
-    const latestActiveSiteTask =
-      activeSiteTasks.length > 0 ? activeSiteTasks[activeSiteTasks.length - 1] : null
-
-    /*
-      Actual site position should not always be the latest active task.
-      If a later task has started lightly while an earlier critical prerequisite is still incomplete,
-      the true recovery position is the earliest incomplete active prerequisite.
-      Example: external MEP can be 60%, but if roofing/M&E first fix/plastering are incomplete,
-      the project is still constrained at that earlier workfront.
-    */
-    const earliestIncompleteStarted =
-      activeSiteTasks.length > 0 ? activeSiteTasks[0] : null
-
-    const latestCompleted =
-      [...workingTasks].filter(isComplete).sort(sequenceSort).slice(-1)[0] || null
-
-    const firstNotStarted =
-      [...workingTasks].filter(isNotStarted).sort(sequenceSort)[0] || null
-
     const actualPosition =
-      earliestIncompleteStarted || latestCompleted || firstNotStarted || firstTask
+      activeIncomplete[0] ||
+      [...workingTasks].filter(isComplete).sort(sequenceSort).slice(-1)[0] ||
+      workingTasks.find(task => !isComplete(task)) ||
+      firstTask
 
     const plannedIndex = plannedPosition
       ? workingTasks.findIndex(task => sameId(task.id, plannedPosition.id))
@@ -601,78 +532,60 @@ export default function RecoveryForecastPage() {
       ? workingTasks.findIndex(task => sameId(task.id, actualPosition.id))
       : -1
 
-    const sequenceGap =
+    const activityGap =
       plannedIndex >= 0 && actualIndex >= 0
         ? Math.max(0, plannedIndex - actualIndex)
         : 0
 
     const stageGap =
-      Math.max(0, getStageIndex(plannedPosition) - getStageIndex(actualPosition))
+      getStageIndex(plannedPosition) >= 0 && getStageIndex(actualPosition) >= 0
+        ? Math.max(0, getStageIndex(plannedPosition) - getStageIndex(actualPosition))
+        : 0
 
     const gapActivities =
-      sequenceGap > 0
+      activityGap > 0 && actualIndex >= 0 && plannedIndex >= 0
         ? workingTasks.slice(actualIndex + 1, plannedIndex + 1)
         : []
 
-    const missedDueActivities = workingTasks.filter(task => {
+    const dueButIncomplete = workingTasks.filter(task => {
       const finish = safeDate(getTaskFinish(task))
       return !!finish && finish < today && !isComplete(task)
     })
 
-    const activeBlockers = workingTasks.filter(task => {
-      const taskStage = getStageIndex(task)
-      const plannedStage = getStageIndex(plannedPosition)
+    const blockers = workingTasks
+      .filter(task => {
+        const start = safeDate(getTaskStart(task))
+        if (!start || start > today || isComplete(task)) return false
 
-      if (plannedStage < 0 || taskStage < 0) return false
-      if (taskStage > plannedStage) return false
-      if (isComplete(task)) return false
+        const taskStage = getStageIndex(task)
+        const plannedStage = getStageIndex(plannedPosition)
 
-      const start = safeDate(getTaskStart(task))
-      return !!start && start <= today
-    })
+        if (taskStage >= 0 && plannedStage >= 0 && taskStage > plannedStage) {
+          return false
+        }
 
-    const criticalBlockers = activeBlockers.slice(0, 8)
+        return true
+      })
+      .sort(sequenceSort)
+      .slice(0, 8)
 
-    const gapDurationDays = [...gapActivities, ...criticalBlockers].reduce(
-      (sum, task) => {
-        const progress = getTaskProgress(task)
-        const remainingRatio = clamp(100 - progress) / 100
-        return sum + getTaskDuration(task) * remainingRatio
-      },
-      0
-    )
+    const gapDuration = [...gapActivities, ...blockers].reduce((sum, task) => {
+      const remainingRatio = (100 - getTaskProgress(task)) / 100
+      return sum + getTaskDuration(task) * remainingRatio
+    }, 0)
 
-    const uniqueBlockerIds = new Set(criticalBlockers.map(task => String(task.id)))
-
-    const sequenceGapDays = Math.ceil(
+    const productionDelayDays = Math.ceil(
       Math.max(
-        gapDurationDays,
-        sequenceGap * 2,
-        stageGap * 5,
-        uniqueBlockerIds.size * 2
+        gapDuration * 0.7,
+        activityGap * 2,
+        stageGap * 7,
+        blockers.length * 2
       )
     )
 
-    const remainingTasks = workingTasks.filter(task => !isComplete(task))
-    const completedTasks = workingTasks.filter(isComplete)
+    const totalDuration = workingTasks.reduce((sum, task) => sum + getTaskDuration(task), 0)
 
-    const totalWeight = workingTasks.reduce((sum, task) => {
-      const weight = Number(task.weight_pct || 0)
-      return sum + (weight > 0 ? weight : getTaskDuration(task))
-    }, 0)
-
-    const actualEarned = workingTasks.reduce((sum, task) => {
-      const weight = Number(task.weight_pct || 0)
-      const effectiveWeight = weight > 0 ? weight : getTaskDuration(task)
-      return sum + effectiveWeight * (getTaskProgress(task) / 100)
-    }, 0)
-
-    const actualProgress =
-      totalWeight > 0
-        ? Math.round((actualEarned / totalWeight) * 100)
-        : Number(context.project?.completion_percent || 0)
-
-    const plannedEarned = workingTasks.reduce((sum, task) => {
+    const plannedEarnedDuration = workingTasks.reduce((sum, task) => {
       const start = safeDate(getTaskStart(task))
       const finish = safeDate(getTaskFinish(task))
       const duration = getTaskDuration(task)
@@ -685,28 +598,27 @@ export default function RecoveryForecastPage() {
       return sum + elapsed
     }, 0)
 
-    const totalDuration = workingTasks.reduce((sum, task) => {
-      return sum + getTaskDuration(task)
-    }, 0)
-
     const plannedProgress =
-      totalDuration > 0 ? Math.round((plannedEarned / totalDuration) * 100) : null
+      totalDuration > 0 ? Math.round((plannedEarnedDuration / totalDuration) * 100) : 0
 
-    const progressVariance =
-      plannedProgress === null ? null : actualProgress - plannedProgress
-
-    const scheduleWindowRemaining =
-      targetDate && today < targetDate ? daysBetween(targetDate, today) : 0
-
-    const remainingDuration = remainingTasks.reduce((sum, task) => {
-      const remainingRatio = clamp(100 - getTaskProgress(task)) / 100
-      return sum + getTaskDuration(task) * remainingRatio
+    const actualEarnedDuration = workingTasks.reduce((sum, task) => {
+      return sum + getTaskDuration(task) * (getTaskProgress(task) / 100)
     }, 0)
+
+    const actualProgress =
+      totalDuration > 0 ? Math.round((actualEarnedDuration / totalDuration) * 100) : 0
+
+    const progressVariance = actualProgress - plannedProgress
+
+    const remainingTasks = workingTasks.filter(task => !isComplete(task))
+    const remainingDuration = remainingTasks.reduce((sum, task) => {
+      return sum + getTaskDuration(task) * ((100 - getTaskProgress(task)) / 100)
+    }, 0)
+
+    const remainingToTarget = targetDate && targetDate > today ? daysBetween(targetDate, today) : 0
 
     const requiredPace =
-      scheduleWindowRemaining > 0
-        ? Math.round((remainingDuration / scheduleWindowRemaining) * 100)
-        : 100
+      remainingToTarget > 0 ? Math.round((remainingDuration / remainingToTarget) * 100) : 100
 
     const pacePressure =
       requiredPace <= 100
@@ -717,55 +629,38 @@ export default function RecoveryForecastPage() {
         ? 'Aggressive'
         : 'Critical'
 
-    const openRisks = context.risks.filter(risk =>
-      ['open', 'active'].includes(normalise(risk.status))
-    )
-
-    const highRisks = openRisks.filter(risk => Number(risk.risk_score || 0) >= 12)
-
-    const pendingApprovals = context.approvals.filter(approval => {
-      const status = normalise(approval.status)
+    const pendingApprovals = context.approvals.filter(item => {
+      const status = normalise(item.status)
       return !['approved', 'rejected', 'closed'].includes(status)
     })
 
-    const overdueApprovals = pendingApprovals.filter(approval => {
-      const deadline = safeDate(approval.deadline || approval.due_date)
+    const overdueApprovals = pendingApprovals.filter(item => {
+      const deadline = safeDate(item.deadline || item.due_date || item.approval_deadline)
       return !!deadline && deadline < today
     })
 
     const procurementRisks = context.procurement.filter(item => {
       const status = normalise(item.status)
-
       if (['delivered', 'ordered', 'closed'].includes(status)) return false
 
-      const orderDate = safeDate(item.order_by_date || item.required_by || item.due_date)
-      if (!orderDate) return false
-
-      return daysBetween(orderDate, today) <= 14
+      const due = safeDate(item.order_by_date || item.required_by || item.due_date)
+      return due ? daysBetween(due, today) <= 14 : false
     })
 
-    const openSnags = context.snags.filter(snag =>
-      !['closed', 'resolved'].includes(normalise(snag.status))
+    const openRisks = context.risks.filter(item =>
+      ['open', 'active'].includes(normalise(item.status))
     )
 
-    const criticalSnags = openSnags.filter(
-      snag => normalise(snag.severity) === 'critical'
+    const highRisks = openRisks.filter(item => Number(item.risk_score || 0) >= 12)
+
+    const openSnags = context.snags.filter(item =>
+      !['closed', 'resolved'].includes(normalise(item.status))
     )
 
-    const dependencySlip =
-      criticalBlockers.length > 0
-        ? Math.ceil(
-            criticalBlockers.reduce((sum, task) => {
-              const progress = getTaskProgress(task)
-              return sum + getTaskDuration(task) * ((100 - progress) / 100)
-            }, 0) * 0.55
-          )
-        : 0
+    const criticalSnags = openSnags.filter(item => normalise(item.severity) === 'critical')
 
-    const paceSlip = Math.max(0, Math.round((requiredPace - 120) * 0.08))
-
-    const riskSlip = Math.min(
-      10,
+    const riskDelay = Math.min(
+      14,
       Math.round(
         overdueApprovals.length * 1.5 +
           procurementRisks.length * 0.8 +
@@ -774,21 +669,23 @@ export default function RecoveryForecastPage() {
       )
     )
 
-    const forecastSlip = clamp(
-      Math.ceil(Math.max(sequenceGapDays * 0.7, dependencySlip) + paceSlip + riskSlip),
+    const paceDelay = Math.max(0, Math.round((requiredPace - 120) * 0.08))
+
+    const daysBehind = clamp(
+      productionDelayDays + riskDelay + paceDelay,
       0,
-      projectScope === 'Carcass' ? 35 : 90
+      projectScope === 'Carcass' ? 45 : 120
     )
 
-    const forecastFinish =
-      targetDate && forecastSlip > 0 ? addDays(targetDate, forecastSlip) : targetDate
+    const forecastDate =
+      targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate
 
     const recoveryStatus: RecoveryStatus =
-      forecastSlip === 0 && criticalBlockers.length === 0
+      daysBehind === 0 && blockers.length === 0
         ? 'On Track'
-        : forecastSlip <= 7 && criticalBlockers.length <= 2
+        : daysBehind <= 7
         ? 'Watch'
-        : forecastSlip <= 30
+        : daysBehind <= 30
         ? 'Recovery Required'
         : 'Critical'
 
@@ -801,30 +698,41 @@ export default function RecoveryForecastPage() {
         ? 'Yes, with recovery'
         : 'No, unless re-sequenced'
 
-    let confidenceScore = 90
-
-    confidenceScore -= sequenceGap * 2.5
-    confidenceScore -= stageGap * 8
-    confidenceScore -= forecastSlip * 1.1
-    confidenceScore -= criticalBlockers.length * 4
-    confidenceScore -= overdueApprovals.length * 3
-    confidenceScore -= procurementRisks.length * 2
-    confidenceScore -= highRisks.length * 4
-    confidenceScore -= criticalSnags.length * 4
-
-    if (pacePressure === 'Critical') confidenceScore -= 12
-    if (pacePressure === 'Aggressive') confidenceScore -= 7
-
-    confidenceScore = clamp(Math.round(confidenceScore), 5, 95)
-
     const additionalCrews =
-      forecastSlip === 0
-        ? 0
-        : forecastSlip <= 7
-        ? 1
-        : forecastSlip <= 21
-        ? 2
-        : 3
+      daysBehind === 0 ? 0 : daysBehind <= 10 ? 1 : daysBehind <= 30 ? 2 : 3
+
+    let confidence = 92
+    confidence -= activityGap * 2
+    confidence -= stageGap * 10
+    confidence -= daysBehind * 0.8
+    confidence -= blockers.length * 3
+    confidence -= overdueApprovals.length * 3
+    confidence -= procurementRisks.length * 2
+    confidence -= highRisks.length * 4
+    confidence -= criticalSnags.length * 4
+    if (pacePressure === 'Critical') confidence -= 12
+    if (pacePressure === 'Aggressive') confidence -= 7
+    confidence = clamp(Math.round(confidence), 5, 95)
+
+    const recoveryIndex = clamp(
+      Math.round(
+        100 -
+          activityGap * 3 -
+          stageGap * 10 -
+          daysBehind * 0.6 -
+          blockers.length * 3 -
+          procurementRisks.length * 1.5 -
+          overdueApprovals.length * 2 -
+          highRisks.length * 3
+      ),
+      0,
+      100
+    )
+
+    const executiveSummary =
+      recoveryStatus === 'On Track'
+        ? 'The project is aligned with the current programme sequence. Maintain daily output and continue monitoring constraints.'
+        : `The project is ${daysBehind} day(s) behind the target forecast. The programme expected ${getTaskName(plannedPosition)}, but site is constrained around ${getTaskName(actualPosition)}. Recovery should focus on closing the blockers before opening too many new workfronts.`
 
     const requiredDecisions: string[] = []
 
@@ -834,86 +742,56 @@ export default function RecoveryForecastPage() {
       )
     }
 
-    if (criticalBlockers.length > 0) {
+    if (blockers.length > 0) {
       requiredDecisions.push(
-        `Escalate ${criticalBlockers.length} critical blocker${criticalBlockers.length > 1 ? 's' : ''} before the next workfront can progress.`
+        `Escalate ${blockers.length} blocker${blockers.length > 1 ? 's' : ''} preventing the next workfront.`
       )
     }
 
     if (procurementRisks.length > 0) {
-      requiredDecisions.push('Fast-track procurement items due within 14 days.')
+      requiredDecisions.push('Fast-track procurement items due within the next 14 days.')
     }
 
     if (overdueApprovals.length > 0) {
       requiredDecisions.push('Resolve overdue approvals affecting the recovery sequence.')
     }
 
-    if (requiredDecisions.length === 0) {
-      requiredDecisions.push('No major management decision required. Continue monitoring.')
+    if (!requiredDecisions.length) {
+      requiredDecisions.push('No major management decision required. Continue weekly monitoring.')
     }
 
     const recoveryActions: string[] = []
 
-    if (criticalBlockers.length > 0) {
-      recoveryActions.push(
-        `Close ${getTaskName(criticalBlockers[0])} before relying on later activities.`
-      )
+    if (blockers[0]) {
+      recoveryActions.push(`Close ${getTaskName(blockers[0])} first. This is the current recovery constraint.`)
     }
 
-    if (getStageIndex(actualPosition) < getStageIndex(plannedPosition)) {
+    if (stageGap > 0) {
       recoveryActions.push(
-        `Re-sequence the programme from ${getStageLabel(actualPosition)} to ${getStageLabel(plannedPosition)}.`
+        `Re-sequence production from ${getStageLabel(actualPosition)} to ${getStageLabel(plannedPosition)}.`
       )
     }
 
     if (actualPosition && getTaskProgress(actualPosition) < 80) {
       recoveryActions.push(
-        `Push ${getTaskName(actualPosition)} from ${getTaskProgress(actualPosition)}% to practical completion before opening too many new fronts.`
+        `Push ${getTaskName(actualPosition)} from ${getTaskProgress(actualPosition)}% to completion before relying on downstream works.`
       )
     }
 
     if (requiredPace > 120) {
-      recoveryActions.push('Introduce daily production targets by workfront and track actual output against plan.')
+      recoveryActions.push('Set daily production targets and track output against each workfront.')
     }
 
     if (procurementRisks.length > 0) {
-      recoveryActions.push('Update procurement dates and confirm delivery commitments.')
+      recoveryActions.push('Confirm material delivery commitments for the next two-week lookahead.')
     }
 
-    if (overdueApprovals.length > 0) {
-      recoveryActions.push('Escalate pending approvals to avoid idle labour and abortive sequencing.')
+    if (!recoveryActions.length) {
+      recoveryActions.push('Maintain current rhythm and update progress weekly.')
     }
-
-    if (recoveryActions.length === 0) {
-      recoveryActions.push('Maintain current rhythm and continue weekly recovery monitoring.')
-    }
-
-    const positionStatement =
-      getStageIndex(actualPosition) < getStageIndex(plannedPosition)
-        ? `The project is behind the planned construction sequence. Planned position is ${getTaskName(plannedPosition)}, but the site is still constrained around ${getTaskName(actualPosition)}.`
-        : sequenceGap > 0
-        ? `The project is behind by ${sequenceGap} activity step(s), even though the stage gap is not severe.`
-        : `The project is generally aligned with the planned sequence today.`
-
-    const executiveSummary =
-      recoveryStatus === 'On Track'
-        ? 'Project sequence is aligned. Maintain current output and continue monitoring blockers.'
-        : recoveryStatus === 'Watch'
-        ? 'The programme is slightly pressured. Close current blockers quickly to prevent the forecast slipping.'
-        : recoveryStatus === 'Recovery Required'
-        ? 'A recovery plan is required. The project is not simply behind by percentage; it is behind in workfront sequence.'
-        : 'Critical recovery intervention is required. Current sequence, blockers and remaining duration indicate that the target date is unlikely without re-sequencing and extra resources.'
-
-    const blockerReasons = criticalBlockers.map(task => ({
-      task,
-      reason:
-        getTaskProgress(task) > 0
-          ? `${getTaskName(task)} is only ${getTaskProgress(task)}% complete.`
-          : `${getTaskName(task)} has not started but should have progressed by now.`,
-    }))
 
     const phaseMap = remainingTasks.reduce((acc: Record<string, any>, task) => {
-      const phase = task.phase || task.discipline || 'Unassigned'
+      const phase = task.phase || (task as any).discipline || 'Unassigned'
 
       if (!acc[phase]) {
         acc[phase] = {
@@ -929,7 +807,7 @@ export default function RecoveryForecastPage() {
       acc[phase].remaining += 1
       acc[phase].progressSum += getTaskProgress(task)
 
-      if (criticalBlockers.some(blocker => sameId(blocker.id, task.id))) {
+      if (blockers.some(blocker => sameId(blocker.id, task.id))) {
         acc[phase].blockers += 1
       }
 
@@ -943,93 +821,87 @@ export default function RecoveryForecastPage() {
 
     return {
       projectScope,
-      firstTask,
-      lastTask,
       targetDate,
       targetDateSource,
-      forecastFinish,
-      forecastSlip,
+      forecastDate,
+      daysBehind,
       recoveryStatus,
       targetCanBeMet,
-      confidenceScore,
+      additionalCrews,
+      confidence,
+      recoveryIndex,
+      plannedPosition,
+      actualPosition,
+      activityGap,
+      stageGap,
+      gapActivities,
+      blockers,
+      dueButIncomplete,
       actualProgress,
       plannedProgress,
       progressVariance,
-      plannedPosition,
-      actualPosition,
-      latestActiveSiteTask,
-      plannedTodayActivities,
-      activeSiteTasks,
-      sequenceGap,
-      stageGap,
-      gapActivities,
-      criticalBlockers,
-      blockerReasons,
-      missedDueActivities,
       remainingTasks,
-      completedTasks,
-      totalTasks: workingTasks.length,
       remainingDuration,
-      scheduleWindowRemaining,
+      remainingToTarget,
       requiredPace,
       pacePressure,
-      additionalCrews,
-      requiredDecisions,
-      recoveryActions,
-      positionStatement,
-      executiveSummary,
-      phaseHealth,
       procurementRisks,
       overdueApprovals,
       highRisks,
       criticalSnags,
+      executiveSummary,
+      requiredDecisions,
+      recoveryActions,
+      phaseHealth,
+      totalTasks: workingTasks.length,
     }
   }, [projectTasks, context])
 
   const loading = tasksLoading || contextLoading
+  const statusColour = statusTone(engine.recoveryStatus)
 
   if (loading) {
-    return <div className="p-8 text-white">Loading Recovery Forecast...</div>
+    return <div className="p-8 text-[#ede8de]">Loading recovery intelligence...</div>
   }
 
   if (!projectId) {
-    return <div className="card p-8 text-slate-400">No project selected.</div>
+    return <div className="card p-8 text-[#6e7d8c]">No project selected.</div>
   }
 
-  if (projectTasks.length === 0) {
+  if (!projectTasks.length) {
     return (
-      <div className="card p-8 text-slate-400">
+      <div className="card p-8 text-[#6e7d8c]">
         No schedule tasks found for this project. Import or add tasks on the Schedule page first.
       </div>
     )
   }
 
-  const statusColor = statusTone(engine.recoveryStatus)
-
   return (
-    <div className="space-y-5 text-white">
-      <div className="card p-5">
-        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+    <div className="space-y-5 text-[#ede8de]">
+      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-              Recovery Forecast
-            </p>
-            <h1 className="text-2xl font-bold mt-1">
-              Sequence-Based Recovery Forecast
+            <div className="text-[10px] uppercase tracking-[0.35em] text-[#6e7d8c]">
+              Project Recovery Intelligence
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold">
+              {projectName || context.project?.name || context.project?.project_name || 'Selected Project'}
             </h1>
-            <p className="text-sm text-slate-400 mt-2 max-w-4xl">
-              Reads directly from the Schedule page data. It compares what should be happening today against what is actually happening on site, then identifies blockers, recovery decisions and forecast finish.
+            <p className="mt-2 max-w-4xl text-sm text-[#9aa7b3]">
+              A sequence-based recovery view that reads the same schedule tasks used by the Schedule page. Forecast date and delay are driven by actual site constraint, planned workfront, blockers, procurement, approvals and risks.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => projectId && fetchProjectContext(projectId)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800"
-          >
-            <RefreshCw size={16} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => projectId && fetchProjectContext(projectId)}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#cbd5df] hover:bg-white/[0.04]"
+            >
+              <RefreshCw size={15} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {notice && (
@@ -1039,42 +911,62 @@ export default function RecoveryForecastPage() {
         )}
       </div>
 
-      <div className="grid xl:grid-cols-3 gap-4">
-        <div className="card p-5 xl:col-span-2">
-          <div className="grid md:grid-cols-4 gap-4">
-            <InfoBlock
-              title="Project"
-              value={projectName || context.project?.project_name || '—'}
-              helper={`${engine.totalTasks} in-scope production tasks`}
-            />
-            <InfoBlock
-              title="Scope"
-              value={engine.projectScope}
-              helper="Set this based on the real contract deliverable."
-            />
-            <InfoBlock
-              title="Target Date"
-              value={formatDate(engine.targetDate)}
-              helper={engine.targetDateSource}
-            />
-            <InfoBlock
-              title="Forecast Finish"
-              value={formatDate(engine.forecastFinish)}
-              helper={`${engine.forecastSlip} day forecast slip`}
-            />
+      <div className="grid xl:grid-cols-[1.6fr_1fr] gap-5">
+        <div className="rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#17222d] to-[#0c1117] p-6 shadow-xl">
+          <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.35em] text-[#6e7d8c]">
+                Forecast Completion
+              </div>
+
+              <div className={`mt-3 text-5xl xl:text-6xl font-black leading-none ${toneClass(statusColour)}`}>
+                {formatDate(engine.forecastDate)}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span
+                  className={`rounded-full px-4 py-2 text-sm font-bold ${
+                    engine.daysBehind > 30
+                      ? 'bg-red-500/15 text-red-300'
+                      : engine.daysBehind > 7
+                      ? 'bg-amber-500/15 text-amber-300'
+                      : engine.daysBehind > 0
+                      ? 'bg-sky-500/15 text-sky-300'
+                      : 'bg-emerald-500/15 text-emerald-300'
+                  }`}
+                >
+                  {engine.daysBehind === 0 ? 'On Target' : `+${engine.daysBehind} Days Behind`}
+                </span>
+
+                <span className="rounded-full bg-white/[0.05] px-4 py-2 text-sm text-[#9aa7b3]">
+                  Target: {formatDate(engine.targetDate)}
+                </span>
+              </div>
+
+              <p className="mt-4 text-sm text-[#9aa7b3]">
+                {engine.targetDateSource}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <HeroMetric title="Recovery Status" value={engine.recoveryStatus} tone={statusColour} />
+              <HeroMetric title="Recovery Index" value={`${engine.recoveryIndex}/100`} tone={engine.recoveryIndex >= 75 ? 'green' : engine.recoveryIndex >= 50 ? 'amber' : 'red'} />
+              <HeroMetric title="Can Target Date Be Met?" value={engine.targetCanBeMet} tone={engine.targetCanBeMet.includes('No') ? 'red' : engine.targetCanBeMet.includes('recovery') ? 'amber' : 'green'} />
+              <HeroMetric title="Forecast Confidence" value={`${engine.confidence}%`} tone={engine.confidence >= 70 ? 'green' : engine.confidence >= 45 ? 'amber' : 'red'} />
+            </div>
           </div>
         </div>
 
-        <div className="card p-5">
-          <label className="text-xs uppercase tracking-wider text-slate-500">
-            Project Scope
+        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+          <label className="text-[10px] uppercase tracking-[0.3em] text-[#6e7d8c]">
+            Contract Scope
           </label>
 
-          <div className="mt-2 flex gap-2">
+          <div className="mt-3 flex gap-2">
             <select
               value={selectedScope}
               onChange={event => setSelectedScope(event.target.value as ProjectScope)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-[#081018] px-3 py-2 text-sm text-[#ede8de] outline-none"
             >
               {PROJECT_SCOPES.map(scope => (
                 <option key={scope} value={scope}>
@@ -1087,249 +979,164 @@ export default function RecoveryForecastPage() {
               type="button"
               onClick={saveProjectScope}
               disabled={savingScope}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#c49e48] px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#c49e48] px-4 py-2 text-sm font-semibold text-[#0c1014] disabled:opacity-60"
             >
-              <Save size={16} />
+              <Save size={15} />
               {savingScope ? 'Saving' : 'Save'}
             </button>
           </div>
-        </div>
-      </div>
 
-      <div className="card p-5 border border-slate-800">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-          <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-500">
-              Project Position Statement
-            </p>
-            <h2 className="text-xl font-semibold mt-2">
-              {engine.positionStatement}
-            </h2>
-            <p className="text-sm text-slate-400 mt-2">
-              {engine.executiveSummary}
-            </p>
-          </div>
-
-          <div className="min-w-[220px] rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-            <p className="text-xs uppercase tracking-wider text-slate-500">
-              Recovery Status
-            </p>
-            <h3 className={`text-2xl font-bold mt-2 ${toneClass(statusColor)}`}>
-              {engine.recoveryStatus}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Confidence: {engine.confidenceScore}%
-            </p>
+          <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+              Countdown
+            </div>
+            <div className="mt-2 text-3xl font-black text-[#ede8de]">
+              {engine.remainingToTarget} Days
+            </div>
+            <div className="mt-1 text-sm text-[#6e7d8c]">
+              remaining to target date
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-4 gap-4">
-        <PositionCard
-          label="Planned Today"
-          task={engine.plannedPosition}
-          helper={`Stage: ${getStageLabel(engine.plannedPosition)}`}
-          icon={Target}
-        />
+      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+        <div className="grid xl:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
+          <PositionPanel
+            title="Should Be Today"
+            task={engine.plannedPosition}
+            helper={getStageLabel(engine.plannedPosition)}
+            tone="blue"
+          />
 
-        <PositionCard
-          label="Actual Site Constraint"
-          task={engine.actualPosition}
-          helper={`${getTaskProgress(engine.actualPosition as Task)}% complete · ${getStageLabel(engine.actualPosition)}`}
-          icon={Activity}
-        />
+          <div className="hidden xl:flex items-center justify-center text-[#6e7d8c]">
+            <ArrowRight size={24} />
+          </div>
 
-        <MetricCard
-          label="Sequence Gap"
-          value={`${engine.sequenceGap} activity step(s)`}
-          helper={`${engine.stageGap} major stage gap(s)`}
-          icon={ArrowRight}
-          tone={engine.sequenceGap > 0 || engine.stageGap > 0 ? 'red' : 'green'}
-        />
+          <PositionPanel
+            title="Actual Site Constraint"
+            task={engine.actualPosition}
+            helper={`${getStageLabel(engine.actualPosition)} · ${getTaskProgress(engine.actualPosition)}%`}
+            tone="amber"
+          />
 
-        <MetricCard
-          label="Forecast Slip"
-          value={`${engine.forecastSlip} day(s)`}
-          helper={`Forecast finish: ${formatDate(engine.forecastFinish)}`}
-          icon={Clock3}
-          tone={engine.forecastSlip > 21 ? 'red' : engine.forecastSlip > 0 ? 'amber' : 'green'}
-        />
-      </div>
+          <div className="hidden xl:flex items-center justify-center text-[#6e7d8c]">
+            <ArrowRight size={24} />
+          </div>
 
-      <div className="grid md:grid-cols-4 gap-4">
-        <MetricCard
-          label="Can Target Date Still Be Met?"
-          value={engine.targetCanBeMet}
-          helper={engine.additionalCrews > 0 ? `Recommended: +${engine.additionalCrews} crew(s)` : 'No extra crew required'}
-          icon={ShieldCheck}
-          tone={
-            engine.targetCanBeMet === 'Yes'
-              ? 'green'
-              : engine.targetCanBeMet.includes('recovery')
-              ? 'amber'
-              : 'red'
-          }
-        />
+          <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+              Production Gap
+            </div>
+            <div className={`mt-2 text-3xl font-black ${engine.activityGap || engine.stageGap ? 'text-red-400' : 'text-emerald-400'}`}>
+              {engine.activityGap} Steps
+            </div>
+            <div className="mt-1 text-sm text-[#9aa7b3]">
+              {engine.stageGap} major stage gap(s)
+            </div>
+          </div>
+        </div>
 
-        <MetricCard
-          label="Actual Progress"
-          value={`${engine.actualProgress}%`}
-          helper="Weighted by task duration/weight"
-          icon={TrendingUp}
-          tone="blue"
-        />
-
-        <MetricCard
-          label="Planned Progress"
-          value={engine.plannedProgress === null ? '—' : `${engine.plannedProgress}%`}
-          helper="Expected progress as at today"
-          icon={Target}
-          tone="slate"
-        />
-
-        <MetricCard
-          label="Progress Variance"
-          value={engine.progressVariance === null ? '—' : `${engine.progressVariance}%`}
-          helper="Secondary indicator only"
-          icon={AlertTriangle}
-          tone={
-            engine.progressVariance === null
-              ? 'slate'
-              : engine.progressVariance < -10
-              ? 'red'
-              : engine.progressVariance < 0
-              ? 'amber'
-              : 'green'
-          }
-        />
-      </div>
-
-      <div className="grid md:grid-cols-4 gap-4">
-        <MiniMetric title="Remaining Activities" value={engine.remainingTasks.length} />
-        <MiniMetric title="Remaining Duration" value={`${Math.ceil(engine.remainingDuration)} days`} />
-        <MiniMetric title="Pace Pressure" value={engine.pacePressure} />
-        <MiniMetric title="Critical Blockers" value={engine.criticalBlockers.length} />
-        <MiniMetric title="Procurement Risks" value={engine.procurementRisks.length} />
-        <MiniMetric title="Overdue Approvals" value={engine.overdueApprovals.length} />
-        <MiniMetric title="High Risks" value={engine.highRisks.length} />
-        <MiniMetric title="Critical Snags" value={engine.criticalSnags.length} />
-      </div>
-
-      <div className="grid xl:grid-cols-3 gap-4">
-        <div className="card p-5 xl:col-span-2">
-          <h2 className="text-lg font-semibold mb-1">Blockers to Next Workfront</h2>
-          <p className="text-sm text-slate-500 mb-4">
-            These are the activities preventing the project from moving cleanly from the actual site position to the planned position.
+        <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-[#6e7d8c]">
+            Executive Interpretation
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[#cbd5df]">
+            {engine.executiveSummary}
           </p>
+        </div>
+      </div>
 
-          <div className="space-y-3">
-            {engine.blockerReasons.length === 0 ? (
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
-                No critical sequence blocker detected.
-              </div>
+      <div className="grid md:grid-cols-4 gap-4">
+        <MetricCard title="Actual Progress" value={`${engine.actualProgress}%`} helper="Secondary indicator" icon={TrendingUp} tone="blue" />
+        <MetricCard title="Planned Progress" value={`${engine.plannedProgress}%`} helper="Expected as at today" icon={Target} tone="slate" />
+        <MetricCard title="Progress Variance" value={`${engine.progressVariance}%`} helper="Do not rely on this alone" icon={AlertTriangle} tone={engine.progressVariance < -10 ? 'red' : engine.progressVariance < 0 ? 'amber' : 'green'} />
+        <MetricCard title="Pace Pressure" value={engine.pacePressure} helper={`${engine.requiredPace}% required pace`} icon={Clock3} tone={engine.pacePressure === 'Critical' ? 'red' : engine.pacePressure === 'Aggressive' ? 'amber' : 'green'} />
+      </div>
+
+      <div className="grid md:grid-cols-4 gap-4">
+        <SmallCard title="Remaining Activities" value={engine.remainingTasks.length} />
+        <SmallCard title="Critical Blockers" value={engine.blockers.length} />
+        <SmallCard title="Procurement Risks" value={engine.procurementRisks.length} />
+        <SmallCard title="Overdue Approvals" value={engine.overdueApprovals.length} />
+      </div>
+
+      <div className="grid xl:grid-cols-3 gap-5">
+        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
+          <SectionHeader
+            title="Blockers to Next Workfront"
+            subtitle="These activities are stopping the project from moving cleanly to the planned position."
+          />
+
+          <div className="mt-4 space-y-3">
+            {engine.blockers.length === 0 ? (
+              <EmptyGood text="No critical sequence blocker detected." />
             ) : (
-              engine.blockerReasons.map(({ task, reason }) => (
-                <div
-                  key={task.id}
-                  className="rounded-xl border border-red-500/20 bg-red-500/10 p-4"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="font-semibold text-red-200">
-                        {getTaskName(task)}
-                      </h3>
-                      <p className="text-sm text-slate-300 mt-1">{reason}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Planned: {formatDate(safeDate(getTaskStart(task)))} → {formatDate(safeDate(getTaskFinish(task)))}
-                      </p>
-                    </div>
-
-                    <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-200">
-                      {getTaskProgress(task)}%
-                    </span>
-                  </div>
-                </div>
+              engine.blockers.map(task => (
+                <BlockerCard key={task.id} task={task} />
               ))
             )}
           </div>
         </div>
 
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-4">Management Decisions Needed</h2>
+        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+          <SectionHeader
+            title="Management Decisions"
+            subtitle="Actions that need leadership approval or escalation."
+          />
 
-          <div className="space-y-3">
+          <div className="mt-4 space-y-3">
             {engine.requiredDecisions.map((item, index) => (
-              <Action key={index} icon={ShieldAlert} text={item} />
+              <ActionItem key={index} icon={ShieldAlert} text={item} />
             ))}
           </div>
         </div>
       </div>
 
-      <div className="grid xl:grid-cols-3 gap-4">
-        <div className="card p-5 xl:col-span-2">
-          <h2 className="text-lg font-semibold mb-1">Activities Between Actual and Planned Position</h2>
-          <p className="text-sm text-slate-500 mb-4">
-            If this table is empty but blockers exist, the issue is not just task distance; it is sequence dependency.
-          </p>
+      <div className="grid xl:grid-cols-3 gap-5">
+        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
+          <SectionHeader
+            title="Activities Between Actual and Planned Position"
+            subtitle="This shows the missing workfronts between where site is and where the programme says it should be."
+          />
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-800 text-slate-400">
-                <tr>
-                  <th className="py-3 text-left">#</th>
-                  <th className="text-left">Activity</th>
-                  <th className="text-left">Stage</th>
-                  <th className="text-left">Planned Finish</th>
-                  <th className="text-left">Progress</th>
-                  <th className="text-left">Status</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {engine.gapActivities.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">
-                      No activity-distance gap detected. Check blocker list for dependency issues.
-                    </td>
-                  </tr>
-                ) : (
-                  engine.gapActivities.map(task => (
-                    <tr key={task.id} className="border-b border-slate-900">
-                      <td className="py-3">{task.task_number || '—'}</td>
-                      <td>{getTaskName(task)}</td>
-                      <td>{getStageLabel(task)}</td>
-                      <td>{formatDate(safeDate(getTaskFinish(task)))}</td>
-                      <td>{getTaskProgress(task)}%</td>
-                      <td>
-                        <span className="rounded-full bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
-                          Gap Item
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            emptyText="No activity-distance gap detected. Check blockers for dependency issues."
+            columns={['#', 'Activity', 'Stage', 'Planned Finish', 'Progress', 'Status']}
+            rows={engine.gapActivities.map(task => [
+              task.task_number || '—',
+              getTaskName(task),
+              getStageLabel(task),
+              formatDate(safeDate(getTaskFinish(task))),
+              `${getTaskProgress(task)}%`,
+              'Gap Item',
+            ])}
+          />
         </div>
 
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-4">Recovery Actions</h2>
+        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+          <SectionHeader
+            title="Recovery Actions"
+            subtitle="Practical actions to protect or recover the forecast."
+          />
 
-          <div className="space-y-3">
+          <div className="mt-4 space-y-3">
             {engine.recoveryActions.map((item, index) => (
-              <Action key={index} icon={CheckCircle2} text={item} />
+              <ActionItem key={index} icon={CheckCircle2} text={item} />
             ))}
           </div>
         </div>
       </div>
 
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-4">Phase / Workfront Health</h2>
+      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+        <SectionHeader
+          title="Workfront Health"
+          subtitle="Remaining work grouped by phase, with blocker pressure highlighted."
+        />
 
-        <div className="overflow-x-auto">
+        <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-800 text-slate-400">
+            <thead className="border-b border-white/[0.08] text-[#6e7d8c]">
               <tr>
                 <th className="py-3 text-left">Phase</th>
                 <th className="text-left">Remaining</th>
@@ -1342,21 +1149,21 @@ export default function RecoveryForecastPage() {
             <tbody>
               {engine.phaseHealth.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-slate-500">
+                  <td colSpan={5} className="py-6 text-center text-[#6e7d8c]">
                     No phase data available.
                   </td>
                 </tr>
               ) : (
                 engine.phaseHealth.map((phase: any) => (
-                  <tr key={phase.phase} className="border-b border-slate-900">
-                    <td className="py-3">{phase.phase}</td>
+                  <tr key={phase.phase} className="border-b border-white/[0.04]">
+                    <td className="py-3 font-medium">{phase.phase}</td>
                     <td>{phase.remaining}</td>
                     <td className={phase.blockers > 0 ? 'text-red-400' : 'text-emerald-400'}>
                       {phase.blockers}
                     </td>
                     <td>
                       <div className="flex items-center gap-3">
-                        <div className="h-2 w-28 rounded-full bg-slate-800">
+                        <div className="h-2 w-28 rounded-full bg-white/[0.06]">
                           <div
                             className="h-2 rounded-full bg-[#c49e48]"
                             style={{ width: `${phase.progress}%` }}
@@ -1384,122 +1191,111 @@ export default function RecoveryForecastPage() {
         </div>
       </div>
 
-      {engine.missedDueActivities.length > 0 && (
-        <div className="card p-5">
-          <div className="flex items-start gap-3 mb-4">
-            <FileWarning className="text-amber-400 mt-1" size={18} />
-            <div>
-              <h2 className="text-lg font-semibold">Overdue Activities to Clean Up</h2>
-              <p className="text-sm text-slate-500">
-                These activities are past planned finish and not complete. Update progress or recovery dates on the Schedule page.
-              </p>
-            </div>
+      {engine.dueButIncomplete.length > 0 && (
+        <div className="rounded-3xl border border-amber-500/20 bg-[#111a22] p-5 shadow-xl">
+          <div className="flex items-start gap-3">
+            <FileWarning className="mt-1 text-amber-400" size={18} />
+            <SectionHeader
+              title="Overdue Activities to Clean Up"
+              subtitle="These items are past planned finish and not complete. Update progress or recovery dates on the Schedule page."
+            />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-800 text-slate-400">
-                <tr>
-                  <th className="py-3 text-left">#</th>
-                  <th className="text-left">Activity</th>
-                  <th className="text-left">Planned Finish</th>
-                  <th className="text-left">Progress</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {engine.missedDueActivities.slice(0, 15).map(task => (
-                  <tr key={task.id} className="border-b border-slate-900">
-                    <td className="py-3">{task.task_number || '—'}</td>
-                    <td>{getTaskName(task)}</td>
-                    <td>{formatDate(safeDate(getTaskFinish(task)))}</td>
-                    <td>{getTaskProgress(task)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table
+            emptyText="No overdue activities."
+            columns={['#', 'Activity', 'Planned Finish', 'Progress']}
+            rows={engine.dueButIncomplete.slice(0, 15).map(task => [
+              task.task_number || '—',
+              getTaskName(task),
+              formatDate(safeDate(getTaskFinish(task))),
+              `${getTaskProgress(task)}%`,
+            ])}
+          />
         </div>
       )}
     </div>
   )
 }
 
-function InfoBlock({
+function HeroMetric({
   title,
   value,
-  helper,
+  tone,
 }: {
   title: string
   value: string | number
-  helper?: string
+  tone: Tone
 }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
-      <div className="text-xs uppercase tracking-wider text-slate-500">{title}</div>
-      <div className="mt-1 font-bold text-white">{value}</div>
-      {helper && <div className="mt-1 text-xs text-slate-500">{helper}</div>}
+    <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+        {title}
+      </div>
+      <div className={`mt-2 text-xl font-black ${toneClass(tone)}`}>
+        {value}
+      </div>
     </div>
   )
 }
 
-function PositionCard({
-  label,
+function PositionPanel({
+  title,
   task,
   helper,
-  icon: Icon,
+  tone,
 }: {
-  label: string
+  title: string
   task?: Task | null
-  helper?: string
-  icon: React.ElementType
+  helper: string
+  tone: Tone
 }) {
   return (
-    <div className="card p-4">
-      <div className="flex justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
-          <h2 className="mt-2 text-xl font-bold text-white">{getTaskName(task)}</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {task ? `Task #${task.task_number || '—'} · ${helper || ''}` : helper || '—'}
-          </p>
-        </div>
-
-        <Icon size={18} className="text-[#c49e48]" />
+    <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+        {title}
+      </div>
+      <div className={`mt-2 text-2xl font-black ${toneClass(tone)}`}>
+        {getTaskName(task)}
+      </div>
+      <div className="mt-1 text-sm text-[#9aa7b3]">
+        Task #{task?.task_number || '—'} · {helper}
       </div>
     </div>
   )
 }
 
 function MetricCard({
-  label,
+  title,
   value,
   helper,
   icon: Icon,
   tone,
 }: {
-  label: string
+  title: string
   value: string | number
-  helper?: string
+  helper: string
   icon: React.ElementType
-  tone: KpiTone
+  tone: Tone
 }) {
   return (
-    <div className="card p-4">
-      <div className="flex justify-between gap-3">
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111a22] p-4 shadow-xl">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
-          <h2 className={`mt-2 text-2xl font-bold ${toneClass(tone)}`}>{value}</h2>
-          {helper && <p className="mt-1 text-xs text-slate-500">{helper}</p>}
+          <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+            {title}
+          </div>
+          <div className={`mt-2 text-2xl font-black ${toneClass(tone)}`}>
+            {value}
+          </div>
+          <div className="mt-1 text-xs text-[#6e7d8c]">{helper}</div>
         </div>
-
         <Icon size={18} className={toneClass(tone)} />
       </div>
     </div>
   )
 }
 
-function MiniMetric({
+function SmallCard({
   title,
   value,
 }: {
@@ -1507,14 +1303,63 @@ function MiniMetric({
   value: string | number
 }) {
   return (
-    <div className="card p-4">
-      <div className="text-xs uppercase tracking-wider text-slate-500">{title}</div>
-      <div className="mt-2 text-xl font-bold text-[#c49e48]">{value}</div>
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111a22] p-4 shadow-xl">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+        {title}
+      </div>
+      <div className="mt-2 text-2xl font-black text-[#c49e48]">{value}</div>
     </div>
   )
 }
 
-function Action({
+function SectionHeader({
+  title,
+  subtitle,
+}: {
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-[#ede8de]">{title}</h2>
+      <p className="mt-1 text-sm text-[#6e7d8c]">{subtitle}</p>
+    </div>
+  )
+}
+
+function EmptyGood({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+      {text}
+    </div>
+  )
+}
+
+function BlockerCard({ task }: { task: Task }) {
+  return (
+    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="font-semibold text-red-200">{getTaskName(task)}</div>
+          <div className="mt-1 text-sm text-[#cbd5df]">
+            {getTaskProgress(task) > 0
+              ? `${getTaskName(task)} is only ${getTaskProgress(task)}% complete.`
+              : `${getTaskName(task)} has not started but should have progressed by now.`}
+          </div>
+          <div className="mt-1 text-xs text-[#6e7d8c]">
+            Planned: {formatDate(safeDate(getTaskStart(task)))} → {formatDate(safeDate(getTaskFinish(task)))}
+          </div>
+        </div>
+
+        <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-200">
+          {getTaskProgress(task)}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ActionItem({
   text,
   icon: Icon,
 }: {
@@ -1522,9 +1367,55 @@ function Action({
   icon: React.ElementType
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/30 p-3 text-sm text-slate-300">
+    <div className="flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-3 text-sm text-[#cbd5df]">
       <Icon size={16} className="mt-0.5 text-[#c49e48]" />
       <span>{text}</span>
+    </div>
+  )
+}
+
+function Table({
+  columns,
+  rows,
+  emptyText,
+}: {
+  columns: string[]
+  rows: Array<Array<string | number>>
+  emptyText: string
+}) {
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="border-b border-white/[0.08] text-[#6e7d8c]">
+          <tr>
+            {columns.map(column => (
+              <th key={column} className="py-3 text-left">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length} className="py-6 text-center text-[#6e7d8c]">
+                {emptyText}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-b border-white/[0.04]">
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} className="py-3">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   )
 }
