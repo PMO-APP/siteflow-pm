@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
@@ -9,7 +8,6 @@ import {
   RefreshCw,
   Save,
   ShieldAlert,
-  ShieldCheck,
   Target,
   TrendingUp,
 } from 'lucide-react'
@@ -514,6 +512,12 @@ export default function RecoveryForecastPage() {
             .sort((a, b) => dateValue(getTaskFinish(b)) - dateValue(getTaskFinish(a)))[0] ||
           firstTask
 
+    /*
+      Actual site position:
+      This uses the earliest incomplete activity that has genuinely started.
+      It prevents a later lightly-started activity from hiding the true site constraint.
+      Example: if external works has started but M&E first fix is still incomplete, M&E remains the constraint.
+    */
     const activeIncomplete = workingTasks
       .filter(task => isStarted(task) && !isComplete(task))
       .sort(sequenceSort)
@@ -547,6 +551,34 @@ export default function RecoveryForecastPage() {
         ? workingTasks.slice(actualIndex + 1, plannedIndex + 1)
         : []
 
+    /*
+      TRUE DELAY LOGIC:
+      Delay is not calculated from risk scores, procurement risks or arbitrary caps.
+      Delay = how far apart the actual site position and today's planned position are on the approved schedule.
+
+      Example:
+      - Today the programme says "Ceiling Installation" should be active.
+      - Actual site is still at "M&E First Fix".
+      - The delay is the calendar distance between those two schedule positions.
+    */
+    const plannedStart = plannedPosition ? safeDate(getTaskStart(plannedPosition)) : null
+    const plannedFinish = plannedPosition ? safeDate(getTaskFinish(plannedPosition)) : null
+    const actualStart = actualPosition ? safeDate(getTaskStart(actualPosition)) : null
+    const actualFinish = actualPosition ? safeDate(getTaskFinish(actualPosition)) : null
+
+    const actualReferenceDate = actualFinish || actualStart
+    const plannedReferenceDate = plannedStart || plannedFinish
+
+    const schedulePositionDelay =
+      actualReferenceDate && plannedReferenceDate
+        ? Math.max(0, daysBetween(plannedReferenceDate, actualReferenceDate))
+        : 0
+
+    const daysBehind = schedulePositionDelay
+
+    const forecastDate =
+      targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate
+
     const dueButIncomplete = workingTasks.filter(task => {
       const finish = safeDate(getTaskFinish(task))
       return !!finish && finish < today && !isComplete(task)
@@ -568,20 +600,6 @@ export default function RecoveryForecastPage() {
       })
       .sort(sequenceSort)
       .slice(0, 8)
-
-    const gapDuration = [...gapActivities, ...blockers].reduce((sum, task) => {
-      const remainingRatio = (100 - getTaskProgress(task)) / 100
-      return sum + getTaskDuration(task) * remainingRatio
-    }, 0)
-
-    const productionDelayDays = Math.ceil(
-      Math.max(
-        gapDuration * 0.7,
-        activityGap * 2,
-        stageGap * 7,
-        blockers.length * 2
-      )
-    )
 
     const totalDuration = workingTasks.reduce((sum, task) => sum + getTaskDuration(task), 0)
 
@@ -610,7 +628,9 @@ export default function RecoveryForecastPage() {
 
     const progressVariance = actualProgress - plannedProgress
 
-    const remainingTasks = workingTasks.filter(task => !isComplete(task))
+    const remainingTasks = workingTasks.filter(task => !isComplete(task)
+    )
+
     const remainingDuration = remainingTasks.reduce((sum, task) => {
       return sum + getTaskDuration(task) * ((100 - getTaskProgress(task)) / 100)
     }, 0)
@@ -659,27 +679,6 @@ export default function RecoveryForecastPage() {
 
     const criticalSnags = openSnags.filter(item => normalise(item.severity) === 'critical')
 
-    const riskDelay = Math.min(
-      14,
-      Math.round(
-        overdueApprovals.length * 1.5 +
-          procurementRisks.length * 0.8 +
-          highRisks.length * 1.5 +
-          criticalSnags.length * 1.5
-      )
-    )
-
-    const paceDelay = Math.max(0, Math.round((requiredPace - 120) * 0.08))
-
-    const daysBehind = clamp(
-      productionDelayDays + riskDelay + paceDelay,
-      0,
-      projectScope === 'Carcass' ? 45 : 120
-    )
-
-    const forecastDate =
-      targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate
-
     const recoveryStatus: RecoveryStatus =
       daysBehind === 0 && blockers.length === 0
         ? 'On Track'
@@ -703,36 +702,41 @@ export default function RecoveryForecastPage() {
 
     let confidence = 92
     confidence -= activityGap * 2
-    confidence -= stageGap * 10
-    confidence -= daysBehind * 0.8
-    confidence -= blockers.length * 3
-    confidence -= overdueApprovals.length * 3
-    confidence -= procurementRisks.length * 2
-    confidence -= highRisks.length * 4
-    confidence -= criticalSnags.length * 4
-    if (pacePressure === 'Critical') confidence -= 12
-    if (pacePressure === 'Aggressive') confidence -= 7
+    confidence -= stageGap * 8
+    confidence -= daysBehind * 0.7
+    confidence -= blockers.length * 2
+    confidence -= overdueApprovals.length * 2
+    confidence -= procurementRisks.length * 1
+    confidence -= highRisks.length * 3
+    confidence -= criticalSnags.length * 3
+    if (pacePressure === 'Critical') confidence -= 8
+    if (pacePressure === 'Aggressive') confidence -= 5
     confidence = clamp(Math.round(confidence), 5, 95)
 
     const recoveryIndex = clamp(
       Math.round(
         100 -
-          activityGap * 3 -
-          stageGap * 10 -
-          daysBehind * 0.6 -
-          blockers.length * 3 -
-          procurementRisks.length * 1.5 -
-          overdueApprovals.length * 2 -
-          highRisks.length * 3
+          activityGap * 2.5 -
+          stageGap * 8 -
+          daysBehind * 0.5 -
+          blockers.length * 2 -
+          procurementRisks.length * 1 -
+          overdueApprovals.length * 1.5 -
+          highRisks.length * 2
       ),
       0,
       100
     )
 
+    const delayBasis =
+      actualReferenceDate && plannedReferenceDate
+        ? `${formatDate(actualReferenceDate)} → ${formatDate(plannedReferenceDate)}`
+        : 'Insufficient schedule dates'
+
     const executiveSummary =
       recoveryStatus === 'On Track'
         ? 'The project is aligned with the current programme sequence. Maintain daily output and continue monitoring constraints.'
-        : `The project is ${daysBehind} day(s) behind the target forecast. The programme expected ${getTaskName(plannedPosition)}, but site is constrained around ${getTaskName(actualPosition)}. Recovery should focus on closing the blockers before opening too many new workfronts.`
+        : `The project is ${daysBehind} day(s) behind based on the approved schedule position. As at today, the programme expected ${getTaskName(plannedPosition)}, but site is constrained around ${getTaskName(actualPosition)}. The delay is measured from ${delayBasis}, not from percentage variance.`
 
     const requiredDecisions: string[] = []
 
@@ -825,6 +829,7 @@ export default function RecoveryForecastPage() {
       targetDateSource,
       forecastDate,
       daysBehind,
+      delayBasis,
       recoveryStatus,
       targetCanBeMet,
       additionalCrews,
@@ -888,20 +893,18 @@ export default function RecoveryForecastPage() {
               {projectName || context.project?.name || context.project?.project_name || 'Selected Project'}
             </h1>
             <p className="mt-2 max-w-4xl text-sm text-[#9aa7b3]">
-              A sequence-based recovery view that reads the same schedule tasks used by the Schedule page. Forecast date and delay are driven by actual site constraint, planned workfront, blockers, procurement, approvals and risks.
+              A sequence-based recovery view that calculates delay by comparing today's planned schedule position with the actual site position.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => projectId && fetchProjectContext(projectId)}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#cbd5df] hover:bg-white/[0.04]"
-            >
-              <RefreshCw size={15} />
-              Refresh
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => projectId && fetchProjectContext(projectId)}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#cbd5df] hover:bg-white/[0.04]"
+          >
+            <RefreshCw size={15} />
+            Refresh
+          </button>
         </div>
 
         {notice && (
@@ -944,6 +947,9 @@ export default function RecoveryForecastPage() {
               </div>
 
               <p className="mt-4 text-sm text-[#9aa7b3]">
+                Delay basis: {engine.delayBasis}
+              </p>
+              <p className="mt-1 text-xs text-[#6e7d8c]">
                 {engine.targetDateSource}
               </p>
             </div>
@@ -1014,7 +1020,7 @@ export default function RecoveryForecastPage() {
           </div>
 
           <PositionPanel
-            title="Actual Site Constraint"
+            title="Actual Site Position"
             task={engine.actualPosition}
             helper={`${getStageLabel(engine.actualPosition)} · ${getTaskProgress(engine.actualPosition)}%`}
             tone="amber"
@@ -1026,7 +1032,7 @@ export default function RecoveryForecastPage() {
 
           <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
             <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
-              Production Gap
+              Schedule Position Gap
             </div>
             <div className={`mt-2 text-3xl font-black ${engine.activityGap || engine.stageGap ? 'text-red-400' : 'text-emerald-400'}`}>
               {engine.activityGap} Steps
@@ -1065,7 +1071,7 @@ export default function RecoveryForecastPage() {
         <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
           <SectionHeader
             title="Blockers to Next Workfront"
-            subtitle="These activities are stopping the project from moving cleanly to the planned position."
+            subtitle="These are incomplete activities that should already be progressing before the planned position can be achieved."
           />
 
           <div className="mt-4 space-y-3">
@@ -1097,7 +1103,7 @@ export default function RecoveryForecastPage() {
         <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
           <SectionHeader
             title="Activities Between Actual and Planned Position"
-            subtitle="This shows the missing workfronts between where site is and where the programme says it should be."
+            subtitle="This shows the schedule activities between where site is and where the programme says it should be."
           />
 
           <Table
