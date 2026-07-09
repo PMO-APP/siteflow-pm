@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useProjectStore } from '@/store/project'
 import {
-  AlertTriangle,
-  CalendarDays,
+  Activity,
   CheckCircle2,
-  Clock3,
   FileWarning,
-  Gauge,
-  Hammer,
   RefreshCw,
+  Route,
   Save,
   ShieldCheck,
   Target,
@@ -58,6 +55,8 @@ type Kpi = {
   icon: React.ElementType
   tone: 'red' | 'amber' | 'green' | 'blue' | 'violet' | 'slate'
 }
+
+type RecoveryStatus = 'On Target' | 'Recoverable' | 'At Risk' | 'Critical'
 
 const PROJECT_SCOPES: ProjectScope[] = [
   'Carcass',
@@ -184,7 +183,9 @@ function formatDate(date?: Date | null) {
   })
 }
 
-function getTaskName(task: Task) {
+function getTaskName(task?: Task | null) {
+  if (!task) return '—'
+
   return String(
     task.name ||
       task.activity ||
@@ -194,8 +195,8 @@ function getTaskName(task: Task) {
   ).trim()
 }
 
-function getTaskNumber(task: Task) {
-  return Number(task.task_number || 0)
+function getTaskNumber(task?: Task | null) {
+  return Number(task?.task_number || 0)
 }
 
 function getTaskStart(task: Task) {
@@ -204,6 +205,19 @@ function getTaskStart(task: Task) {
 
 function getTaskFinish(task: Task) {
   return task.planned_finish || task.finish_date || task.baseline_finish || null
+}
+
+function getTaskDuration(task: Task) {
+  const explicitDuration = Number(task.duration_days || 0)
+
+  if (explicitDuration > 0) return explicitDuration
+
+  const start = safeDate(getTaskStart(task))
+  const finish = safeDate(getTaskFinish(task))
+
+  if (start && finish) return Math.max(1, daysBetween(finish, start))
+
+  return 1
 }
 
 function getTaskProgress(task: Task) {
@@ -255,6 +269,30 @@ function toneClass(tone: Kpi['tone']) {
   if (tone === 'blue') return 'text-sky-400'
   if (tone === 'violet') return 'text-violet-400'
   return 'text-slate-300'
+}
+
+function getStatusTone(status: RecoveryStatus): Kpi['tone'] {
+  if (status === 'On Target') return 'green'
+  if (status === 'Recoverable') return 'blue'
+  if (status === 'At Risk') return 'amber'
+  return 'red'
+}
+
+function isTaskActiveOnDate(task: Task, date: Date) {
+  const start = safeDate(getTaskStart(task))
+  const finish = safeDate(getTaskFinish(task))
+
+  return !!start && !!finish && start <= date && finish >= date
+}
+
+function taskSort(a: Task, b: Task) {
+  const numberDiff = getTaskNumber(a) - getTaskNumber(b)
+  if (numberDiff !== 0) return numberDiff
+
+  const aStart = safeDate(getTaskStart(a))?.getTime() ?? 0
+  const bStart = safeDate(getTaskStart(b))?.getTime() ?? 0
+
+  return aStart - bStart
 }
 
 export default function RecoveryForecastPage() {
@@ -387,31 +425,13 @@ export default function RecoveryForecastPage() {
 
     const validTasks = tasks
       .filter(task => safeDate(getTaskStart(task)) && safeDate(getTaskFinish(task)))
-      .sort((a, b) => getTaskNumber(a) - getTaskNumber(b))
+      .sort(taskSort)
 
-    const scopeFilteredTasks = validTasks.filter(task =>
-      isScopeTask(task, projectScope)
-    )
+    const scopeFilteredTasks = validTasks.filter(task => isScopeTask(task, projectScope))
+    const scopeTasks = (scopeFilteredTasks.length > 0 ? scopeFilteredTasks : validTasks).sort(taskSort)
 
-    const scopeTasks = scopeFilteredTasks.length > 0 ? scopeFilteredTasks : validTasks
-
-    const firstTask =
-      [...scopeTasks]
-        .filter(task => safeDate(getTaskStart(task)))
-        .sort((a, b) => {
-          const aDate = safeDate(getTaskStart(a))?.getTime() ?? 0
-          const bDate = safeDate(getTaskStart(b))?.getTime() ?? 0
-          return aDate - bDate
-        })[0] || null
-
-    const lastTask =
-      [...scopeTasks]
-        .filter(task => safeDate(getTaskFinish(task)))
-        .sort((a, b) => {
-          const aDate = safeDate(getTaskFinish(a))?.getTime() ?? 0
-          const bDate = safeDate(getTaskFinish(b))?.getTime() ?? 0
-          return bDate - aDate
-        })[0] || null
+    const firstTask = scopeTasks[0] || null
+    const lastTask = scopeTasks[scopeTasks.length - 1] || null
 
     const targetDate =
       safeDate(project?.handover_date) ||
@@ -430,103 +450,117 @@ export default function RecoveryForecastPage() {
       safeDate(project?.start_date) ||
       (firstTask ? safeDate(getTaskStart(firstTask)) : null)
 
-    const plannedPct =
-      projectStart && targetDate
-        ? clamp(
-            Math.round(
-              (daysBetween(today, projectStart) /
-                Math.max(1, daysBetween(targetDate, projectStart))) *
-                100
-            )
-          )
-        : null
+    const plannedCurrentTask =
+      scopeTasks.find(task => isTaskActiveOnDate(task, today)) ||
+      [...scopeTasks]
+        .filter(task => {
+          const finish = safeDate(getTaskFinish(task))
+          return !!finish && finish < today
+        })
+        .sort((a, b) => {
+          const aFinish = safeDate(getTaskFinish(a))?.getTime() ?? 0
+          const bFinish = safeDate(getTaskFinish(b))?.getTime() ?? 0
+          return bFinish - aFinish
+        })[0] ||
+      firstTask
 
-    const progressPct = scopeTasks.length
-      ? Math.round(
-          scopeTasks.reduce((sum, task) => sum + getTaskProgress(task), 0) /
-            scopeTasks.length
-        )
-      : Number(project?.completion_percent || 0)
+    const actualCurrentTask =
+      [...scopeTasks]
+        .filter(task => getTaskProgress(task) > 0 && getTaskProgress(task) < 100)
+        .sort((a, b) => taskSort(b, a))[0] ||
+      [...scopeTasks]
+        .filter(task => getTaskProgress(task) >= 100)
+        .sort((a, b) => taskSort(b, a))[0] ||
+      [...scopeTasks]
+        .filter(task => getTaskProgress(task) === 0)
+        .sort(taskSort)[0] ||
+      firstTask
+
+    const plannedIndex = plannedCurrentTask
+      ? Math.max(0, scopeTasks.findIndex(task => sameId(task.id, plannedCurrentTask.id)))
+      : -1
+
+    const actualIndex = actualCurrentTask
+      ? Math.max(0, scopeTasks.findIndex(task => sameId(task.id, actualCurrentTask.id)))
+      : -1
+
+    const productionGapActivities =
+      plannedIndex >= 0 && actualIndex >= 0 ? Math.max(0, plannedIndex - actualIndex) : 0
+
+    const gapTasks =
+      productionGapActivities > 0 ? scopeTasks.slice(actualIndex + 1, plannedIndex + 1) : []
+
+    const productionGapDays = gapTasks.reduce((sum, task) => {
+      const progress = getTaskProgress(task)
+      const remainingRatio = clamp(100 - progress) / 100
+      return sum + getTaskDuration(task) * remainingRatio
+    }, 0)
+
+    const averageScopeDuration =
+      scopeTasks.length > 0
+        ? scopeTasks.reduce((sum, task) => sum + getTaskDuration(task), 0) / scopeTasks.length
+        : 1
+
+    const calculatedProductionGapDays =
+      productionGapDays > 0
+        ? Math.ceil(productionGapDays)
+        : Math.ceil(productionGapActivities * averageScopeDuration)
 
     const completedTasks = scopeTasks.filter(isComplete)
     const remainingTasks = scopeTasks.filter(task => !isComplete(task))
 
-    const currentWorkfront =
-      [...scopeTasks]
-        .filter(task => getTaskProgress(task) > 0 && getTaskProgress(task) < 100)
-        .sort((a, b) => getTaskNumber(b) - getTaskNumber(a))[0] ||
-      [...remainingTasks].sort((a, b) => getTaskNumber(a) - getTaskNumber(b))[0] ||
-      null
-
-    const currentTaskNumber = currentWorkfront ? getTaskNumber(currentWorkfront) : 0
-
-    const historicalOverdueTasks = remainingTasks.filter(task => {
+    const historicalOverdueTasks = scopeTasks.filter(task => {
       const finish = safeDate(getTaskFinish(task))
-      return !!finish && finish < today
+      return !!finish && finish < today && !isComplete(task)
     })
 
-    /*
-      Important:
-      We do not allow one old, stale task to push the forecast by hundreds of days.
-      Enterprise recovery forecasts separate:
-      1. historical data-quality backlog, and
-      2. active/current workfront delay.
-      The forecast is driven by the current workfront and remaining scope.
-    */
-    const activeDelayedTasks = historicalOverdueTasks.filter(task => {
-      const taskNo = getTaskNumber(task)
-      return currentTaskNumber === 0 || taskNo >= currentTaskNumber - 2
-    })
-
-    const dataQualityBacklog = historicalOverdueTasks.filter(
-      task => !activeDelayedTasks.some(active => sameId(active.id, task.id))
+    const staleProgrammeItems = historicalOverdueTasks.filter(
+      task => !gapTasks.some(gapTask => sameId(gapTask.id, task.id))
     )
 
-    const currentTaskFinish = currentWorkfront
-      ? safeDate(getTaskFinish(currentWorkfront))
-      : null
+    const totalScopeDuration = scopeTasks.reduce((sum, task) => sum + getTaskDuration(task), 0)
 
-    const currentWorkfrontDelay =
-      currentTaskFinish && currentTaskFinish < today && currentWorkfront
-        ? Math.max(0, daysBetween(today, currentTaskFinish))
-        : 0
-
-    const activeDelayDays =
-      activeDelayedTasks.length === 0
-        ? currentWorkfrontDelay
-        : Math.max(
-            currentWorkfrontDelay,
-            ...activeDelayedTasks.map(task => {
-              const finish = safeDate(getTaskFinish(task))
-              return finish ? Math.max(0, daysBetween(today, finish)) : 0
-            })
-          )
-
-    const remainingDurationDays = remainingTasks.reduce((sum, task) => {
-      const duration = Number(task.duration_days || 0)
-      const progress = getTaskProgress(task)
-      const remainingRatio = clamp(100 - progress) / 100
-
-      if (duration > 0) return sum + duration * remainingRatio
-
-      const start = safeDate(getTaskStart(task))
-      const finish = safeDate(getTaskFinish(task))
-
-      if (start && finish) {
-        return sum + Math.max(1, daysBetween(finish, start)) * remainingRatio
-      }
-
-      return sum + 1
+    const earnedDuration = scopeTasks.reduce((sum, task) => {
+      return sum + getTaskDuration(task) * (getTaskProgress(task) / 100)
     }, 0)
 
-    const remainingCalendarDays = Math.ceil(remainingDurationDays)
+    const progressPct =
+      totalScopeDuration > 0
+        ? Math.round((earnedDuration / totalScopeDuration) * 100)
+        : Number(project?.completion_percent || 0)
+
+    const plannedEarnedDuration =
+      projectStart && targetDate
+        ? scopeTasks.reduce((sum, task) => {
+            const start = safeDate(getTaskStart(task))
+            const finish = safeDate(getTaskFinish(task))
+
+            if (!start || !finish) return sum
+            if (finish <= today) return sum + getTaskDuration(task)
+            if (start > today) return sum
+
+            const elapsed = clamp(daysBetween(today, start), 0, getTaskDuration(task))
+            return sum + elapsed
+          }, 0)
+        : 0
+
+    const plannedPct =
+      totalScopeDuration > 0 ? Math.round((plannedEarnedDuration / totalScopeDuration) * 100) : null
+
+    const variancePct = plannedPct === null ? null : progressPct - plannedPct
 
     const scheduleWindowRemaining =
       targetDate && today < targetDate ? Math.max(0, daysBetween(targetDate, today)) : 0
 
+    const remainingDurationDays = remainingTasks.reduce((sum, task) => {
+      const progress = getTaskProgress(task)
+      const remainingRatio = clamp(100 - progress) / 100
+      return sum + getTaskDuration(task) * remainingRatio
+    }, 0)
+
     const requiredPace =
       scheduleWindowRemaining > 0
-        ? Math.round((remainingCalendarDays / scheduleWindowRemaining) * 100)
+        ? Math.round((remainingDurationDays / scheduleWindowRemaining) * 100)
         : 100
 
     const pacePressure =
@@ -537,56 +571,6 @@ export default function RecoveryForecastPage() {
         : requiredPace <= 160
         ? 'Aggressive'
         : 'Critical'
-
-    const projectedSlipDays = targetDate
-      ? clamp(
-          Math.round(
-            activeDelayDays * 0.45 +
-              activeDelayedTasks.length * 0.75 +
-              Math.max(0, requiredPace - 120) * 0.12
-          ),
-          0,
-          projectScope === 'Carcass' ? 21 : 45
-        )
-      : activeDelayDays
-
-    const forecastFinish =
-      targetDate && projectedSlipDays > 0
-        ? addDays(targetDate, projectedSlipDays)
-        : targetDate
-
-    const forecastStatus =
-      projectedSlipDays === 0
-        ? 'On Target'
-        : projectedSlipDays <= 7
-        ? 'Recoverable'
-        : projectedSlipDays <= 21
-        ? 'At Risk'
-        : 'Critical'
-
-    const recoverable =
-      projectedSlipDays <= 7
-        ? 'YES'
-        : projectedSlipDays <= 21
-        ? 'WITH RECOVERY'
-        : 'NO'
-
-    const requiredAcceleration =
-      projectedSlipDays === 0
-        ? '0%'
-        : `${clamp(Math.round(projectedSlipDays * 2.5 + activeDelayedTasks.length), 5, 50)}%`
-
-    const procurementRisks = procurement.filter(item => {
-      const status = String(item.status || '').toLowerCase()
-      if (status === 'delivered' || status === 'ordered' || status === 'closed') {
-        return false
-      }
-
-      const orderDate = safeDate(item.order_by_date || item.required_by || item.due_date)
-      if (!orderDate) return false
-
-      return daysBetween(orderDate, today) <= 14
-    })
 
     const openRisks = risks.filter(risk =>
       ['open', 'active'].includes(String(risk.status || '').toLowerCase())
@@ -604,6 +588,16 @@ export default function RecoveryForecastPage() {
       return !!deadline && deadline < today
     })
 
+    const procurementRisks = procurement.filter(item => {
+      const status = String(item.status || '').toLowerCase()
+      if (status === 'delivered' || status === 'ordered' || status === 'closed') return false
+
+      const orderDate = safeDate(item.order_by_date || item.required_by || item.due_date)
+      if (!orderDate) return false
+
+      return daysBetween(orderDate, today) <= 14
+    })
+
     const openSnags = snags.filter(snag =>
       !['closed', 'resolved'].includes(String(snag.status || '').toLowerCase())
     )
@@ -612,17 +606,68 @@ export default function RecoveryForecastPage() {
       snag => String(snag.severity || '').toLowerCase() === 'critical'
     )
 
+    const baselineSlipDays =
+      productionGapActivities === 0 ? 0 : Math.ceil(calculatedProductionGapDays * 0.65)
+
+    const paceSlipDays = Math.max(0, Math.round((requiredPace - 120) * 0.08))
+
+    const riskSlipDays = Math.min(
+      10,
+      Math.round(openRisks.length * 0.5 + pendingApprovals.length * 0.35)
+    )
+
+    const projectedSlipDays = clamp(
+      baselineSlipDays + paceSlipDays + riskSlipDays,
+      0,
+      projectScope === 'Carcass' ? 35 : 90
+    )
+
+    const forecastFinish =
+      targetDate && projectedSlipDays > 0 ? addDays(targetDate, projectedSlipDays) : targetDate
+
+    const forecastStatus: RecoveryStatus =
+      projectedSlipDays === 0
+        ? 'On Target'
+        : projectedSlipDays <= 10
+        ? 'Recoverable'
+        : projectedSlipDays <= 30
+        ? 'At Risk'
+        : 'Critical'
+
+    const recoverable =
+      forecastStatus === 'On Target'
+        ? 'YES'
+        : forecastStatus === 'Recoverable'
+        ? 'YES'
+        : forecastStatus === 'At Risk'
+        ? 'WITH RECOVERY'
+        : 'NO'
+
+    const requiredAcceleration =
+      projectedSlipDays === 0
+        ? '0%'
+        : `${clamp(Math.round(productionGapActivities * 2.5 + projectedSlipDays * 1.2), 5, 60)}%`
+
+    const additionalCrews =
+      productionGapActivities === 0
+        ? 0
+        : projectedSlipDays <= 10
+        ? 1
+        : projectedSlipDays <= 25
+        ? 2
+        : 3
+
     let confidenceScore = 95
 
-    confidenceScore -= projectedSlipDays * 2.2
-    confidenceScore -= activeDelayedTasks.length * 2
+    confidenceScore -= productionGapActivities * 3
+    confidenceScore -= projectedSlipDays * 1.5
     confidenceScore -= overdueApprovals.length * 4
     confidenceScore -= procurementRisks.length * 3
     confidenceScore -= highRisks.length * 5
     confidenceScore -= criticalSnags.length * 5
     confidenceScore -= Math.max(0, requiredPace - 120) * 0.2
 
-    if (dataQualityBacklog.length > 0) confidenceScore -= 5
+    if (staleProgrammeItems.length > 0) confidenceScore -= 5
     if (pacePressure === 'Critical') confidenceScore -= 10
     if (pacePressure === 'Aggressive') confidenceScore -= 5
 
@@ -630,17 +675,14 @@ export default function RecoveryForecastPage() {
 
     const phaseMap = remainingTasks.reduce((acc: Record<string, any>, task) => {
       const phase = task.phase || task.discipline || 'Unassigned'
-      const finish = safeDate(getTaskFinish(task))
-      const isActiveDelayed = activeDelayedTasks.some(active =>
-        sameId(active.id, task.id)
-      )
+      const inProductionGap = gapTasks.some(gapTask => sameId(gapTask.id, task.id))
 
       if (!acc[phase]) {
         acc[phase] = {
           phase,
           total: 0,
           remaining: 0,
-          delayed: 0,
+          gapItems: 0,
           progressSum: 0,
         }
       }
@@ -649,26 +691,22 @@ export default function RecoveryForecastPage() {
       acc[phase].remaining += isComplete(task) ? 0 : 1
       acc[phase].progressSum += getTaskProgress(task)
 
-      if (finish && finish < today && !isComplete(task)) {
-        acc[phase].delayed += 1
-      }
+      if (inProductionGap) acc[phase].gapItems += 1
 
       return acc
     }, {})
 
     const phaseHealth = Object.values(phaseMap).map((phase: any) => ({
       ...phase,
-      progress: phase.total
-        ? Math.round(phase.progressSum / phase.total)
-        : 0,
+      progress: phase.total ? Math.round(phase.progressSum / phase.total) : 0,
     }))
 
     const criticalTasks = [
-      ...activeDelayedTasks,
-      ...remainingTasks
-        .filter(task => !activeDelayedTasks.some(active => sameId(active.id, task.id)))
-        .slice(0, 8),
-    ].slice(0, 10)
+      ...gapTasks,
+      ...remainingTasks.filter(
+        task => !gapTasks.some(gapTask => sameId(gapTask.id, task.id))
+      ),
+    ].slice(0, 12)
 
     const scopeNote =
       projectScope === 'Carcass'
@@ -680,49 +718,51 @@ export default function RecoveryForecastPage() {
         : `Forecast is based on ${projectScope} scope.`
 
     const executiveSummary =
-      forecastStatus === 'On Target'
-        ? 'The current in-scope programme remains achievable. Maintain the current work rate and keep approvals, procurement and snag close-out under control.'
+      productionGapActivities === 0
+        ? 'The project is aligned with the planned production position for today. Maintain current production rhythm and keep blockers under control.'
         : forecastStatus === 'Recoverable'
-        ? 'The current in-scope programme is slightly pressured but recoverable. Focus on the current workfront and close short-term blockers within the next week.'
+        ? `The project is ${productionGapActivities} activity step(s) behind the planned position. The gap is recoverable if the current workfront is accelerated immediately.`
         : forecastStatus === 'At Risk'
-        ? 'The current in-scope programme is at risk. A short recovery plan is required, with additional supervision, sequencing control and daily tracking of delayed activities.'
-        : 'The current in-scope programme is under critical pressure. Immediate management intervention is required to protect the target date.'
+        ? `The project is ${productionGapActivities} activity step(s) behind the planned position. A formal recovery plan is required to protect the ${formatDate(targetDate)} target.`
+        : `The project is ${productionGapActivities} activity step(s) behind the planned position. Management intervention is required because normal sequencing is unlikely to recover the target.`
 
     const recommendations: string[] = []
 
-    if (activeDelayedTasks.length > 0) {
+    if (productionGapActivities > 0) {
       recommendations.push(
-        'Agree a 7-day recovery action plan for the current delayed workfront.'
+        `Close the production gap between ${getTaskName(actualCurrentTask)} and ${getTaskName(plannedCurrentTask)}.`
       )
     }
 
-    if (dataQualityBacklog.length > 0) {
+    if (additionalCrews > 0) {
       recommendations.push(
-        'Clean up historical overdue activities so the programme reflects the true site position.'
+        `Add ${additionalCrews} additional workfront ${additionalCrews === 1 ? 'crew' : 'crews'} or equivalent labour capacity.`
+      )
+    }
+
+    if (actualCurrentTask && getTaskProgress(actualCurrentTask) < 80) {
+      recommendations.push(
+        `Prioritise completion of ${getTaskName(actualCurrentTask)} before opening too many new workfronts.`
       )
     }
 
     if (requiredPace > 120) {
       recommendations.push(
-        'Increase labour/resource density on remaining in-scope activities.'
+        'Increase weekly production rate and track output daily against planned floor/activity sequence.'
       )
     }
 
     if (procurementRisks.length > 0) {
-      recommendations.push(
-        'Fast-track procurement items required within the next 14 days.'
-      )
+      recommendations.push('Fast-track procurement items required within the next 14 days.')
     }
 
     if (overdueApprovals.length > 0) {
-      recommendations.push(
-        'Escalate overdue approvals because they may block recovery execution.'
-      )
+      recommendations.push('Escalate overdue approvals because they may block recovery execution.')
     }
 
-    if (criticalSnags.length > 0) {
+    if (staleProgrammeItems.length > 0) {
       recommendations.push(
-        'Assign critical snags to accountable owners with close-out dates.'
+        'Clean up stale overdue schedule items so the programme reflects the true site position.'
       )
     }
 
@@ -741,21 +781,27 @@ export default function RecoveryForecastPage() {
       projectedSlipDays,
       recoverable,
       requiredAcceleration,
+      additionalCrews,
       confidenceScore,
       progressPct,
       plannedPct,
-      variancePct: plannedPct === null ? null : progressPct - plannedPct,
+      variancePct,
       firstTask,
       lastTask,
-      currentWorkfront,
-      activeDelayDays,
-      activeDelayedTasks,
+      plannedCurrentTask,
+      actualCurrentTask,
+      plannedIndex,
+      actualIndex,
+      productionGapActivities,
+      calculatedProductionGapDays,
+      gapTasks,
       historicalOverdueTasks,
-      dataQualityBacklog,
+      staleProgrammeItems,
       remainingTasks,
       completedTasks,
       totalTasks: scopeTasks.length,
-      remainingCalendarDays,
+      remainingDurationDays,
+      scheduleWindowRemaining,
       requiredPace,
       pacePressure,
       procurementRisks,
@@ -774,41 +820,50 @@ export default function RecoveryForecastPage() {
 
   const kpis: Kpi[] = [
     {
-      label: 'Forecast Status',
+      label: 'Recovery Status',
       value: engine.forecastStatus,
-      helper: `${engine.projectedSlipDays} projected slip day(s)`,
+      helper: `${engine.projectedSlipDays} forecast slip day(s)`,
       icon: Target,
+      tone: getStatusTone(engine.forecastStatus),
+    },
+    {
+      label: 'Production Gap',
+      value: `${engine.productionGapActivities}`,
+      helper: 'Activity step(s) behind planned position',
+      icon: Route,
       tone:
-        engine.forecastStatus === 'On Target'
+        engine.productionGapActivities === 0
           ? 'green'
-          : engine.forecastStatus === 'Recoverable'
-          ? 'blue'
-          : engine.forecastStatus === 'At Risk'
+          : engine.productionGapActivities <= 3
           ? 'amber'
           : 'red',
     },
     {
-      label: 'Current Workfront Delay',
-      value: `${engine.activeDelayDays} Days`,
-      helper: engine.currentWorkfront
-        ? getTaskName(engine.currentWorkfront)
-        : 'No active workfront',
-      icon: Clock3,
-      tone: engine.activeDelayDays > 7 ? 'red' : engine.activeDelayDays > 0 ? 'amber' : 'green',
-    },
-    {
       label: 'Recoverable',
       value: engine.recoverable,
-      helper: `Speed increase: ${engine.requiredAcceleration}`,
+      helper:
+        engine.additionalCrews > 0
+          ? `Recommended: +${engine.additionalCrews} crew(s)`
+          : 'No extra crew required',
       icon: ShieldCheck,
-      tone: engine.recoverable === 'YES' ? 'green' : engine.recoverable === 'WITH RECOVERY' ? 'amber' : 'red',
+      tone:
+        engine.recoverable === 'YES'
+          ? 'green'
+          : engine.recoverable === 'WITH RECOVERY'
+          ? 'amber'
+          : 'red',
     },
     {
       label: 'Confidence',
       value: `${engine.confidenceScore}%`,
-      helper: 'Based on active delay, pace, risks and approvals',
+      helper: 'Based on production gap, risks and pace',
       icon: TrendingUp,
-      tone: engine.confidenceScore >= 70 ? 'green' : engine.confidenceScore >= 45 ? 'amber' : 'red',
+      tone:
+        engine.confidenceScore >= 70
+          ? 'green'
+          : engine.confidenceScore >= 45
+          ? 'amber'
+          : 'red',
     },
   ]
 
@@ -833,10 +888,10 @@ export default function RecoveryForecastPage() {
               Recovery Forecast
             </p>
             <h1 className="text-2xl font-bold mt-1">
-              Scope-aware Recovery Forecast
+              Production-based Recovery Forecast
             </h1>
             <p className="text-sm text-slate-400 mt-2 max-w-3xl">
-              This page now separates historical data backlog from active workfront delay, so one stale task cannot push a carcass programme into the following year.
+              Compares where the project should be today against where site production actually is, then converts the production gap into a forecast finish.
             </p>
           </div>
 
@@ -862,8 +917,12 @@ export default function RecoveryForecastPage() {
           <div className="grid md:grid-cols-4 gap-4">
             <InfoBlock title="Scope" value={engine.projectScope} helper={engine.scopeNote} />
             <InfoBlock title="Target Date" value={formatDate(engine.targetDate)} helper={engine.targetDateSource} />
-            <InfoBlock title="Forecast Finish" value={formatDate(engine.forecastFinish)} helper={`${engine.projectedSlipDays} day projected slip`} />
-            <InfoBlock title="Current Workfront" value={engine.currentWorkfront ? getTaskName(engine.currentWorkfront) : 'None'} helper={engine.currentWorkfront ? `${getTaskProgress(engine.currentWorkfront)}% complete` : 'No active activity'} />
+            <InfoBlock title="Forecast Finish" value={formatDate(engine.forecastFinish)} helper={`${engine.projectedSlipDays} day forecast slip`} />
+            <InfoBlock
+              title="Additional Capacity"
+              value={engine.additionalCrews > 0 ? `+${engine.additionalCrews} crew(s)` : 'Not required'}
+              helper={`Required acceleration: ${engine.requiredAcceleration}`}
+            />
           </div>
         </div>
 
@@ -903,6 +962,36 @@ export default function RecoveryForecastPage() {
       </div>
 
       <div className="grid md:grid-cols-4 gap-4">
+        <PositionCard label="Planned Position Today" task={engine.plannedCurrentTask} helper="Should be active/completed by today" icon={Target} />
+        <PositionCard
+          label="Actual Site Position"
+          task={engine.actualCurrentTask}
+          helper={engine.actualCurrentTask ? `${getTaskProgress(engine.actualCurrentTask)}% complete` : 'No active site position'}
+          icon={Activity}
+        />
+
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wider text-slate-500">Production Gap</p>
+          <h2 className={`mt-2 text-2xl font-bold ${engine.productionGapActivities > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+            {engine.productionGapActivities} Activity Step(s)
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Estimated production gap: {engine.calculatedProductionGapDays} day(s)
+          </p>
+        </div>
+
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wider text-slate-500">Forecast Slip</p>
+          <h2 className={`mt-2 text-2xl font-bold ${engine.projectedSlipDays > 10 ? 'text-red-400' : engine.projectedSlipDays > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+            {engine.projectedSlipDays} Day(s)
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Forecast: {formatDate(engine.forecastFinish)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-4 gap-4">
         {kpis.map(item => {
           const Icon = item.icon
 
@@ -916,11 +1005,7 @@ export default function RecoveryForecastPage() {
                   <h2 className={`mt-2 text-2xl font-bold ${toneClass(item.tone)}`}>
                     {item.value}
                   </h2>
-                  {item.helper && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      {item.helper}
-                    </p>
-                  )}
+                  {item.helper && <p className="mt-1 text-xs text-slate-500">{item.helper}</p>}
                 </div>
 
                 <Icon size={18} className={toneClass(item.tone)} />
@@ -936,21 +1021,19 @@ export default function RecoveryForecastPage() {
         <MiniMetric title="Variance" value={engine.variancePct === null ? '—' : `${engine.variancePct}%`} />
         <MiniMetric title="Pace Pressure" value={engine.pacePressure} />
         <MiniMetric title="Remaining Scope Items" value={engine.remainingTasks.length} />
-        <MiniMetric title="Historical Backlog" value={engine.dataQualityBacklog.length} />
+        <MiniMetric title="Stale Programme Items" value={engine.staleProgrammeItems.length} />
         <MiniMetric title="Procurement Risks" value={engine.procurementRisks.length} />
         <MiniMetric title="Overdue Approvals" value={engine.overdueApprovals.length} />
       </div>
 
-      {engine.dataQualityBacklog.length > 0 && (
+      {engine.staleProgrammeItems.length > 0 && (
         <div className="card border border-amber-500/30 p-5">
           <div className="flex items-start gap-3">
             <FileWarning className="mt-1 text-amber-400" size={20} />
             <div>
-              <h2 className="font-semibold text-amber-200">
-                Data quality warning
-              </h2>
+              <h2 className="font-semibold text-amber-200">Programme data cleanup required</h2>
               <p className="mt-1 text-sm text-slate-300">
-                {engine.dataQualityBacklog.length} old overdue task(s) exist behind the current workfront. They are shown for cleanup, but they are not allowed to push the forecast into an unrealistic delivery date.
+                {engine.staleProgrammeItems.length} overdue task(s) are behind the actual production position. They are not used as the main delay driver, but they should be updated so the programme reflects the true site position.
               </p>
             </div>
           </div>
@@ -960,25 +1043,67 @@ export default function RecoveryForecastPage() {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="card p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold">Executive Interpretation</h2>
-          <p className="mt-3 text-slate-300">
-            {engine.executiveSummary}
-          </p>
+          <p className="mt-3 text-slate-300">{engine.executiveSummary}</p>
 
           <div className="mt-5 grid md:grid-cols-3 gap-3 text-sm">
-            <InfoBlock title="Active delay source" value={engine.currentWorkfront ? getTaskName(engine.currentWorkfront) : 'None'} helper="Forecast uses current workfront, not stale historical tasks." />
-            <InfoBlock title="Recovery speed required" value={engine.requiredAcceleration} helper="Estimated acceleration needed to hold target." />
-            <InfoBlock title="Target basis" value={engine.targetDateSource} helper="Date source used for recovery forecast." />
+            <InfoBlock title="Planned" value={getTaskName(engine.plannedCurrentTask)} helper={`Task #${engine.plannedCurrentTask?.task_number || '—'}`} />
+            <InfoBlock title="Actual" value={getTaskName(engine.actualCurrentTask)} helper={`Task #${engine.actualCurrentTask?.task_number || '—'}`} />
+            <InfoBlock title="Target Basis" value={engine.targetDateSource} helper="Date source used for forecast finish." />
           </div>
         </div>
 
         <div className="card p-5">
-          <h2 className="text-lg font-semibold">Recommended Actions</h2>
+          <h2 className="text-lg font-semibold">Recovery Actions</h2>
 
           <div className="mt-4 space-y-3">
             {engine.recommendations.map((item, index) => (
               <Action key={index} text={item} />
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="card p-5">
+        <h2 className="text-lg font-semibold mb-4">Production Gap Activities</h2>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-800 text-slate-400">
+              <tr>
+                <th className="py-3 text-left">#</th>
+                <th className="text-left">Activity</th>
+                <th className="text-left">Phase</th>
+                <th className="text-left">Planned Finish</th>
+                <th className="text-left">Progress</th>
+                <th className="text-left">Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {engine.gapTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-emerald-400">
+                    No production gap detected. Actual position is aligned with planned position.
+                  </td>
+                </tr>
+              ) : (
+                engine.gapTasks.map(task => (
+                  <tr key={task.id} className="border-b border-slate-900">
+                    <td className="py-3">{task.task_number || '—'}</td>
+                    <td>{getTaskName(task)}</td>
+                    <td>{task.phase || task.discipline || '—'}</td>
+                    <td>{formatDate(safeDate(getTaskFinish(task)))}</td>
+                    <td>{getTaskProgress(task)}%</td>
+                    <td>
+                      <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-300">
+                        Gap Item
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -991,7 +1116,7 @@ export default function RecoveryForecastPage() {
               <tr>
                 <th className="py-3 text-left">Phase</th>
                 <th className="text-left">Remaining</th>
-                <th className="text-left">Delayed</th>
+                <th className="text-left">Gap Items</th>
                 <th className="text-left">Progress</th>
                 <th className="text-left">Pressure</th>
               </tr>
@@ -1009,24 +1134,21 @@ export default function RecoveryForecastPage() {
                   <tr key={phase.phase} className="border-b border-slate-900">
                     <td className="py-3">{phase.phase}</td>
                     <td>{phase.remaining}</td>
-                    <td className={phase.delayed > 0 ? 'text-red-400' : 'text-emerald-400'}>
-                      {phase.delayed}
+                    <td className={phase.gapItems > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                      {phase.gapItems}
                     </td>
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="h-2 w-28 rounded-full bg-slate-800">
-                          <div
-                            className="h-2 rounded-full bg-[#c49e48]"
-                            style={{ width: `${phase.progress}%` }}
-                          />
+                          <div className="h-2 rounded-full bg-[#c49e48]" style={{ width: `${phase.progress}%` }} />
                         </div>
                         <span>{phase.progress}%</span>
                       </div>
                     </td>
                     <td>
-                      {phase.delayed > 0 ? (
+                      {phase.gapItems > 0 ? (
                         <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-300">
-                          Attention
+                          Recovery Needed
                         </span>
                       ) : (
                         <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
@@ -1042,65 +1164,9 @@ export default function RecoveryForecastPage() {
         </div>
       </div>
 
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold mb-4">Activities Requiring Recovery Attention</h2>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-800 text-slate-400">
-              <tr>
-                <th className="py-3 text-left">#</th>
-                <th className="text-left">Activity</th>
-                <th className="text-left">Phase</th>
-                <th className="text-left">Planned Finish</th>
-                <th className="text-left">Progress</th>
-                <th className="text-left">Status</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {engine.criticalTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-emerald-400">
-                    No recovery-critical activity found for the current scope.
-                  </td>
-                </tr>
-              ) : (
-                engine.criticalTasks.map(task => {
-                  const isActiveDelay = engine.activeDelayedTasks.some(active =>
-                    sameId(active.id, task.id)
-                  )
-
-                  return (
-                    <tr key={task.id} className="border-b border-slate-900">
-                      <td className="py-3">{task.task_number || '—'}</td>
-                      <td>{getTaskName(task)}</td>
-                      <td>{task.phase || task.discipline || '—'}</td>
-                      <td>{formatDate(safeDate(getTaskFinish(task)))}</td>
-                      <td>{getTaskProgress(task)}%</td>
-                      <td>
-                        {isActiveDelay ? (
-                          <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-300">
-                            Active Delay
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-slate-700/60 px-2 py-1 text-xs text-slate-300">
-                            Remaining
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {engine.dataQualityBacklog.length > 0 && (
+      {engine.staleProgrammeItems.length > 0 && (
         <div className="card p-5">
-          <h2 className="text-lg font-semibold mb-4">Historical Overdue Items to Clean Up</h2>
+          <h2 className="text-lg font-semibold mb-4">Stale Programme Items to Clean Up</h2>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1114,7 +1180,7 @@ export default function RecoveryForecastPage() {
               </thead>
 
               <tbody>
-                {engine.dataQualityBacklog.slice(0, 12).map(task => (
+                {engine.staleProgrammeItems.slice(0, 12).map(task => (
                   <tr key={task.id} className="border-b border-slate-900">
                     <td className="py-3">{task.task_number || '—'}</td>
                     <td>{getTaskName(task)}</td>
@@ -1142,17 +1208,37 @@ function InfoBlock({
 }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-3">
-      <div className="text-xs uppercase tracking-wider text-slate-500">
-        {title}
-      </div>
-      <div className="mt-1 font-bold text-white">
-        {value}
-      </div>
-      {helper && (
-        <div className="mt-1 text-xs text-slate-500">
-          {helper}
+      <div className="text-xs uppercase tracking-wider text-slate-500">{title}</div>
+      <div className="mt-1 font-bold text-white">{value}</div>
+      {helper && <div className="mt-1 text-xs text-slate-500">{helper}</div>}
+    </div>
+  )
+}
+
+function PositionCard({
+  label,
+  task,
+  helper,
+  icon: Icon,
+}: {
+  label: string
+  task?: Task | null
+  helper?: string
+  icon: React.ElementType
+}) {
+  return (
+    <div className="card p-4">
+      <div className="flex justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-slate-500">{label}</p>
+          <h2 className="mt-2 text-xl font-bold text-white">{getTaskName(task)}</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            {task ? `Task #${task.task_number || '—'} · ${helper || ''}` : helper || '—'}
+          </p>
         </div>
-      )}
+
+        <Icon size={18} className="text-[#c49e48]" />
+      </div>
     </div>
   )
 }
@@ -1166,12 +1252,8 @@ function MiniMetric({
 }) {
   return (
     <div className="card p-4">
-      <div className="text-xs uppercase tracking-wider text-slate-500">
-        {title}
-      </div>
-      <div className="mt-2 text-xl font-bold text-[#c49e48]">
-        {value}
-      </div>
+      <div className="text-xs uppercase tracking-wider text-slate-500">{title}</div>
+      <div className="mt-2 text-xl font-bold text-[#c49e48]">{value}</div>
     </div>
   )
 }
