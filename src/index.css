@@ -853,3 +853,115 @@ html.light .nav-active {
   color: #2563eb;
   border-color: rgba(37, 99, 235, 0.20);
 }
+
+/* =========================================================
+   PMOCOREX V3 FINAL RESTRAINT LAYER
+   Neutral enterprise shell. No gold, glow, gradients or lift.
+========================================================= */
+:root {
+  --pmx-bg: #0f1115;
+  --pmx-surface: #171a21;
+  --pmx-surface-2: #1d222b;
+  --pmx-border: #262c36;
+  --pmx-border-strong: #343b47;
+  --pmx-text: #f8fafc;
+  --pmx-muted: #94a3b8;
+  --pmx-primary: #3b82f6;
+}
+
+body,
+.layout-shell,
+.layout-content {
+  background: var(--pmx-bg) !important;
+}
+
+.layout-sidebar,
+.layout-header,
+.card,
+.stat-card,
+.sidebar-panel,
+.modal,
+.workspace-hero,
+.dashboard-hero,
+.ai-insight-card,
+.executive-summary-card,
+.project-card {
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.card,
+.stat-card {
+  border-radius: 12px !important;
+}
+
+.card:hover,
+.stat-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: var(--pmx-border-strong) !important;
+}
+
+.gold-bar {
+  display: none !important;
+}
+
+.font-display,
+.page-title,
+.card-title,
+.section-title,
+.stat-number,
+.modal-title {
+  font-family: Inter, system-ui, sans-serif !important;
+}
+
+.page-title {
+  font-size: 22px !important;
+  letter-spacing: -0.02em !important;
+}
+
+.stat-number {
+  font-size: 30px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.btn-gold,
+.btn-primary {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.btn-gold:hover,
+.btn-primary:hover {
+  background: #2563eb !important;
+  transform: none !important;
+}
+
+.badge-gold {
+  background: rgba(59,130,246,.10) !important;
+  color: #60a5fa !important;
+  border-color: rgba(59,130,246,.18) !important;
+}
+
+.pulse-gold {
+  animation: none !important;
+}
+
+html.light body,
+html.light .layout-shell,
+html.light .layout-content {
+  background: #f6f7f9 !important;
+}
+
+html.light .layout-sidebar,
+html.light .layout-header,
+html.light .card,
+html.light .stat-card,
+html.light .sidebar-panel,
+html.light .modal {
+  background: #ffffff !important;
+  border-color: #e3e8ef !important;
+  box-shadow: none !important;
+}
