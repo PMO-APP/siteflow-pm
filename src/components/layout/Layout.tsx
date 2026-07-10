@@ -364,7 +364,7 @@ export default function Layout() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="h-[2px] bg-gradient-to-r from-[#c49e48] via-[#e3c06a] to-transparent flex-shrink-0" />
+        <div className="h-[2px] bg-transparent flex-shrink-0" />
 
         <div className="px-4 py-5 border-b border-white/[0.06] flex-shrink-0">
           <button
@@ -404,7 +404,7 @@ export default function Layout() {
               className={`font-display text-3xl font-black leading-none ${
                 daysLeft !== null && daysLeft < 60
                   ? 'text-red-400'
-                  : 'text-[#c49e48]'
+                  : 'text-slate-200'
               }`}
             >
               {daysLeft !== null ? Math.max(0, daysLeft) : '-'}
@@ -415,7 +415,7 @@ export default function Layout() {
                 className={`text-[10px] font-semibold ${
                   daysLeft !== null && daysLeft < 60
                     ? 'text-red-400'
-                    : 'text-[#c49e48]'
+                    : 'text-slate-400'
                 }`}
               >
                 DAYS LEFT
@@ -459,9 +459,9 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="sidebar-panel w-full flex items-center gap-2.5 rounded-xl p-2.5 hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all text-left"
+            className="sidebar-panel w-full flex items-center gap-2.5 rounded-xl p-2.5 hover:border-white/[0.12] hover:bg-white/[0.04] transition-all text-left"
           >
-            <div className="w-8 h-8 rounded-full bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-[10px] font-bold text-[#c49e48] flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-[10px] font-bold text-blue-400 flex-shrink-0">
               {user ? getInitials(user.full_name || user.email || 'User') : 'U'}
             </div>
 
@@ -476,7 +476,7 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center gap-2">
-              <UserCircle size={16} className="text-[#c49e48]" />
+              <UserCircle size={16} className="text-blue-400" />
 
               <button
                 type="button"
@@ -497,7 +497,7 @@ export default function Layout() {
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="layout-header sticky top-0 z-20 border-b backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
           <button
-            className="lg:hidden sidebar-muted hover:text-[#c49e48] transition-colors"
+            className="lg:hidden sidebar-muted hover:text-slate-200 transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={18} />
@@ -528,7 +528,7 @@ export default function Layout() {
                 <span>/</span>
                 <span>{portfolioName || 'Portfolio'}</span>
                 <span>/</span>
-                <span className="text-[#c49e48]">
+                <span className="text-blue-400">
                   {projectName || 'Project'}
                 </span>
               </div>
@@ -550,7 +550,7 @@ export default function Layout() {
           </div>
 
           <button
-            className="relative sidebar-muted hover:text-[#c49e48] transition-colors p-1"
+            className="relative sidebar-muted hover:text-slate-200 transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
           >
             <Bell size={16} />
@@ -595,7 +595,7 @@ function InfoBlock({
       <div
         className={`mt-1 truncate ${
           highlight
-            ? 'text-sm font-bold text-[#c49e48]'
+            ? 'text-sm font-bold text-[#3b82f6]'
             : 'sidebar-text text-xs font-semibold'
         }`}
       >
