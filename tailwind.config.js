@@ -5,31 +5,53 @@ export default {
     extend: {
       colors: {
         ink: {
-          DEFAULT: '#0c1014',
-          2: '#111820',
-          3: '#161f28',
-          4: '#1c2a36',
-          5: '#22333f',
+          DEFAULT: '#0f1115',
+          2: '#151922',
+          3: '#1b202b',
+          4: '#222936',
+          5: '#2b3442',
         },
-        gold: {
-          DEFAULT: '#c49e48',
-          2: '#e3c06a',
-          dim: 'rgba(196,158,72,0.15)',
+        primary: {
+          DEFAULT: '#3b82f6',
+          2: '#60a5fa',
+          dim: 'rgba(59,130,246,0.12)',
+        },
+        success: {
+          DEFAULT: '#22c55e',
+          dim: 'rgba(34,197,94,0.12)',
+        },
+        warning: {
+          DEFAULT: '#f59e0b',
+          dim: 'rgba(245,158,11,0.12)',
+        },
+        danger: {
+          DEFAULT: '#ef4444',
+          dim: 'rgba(239,68,68,0.12)',
         },
         cream: {
-          DEFAULT: '#ede8de',
-          2: '#bfb9ae',
+          DEFAULT: '#f8fafc',
+          2: '#cbd5e1',
         },
-        dust: '#6e7d8c',
+        dust: '#94a3b8',
+        slateLine: '#262b36',
+
+        // Backward compatibility only.
+        // Existing .btn-gold / text-gold classes will now render as primary blue,
+        // so the gold accent is removed system-wide without breaking old pages.
+        gold: {
+          DEFAULT: '#3b82f6',
+          2: '#60a5fa',
+          dim: 'rgba(59,130,246,0.12)',
+        },
       },
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
+        display: ['Outfit', 'sans-serif'],
         sans: ['Outfit', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       borderColor: {
-        gold: 'rgba(196,158,72,0.2)',
-        subtle: 'rgba(255,255,255,0.06)',
+        primary: 'rgba(59,130,246,0.18)',
+        subtle: 'rgba(255,255,255,0.07)',
       },
     },
   },
