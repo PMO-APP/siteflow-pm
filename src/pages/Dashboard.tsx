@@ -27,8 +27,8 @@ import { fdate, urgencyColor, formatCurrency } from '@/lib/utils'
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
 const colorPool = [
-  '#c49e48',
-  '#4599d4',
+  '#3b82f6',
+  '#64748b',
   '#9b7fd4',
   '#3fad78',
   '#e05252',
@@ -733,7 +733,7 @@ export default function Dashboard() {
       label: 'Progress',
       value: `${progressPct}%`,
       sub: `${done}/${tasks.length} tasks completed`,
-      color: 'c-gold',
+      color: 'c-blue',
       icon: TrendingUp,
       link: route('/schedule'),
     },
@@ -741,7 +741,7 @@ export default function Dashboard() {
       label: 'Housebuild',
       value: `${housebuildProgress}%`,
       sub: `${housebuildTasks.length} tasks`,
-      color: 'c-gold',
+      color: 'c-blue',
       icon: TrendingUp,
       link: route('/schedule'),
     },
@@ -825,7 +825,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="dashboard-hero relative rounded-xl p-5 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_80%_50%,rgba(196,158,72,0.05),transparent)]" />
+        <div className="absolute inset-0 bg-transparent" />
 
         <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
           <div>
@@ -833,7 +833,7 @@ export default function Dashboard() {
               className={`font-display text-7xl font-black leading-none ${
                 daysLeft !== null && daysLeft < 60
                   ? 'text-red-400'
-                  : 'text-[#c49e48]'
+                  : 'text-[#3b82f6]'
               }`}
             >
               {daysLeft ?? '-'}
@@ -871,7 +871,7 @@ export default function Dashboard() {
 
             <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#c49e48] to-[#e3c06a]"
+                className="h-full rounded-full bg-blue-500"
                 style={{ width: `${timelinePct}%` }}
               />
             </div>
@@ -890,18 +890,20 @@ export default function Dashboard() {
           return (
             <div
               key={k.label}
-              className="stat-card cursor-pointer hover:border-[#c49e48]/20 transition-colors group"
+              className="stat-card cursor-pointer hover:border-white/[0.12] transition-colors group"
               onClick={() => navigate(k.link)}
             >
               <div
-                className={`gold-bar ${
+                className={`absolute left-0 top-0 h-full w-[3px] ${
                   k.color === 'c-red'
-                    ? '!bg-red-500'
+                    ? 'bg-red-500'
                     : k.color === 'c-amr'
-                    ? '!bg-amber-500'
+                    ? 'bg-amber-500'
                     : k.color === 'c-grn'
-                    ? '!bg-emerald-500'
-                    : ''
+                    ? 'bg-emerald-500'
+                    : k.color === 'c-blue'
+                    ? 'bg-blue-500'
+                    : 'bg-transparent'
                 }`}
               />
 
@@ -914,7 +916,7 @@ export default function Dashboard() {
 
                 <Icon
                   size={16}
-                  className="text-[#6e7d8c] group-hover:text-[#c49e48] transition-colors mt-1"
+                  className="text-[#6e7d8c] group-hover:text-slate-200 transition-colors mt-1"
                 />
               </div>
             </div>
@@ -961,7 +963,7 @@ export default function Dashboard() {
               <button
                 key={alert.msg}
                 onClick={() => navigate(alert.action)}
-                className="w-full flex items-center justify-between gap-4 text-left rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 hover:border-[#c49e48]/20"
+                className="w-full flex items-center justify-between gap-4 text-left rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 hover:border-white/[0.12]"
               >
                 <div className="flex items-center gap-3">
                   <AlertTriangle
@@ -1076,7 +1078,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="text-[#c49e48] font-semibold">
+                    <div className="text-blue-400 font-semibold">
                       {getTaskProgress(task)}%
                     </div>
                   </div>
