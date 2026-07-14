@@ -32,6 +32,7 @@ export type ActivityEventInput = {
   route?: string | null
 
   severity?: ActivitySeverity
+
   actorId?: string | null
   actorName?: string | null
   actorRole?: string | null
