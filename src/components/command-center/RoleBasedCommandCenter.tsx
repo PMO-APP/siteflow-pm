@@ -292,7 +292,7 @@ export default function RoleBasedCommandCenter({
             ...intelligence.health.drivers,
             ...intelligence.governance.exceptions
               .slice(0, 3)
-              .map(item => item.title),
+              .map((item: any) => item.title),
           ].slice(0, 5)}
           badge="Live"
           tone={
