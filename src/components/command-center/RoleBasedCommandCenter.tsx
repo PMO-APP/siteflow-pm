@@ -13,6 +13,7 @@ import {
 import { useMembershipStore } from '@/store/membership'
 import { useActivityFeed } from '@/hooks/useActivityFeed'
 import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
+import RoleAwareCommandSections from './RoleAwareCommandSections'
 
 import HealthTrend from './HealthTrend'
 
@@ -68,7 +69,7 @@ function getMetricTone(score: number) {
 
   return 'danger'
 }
-
+<RoleAwareCommandSections project={project} />
 export default function RoleBasedCommandCenter({
   project,
 }: {
