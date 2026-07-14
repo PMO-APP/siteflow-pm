@@ -1,20 +1,29 @@
 import { useMemo } from 'react'
 import { useProjectState } from '@/hooks/useProjectState'
-import { buildProjectIntelligence } from '@/core/intelligence/projectIntelligence'
+import { buildProjectIntelligenceV2 } from '@/core/intelligence/projectIntelligenceV2'
 
 export function useUnifiedProjectIntelligence(
-  options: Parameters<typeof useProjectState>[0] = {}
+  options: Parameters<
+    typeof useProjectState
+  >[0] = {}
 ) {
-  const projectState = useProjectState(options)
+  const projectState =
+    useProjectState(options)
 
-  const intelligence = useMemo(
-    () => buildProjectIntelligence(projectState.state),
-    [projectState.state]
-  )
+  const intelligence =
+    useMemo(
+      () =>
+        buildProjectIntelligenceV2(
+          projectState.state
+        ),
+      [projectState.state]
+    )
 
   return {
     ...intelligence,
-    isLoading: projectState.isLoading,
-    isError: projectState.isError,
+    isLoading:
+      projectState.isLoading,
+    isError:
+      projectState.isError,
   }
 }
