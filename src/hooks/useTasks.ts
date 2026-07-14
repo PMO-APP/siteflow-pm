@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types'
 import { computeRAG } from '@/lib/utils'
+import { activityBuilders } from '@/core/activity/activityBuilders'
+import { recordActivitySafely } from '@/core/activity/activityService'
+
 
 export const useTasks = () => {
   const { projectId } = useProjectStore()
@@ -118,6 +121,28 @@ export const useUpdateTask = () => {
       qc.invalidateQueries({ queryKey: ['tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['weekly_reports', projectId] })
     },
+    if (newProgress !== previousProgress) {
+  await recordActivitySafely(
+    activityBuilders.taskProgressUpdated(
+      {
+        projectId,
+        actorId: user?.id || null,
+        actorName:
+          user?.user_metadata?.full_name ||
+          user?.email ||
+          null,
+        actorRole: role || null,
+      },
+      {
+        id,
+        name: existingTask?.name || null,
+        previousProgress,
+        newProgress,
+      }
+    )
+  )
+}
+
   })
 }
 
