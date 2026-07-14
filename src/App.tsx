@@ -25,7 +25,7 @@ import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
 import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
 import HandoverPage from '@/pages/HandoverPage'
 
-
+import CommandCenterDashboard from '@/pages/CommandCenterDashboard'
 import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
 import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
 import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
@@ -401,7 +401,7 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<CommandCenterDashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
            <Route path="costing" element={<CostingPage />} />
