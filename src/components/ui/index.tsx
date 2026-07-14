@@ -1,4 +1,5 @@
-import type { ComponentType, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -14,11 +15,7 @@ export type Tone =
   | 'danger'
   | 'info'
 
-export type IconType = ComponentType<{
-  size?: number | string
-  className?: string
-  strokeWidth?: number
-}>
+export type IconType = LucideIcon
 
 const toneMap: Record<Tone, string> = {
   neutral: 'neutral',
