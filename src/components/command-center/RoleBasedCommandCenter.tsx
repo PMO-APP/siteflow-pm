@@ -14,6 +14,9 @@ import { useMembershipStore } from '@/store/membership'
 import { useActivityFeed } from '@/hooks/useActivityFeed'
 import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import RoleAwareCommandSections from './RoleAwareCommandSections'
+import ReadinessPanel from './ReadinessPanel'
+import ProductionPanel from './ProductionPanel'
+
 
 import HealthTrend from './HealthTrend'
 
@@ -69,7 +72,8 @@ function getMetricTone(score: number) {
 
   return 'danger'
 }
-<RoleAwareCommandSections project={project} />
+
+
 export default function RoleBasedCommandCenter({
   project,
 }: {
@@ -389,6 +393,17 @@ export default function RoleBasedCommandCenter({
           )}
         />
       </div>
+      <RoleAwareCommandSections project={project} />
+
+<div className="grid gap-4 xl:grid-cols-2">
+  <ReadinessPanel
+    readiness={intelligence.readiness}
+  />
+
+  <ProductionPanel
+    forecast={intelligence.forecastV2}
+  />
+</div>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="pmx-card p-5">
