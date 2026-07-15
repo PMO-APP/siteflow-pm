@@ -4,6 +4,7 @@
 @import './components.css';
 @import './utilities.css';
 @import './pages/command-center-a6.css';
+@import './pages/studio.css';
 
 /* Existing reusable PMOCorex components */
 @import './pmocorex-components.css';
