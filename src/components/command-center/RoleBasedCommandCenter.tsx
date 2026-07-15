@@ -16,6 +16,10 @@ import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import RoleAwareCommandSections from './RoleAwareCommandSections'
 import ReadinessPanel from './ReadinessPanel'
 import ProductionPanel from './ProductionPanel'
+import ExecutiveNarrativePanel from './ExecutiveNarrativePanel'
+import RootCausePanel from './RootCausePanel'
+import RecommendationsPanel from './RecommendationsPanel'
+
 
 
 import HealthTrend from './HealthTrend'
@@ -191,6 +195,7 @@ export default function RoleBasedCommandCenter({
 
   return (
     <div className="space-y-6">
+      
       <SectionHeader
         eyebrow="Project Command Center"
         title={
@@ -393,7 +398,7 @@ export default function RoleBasedCommandCenter({
           )}
         />
       </div>
-      <RoleAwareCommandSections project={project} />
+    <RoleAwareCommandSections project={project} />
 
 <div className="grid gap-4 xl:grid-cols-2">
   <ReadinessPanel
@@ -405,7 +410,21 @@ export default function RoleBasedCommandCenter({
   />
 </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+<ExecutiveNarrativePanel
+  narrative={intelligence.narrative}
+/>
+
+<div className="grid gap-4 xl:grid-cols-2">
+  <RootCausePanel
+    rootCause={intelligence.rootCause}
+  />
+
+  <RecommendationsPanel
+    recommendations={intelligence.recommendations}
+  />
+</div>
+
+<div className="grid gap-4 xl:grid-cols-3">
         <div className="pmx-card p-5">
           <SectionHeader
             title="Delivery Pulse"
