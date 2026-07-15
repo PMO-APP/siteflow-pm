@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useProjectState } from '@/hooks/useProjectState'
-import { buildProjectIntelligenceV3 } from '@/core/intelligence/projectIntelligenceV3'
+import { buildProjectIntelligenceV4 } from '@/core/intelligence/projectIntelligenceV4'
 
 export function useUnifiedProjectIntelligence(
   options: Parameters<
@@ -13,7 +13,7 @@ export function useUnifiedProjectIntelligence(
   const intelligence =
     useMemo(
       () =>
-        buildProjectIntelligenceV3(
+        buildProjectIntelligenceV4(
           projectState.state
         ),
       [projectState.state]
