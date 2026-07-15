@@ -1,6 +1,6 @@
 import {
   CheckCircle2,
-  CircleHelp,
+  HelpCircle,
   XCircle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -63,7 +63,7 @@ export default function ReadinessPanel({
                 ? CheckCircle2
                 : requirement.status === 'not_ready'
                 ? XCircle
-                : CircleHelp
+                : HelpCircle
 
             return (
               <button
