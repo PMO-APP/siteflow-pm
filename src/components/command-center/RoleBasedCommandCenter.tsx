@@ -1,3 +1,5 @@
+import '@/styles/pmocorex-components.css'
+import '@/styles/command-center-a4.css'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
