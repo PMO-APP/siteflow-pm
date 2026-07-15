@@ -49,7 +49,7 @@ export default function DeliveryTwinPanel({
         <SectionHeader
           eyebrow="Project Delivery State"
           title="Digital Project Twin"
-          description={`Scope template: ${twin.scopeTemplate.replaceAll('_', ' ')}`}
+          description={`Scope template: ${twin.scopeTemplate.replace(/_/g, ' ')}`}
           action={
             <span className="text-xs font-medium text-[var(--pmx-muted)]">
               {twin.completedStages}/{twin.totalApplicableStages} stages complete
