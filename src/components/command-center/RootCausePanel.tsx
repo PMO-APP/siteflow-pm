@@ -1,6 +1,6 @@
 import {
   ArrowDown,
-  CircleAlert,
+  AlertCircle,
 } from 'lucide-react'
 import type { RootCauseResult } from '@/core/intelligence/root-cause/rootCauseTypes'
 import {
@@ -50,7 +50,7 @@ export default function RootCausePanel({
                         : 'flex items-center gap-3 rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4'
                     }
                   >
-                    <CircleAlert
+                    <AlertCircle
                       size={17}
                       className={
                         index === 0
