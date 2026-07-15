@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -40,6 +41,11 @@ import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReview
 import ExternalTaskDetailPage from '@/pages/external/ExternalTaskDetailPage'
 import ExternalTaskReviewPage from '@/pages/ExternalTaskReviewPage'
 import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
+import StudioLayout from '@/studio/layout/StudioLayout'
+import StudioHome from '@/studio/pages/StudioHome'
+import StudioIntelligencePage from '@/studio/pages/StudioIntelligencePage'
+import StudioProjectStatePage from '@/studio/pages/StudioProjectStatePage'
+import StudioPlaceholderPage from '@/studio/pages/StudioPlaceholderPage'
 
 import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
@@ -443,6 +449,75 @@ export default function App() {
             element={<ExternalAssignmentsPage />}
           />
         </Route>
+        <Route path="studio" element={<StudioLayout />}>
+  <Route index element={<StudioHome />} />
+
+  <Route
+    path="intelligence"
+    element={<StudioIntelligencePage />}
+  />
+
+  <Route
+    path="project-state"
+    element={<StudioProjectStatePage />}
+  />
+
+  <Route
+    path="recovery-validator"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="project-twin"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="portfolio-simulator"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="scenario-builder"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="executive-preview"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="ai-preview"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="events"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="performance"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="permissions"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="design-system"
+    element={<StudioPlaceholderPage />}
+  />
+
+  <Route
+    path="database"
+    element={<StudioPlaceholderPage />}
+  />
+</Route>
+
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
