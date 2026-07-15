@@ -1,0 +1,41 @@
+:root {
+  /* Brand */
+  --pmx-primary: #0f766e;
+  --pmx-primary-hover: #115e59;
+  --pmx-primary-soft: rgba(15, 118, 110, 0.12);
+
+  /* Status */
+  --pmx-success: #22c55e;
+  --pmx-warning: #f59e0b;
+  --pmx-danger: #ef4444;
+  --pmx-info: #3b82f6;
+
+  /* Radius */
+  --pmx-radius-sm: 8px;
+  --pmx-radius-md: 12px;
+  --pmx-radius-lg: 16px;
+  --pmx-radius-xl: 20px;
+
+  /* Spacing */
+  --pmx-space-1: 4px;
+  --pmx-space-2: 8px;
+  --pmx-space-3: 12px;
+  --pmx-space-4: 16px;
+  --pmx-space-5: 20px;
+  --pmx-space-6: 24px;
+  --pmx-space-8: 32px;
+  --pmx-space-10: 40px;
+  --pmx-space-12: 48px;
+  --pmx-space-16: 64px;
+
+  /* Typography */
+  --pmx-font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --pmx-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular,
+    Menlo, Monaco, Consolas, monospace;
+
+  /* Motion */
+  --pmx-motion-fast: 120ms;
+  --pmx-motion-normal: 180ms;
+  --pmx-motion-slow: 260ms;
+}

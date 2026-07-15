@@ -1,0 +1,220 @@
+/* Command Center page-specific styles */
+
+.pmx-command-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  overflow: hidden;
+  background: var(--pmx-surface);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-lg);
+}
+
+.pmx-command-shell-main {
+  padding: var(--pmx-space-6);
+}
+
+.pmx-command-shell-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--pmx-space-6);
+  background: var(--pmx-surface-2);
+  border-left: 1px solid var(--pmx-border);
+}
+
+.pmx-command-title {
+  margin: 0;
+  color: var(--pmx-text);
+  font-size: clamp(1.5rem, 2vw, 2.15rem);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+}
+
+.pmx-command-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--pmx-muted);
+  font-size: 0.85rem;
+}
+
+.pmx-command-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(120px, 1fr));
+  gap: var(--pmx-space-4);
+  margin-top: var(--pmx-space-6);
+}
+
+.pmx-command-hero-primary,
+.pmx-command-hero-stat {
+  min-width: 0;
+  padding-top: var(--pmx-space-4);
+  border-top: 1px solid var(--pmx-border);
+}
+
+.pmx-command-hero-label {
+  color: var(--pmx-faint);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pmx-command-hero-date {
+  margin-top: 0.45rem;
+  color: var(--pmx-text);
+  font-size: 1.85rem;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+}
+
+.pmx-command-hero-target,
+.pmx-command-hero-caption {
+  margin-top: 0.25rem;
+  color: var(--pmx-muted);
+  font-size: 0.75rem;
+}
+
+.pmx-command-hero-number {
+  margin-top: 0.45rem;
+  color: var(--pmx-text);
+  font-size: 1.55rem;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+}
+
+.pmx-position-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pmx-space-4);
+  padding-bottom: var(--pmx-space-4);
+  border-bottom: 1px solid var(--pmx-border);
+}
+
+.pmx-position-label {
+  color: var(--pmx-faint);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pmx-position-value {
+  margin-top: 0.35rem;
+  color: var(--pmx-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pmx-position-gap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--pmx-space-4);
+}
+
+.pmx-position-gap-value {
+  margin-top: 0.2rem;
+  color: var(--pmx-text);
+  font-size: 2rem;
+  font-weight: 720;
+  letter-spacing: -0.04em;
+}
+
+.pmx-position-gap-copy {
+  padding-bottom: 0.35rem;
+  color: var(--pmx-muted);
+  font-size: 0.76rem;
+}
+
+.pmx-empty-state {
+  display: flex;
+  min-height: 130px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: var(--pmx-space-5);
+  background: var(--pmx-surface-2);
+  border: 1px dashed var(--pmx-border);
+  border-radius: var(--pmx-radius-md);
+}
+
+.pmx-empty-title {
+  color: var(--pmx-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.pmx-empty-copy {
+  margin-top: 0.2rem;
+  color: var(--pmx-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.pmx-exception-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.pmx-exception-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+}
+
+.pmx-exception-dot.is-critical { background: var(--pmx-danger); }
+.pmx-exception-dot.is-warning { background: var(--pmx-warning); }
+.pmx-exception-dot.is-info { background: var(--pmx-info); }
+
+.pmx-exception-title {
+  color: var(--pmx-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.pmx-exception-copy {
+  margin-top: 0.2rem;
+  color: var(--pmx-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 1100px) {
+  .pmx-command-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .pmx-command-shell-side {
+    border-top: 1px solid var(--pmx-border);
+    border-left: 0;
+  }
+
+  .pmx-command-hero-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .pmx-command-shell-main,
+  .pmx-command-shell-side {
+    padding: var(--pmx-space-4);
+  }
+
+  .pmx-command-hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pmx-command-hero-date {
+    font-size: 1.55rem;
+  }
+}

@@ -1,0 +1,50 @@
+.pmx-muted {
+  color: var(--pmx-muted);
+}
+
+.pmx-faint {
+  color: var(--pmx-faint);
+}
+
+.pmx-text-success {
+  color: var(--pmx-success);
+}
+
+.pmx-text-warning {
+  color: var(--pmx-warning);
+}
+
+.pmx-text-danger {
+  color: var(--pmx-danger);
+}
+
+.pmx-text-info {
+  color: var(--pmx-info);
+}
+
+.pmx-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pmx-border-strong) transparent;
+}
+
+.pmx-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.pmx-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--pmx-border-strong);
+  border-radius: 999px;
+}
+
+.pmx-skeleton {
+  overflow: hidden;
+  background: var(--pmx-surface-2);
+  border-radius: var(--pmx-radius-sm);
+  animation: pmx-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pmx-pulse {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
