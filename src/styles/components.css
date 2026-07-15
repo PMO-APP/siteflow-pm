@@ -1,0 +1,113 @@
+.pmx-card,
+.pmx-section-panel {
+  background: var(--pmx-surface);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-lg);
+}
+
+.pmx-card {
+  padding: var(--pmx-space-5);
+}
+
+.pmx-eyebrow {
+  color: var(--pmx-faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pmx-btn-primary,
+.pmx-btn-secondary,
+.pmx-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 38px;
+  padding: 0.625rem 0.9rem;
+  border-radius: var(--pmx-radius-sm);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background-color var(--pmx-motion-fast) ease,
+    border-color var(--pmx-motion-fast) ease,
+    color var(--pmx-motion-fast) ease,
+    transform var(--pmx-motion-fast) ease;
+}
+
+.pmx-btn-primary {
+  color: #fff;
+  background: var(--pmx-primary);
+  border: 1px solid var(--pmx-primary);
+}
+
+.pmx-btn-primary:hover {
+  background: var(--pmx-primary-hover);
+  border-color: var(--pmx-primary-hover);
+}
+
+.pmx-btn-secondary {
+  color: var(--pmx-text);
+  background: var(--pmx-surface-2);
+  border: 1px solid var(--pmx-border);
+}
+
+.pmx-btn-secondary:hover {
+  border-color: var(--pmx-border-strong);
+  background: var(--pmx-surface-3);
+}
+
+.pmx-btn-ghost {
+  color: var(--pmx-muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.pmx-btn-ghost:hover {
+  color: var(--pmx-text);
+  background: var(--pmx-surface-2);
+}
+
+.pmx-btn-sm {
+  min-height: 30px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.7rem;
+}
+
+.pmx-divider {
+  height: 1px;
+  background: var(--pmx-border);
+}
+
+.pmx-input,
+.pmx-select,
+.pmx-textarea {
+  width: 100%;
+  color: var(--pmx-text);
+  background: var(--pmx-surface-2);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-sm);
+  outline: none;
+  transition: border-color var(--pmx-motion-fast) ease;
+}
+
+.pmx-input,
+.pmx-select {
+  min-height: 40px;
+  padding: 0 0.75rem;
+}
+
+.pmx-textarea {
+  min-height: 120px;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.pmx-input:focus,
+.pmx-select:focus,
+.pmx-textarea:focus {
+  border-color: var(--pmx-primary);
+}
