@@ -1,7 +1,7 @@
 import {
   CalendarClock,
   ChevronRight,
-  CircleCheck,
+  CheckCircle2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -64,7 +64,7 @@ export default function DecisionPanel({
         ) : items.length === 0 ? (
           <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-[var(--pmx-border)] bg-[var(--pmx-surface-2)]">
             <div className="text-center">
-              <CircleCheck
+              <CheckCircle2
                 size={22}
                 className="mx-auto text-emerald-400"
               />
