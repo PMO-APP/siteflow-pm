@@ -1,4 +1,4 @@
-
+import V6IntelligenceComparison from '@/components/dev/V6IntelligenceComparison'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -231,7 +231,7 @@ export default function RoleBasedCommandCenter({
       <DeliveryTwinPanel
   twin={intelligence.deliveryTwin}
 />
-
+<V6IntelligenceComparison project={project} />
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <RoleAwareCommandSections project={project} />
