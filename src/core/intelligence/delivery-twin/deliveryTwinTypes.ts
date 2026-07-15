@@ -4,12 +4,21 @@ export type DeliveryStageStatus =
   | 'blocked'
   | 'waiting'
   | 'not_started'
+  | 'not_applicable'
+
+export type DeliveryStageBlocker = {
+  id: string
+  title: string
+  source: 'schedule' | 'approval' | 'procurement' | 'quality' | 'risk' | 'hse'
+  ownerId: string | null
+  ownerName: string | null
+  route: string
+  severity: 'warning' | 'critical'
+}
 
 export type DeliveryStage = {
   id: string
   name: string
-  phase: string
-  discipline: string | null
   progress: number
   status: DeliveryStageStatus
   activityIds: string[]
@@ -17,14 +26,18 @@ export type DeliveryStage = {
   criticalActivityCount: number
   readinessScore: number
   route: string
+  blockers: DeliveryStageBlocker[]
+  ownerLabel: string | null
+  applicable: boolean
 }
 
 export type DeliveryTwinResult = {
+  scopeTemplate: string
   stages: DeliveryStage[]
   activeStage: DeliveryStage | null
   nextStage: DeliveryStage | null
   completedStages: number
-  totalStages: number
+  totalApplicableStages: number
   overallProgress: number
   generatedAt: string
 }
