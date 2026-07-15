@@ -1,210 +1,250 @@
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
+import {
+  getApplicableStageTemplates,
+  resolveProjectScopeTemplate,
+  type DeliveryStageTemplate,
+} from './deliveryStageConfig'
 import type {
   DeliveryStage,
+  DeliveryStageBlocker,
   DeliveryStageStatus,
   DeliveryTwinResult,
 } from './deliveryTwinTypes'
 
-const DEFAULT_STAGE_ORDER = [
-  'Mobilisation',
-  'Substructure',
-  'Superstructure',
-  'Roofing',
-  'MEP First Fix',
-  'Internal Finishes',
-  'External Works',
-  'Testing & Commissioning',
-  'Snagging',
-  'Handover',
-]
-
-function normalizePhase(value?: string | null) {
-  const text = String(value || '').trim().toLowerCase()
-
-  if (!text) return 'Other'
-  if (text.includes('mobil')) return 'Mobilisation'
-  if (
-    text.includes('foundation') ||
-    text.includes('substructure') ||
-    text.includes('ground beam')
-  ) return 'Substructure'
-  if (
-    text.includes('superstructure') ||
-    text.includes('frame') ||
-    text.includes('slab') ||
-    text.includes('blockwork')
-  ) return 'Superstructure'
-  if (text.includes('roof')) return 'Roofing'
-  if (
-    text.includes('mep') ||
-    text.includes('first fix') ||
-    text.includes('electrical') ||
-    text.includes('mechanical') ||
-    text.includes('plumbing')
-  ) return 'MEP First Fix'
-  if (
-    text.includes('finish') ||
-    text.includes('ceiling') ||
-    text.includes('painting') ||
-    text.includes('tiling') ||
-    text.includes('joinery')
-  ) return 'Internal Finishes'
-  if (
-    text.includes('external') ||
-    text.includes('landscape') ||
-    text.includes('road') ||
-    text.includes('drainage')
-  ) return 'External Works'
-  if (
-    text.includes('test') ||
-    text.includes('commission')
-  ) return 'Testing & Commissioning'
-  if (
-    text.includes('snag') ||
-    text.includes('defect')
-  ) return 'Snagging'
-  if (
-    text.includes('handover') ||
-    text.includes('practical completion')
-  ) return 'Handover'
-
-  return 'Other'
+function normalize(value?: string | null) {
+  return String(value || '').trim().toLowerCase()
 }
 
-function stageStatus({
+function activityMatchesStage(
+  stage: DeliveryStageTemplate,
+  activity: ProjectState['schedule']['activities'][number]
+) {
+  const haystack = [
+    activity.name,
+    activity.phase,
+    activity.discipline,
+  ]
+    .map(normalize)
+    .join(' ')
+
+  if (
+    stage.disciplines?.length &&
+    activity.discipline &&
+    stage.disciplines.some(
+      discipline =>
+        normalize(discipline) === normalize(activity.discipline)
+    )
+  ) {
+    return true
+  }
+
+  return stage.aliases.some(alias =>
+    haystack.includes(normalize(alias))
+  )
+}
+
+function getStatus({
   progress,
-  blocked,
+  blockers,
   hasStarted,
+  applicable,
 }: {
   progress: number
-  blocked: boolean
+  blockers: number
   hasStarted: boolean
+  applicable: boolean
 }): DeliveryStageStatus {
+  if (!applicable) return 'not_applicable'
   if (progress >= 100) return 'completed'
-  if (blocked) return 'blocked'
+  if (blockers > 0) return 'blocked'
   if (hasStarted) return 'in_progress'
-  if (progress === 0) return 'not_started'
-  return 'waiting'
+  return 'not_started'
 }
 
-function stageRoute(stage: string) {
-  if (stage === 'Snagging') return '/app/snags'
-  if (stage === 'Handover') return '/app/handover'
-  if (stage === 'MEP First Fix') return '/app/schedule'
-  if (stage === 'Testing & Commissioning') return '/app/quality'
-  return '/app/schedule'
+function buildGlobalBlockers(
+  state: ProjectState,
+  stage: DeliveryStageTemplate
+): DeliveryStageBlocker[] {
+  const blockers: DeliveryStageBlocker[] = []
+
+  if (state.approvals.overdueApprovals > 0) {
+    blockers.push({
+      id: `${stage.id}-approval`,
+      title: `${state.approvals.overdueApprovals} overdue approval item(s)`,
+      source: 'approval',
+      ownerId: null,
+      ownerName: 'Design / Approval Owner',
+      route: '/app/approvals',
+      severity: state.approvals.overdueApprovals >= 3 ? 'critical' : 'warning',
+    })
+  }
+
+  if (state.procurement.atRiskItems > 0) {
+    blockers.push({
+      id: `${stage.id}-procurement`,
+      title: `${state.procurement.atRiskItems} procurement item(s) at risk`,
+      source: 'procurement',
+      ownerId: null,
+      ownerName: 'Procurement Owner',
+      route: '/app/procurement',
+      severity: state.procurement.atRiskItems >= 3 ? 'critical' : 'warning',
+    })
+  }
+
+  if (state.quality.failedInspections > 0) {
+    blockers.push({
+      id: `${stage.id}-quality`,
+      title: `${state.quality.failedInspections} failed inspection(s)`,
+      source: 'quality',
+      ownerId: null,
+      ownerName: 'Quality Owner',
+      route: '/app/quality',
+      severity: 'critical',
+    })
+  }
+
+  if (state.risk.unmitigatedHighRisks > 0) {
+    blockers.push({
+      id: `${stage.id}-risk`,
+      title: `${state.risk.unmitigatedHighRisks} high risk(s) without mitigation`,
+      source: 'risk',
+      ownerId: null,
+      ownerName: 'Risk Owner',
+      route: '/app/risk',
+      severity: 'critical',
+    })
+  }
+
+  if (state.hse.overdueActions > 0) {
+    blockers.push({
+      id: `${stage.id}-hse`,
+      title: `${state.hse.overdueActions} overdue HSE action(s)`,
+      source: 'hse',
+      ownerId: null,
+      ownerName: 'HSE Owner',
+      route: '/app/hse',
+      severity: 'critical',
+    })
+  }
+
+  return blockers
 }
 
 export function calculateDeliveryTwin(
   state: ProjectState
 ): DeliveryTwinResult {
-  const grouped = new Map<
-    string,
-    ProjectState['schedule']['activities']
-  >()
+  const scopeTemplate = resolveProjectScopeTemplate(
+    state.project.scope
+  )
 
-  state.schedule.activities.forEach(activity => {
-    const stage = normalizePhase(
-      activity.phase ||
-      activity.name
+  const templates = getApplicableStageTemplates(
+    state.project.scope
+  )
+
+  const stages: DeliveryStage[] = templates.map(stage => {
+    const activities = state.schedule.activities.filter(activity =>
+      activityMatchesStage(stage, activity)
     )
 
-    const current = grouped.get(stage) || []
-    current.push(activity)
-    grouped.set(stage, current)
-  })
-
-  const stages: DeliveryStage[] = Array.from(
-    grouped.entries()
-  ).map(([phase, activities]) => {
-    const weightTotal = activities.reduce(
-      (sum, item) => sum + (item.weight || 0),
+    const activityWeight = activities.reduce(
+      (sum, activity) => sum + Number(activity.weight || 0),
       0
     )
 
     const progress =
-      weightTotal > 0
+      activities.length === 0
+        ? 0
+        : activityWeight > 0
         ? Math.round(
             activities.reduce(
-              (sum, item) =>
+              (sum, activity) =>
                 sum +
-                item.progress *
-                  (item.weight / weightTotal),
+                activity.progress *
+                  (Number(activity.weight || 0) /
+                    activityWeight),
               0
             )
           )
         : Math.round(
             activities.reduce(
-              (sum, item) => sum + item.progress,
+              (sum, activity) => sum + activity.progress,
               0
-            ) / Math.max(1, activities.length)
+            ) / activities.length
           )
 
-    const blockerCount = activities.filter(
-      item => item.isBlocked
-    ).length
+    const scheduleBlockers: DeliveryStageBlocker[] =
+      activities
+        .filter(
+          activity =>
+            activity.isBlocked &&
+            activity.progress < 100
+        )
+        .map(activity => ({
+          id: `schedule-${activity.id}`,
+          title: `${activity.name} is blocked`,
+          source: 'schedule',
+          ownerId: null,
+          ownerName: activity.discipline || 'Project Team',
+          route: '/app/schedule',
+          severity: activity.isCritical ? 'critical' : 'warning',
+        }))
+
+    const shouldApplyGlobalBlockers =
+      progress < 100 &&
+      (
+        activities.some(activity => activity.isCritical) ||
+        activities.some(activity => activity.progress > 0)
+      )
+
+    const blockers = [
+      ...scheduleBlockers,
+      ...(shouldApplyGlobalBlockers
+        ? buildGlobalBlockers(state, stage)
+        : []),
+    ]
 
     const criticalActivityCount = activities.filter(
-      item =>
-        item.isCritical &&
-        item.progress < 100
+      activity =>
+        activity.isCritical &&
+        activity.progress < 100
     ).length
-
-    const hasStarted = activities.some(
-      item => item.progress > 0
-    )
 
     const readinessScore = Math.max(
       0,
       Math.min(
         100,
         100 -
-          blockerCount * 25 -
-          criticalActivityCount * 10 -
-          Math.max(
-            0,
-            state.approvals.overdueApprovals * 4
-          ) -
-          Math.max(
-            0,
-            state.procurement.atRiskItems * 4
-          )
+          blockers.filter(item => item.severity === 'critical').length * 20 -
+          blockers.filter(item => item.severity === 'warning').length * 10 -
+          criticalActivityCount * 5
       )
     )
 
+    const hasStarted = activities.some(
+      activity => activity.progress > 0
+    )
+
     return {
-      id: phase
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-'),
-      name: phase,
-      phase,
-      discipline:
-        activities.find(item => item.discipline)
-          ?.discipline || null,
+      id: stage.id,
+      name: stage.name,
       progress,
-      status: stageStatus({
+      status: getStatus({
         progress,
-        blocked: blockerCount > 0,
+        blockers: blockers.length,
         hasStarted,
+        applicable: true,
       }),
-      activityIds: activities.map(item => item.id),
-      blockerCount,
+      activityIds: activities.map(activity => activity.id),
+      blockerCount: blockers.length,
       criticalActivityCount,
       readinessScore,
-      route: stageRoute(phase),
+      route: stage.defaultRoute,
+      blockers,
+      ownerLabel:
+        activities.find(activity => activity.discipline)
+          ?.discipline || null,
+      applicable: true,
     }
-  })
-
-  stages.sort((a, b) => {
-    const ai = DEFAULT_STAGE_ORDER.indexOf(a.name)
-    const bi = DEFAULT_STAGE_ORDER.indexOf(b.name)
-
-    if (ai === -1 && bi === -1) {
-      return a.name.localeCompare(b.name)
-    }
-    if (ai === -1) return 1
-    if (bi === -1) return -1
-    return ai - bi
   })
 
   const activeStage =
@@ -215,34 +255,26 @@ export function calculateDeliveryTwin(
     ) || null
 
   const activeIndex = activeStage
-    ? stages.findIndex(
-        stage => stage.id === activeStage.id
-      )
+    ? stages.findIndex(stage => stage.id === activeStage.id)
     : -1
 
   const nextStage =
     activeIndex >= 0
       ? stages
           .slice(activeIndex + 1)
-          .find(
-            stage =>
-              stage.status !== 'completed'
-          ) || null
-      : stages.find(
-          stage =>
-            stage.status !== 'completed'
-        ) || null
+          .find(stage => stage.status !== 'completed') || null
+      : stages.find(stage => stage.status !== 'completed') || null
 
   return {
+    scopeTemplate,
     stages,
     activeStage,
     nextStage,
     completedStages: stages.filter(
       stage => stage.status === 'completed'
     ).length,
-    totalStages: stages.length,
-    overallProgress:
-      state.schedule.weightedProgress,
+    totalApplicableStages: stages.length,
+    overallProgress: state.schedule.weightedProgress,
     generatedAt: new Date().toISOString(),
   }
 }
