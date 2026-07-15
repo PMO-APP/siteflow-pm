@@ -1,0 +1,23 @@
+.pmx-stage-inspector {
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  right: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(460px, 100vw);
+  height: 100vh;
+  background: var(--pmx-surface);
+  border-left: 1px solid var(--pmx-border);
+  box-shadow: var(--pmx-shadow-overlay);
+}
+
+.pmx-stage-inspector-header {
+  padding: var(--pmx-space-5);
+  border-bottom: 1px solid var(--pmx-border);
+}
+
+.pmx-stage-inspector-body {
+  overflow-y: auto;
+  padding: var(--pmx-space-5);
+}
