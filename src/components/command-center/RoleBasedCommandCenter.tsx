@@ -24,6 +24,9 @@ import ExecutiveNarrativePanel from './ExecutiveNarrativePanel'
 import RootCausePanel from './RootCausePanel'
 import RecommendationsPanel from './RecommendationsPanel'
 import HealthTrend from './HealthTrend'
+import DeliveryTwinPanel from './DeliveryTwinPanel'
+
+
 
 import {
   ActivityFeed,
@@ -225,6 +228,10 @@ export default function RoleBasedCommandCenter({
       </section>
 
       <ExecutiveNarrativePanel narrative={intelligence.narrative} />
+      <DeliveryTwinPanel
+  twin={intelligence.deliveryTwin}
+/>
+
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <RoleAwareCommandSections project={project} />
