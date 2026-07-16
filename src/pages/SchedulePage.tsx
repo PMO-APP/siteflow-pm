@@ -1,5 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
-import * as XLSX from 'xlsx'
 import {
   Upload,
   Plus,
@@ -8,11 +6,11 @@ import {
   Flag,
   Search,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { Fragment, useEffect, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
+import { useScheduleImport } from '@/features/schedule/imports'
 import { useQualityGates } from '@/hooks/useData'
 import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
@@ -52,7 +50,7 @@ export default function SchedulePage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
 
-  const queryClient = useQueryClient()
+  const { importExcel, importXml, uploadBackup } = useScheduleImport()
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
 
@@ -96,24 +94,6 @@ export default function SchedulePage() {
     setSearch('')
   }, [disciplineTab])
 
-  const excelDateToISO = (value: any) => {
-    if (!value) return null
-
-    if (typeof value === 'number') {
-      const date = XLSX.SSF.parse_date_code(value)
-      if (!date) return null
-
-      return `${date.y}-${String(date.m).padStart(2, '0')}-${String(
-        date.d
-      ).padStart(2, '0')}`
-    }
-
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return null
-
-    return parsed.toISOString().slice(0, 10)
-  }
-
   const handleBackupUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -124,24 +104,19 @@ export default function SchedulePage() {
 
     const file = event.target.files?.[0]
 
-    if (!file || !projectId) {
-      alert('No project selected.')
+    if (!file) {
+      alert('No file selected.')
       return
     }
 
-    const fileName = `${projectId}/schedule-backups/${activeDiscipline}/${Date.now()}-${file.name}`
-
-    const { error } = await supabase.storage
-      .from('project-files')
-      .upload(fileName, file)
-
-    if (error) {
-      alert(error.message)
-      return
+    try {
+      await uploadBackup(file, activeDiscipline)
+      alert(`${activeDiscipline} schedule backup uploaded successfully.`)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to upload backup.')
+    } finally {
+      event.target.value = ''
     }
-
-    alert(`${activeDiscipline} schedule backup uploaded successfully.`)
-    event.target.value = ''
   }
 
   const handleScheduleUpload = async (
@@ -154,80 +129,21 @@ export default function SchedulePage() {
 
     const file = event.target.files?.[0]
 
-    if (!file || !projectId) {
-      alert('No project selected.')
+    if (!file) {
+      alert('No file selected.')
       return
     }
 
-    const reader = new FileReader()
-
-    reader.onload = async e => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer)
-      const workbook = XLSX.read(data, { type: 'array' })
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
-
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, {
-        defval: '',
-      })
-
-      if (!rows.length) {
-        alert('No rows found in the Excel file.')
-        return
-      }
-
-      const tasksToInsert = rows
-        .filter(row => row['Task Name'] || row['Name'])
-        .map((row, index) => ({
-          project_id: projectId,
-          discipline: activeDiscipline,
-          schedule_source: 'Imported',
-          task_number: Number(row['Task Number'] || index + 1),
-          name: row['Task Name'] || row['Name'],
-          phase: row['Phase'] || `Imported ${activeDiscipline} Schedule`,
-          start_date: excelDateToISO(row['Start Date']),
-          finish_date: excelDateToISO(row['Finish Date']),
-          planned_start: excelDateToISO(row['Start Date']),
-          planned_finish: excelDateToISO(row['Finish Date']),
-          dependencies: row['Dependencies'] || null,
-          responsible: row['Responsible'] || null,
-          status: row['Status'] || 'Not Started',
-          rag: row['RAG'] || '',
-          progress_pct: Number(row['Progress'] || 0),
-          procurement_deadline: excelDateToISO(row['Procurement Deadline']),
-          approval_deadline: excelDateToISO(row['Approval Deadline']),
-          notes: row['Notes'] || null,
-          is_milestone:
-            row['Milestone'] === true ||
-            row['Milestone'] === 'Yes' ||
-            row['Milestone'] === 'YES',
-        }))
-
-      if (!tasksToInsert.length) {
-        alert(
-          'No valid tasks found. Make sure your Excel has a Task Name column.'
-        )
-        return
-      }
-
-      const { error } = await supabase.from('tasks').insert(tasksToInsert)
-
-      if (error) {
-        alert(error.message)
-        return
-      }
-
-      await queryClient.invalidateQueries({
-        queryKey: ['tasks', projectId],
-      })
-
+    try {
+      const count = await importExcel(file, activeDiscipline)
       alert(
-        `${tasksToInsert.length} ${activeDiscipline} Excel tasks imported successfully.`
+        `${count} ${activeDiscipline} Excel tasks imported successfully.`
       )
-
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to import Excel schedule.')
+    } finally {
       event.target.value = ''
     }
-
-    reader.readAsArrayBuffer(file)
   }
 
   const handleXmlScheduleUpload = async (
@@ -240,98 +156,21 @@ export default function SchedulePage() {
 
     const file = event.target.files?.[0]
 
-    if (!file || !projectId) {
-      alert('No project selected.')
+    if (!file) {
+      alert('No file selected.')
       return
     }
 
-    const text = await file.text()
-    const parser = new DOMParser()
-    const xml = parser.parseFromString(text, 'text/xml')
-
-    const parseError = xml.getElementsByTagName('parsererror')[0]
-
-    if (parseError) {
-      alert('Invalid XML file. Please export again from MS Project as XML.')
+    try {
+      const count = await importXml(file, activeDiscipline)
+      alert(
+        `${count} ${activeDiscipline} MS Project XML tasks imported successfully.`
+      )
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to import MS Project XML.')
+    } finally {
       event.target.value = ''
-      return
     }
-
-    const xmlTasks = Array.from(xml.getElementsByTagName('Task'))
-
-    const tasksToInsert = xmlTasks
-      .map((taskNode, index) => {
-        const getText = (tag: string) =>
-          taskNode.getElementsByTagName(tag)[0]?.textContent || ''
-
-        const name = getText('Name')?.trim()
-        const uid = getText('UID')
-        const id = getText('ID')
-        const outlineLevel = getText('OutlineLevel')
-        const start = getText('Start')
-        const finish = getText('Finish')
-        const milestone = getText('Milestone')
-        const percentComplete = Number(getText('PercentComplete') || 0)
-
-        if (!name) return null
-
-        return {
-          project_id: projectId,
-          discipline: activeDiscipline,
-          schedule_source: 'Imported',
-          task_number: Number(id || uid || index + 1),
-          name,
-          phase:
-            outlineLevel === '1'
-              ? name
-              : `Imported ${activeDiscipline} MS Project Schedule`,
-          start_date: start ? start.slice(0, 10) : null,
-          finish_date: finish ? finish.slice(0, 10) : null,
-          planned_start: start ? start.slice(0, 10) : null,
-          planned_finish: finish ? finish.slice(0, 10) : null,
-          dependencies: null,
-          responsible: null,
-          status:
-            percentComplete >= 100
-              ? 'Completed'
-              : percentComplete > 0
-              ? 'In Progress'
-              : 'Not Started',
-          rag: '',
-          progress_pct: percentComplete,
-          procurement_deadline: null,
-          approval_deadline: null,
-          notes: `Imported from MS Project XML. UID: ${uid || 'N/A'}`,
-          is_milestone:
-            milestone === '1' || milestone?.toLowerCase() === 'true',
-        }
-      })
-      .filter(Boolean)
-
-    if (!tasksToInsert.length) {
-      alert('No valid tasks found in the XML file.')
-      event.target.value = ''
-      return
-    }
-
-    const { error } = await supabase
-      .from('tasks')
-      .insert(tasksToInsert as any[])
-
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    await queryClient.invalidateQueries({
-      queryKey: ['tasks', projectId],
-    })
-
-    alert(
-      `${tasksToInsert.length} ${activeDiscipline} MS Project XML tasks imported successfully.`
-    )
-
-    event.target.value = ''
   }
 
   const getTaskProgress = (task: Task): number => {
