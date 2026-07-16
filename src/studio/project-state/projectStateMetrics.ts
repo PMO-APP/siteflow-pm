@@ -628,7 +628,7 @@ export function buildProjectStateSections(
               : 'success',
         },
       ],
-      rawData: state.risk,
+      rawData: state.risks,
     },
     {
       id: 'approvals',
