@@ -1,4 +1,4 @@
-import ProjectStateViewer from '@/components/dev/ProjectStateViewer'
+import ProjectStateViewer from '../components/ProjectStateViewer'
 
 export default function StudioProjectStatePage() {
   return (
