@@ -29,4 +29,5 @@ export type ProjectStateSection = {
   description: string
   count?: number
   metrics: InspectorMetric[]
+  rawData: unknown
 }
