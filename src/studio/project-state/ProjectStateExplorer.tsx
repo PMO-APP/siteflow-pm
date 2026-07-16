@@ -1,38 +1,127 @@
 import { useMemo, useState } from 'react'
-import type { ProjectStateSection, ProjectStateSectionId } from './types'
+import {
+  AlertTriangle,
+  RefreshCw,
+} from 'lucide-react'
+import { useV6ProjectState } from '@/hooks/useV6ProjectState'
+import type { ProjectStateSectionId } from './types'
+import { buildProjectStateSections } from './projectStateMetrics'
 import ExplorerSidebar from './ExplorerSidebar'
 import ExplorerContent from './ExplorerContent'
-
-const sections: ProjectStateSection[] = [
-  { id: 'project', label: 'Project', description: 'Project identity, status, scope and key dates.' },
-  { id: 'schedule', label: 'Schedule', description: 'Activities, completion, overdue work and progress position.' },
-  { id: 'commercial', label: 'Commercial', description: 'Contract sum, variations, payments and forecast cost.' },
-  { id: 'quality', label: 'Quality', description: 'Snags, inspections and critical quality exceptions.' },
-  { id: 'risk', label: 'Risk', description: 'Open risks, high risks and mitigation coverage.' },
-  { id: 'approvals', label: 'Approvals', description: 'Pending, overdue and approved reviews.' },
-  { id: 'procurement', label: 'Procurement', description: 'At-risk, overdue and completed procurement items.' },
-  { id: 'hse', label: 'HSE', description: 'Incidents, open actions and overdue actions.' },
-  { id: 'reports', label: 'Reports', description: 'Weekly, cost and design report submission status.' },
-  { id: 'documents', label: 'Documents', description: 'Documents awaiting review, approved and uploaded this week.' },
-]
 
 export default function ProjectStateExplorer() {
   const [activeSection, setActiveSection] =
     useState<ProjectStateSectionId>('project')
 
-  const active = useMemo(
-    () => sections.find(section => section.id === activeSection) || sections[0],
-    [activeSection]
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useV6ProjectState()
+
+  const sections = useMemo(
+    () =>
+      data
+        ? buildProjectStateSections(data)
+        : [],
+    [data]
   )
 
+  const active = useMemo(
+    () =>
+      sections.find(
+        section =>
+          section.id === activeSection
+      ) || sections[0],
+    [sections, activeSection]
+  )
+
+  if (isLoading) {
+    return (
+      <div className="pmx-state-loading">
+        <div className="pmx-skeleton h-10 w-44" />
+        <div className="pmx-skeleton h-96" />
+      </div>
+    )
+  }
+
+  if (isError || !data || !active) {
+    return (
+      <div className="pmx-state-error">
+        <AlertTriangle size={19} />
+
+        <div>
+          <div className="text-sm font-semibold">
+            Project State could not be loaded
+          </div>
+
+          <div className="mt-1 text-xs">
+            {error instanceof Error
+              ? error.message
+              : 'No ProjectState is available for the selected project.'}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="pmx-btn-secondary pmx-btn-sm ml-auto"
+          onClick={() => refetch()}
+        >
+          <RefreshCw size={14} />
+          Retry
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="pmx-state-explorer">
-      <ExplorerSidebar
-        sections={sections}
-        activeSection={activeSection}
-        onSelect={setActiveSection}
-      />
-      <ExplorerContent section={active} />
+    <div>
+      <div className="pmx-state-toolbar">
+        <div>
+          <div className="text-sm font-semibold text-[var(--pmx-text)]">
+            {data.project.name}
+          </div>
+
+          <div className="mt-1 text-xs text-[var(--pmx-muted)]">
+            Generated{' '}
+            {new Date(
+              data.generatedAt
+            ).toLocaleString('en-GB')}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="pmx-btn-secondary pmx-btn-sm"
+          disabled={isFetching}
+          onClick={() => refetch()}
+        >
+          <RefreshCw
+            size={14}
+            className={
+              isFetching
+                ? 'animate-spin'
+                : ''
+            }
+          />
+          Refresh
+        </button>
+      </div>
+
+      <div className="pmx-state-explorer">
+        <ExplorerSidebar
+          sections={sections}
+          activeSection={activeSection}
+          onSelect={setActiveSection}
+        />
+
+        <ExplorerContent
+          section={active}
+        />
+      </div>
     </div>
   )
 }
