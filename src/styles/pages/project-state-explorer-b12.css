@@ -1,0 +1,39 @@
+.pmx-state-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pmx-space-4);
+  margin-bottom: var(--pmx-space-3);
+  padding: var(--pmx-space-4);
+  background: var(--pmx-surface);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-md);
+}
+
+.pmx-state-loading {
+  display: grid;
+  gap: var(--pmx-space-4);
+}
+
+.pmx-state-error {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: var(--pmx-space-4);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, .08);
+  border: 1px solid rgba(239, 68, 68, .22);
+  border-radius: var(--pmx-radius-md);
+}
+
+.pmx-inspector-value.is-success {
+  color: var(--pmx-success);
+}
+
+.pmx-inspector-value.is-warning {
+  color: var(--pmx-warning);
+}
+
+.pmx-inspector-value.is-danger {
+  color: var(--pmx-danger);
+}
