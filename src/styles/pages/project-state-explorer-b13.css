@@ -1,0 +1,76 @@
+.pmx-state-view-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--pmx-surface-2);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-sm);
+}
+
+.pmx-state-view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 30px;
+  padding: .35rem .6rem;
+  color: var(--pmx-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: .7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pmx-state-view-toggle button.is-active {
+  color: var(--pmx-text);
+  background: var(--pmx-surface);
+}
+
+.pmx-json-preview {
+  display: grid;
+  gap: var(--pmx-space-3);
+}
+
+.pmx-json-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pmx-space-4);
+}
+
+.pmx-json-search {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem .7rem;
+  color: var(--pmx-faint);
+  background: var(--pmx-surface-2);
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-sm);
+}
+
+.pmx-json-search input {
+  width: 100%;
+  color: var(--pmx-text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-size: .75rem;
+}
+
+.pmx-json-code {
+  max-height: 62vh;
+  overflow: auto;
+  margin: 0;
+  padding: var(--pmx-space-4);
+  color: #c7d2fe;
+  background: #0a0f11;
+  border: 1px solid var(--pmx-border);
+  border-radius: var(--pmx-radius-md);
+  font-family: var(--pmx-font-mono);
+  font-size: .72rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
