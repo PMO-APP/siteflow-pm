@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
   AlertTriangle,
+  Braces,
+  LayoutList,
   RefreshCw,
 } from 'lucide-react'
 import { useV6ProjectState } from '@/hooks/useV6ProjectState'
@@ -12,6 +14,9 @@ import ExplorerContent from './ExplorerContent'
 export default function ProjectStateExplorer() {
   const [activeSection, setActiveSection] =
     useState<ProjectStateSectionId>('project')
+
+  const [mode, setMode] =
+    useState<'structured' | 'json'>('structured')
 
   const {
     data,
@@ -77,6 +82,18 @@ export default function ProjectStateExplorer() {
     )
   }
 
+  const generatedAt =
+    new Date(data.generatedAt)
+
+  const ageSeconds = Math.max(
+    0,
+    Math.floor(
+      (Date.now() -
+        generatedAt.getTime()) /
+        1000
+    )
+  )
+
   return (
     <div>
       <div className="pmx-state-toolbar">
@@ -85,30 +102,76 @@ export default function ProjectStateExplorer() {
             {data.project.name}
           </div>
 
-          <div className="mt-1 text-xs text-[var(--pmx-muted)]">
-            Generated{' '}
-            {new Date(
-              data.generatedAt
-            ).toLocaleString('en-GB')}
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--pmx-muted)]">
+            <span>
+              Generated{' '}
+              {generatedAt.toLocaleString('en-GB')}
+            </span>
+
+            <span>•</span>
+
+            <span>
+              {ageSeconds < 60
+                ? `${ageSeconds}s old`
+                : `${Math.floor(ageSeconds / 60)}m old`}
+            </span>
+
+            <span>•</span>
+
+            <span>Source: Supabase</span>
           </div>
         </div>
 
-        <button
-          type="button"
-          className="pmx-btn-secondary pmx-btn-sm"
-          disabled={isFetching}
-          onClick={() => refetch()}
-        >
-          <RefreshCw
-            size={14}
-            className={
-              isFetching
-                ? 'animate-spin'
-                : ''
-            }
-          />
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="pmx-state-view-toggle">
+            <button
+              type="button"
+              className={
+                mode === 'structured'
+                  ? 'is-active'
+                  : ''
+              }
+              onClick={() =>
+                setMode('structured')
+              }
+            >
+              <LayoutList size={14} />
+              Structured
+            </button>
+
+            <button
+              type="button"
+              className={
+                mode === 'json'
+                  ? 'is-active'
+                  : ''
+              }
+              onClick={() =>
+                setMode('json')
+              }
+            >
+              <Braces size={14} />
+              JSON
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="pmx-btn-secondary pmx-btn-sm"
+            disabled={isFetching}
+            onClick={() => refetch()}
+          >
+            <RefreshCw
+              size={14}
+              className={
+                isFetching
+                  ? 'animate-spin'
+                  : ''
+              }
+            />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="pmx-state-explorer">
@@ -120,6 +183,7 @@ export default function ProjectStateExplorer() {
 
         <ExplorerContent
           section={active}
+          mode={mode}
         />
       </div>
     </div>
