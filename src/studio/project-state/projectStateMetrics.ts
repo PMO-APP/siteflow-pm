@@ -450,6 +450,7 @@ export function buildProjectStateSections(
             state.project.portfolioId || 'Not set',
         },
       ],
+      rawData: state.project,
     },
     {
       id: 'schedule',
@@ -494,6 +495,7 @@ export function buildProjectStateSections(
               : 'danger',
         },
       ],
+      rawData: state.schedule,
     },
     {
       id: 'commercial',
@@ -547,6 +549,7 @@ export function buildProjectStateSections(
           ),
         },
       ],
+      rawData: state.commercial,
     },
     {
       id: 'quality',
@@ -595,6 +598,7 @@ export function buildProjectStateSections(
               : 'success',
         },
       ],
+      rawData: state.quality,
     },
     {
       id: 'risk',
@@ -624,6 +628,7 @@ export function buildProjectStateSections(
               : 'success',
         },
       ],
+      rawData: state.risk,
     },
     {
       id: 'approvals',
@@ -654,6 +659,7 @@ export function buildProjectStateSections(
           tone: 'success',
         },
       ],
+      rawData: state.approvals,
     },
     {
       id: 'procurement',
@@ -688,6 +694,7 @@ export function buildProjectStateSections(
           value: state.procurement.length,
         },
       ],
+      rawData: state.procurement,
     },
     {
       id: 'hse',
@@ -721,6 +728,7 @@ export function buildProjectStateSections(
               : 'success',
         },
       ],
+      rawData: state.hse,
     },
     {
       id: 'reports',
@@ -761,6 +769,7 @@ export function buildProjectStateSections(
           ),
         },
       ],
+      rawData: state.reports,
     },
     {
       id: 'documents',
@@ -791,6 +800,7 @@ export function buildProjectStateSections(
             state.documents.uploadedThisWeek,
         },
       ],
+      rawData: state.documents,
     },
   ]
 }
