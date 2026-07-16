@@ -1,12 +1,26 @@
 import type { ProjectStateSection } from './types'
 import InspectorCard from './InspectorCard'
 import InspectorField from './InspectorField'
+import JsonPreview from './JsonPreview'
 
 export default function ExplorerContent({
   section,
+  mode,
 }: {
   section: ProjectStateSection
+  mode: 'structured' | 'json'
 }) {
+  if (mode === 'json') {
+    return (
+      <div className="pmx-state-content">
+        <JsonPreview
+          data={section.rawData}
+          label={section.label}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="pmx-state-content">
       <div className="pmx-eyebrow">
