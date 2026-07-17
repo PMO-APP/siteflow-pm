@@ -79,14 +79,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function RequireInternal({ children }: { children: React.ReactNode }) {
-  const role = useMembershipStore(state => state.role)
-  const workspaceType = useMembershipStore(state => state.workspaceType)
-  const workspace = workspaceType || resolveWorkspace(role)
-
-
-  return <>{children}</>
-}
 
 
 function ViewerRoute({ children }: { children: React.ReactNode }) {
@@ -151,17 +143,11 @@ export default function App() {
       )
       .map(membership => membership.project_id)
 
-    const workspaceType = resolveWorkspace(
-      selectedMembership.role,
-      selectedMembership.workspace_type
-    )
+   
 
     setMembership({
       role: selectedMembership.role,
-      portalRole: selectedMembership.portal_role || null,
-      workspaceType: workspaceType as WorkspaceType,
       accessScope: selectedMembership.access_scope,
-      organizationId: selectedMembership.organization_id,
       portfolioId: selectedMembership.portfolio_id,
       projectId: selectedMembership.project_id,
       projectIds,
