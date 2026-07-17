@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-
-const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
+import { getWorkspaceHome, resolveWorkspace } from '@/platform/access'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -31,20 +30,32 @@ export default function LoginPage() {
 
     const { data: memberships, error } = await supabase
       .from('memberships')
-      .select('role')
+      .select('role, workspace_type, access_scope')
       .or(`user_id.eq.${userId},email.eq.${cleanEmail}`)
 
     if (error) {
       throw error
     }
 
-    const roles = (memberships || []).map(item =>
-      String(item.role || '').toLowerCase().trim()
+    const rows = memberships || []
+
+    const externalMembership = rows.find(item =>
+      resolveWorkspace(item.role, item.workspace_type) !== 'internal'
     )
 
-    const isExternal = roles.some(role => EXTERNAL_ROLES.includes(role))
+    const workspaceMembership = rows.find(
+      item => item.access_scope === 'workspace'
+    )
 
-    return isExternal ? '/external-project' : '/projects'
+    const selectedMembership =
+      externalMembership || workspaceMembership || rows[0]
+
+    const workspace = resolveWorkspace(
+      selectedMembership?.role,
+      selectedMembership?.workspace_type
+    )
+
+    return getWorkspaceHome(workspace)
   }
 
   async function handleSubmit(e: React.FormEvent) {
