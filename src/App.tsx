@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -33,7 +32,6 @@ import StudioIntelligencePage from '@/studio/pages/StudioIntelligencePage'
 import StudioProjectStatePage from '@/studio/pages/StudioProjectStatePage'
 import StudioPlaceholderPage from '@/studio/pages/StudioPlaceholderPage'
 
-import Dashboard from '@/pages/Dashboard'
 import SchedulePage from '@/pages/SchedulePage'
 import QualityPage from '@/pages/QualityPage'
 import HSEPage from '@/pages/HSEPage'
@@ -79,8 +77,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-
-
 function ViewerRoute({ children }: { children: React.ReactNode }) {
   const role = useMembershipStore(state => state.role)
   const path = window.location.pathname
@@ -123,33 +119,47 @@ export default function App() {
 
     const { data: memberships, error } = await query
 
-    if (error || !memberships || memberships.length === 0) {
+    if (error) {
+      console.error('Membership loading failed:', error)
       clearMembership()
       return
     }
 
-   
+    if (!memberships || memberships.length === 0) {
+      clearMembership()
+      return
+    }
 
-    const workspaceMembership = memberships.find(
-      membership => membership.access_scope === 'workspace'
-    )
+    const selectedMembership =
+      memberships.find(
+        membership => membership.access_scope === 'workspace'
+      ) ??
+      memberships.find(
+        membership => membership.access_scope === 'portfolio'
+      ) ??
+      memberships.find(
+        membership => membership.access_scope === 'project'
+      ) ??
+      memberships[0]
 
-
-
-    const projectIds = memberships
-      .filter(
-        membership =>
-          membership.access_scope === 'project' && membership.project_id
+    const projectIds = Array.from(
+      new Set(
+        memberships
+          .filter(
+            membership =>
+              membership.access_scope === 'project' &&
+              membership.project_id !== null &&
+              membership.project_id !== undefined
+          )
+          .map(membership => membership.project_id)
       )
-      .map(membership => membership.project_id)
-
-   
+    )
 
     setMembership({
       role: selectedMembership.role,
       accessScope: selectedMembership.access_scope,
-      portfolioId: selectedMembership.portfolio_id,
-      projectId: selectedMembership.project_id,
+      portfolioId: selectedMembership.portfolio_id ?? null,
+      projectId: selectedMembership.project_id ?? null,
       projectIds,
     })
   }
@@ -238,7 +248,6 @@ export default function App() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route path="/mixta-admin-login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-       
 
         <Route
           path="/profile"
@@ -253,21 +262,16 @@ export default function App() {
           path="/portfolio-dashboard"
           element={
             <RequireAuth>
-              <RequireInternal>
-                <PortfolioDashboardPage />
-              </RequireInternal>
+              <PortfolioDashboardPage />
             </RequireAuth>
           }
         />
 
-      
         <Route
           path="/projects"
           element={
             <RequireAuth>
-              <RequireInternal>
-                <ProjectsPage />
-              </RequireInternal>
+              <ProjectsPage />
             </RequireAuth>
           }
         />
@@ -276,11 +280,9 @@ export default function App() {
           path="/admin"
           element={
             <RequireAuth>
-              <RequireInternal>
-                <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
-                  <WorkspaceAdminPage />
-                </RequireRole>
-              </RequireInternal>
+              <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+                <WorkspaceAdminPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -289,11 +291,9 @@ export default function App() {
           path="/admin/audit"
           element={
             <RequireAuth>
-              <RequireInternal>
-                <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
-                  <AuditPage />
-                </RequireRole>
-              </RequireInternal>
+              <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+                <AuditPage />
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -302,18 +302,16 @@ export default function App() {
           path="/app"
           element={
             <RequireAuth>
-              <RequireInternal>
-                <ViewerRoute>
-                  <Layout />
-                </ViewerRoute>
-              </RequireInternal>
+              <ViewerRoute>
+                <Layout />
+              </ViewerRoute>
             </RequireAuth>
           }
         >
           <Route index element={<CommandCenterDashboard />} />
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
-           <Route path="costing" element={<CostingPage />} />
+          <Route path="costing" element={<CostingPage />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
           <Route path="hse" element={<HSEPage />} />
@@ -326,91 +324,45 @@ export default function App() {
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
           <Route path="pmo-weekly-report" element={<PMOWeeklyReportPage />} />
-          <Route path="business-intelligence" element={<BusinessIntelligencePage />} />
+          <Route
+            path="business-intelligence"
+            element={<BusinessIntelligencePage />}
+          />
           <Route path="project-packages" element={<ProjectPackagesPage />} />
           <Route path="project-controls" element={<ProjectControlsPage />} />
-          <Route path="schedule-revisions" element={<ScheduleRevisionsPage />} />
-          <Route path="handover" element={<HandoverPage />} />
-         
-          <Route path="team" element={<TeamPage />} />
           <Route
-            path="internal-assignments"
-            element={<InternalAssignmentsPage />}
+            path="schedule-revisions"
+            element={<ScheduleRevisionsPage />}
           />
+          <Route path="handover" element={<HandoverPage />} />
+          <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
-          
-         
         </Route>
-        <Route path="studio" element={<StudioLayout />}>
-  <Route index element={<StudioHome />} />
 
-  <Route
-    path="intelligence"
-    element={<StudioIntelligencePage />}
-  />
-
-  <Route
-    path="project-state"
-    element={<StudioProjectStatePage />}
-  />
-
-  <Route
-    path="recovery-validator"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="project-twin"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="portfolio-simulator"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="scenario-builder"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="executive-preview"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="ai-preview"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="events"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="performance"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="permissions"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="design-system"
-    element={<StudioPlaceholderPage />}
-  />
-
-  <Route
-    path="database"
-    element={<StudioPlaceholderPage />}
-  />
-</Route>
-
+        <Route
+          path="/studio"
+          element={
+            <RequireAuth>
+              <StudioLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<StudioHome />} />
+          <Route path="intelligence" element={<StudioIntelligencePage />} />
+          <Route path="project-state" element={<StudioProjectStatePage />} />
+          <Route path="recovery-validator" element={<StudioPlaceholderPage />} />
+          <Route path="project-twin" element={<StudioPlaceholderPage />} />
+          <Route path="portfolio-simulator" element={<StudioPlaceholderPage />} />
+          <Route path="scenario-builder" element={<StudioPlaceholderPage />} />
+          <Route path="executive-preview" element={<StudioPlaceholderPage />} />
+          <Route path="ai-preview" element={<StudioPlaceholderPage />} />
+          <Route path="events" element={<StudioPlaceholderPage />} />
+          <Route path="performance" element={<StudioPlaceholderPage />} />
+          <Route path="permissions" element={<StudioPlaceholderPage />} />
+          <Route path="design-system" element={<StudioPlaceholderPage />} />
+          <Route path="database" element={<StudioPlaceholderPage />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
