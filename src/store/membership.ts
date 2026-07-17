@@ -1,9 +1,12 @@
 import { create } from 'zustand'
+import type { WorkspaceType } from '@/platform/access'
 
 export type AccessScope = 'workspace' | 'portfolio' | 'project' | null
 
 interface MembershipState {
   role: string | null
+  portalRole: string | null
+  workspaceType: WorkspaceType | null
   accessScope: AccessScope
   organizationId: number | null
   portfolioId: number | null
@@ -12,6 +15,8 @@ interface MembershipState {
 
   setMembership: (membership: {
     role: string | null
+    portalRole?: string | null
+    workspaceType?: WorkspaceType | null
     accessScope: AccessScope
     organizationId?: number | null
     portfolioId?: number | null
@@ -24,6 +29,8 @@ interface MembershipState {
 
 export const useMembershipStore = create<MembershipState>(set => ({
   role: null,
+  portalRole: null,
+  workspaceType: null,
   accessScope: null,
   organizationId: null,
   portfolioId: null,
@@ -33,6 +40,8 @@ export const useMembershipStore = create<MembershipState>(set => ({
   setMembership: membership =>
     set({
       role: membership.role,
+      portalRole: membership.portalRole ?? null,
+      workspaceType: membership.workspaceType ?? null,
       accessScope: membership.accessScope,
       organizationId: membership.organizationId ?? null,
       portfolioId: membership.portfolioId ?? null,
@@ -43,6 +52,8 @@ export const useMembershipStore = create<MembershipState>(set => ({
   clearMembership: () =>
     set({
       role: null,
+      portalRole: null,
+      workspaceType: null,
       accessScope: null,
       organizationId: null,
       portfolioId: null,
