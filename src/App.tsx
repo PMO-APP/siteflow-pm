@@ -32,19 +32,6 @@ import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
 import HandoverPage from '@/pages/HandoverPage'
 
 import CommandCenterDashboard from '@/pages/CommandCenterDashboard'
-import ExternalProjectPortal from '@/pages/ExternalProjectPortal'
-import ExternalTasksPage from '@/pages/external/ExternalTasksPage'
-import ExternalDocumentsPage from '@/pages/external/ExternalDocumentsPage'
-import ExternalRFIPage from '@/pages/external/ExternalRFIPage'
-import ExternalProgressReportPage from '@/pages/external/ExternalProgressReportPage'
-import ExternalReviewDashboard from '@/pages/ExternalReviewDashboard'
-import ExternalSubmissionStatusPage from '@/pages/external/ExternalSubmissionStatusPage'
-import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
-import ExternalAssignmentsPage from '@/pages/ExternalAssignmentsPage'
-import ExternalCommunicationPage from '@/pages/external/ExternalCommunicationPage'
-import ExternalCommunicationReviewPage from '@/pages/ExternalCommunicationReviewPage'
-import ExternalTaskDetailPage from '@/pages/external/ExternalTaskDetailPage'
-import ExternalTaskReviewPage from '@/pages/ExternalTaskReviewPage'
 import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
 import StudioLayout from '@/studio/layout/StudioLayout'
 import StudioHome from '@/studio/pages/StudioHome'
@@ -110,17 +97,6 @@ function RequireInternal({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function RequireExternal({ children }: { children: React.ReactNode }) {
-  const role = useMembershipStore(state => state.role)
-  const workspaceType = useMembershipStore(state => state.workspaceType)
-  const workspace = workspaceType || resolveWorkspace(role)
-
-  if (!isExternalWorkspace(workspace)) {
-    return <Navigate to="/projects" replace />
-  }
-
-  return <>{children}</>
-}
 
 function ViewerRoute({ children }: { children: React.ReactNode }) {
   const role = useMembershipStore(state => state.role)
@@ -169,11 +145,7 @@ export default function App() {
       return
     }
 
-    const externalMembership = memberships.find(membership =>
-      ['consultant', 'contractor', 'vendor', 'subcontractor'].includes(
-        String(membership.role || '').toLowerCase().trim()
-      )
-    )
+   
 
     const workspaceMembership = memberships.find(
       membership => membership.access_scope === 'workspace'
@@ -312,94 +284,7 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/external-project"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalProjectPortal />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/tasks"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalTasksPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/tasks/:taskId"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalTaskDetailPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/submissions"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalSubmissionStatusPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/documents"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalDocumentsPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/progress-report"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalProgressReportPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/communication"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalCommunicationPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/external-project/rfis"
-          element={
-            <RequireAuth>
-              <RequireExternal>
-                <ExternalRFIPage />
-              </RequireExternal>
-            </RequireAuth>
-          }
-        />
-
+      
         <Route
           path="/projects"
           element={
@@ -471,10 +356,7 @@ export default function App() {
           <Route path="project-controls" element={<ProjectControlsPage />} />
           <Route path="schedule-revisions" element={<ScheduleRevisionsPage />} />
           <Route path="handover" element={<HandoverPage />} />
-          <Route
-            path="external-communication"
-            element={<ExternalCommunicationReviewPage />}
-          />
+         
           <Route path="team" element={<TeamPage />} />
           <Route
             path="internal-assignments"
@@ -482,14 +364,8 @@ export default function App() {
           />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
-          <Route
-            path="external-task-review"
-            element={<ExternalTaskReviewPage />}
-          />
-          <Route
-            path="external-assignments"
-            element={<ExternalAssignmentsPage />}
-          />
+          
+         
         </Route>
         <Route path="studio" element={<StudioLayout />}>
   <Route index element={<StudioHome />} />
