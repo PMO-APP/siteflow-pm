@@ -6,6 +6,11 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useThemeStore } from '@/store/theme'
 import { isExternalRole } from '@/lib/permissions'
+import {
+  isExternalWorkspace,
+  resolveWorkspace,
+  type WorkspaceType,
+} from '@/platform/access'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -95,9 +100,23 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function RequireInternal({ children }: { children: React.ReactNode }) {
   const role = useMembershipStore(state => state.role)
+  const workspaceType = useMembershipStore(state => state.workspaceType)
+  const workspace = workspaceType || resolveWorkspace(role)
 
-  if (isExternalRole(role)) {
+  if (isExternalWorkspace(workspace) || isExternalRole(role)) {
     return <Navigate to="/external-project" replace />
+  }
+
+  return <>{children}</>
+}
+
+function RequireExternal({ children }: { children: React.ReactNode }) {
+  const role = useMembershipStore(state => state.role)
+  const workspaceType = useMembershipStore(state => state.workspaceType)
+  const workspace = workspaceType || resolveWorkspace(role)
+
+  if (!isExternalWorkspace(workspace)) {
+    return <Navigate to="/projects" replace />
   }
 
   return <>{children}</>
@@ -170,8 +189,15 @@ export default function App() {
       )
       .map(membership => membership.project_id)
 
+    const workspaceType = resolveWorkspace(
+      selectedMembership.role,
+      selectedMembership.workspace_type
+    )
+
     setMembership({
       role: selectedMembership.role,
+      portalRole: selectedMembership.portal_role || null,
+      workspaceType: workspaceType as WorkspaceType,
       accessScope: selectedMembership.access_scope,
       organizationId: selectedMembership.organization_id,
       portfolioId: selectedMembership.portfolio_id,
@@ -290,7 +316,9 @@ export default function App() {
           path="/external-project"
           element={
             <RequireAuth>
-              <ExternalProjectPortal />
+              <RequireExternal>
+                <ExternalProjectPortal />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -299,7 +327,9 @@ export default function App() {
           path="/external-project/tasks"
           element={
             <RequireAuth>
-              <ExternalTasksPage />
+              <RequireExternal>
+                <ExternalTasksPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -308,7 +338,9 @@ export default function App() {
           path="/external-project/tasks/:taskId"
           element={
             <RequireAuth>
-              <ExternalTaskDetailPage />
+              <RequireExternal>
+                <ExternalTaskDetailPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -317,7 +349,9 @@ export default function App() {
           path="/external-project/submissions"
           element={
             <RequireAuth>
-              <ExternalSubmissionStatusPage />
+              <RequireExternal>
+                <ExternalSubmissionStatusPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -326,7 +360,9 @@ export default function App() {
           path="/external-project/documents"
           element={
             <RequireAuth>
-              <ExternalDocumentsPage />
+              <RequireExternal>
+                <ExternalDocumentsPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -335,7 +371,9 @@ export default function App() {
           path="/external-project/progress-report"
           element={
             <RequireAuth>
-              <ExternalProgressReportPage />
+              <RequireExternal>
+                <ExternalProgressReportPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -344,7 +382,9 @@ export default function App() {
           path="/external-project/communication"
           element={
             <RequireAuth>
-              <ExternalCommunicationPage />
+              <RequireExternal>
+                <ExternalCommunicationPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
@@ -353,7 +393,9 @@ export default function App() {
           path="/external-project/rfis"
           element={
             <RequireAuth>
-              <ExternalRFIPage />
+              <RequireExternal>
+                <ExternalRFIPage />
+              </RequireExternal>
             </RequireAuth>
           }
         />
