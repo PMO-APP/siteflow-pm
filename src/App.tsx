@@ -5,12 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useThemeStore } from '@/store/theme'
-import { isExternalRole } from '@/lib/permissions'
-import {
-  isExternalWorkspace,
-  resolveWorkspace,
-  type WorkspaceType,
-} from '@/platform/access'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -90,9 +84,6 @@ function RequireInternal({ children }: { children: React.ReactNode }) {
   const workspaceType = useMembershipStore(state => state.workspaceType)
   const workspace = workspaceType || resolveWorkspace(role)
 
-  if (isExternalWorkspace(workspace) || isExternalRole(role)) {
-    return <Navigate to="/external-project" replace />
-  }
 
   return <>{children}</>
 }
@@ -151,8 +142,7 @@ export default function App() {
       membership => membership.access_scope === 'workspace'
     )
 
-    const selectedMembership =
-      externalMembership || workspaceMembership || memberships[0]
+
 
     const projectIds = memberships
       .filter(
@@ -348,7 +338,6 @@ export default function App() {
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
-          <Route path="external-review" element={<ExternalReviewDashboard />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
           <Route path="pmo-weekly-report" element={<PMOWeeklyReportPage />} />
           <Route path="business-intelligence" element={<BusinessIntelligencePage />} />
