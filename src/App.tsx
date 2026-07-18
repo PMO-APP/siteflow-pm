@@ -23,6 +23,7 @@ import DesignReportsPage from '@/pages/DesignReportsPage'
 import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
 import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
 import HandoverPage from '@/pages/HandoverPage'
+import AdministrationPage from '@/pages/AdministrationPage'
 
 import CommandCenterDashboard from '@/pages/CommandCenterDashboard'
 import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
@@ -312,8 +313,17 @@ export default function App() {
           }
         >
           <Route index element={<CommandCenterDashboard />} />
-          <Route
-  path="organizations"
+    <Route
+  path="administration"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <AdministrationPage />
+    </RequireRole>
+  }
+/>
+
+<Route
+  path="administration/organizations"
   element={
     <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
       <OrganizationsPage />
