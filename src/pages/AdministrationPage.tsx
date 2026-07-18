@@ -5,7 +5,7 @@ import {
   KeyRound,
   Layers3,
   ClipboardList,
-  BriefcaseBusiness,
+  Briefcase,
   Settings,
 } from 'lucide-react'
 import AdminCard from '@/components/administration/AdminCard'
