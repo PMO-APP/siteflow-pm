@@ -57,7 +57,7 @@ const modules = [
     title: 'Portfolios',
     description: 'Manage portfolios and project assignments.',
     to: '/app/administration/portfolios',
-    icon: BriefcaseBusiness,
+    icon: Briefcase,
     status: 'coming-soon' as const,
   },
   {
