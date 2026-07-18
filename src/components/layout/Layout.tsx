@@ -38,14 +38,21 @@ import {
   ClipboardCheck,
   UserCircle,
   Building2,
-  MessageSquare,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
-const NAV = [
+type NavItem = {
+  to: string
+  icon: any
+  label: string
+  exact?: boolean
+  roles?: string[]
+}
+
+const NAV: NavItem[] = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
   {
@@ -91,12 +98,17 @@ const NAV = [
     icon: ClipboardList,
     label: 'Internal Assignments',
   },
- 
   {
   to: '/app/business-intelligence',
   icon: Brain,
   label: 'Business Intelligence',
 },
+  {
+    to: '/app/administration',
+    icon: Shield,
+    label: 'Administration',
+    roles: ['workspace_admin', 'admin', 'pmo'],
+  },
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
@@ -321,7 +333,13 @@ export default function Layout() {
       return VIEWER_NAV.includes(item.to)
     }
 
-    return canViewInternalPages(role)
+    if (!canViewInternalPages(role)) return false
+
+    if (item.roles) {
+      return item.roles.includes(role ?? '')
+    }
+
+    return true
   })
 
   const currentPage = allowedNav.find(n =>
