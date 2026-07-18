@@ -21,7 +21,7 @@ import { useThemeStore } from '@/store/theme'
 import { getInitials } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
-const EXTERNAL_ROLES = ['consultant', 'contractor', 'vendor', 'subcontractor']
+
 
 function formatRoleLabel(role?: string | null) {
   if (!role) return 'Team Member'
@@ -32,10 +32,6 @@ function formatRoleLabel(role?: string | null) {
     pmo: 'PMO',
     portfolio_manager: 'Portfolio Manager',
     project_owner: 'Project Owner',
-    contractor: 'Contractor',
-    consultant: 'Consultant',
-    vendor: 'Vendor',
-    subcontractor: 'Subcontractor',
     design: 'Design Team',
     costing: 'Costing Team',
     housebuild: 'Housebuild',
@@ -63,10 +59,10 @@ const projectIds = useMembershipStore(state => state.projectIds)
 
   
 
-  const [organizationName, setOrganizationName] = useState('—')
+  const [portfolioName, setPortfolioName] = useState('—')
   const [portfolioName, setPortfolioName] = useState('—')
  const [projectNames, setProjectNames] = useState<string[]>([])
-  const [assignedProjects, setAssignedProjects] = useState<any[]>([])
+  const [projectNames, setProjectNames] = useState<string[]>([])
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -78,74 +74,9 @@ const projectIds = useMembershipStore(state => state.projectIds)
 
   useEffect(() => {
     loadAccessContext()
-  }, [organizationId, portfolioId, projectId, user?.email])
+ }, [portfolioId, projectIds ])
 
-  async function loadAccessContext() {
-    if (organizationId) {
-      const { data } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', organizationId)
-        .maybeSingle()
-
-      setOrganizationName(data?.name || '—')
-    } else {
-      setOrganizationName('—')
-    }
-
-    if (!isExternalUser && portfolioId) {
-      const { data } = await supabase
-        .from('portfolios')
-        .select('name')
-        .eq('id', portfolioId)
-        .maybeSingle()
-
-      setPortfolioName(data?.name || '—')
-    } else {
-      setPortfolioName('—')
-    }
-
- if (!isExternalUser && projectIds.length > 0) {
-  const { data } = await supabase
-    .from('projects')
-    .select('project_name')
-    .in('id', projectIds)
-
-  setProjectNames(
-    (data || []).map(project => project.project_name)
-  )
-} else {
-  setProjectNames([])
-}
-
-    if (isExternalUser && user?.email) {
-      const cleanEmail = user.email.toLowerCase().trim()
-
-      const { data: membershipRows } = await supabase
-        .from('memberships')
-        .select('project_id')
-        .or(`user_id.eq.${user.id},email.eq.${cleanEmail}`)
-
-      const projectIds = [
-        ...new Set(
-          (membershipRows || [])
-            .map(item => item.project_id)
-            .filter(Boolean)
-        ),
-      ]
-
-      if (projectIds.length > 0) {
-        const { data: projects } = await supabase
-          .from('projects')
-          .select('id, project_name, location')
-          .in('id', projectIds)
-
-        setAssignedProjects(projects || [])
-      } else {
-        setAssignedProjects([])
-      }
-    }
-  }
+ 
 
   async function updatePassword() {
     setPasswordNotice('')
@@ -203,7 +134,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <button
             type="button"
-            onClick={() => navigate(isExternalUser ? '/external-project' : '/')}
+            onClick={() => navigate('/')
             className="text-left w-fit"
           >
             <PMOCorexLogo size={42} />
@@ -215,21 +146,12 @@ const projectIds = useMembershipStore(state => state.projectIds)
               Back
             </button>
 
-            {isExternalUser ? (
-              <button
-                onClick={() => navigate('/external-project')}
-                className="btn btn-gold"
-              >
-                External Portal
-              </button>
-            ) : (
-              <button
-                onClick={() => navigate('/projects')}
-                className="btn btn-gold"
-              >
-                Workspace Hub
-              </button>
-            )}
+            <button
+    onClick={() => navigate('/projects')}
+    className="btn btn-gold"
+>
+    Workspace Hub
+</button>
           </div>
         </div>
 
@@ -244,7 +166,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
 
               <div>
                 <div className="inline-flex mb-2 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-                  {isExternalUser ? 'Partner Account' : 'PMOCorex Account'}
+                  PMOCorex Account
                 </div>
 
                 <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
@@ -300,84 +222,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
               </div>
             </section>
 
-            {isExternalUser ? (
-              <section className="card p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <FolderKanban size={18} className="text-[#c49e48]" />
-
-                  <div>
-                    <h2 className="text-lg font-bold text-[#ede8de]">
-                      Assigned Projects
-                    </h2>
-
-                    <p className="text-xs text-[#6e7d8c]">
-                      Projects where you have been granted partner access.
-                    </p>
-                  </div>
-                </div>
-
-                {assignedProjects.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-[#6e7d8c]">
-                    No assigned projects found.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {assignedProjects.map(project => (
-                      <div
-                        key={project.id}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                      >
-                        <div className="text-sm font-bold text-[#ede8de]">
-                          {project.project_name}
-                        </div>
-
-                        <div className="text-xs text-[#6e7d8c] mt-1">
-                          {project.location || 'No location set'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            ) : (
-              <section className="card p-6">
-                <div className="flex items-center gap-2 mb-5">
-                  <Building2 size={18} className="text-[#c49e48]" />
-
-                  <div>
-                    <h2 className="text-lg font-bold text-[#ede8de]">
-                      Access Details
-                    </h2>
-
-                    <p className="text-xs text-[#6e7d8c]">
-                      Workspace, portfolio, and project access assigned to your account.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <InfoCard
-                    icon={Building2}
-                    label="Organization"
-                    value={organizationName}
-                  />
-                  <InfoCard
-                    icon={Briefcase}
-                    label="Portfolio"
-                    value={portfolioName}
-                  />
-                 <InfoCard
-  icon={FolderKanban}
-  label="Projects"
-  value={
-    projectNames.length > 0
-      ? projectNames.join(', ')
-      : '—'
-  }
-/>
-                </div>
-              </section>
-            )}
+            
 
             <section className="card p-6">
               <div className="flex items-center gap-2 mb-5">
@@ -389,7 +234,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
                   </h2>
 
                   <p className="text-xs text-[#6e7d8c]">
-                    Change your password for future PMOCorex sign-ins.
+                    Change your password.
                   </p>
                 </div>
               </div>
@@ -521,7 +366,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
                   </h2>
 
                   <p className="text-xs text-[#6e7d8c] mt-1">
-                    Sign out of this PMOCorex session.
+                    Sign out of your account.
                   </p>
                 </div>
               </div>
@@ -541,26 +386,15 @@ const projectIds = useMembershipStore(state => state.projectIds)
               </h2>
 
               <div className="space-y-2 mt-4">
-                {isExternalUser ? (
-                  <button
-                    onClick={() => navigate('/external-project')}
-                    className="btn btn-ghost w-full justify-center"
-                  >
-                    <ArrowLeft size={15} />
-                    External Portal
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => navigate('/projects')}
-                    className="btn btn-ghost w-full justify-center"
-                  >
-                    <ArrowLeft size={15} />
-                    Workspace Hub
-                  </button>
-                )}
+               <button
+    onClick={() => navigate('/projects')}
+    className="btn btn-ghost w-full justify-center"
+>
+    <ArrowLeft size={15} />
+    Workspace Hub
+</button>
 
-                {!isExternalUser &&
-                  ['workspace_admin', 'admin', 'pmo'].includes(role || '') && (
+               {['workspace_admin','admin','pmo'].includes(role || '')
                     <button
                       onClick={() => navigate('/admin')}
                       className="btn btn-ghost w-full justify-center"
