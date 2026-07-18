@@ -32,6 +32,7 @@ import StudioIntelligencePage from '@/studio/pages/StudioIntelligencePage'
 import StudioProjectStatePage from '@/studio/pages/StudioProjectStatePage'
 import StudioPlaceholderPage from '@/studio/pages/StudioPlaceholderPage'
 
+
 import SchedulePage from '@/pages/SchedulePage'
 import QualityPage from '@/pages/QualityPage'
 import HSEPage from '@/pages/HSEPage'
@@ -48,6 +49,7 @@ import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 import ProjectControlsPage from '@/pages/ProjectControlsPage'
 import ScheduleRevisionsPage from '@/pages/ScheduleRevisionsPage'
+import OrganizationsPage from '@/features/organizations/pages/OrganizationsPage'
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
