@@ -71,7 +71,7 @@ export default function OrganizationDetailPage() {
               <tr key={item.id} className="border-t">
                 <td className="py-3">{item.profile?.full_name ?? 'Unnamed user'}</td>
                 <td className="py-3">{item.profile?.email ?? '—'}</td>
-                <td className="py-3 capitalize">{item.role.replaceAll('_', ' ')}</td>
+                <td className="py-3 capitalize">{item.role.replace(/_/g, ' ')}</td>
               </tr>
             ))}
           </tbody>
@@ -112,7 +112,7 @@ export default function OrganizationDetailPage() {
             {(invitations.data ?? []).map((item) => (
               <tr key={item.id} className="border-t">
                 <td className="py-3">{item.email}</td>
-                <td className="py-3 capitalize">{item.role.replaceAll('_', ' ')}</td>
+                <td className="py-3 capitalize">{item.role.replace(/_/g, ' ')}</td>
                 <td className="py-3 capitalize">{item.status}</td>
               </tr>
             ))}
