@@ -91,27 +91,7 @@ const NAV = [
     icon: ClipboardList,
     label: 'Internal Assignments',
   },
-  {
-    to: '/app/external-task-review',
-    icon: ClipboardList,
-    label: 'Task Review',
-  },
-  {
-    to: '/app/external-assignments',
-    icon: Building2,
-    label: 'External Assignments',
-  },
-
-  {
-    to: '/app/external-review',
-    icon: Building2,
-    label: 'External Review',
-  },
-  {
-    to: '/app/external-communication',
-    icon: MessageSquare,
-    label: 'Communications',
-  },
+ 
   {
   to: '/app/business-intelligence',
   icon: Brain,
