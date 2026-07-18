@@ -24,6 +24,9 @@ import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
 import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
 import HandoverPage from '@/pages/HandoverPage'
 import AdministrationPage from '@/pages/AdministrationPage'
+import CreateOrganizationPage from '@/features/organizations/pages/CreateOrganizationPage'
+import OrganizationDetailPage from '@/features/organizations/pages/OrganizationDetailPage'
+
 
 import CommandCenterDashboard from '@/pages/CommandCenterDashboard'
 import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
@@ -330,6 +333,34 @@ export default function App() {
     </RequireRole>
   }
 />
+
+<Route
+  path="administration/organizations/new"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <CreateOrganizationPage />
+    </RequireRole>
+  }
+/>
+
+<Route
+  path="administration/organizations/:organizationId"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <OrganizationDetailPage />
+    </RequireRole>
+  }
+/>
+
+<Route
+  path="administration/audit"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <AuditPage />
+    </RequireRole>
+  }
+/>
+
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
