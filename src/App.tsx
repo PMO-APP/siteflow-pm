@@ -299,6 +299,14 @@ export default function App() {
             </RequireAuth>
           }
         />
+<Route
+  path="organizations"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <OrganizationsPage />
+    </RequireRole>
+  }
+/>
 
         <Route
           path="/app"
