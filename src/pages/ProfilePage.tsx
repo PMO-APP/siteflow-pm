@@ -60,9 +60,9 @@ const projectIds = useMembershipStore(state => state.projectIds)
   
 
   const [portfolioName, setPortfolioName] = useState('—')
-  const [portfolioName, setPortfolioName] = useState('—')
+  
  const [projectNames, setProjectNames] = useState<string[]>([])
-  const [projectNames, setProjectNames] = useState<string[]>([])
+  
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -72,9 +72,32 @@ const projectIds = useMembershipStore(state => state.projectIds)
   const [passwordError, setPasswordError] = useState('')
   const [passwordLoading, setPasswordLoading] = useState(false)
 
-  useEffect(() => {
-    loadAccessContext()
- }, [portfolioId, projectIds ])
+  async function loadAccessContext() {
+  if (portfolioId) {
+    const { data } = await supabase
+      .from('portfolios')
+      .select('name')
+      .eq('id', portfolioId)
+      .maybeSingle()
+
+    setPortfolioName(data?.name || '—')
+  } else {
+    setPortfolioName('—')
+  }
+
+  if (projectIds.length > 0) {
+    const { data } = await supabase
+      .from('projects')
+      .select('project_name')
+      .in('id', projectIds)
+
+    setProjectNames(
+      (data || []).map(p => p.project_name)
+    )
+  } else {
+    setProjectNames([])
+  }
+}
 
  
 
@@ -134,7 +157,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <button
             type="button"
-            onClick={() => navigate('/')
+            onClick={() => navigate('/')}
             className="text-left w-fit"
           >
             <PMOCorexLogo size={42} />
@@ -394,7 +417,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
     Workspace Hub
 </button>
 
-               {['workspace_admin','admin','pmo'].includes(role || '')
+               {['workspace_admin','admin','pmo'].includes(role || '') && (
                     <button
                       onClick={() => navigate('/admin')}
                       className="btn btn-ghost w-full justify-center"
