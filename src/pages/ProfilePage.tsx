@@ -56,12 +56,12 @@ export default function ProfilePage() {
 
   const role = useMembershipStore(state => state.role)
   const accessScope = useMembershipStore(state => state.accessScope)
-  const organizationId = useMembershipStore(state => state.organizationId)
+
   const portfolioId = useMembershipStore(state => state.portfolioId)
   const projectId = useMembershipStore(state => state.projectId)
 const projectIds = useMembershipStore(state => state.projectIds)
 
-  const isExternalUser = EXTERNAL_ROLES.includes(role || '')
+  
 
   const [organizationName, setOrganizationName] = useState('—')
   const [portfolioName, setPortfolioName] = useState('—')
