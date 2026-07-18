@@ -299,14 +299,7 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="organizations"
-  element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
-      <OrganizationsPage />
-    </RequireRole>
-  }
-/>
+
 
         <Route
           path="/app"
@@ -319,6 +312,14 @@ export default function App() {
           }
         >
           <Route index element={<CommandCenterDashboard />} />
+          <Route
+  path="organizations"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <OrganizationsPage />
+    </RequireRole>
+  }
+/>
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
