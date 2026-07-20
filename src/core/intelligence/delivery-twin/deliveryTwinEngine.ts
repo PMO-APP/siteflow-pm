@@ -11,67 +11,91 @@ import type {
   DeliveryTwinResult,
 } from './deliveryTwinTypes'
 
-function normalize(value?: string | null) {
-  return String(value || '').trim().toLowerCase()
-}
+type ScheduleActivity = ProjectState['schedule']['activities'][number]
 
-function includesAlias(value: string, aliases: string[]) {
-  return aliases.some(alias => value.includes(normalize(alias)))
+function normalize(value?: string | null) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_–—-]+/g, ' ')
+    .replace(/\s+/g, ' ')
 }
 
 /**
- * Returns a confidence score for assigning one schedule activity to one stage.
- * Discipline is deliberately only a tie-breaker. It must never assign every
- * Housebuild task to every Housebuild stage.
+ * Scores an activity against a delivery stage.
+ *
+ * Activity name is deliberately given much more weight than phase. Imported
+ * schedules frequently repeat a phase value across several activities, which
+ * previously caused one activity to be counted in multiple delivery stages.
+ * Discipline is not used as a standalone match because a Housebuild activity
+ * can belong to mobilisation, substructure, superstructure, roofing or finishes.
  */
-function stageMatchScore(
+function getStageMatchScore(
   stage: DeliveryStageTemplate,
-  activity: ProjectState['schedule']['activities'][number]
+  activity: ScheduleActivity
 ) {
-  const phase = normalize(activity.phase)
   const name = normalize(activity.name)
-  const discipline = normalize(activity.discipline)
+  const phase = normalize(activity.phase)
 
   let score = 0
 
-  if (phase && includesAlias(phase, stage.aliases)) score += 100
-  if (name && includesAlias(name, stage.aliases)) score += 60
+  for (const rawAlias of stage.aliases) {
+    const alias = normalize(rawAlias)
+    if (!alias) continue
 
-  // Exact stage id/name matches are stronger than loose aliases.
-  if (phase === normalize(stage.id) || phase === normalize(stage.name)) score += 120
-  if (name === normalize(stage.name)) score += 80
+    if (name === alias) {
+      score = Math.max(score, 120)
+    } else if (name.startsWith(`${alias} `) || name.endsWith(` ${alias}`)) {
+      score = Math.max(score, 105)
+    } else if (name.includes(alias)) {
+      score = Math.max(score, 95)
+    }
 
-  // Discipline only confirms an already identified stage.
+    if (phase === alias) {
+      score = Math.max(score, 45)
+    } else if (phase.includes(alias)) {
+      score = Math.max(score, 30)
+    }
+  }
+
+  // Discipline may break a tie, but can never classify an activity by itself.
   if (
     score > 0 &&
-    stage.disciplines?.some(item => normalize(item) === discipline)
+    stage.disciplines?.some(
+      discipline => normalize(discipline) === normalize(activity.discipline)
+    )
   ) {
-    score += 5
+    score += 3
   }
 
   return score
 }
 
-function assignActivitiesToStages(
+/** Assign every schedule activity to one, and only one, delivery stage. */
+function classifyActivities(
   templates: DeliveryStageTemplate[],
-  activities: ProjectState['schedule']['activities']
+  activities: ScheduleActivity[]
 ) {
-  const assigned = new Map<string, ProjectState['schedule']['activities']>()
-  templates.forEach(stage => assigned.set(stage.id, []))
+  const stageActivities = new Map<string, ScheduleActivity[]>()
 
-  activities.forEach(activity => {
+  templates.forEach(stage => stageActivities.set(stage.id, []))
+
+  for (const activity of activities) {
     const ranked = templates
-      .map(stage => ({ stage, score: stageMatchScore(stage, activity) }))
+      .map(stage => ({ stage, score: getStageMatchScore(stage, activity) }))
       .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score || a.stage.order - b.stage.order)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        return a.stage.order - b.stage.order
+      })
 
-    const best = ranked[0]?.stage
-    if (!best) return
+    const best = ranked[0]
+    if (!best) continue
 
-    assigned.get(best.id)?.push(activity)
-  })
+    stageActivities.get(best.stage.id)?.push(activity)
+  }
 
-  return assigned
+  return stageActivities
 }
 
 function getStatus({
@@ -161,41 +185,48 @@ function buildGlobalBlockers(
   return blockers
 }
 
+function calculateStageProgress(activities: ScheduleActivity[]) {
+  if (activities.length === 0) return 0
+
+  const activityWeight = activities.reduce(
+    (sum, activity) => sum + Math.max(0, Number(activity.weight || 0)),
+    0
+  )
+
+  if (activityWeight > 0) {
+    return Math.round(
+      activities.reduce(
+        (sum, activity) =>
+          sum +
+          Math.max(0, Math.min(100, activity.progress)) *
+            (Math.max(0, Number(activity.weight || 0)) / activityWeight),
+        0
+      )
+    )
+  }
+
+  return Math.round(
+    activities.reduce(
+      (sum, activity) =>
+        sum + Math.max(0, Math.min(100, activity.progress)),
+      0
+    ) / activities.length
+  )
+}
+
 export function calculateDeliveryTwin(
   state: ProjectState
 ): DeliveryTwinResult {
   const scopeTemplate = resolveProjectScopeTemplate(state.project.scope)
   const templates = getApplicableStageTemplates(state.project.scope)
-  const assignedActivities = assignActivitiesToStages(
+  const classifiedActivities = classifyActivities(
     templates,
     state.schedule.activities
   )
 
   const stages: DeliveryStage[] = templates.map(stage => {
-    const activities = assignedActivities.get(stage.id) || []
-
-    const activityWeight = activities.reduce(
-      (sum, activity) => sum + Number(activity.weight || 0),
-      0
-    )
-
-    const progress =
-      activities.length === 0
-        ? 0
-        : activityWeight > 0
-        ? Math.round(
-            activities.reduce(
-              (sum, activity) =>
-                sum +
-                activity.progress *
-                  (Number(activity.weight || 0) / activityWeight),
-              0
-            )
-          )
-        : Math.round(
-            activities.reduce((sum, activity) => sum + activity.progress, 0) /
-              activities.length
-          )
+    const activities = classifiedActivities.get(stage.id) || []
+    const progress = calculateStageProgress(activities)
 
     const scheduleBlockers: DeliveryStageBlocker[] = activities
       .filter(activity => activity.isBlocked && activity.progress < 100)
@@ -209,13 +240,10 @@ export function calculateDeliveryTwin(
         severity: activity.isCritical ? 'critical' : 'warning',
       }))
 
-    const hasStarted = activities.some(activity => activity.progress > 0)
-    const hasActiveCritical = activities.some(
-      activity => activity.isCritical && activity.progress > 0 && activity.progress < 100
-    )
-
     const shouldApplyGlobalBlockers =
-      progress < 100 && (hasActiveCritical || hasStarted)
+      progress < 100 &&
+      (activities.some(activity => activity.isCritical) ||
+        activities.some(activity => activity.progress > 0))
 
     const blockers = [
       ...scheduleBlockers,
@@ -223,8 +251,7 @@ export function calculateDeliveryTwin(
     ]
 
     const criticalActivityCount = activities.filter(
-      activity =>
-        activity.isCritical && activity.progress > 0 && activity.progress < 100
+      activity => activity.isCritical && activity.progress < 100
     ).length
 
     const readinessScore = Math.max(
@@ -237,6 +264,8 @@ export function calculateDeliveryTwin(
           criticalActivityCount * 5
       )
     )
+
+    const hasStarted = activities.some(activity => activity.progress > 0)
 
     return {
       id: stage.id,
