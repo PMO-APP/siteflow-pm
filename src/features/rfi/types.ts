@@ -23,8 +23,22 @@ export interface RFI {
   updated_at: string
 }
 
-export type CreateRFIInput = Pick<RFI, 'project_id'|'title'|'question'|'discipline'|'priority'> & {
+export type CreateRFIInput = Pick<
+  RFI,
+  'project_id' | 'title' | 'question' | 'discipline' | 'priority'
+> & {
   organization_id?: string | null
   assigned_to?: string | null
   due_date?: string | null
+}
+
+export type UpdateRFIInput = Partial<
+  Pick<RFI, 'title' | 'question' | 'discipline' | 'priority' | 'organization_id' | 'assigned_to' | 'due_date'>
+>
+
+export interface RFIFilters {
+  search?: string
+  status?: RFIStatus | 'All'
+  priority?: RFIPriority | 'All'
+  discipline?: RFIDiscipline | 'All'
 }
