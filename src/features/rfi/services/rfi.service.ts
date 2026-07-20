@@ -1,30 +1,33 @@
 import { supabase } from '@/lib/supabase'
-import type { CreateRFIInput, RFI, RFIFilters, RFIStatus, UpdateRFIInput } from '../types'
-import { getAllowedRFITransitions } from '../utils/rfi.utils'
+import type {
+  CreateRFIInput,
+  RFI,
+  RFIComment,
+  RFIHistoryEvent,
+  RFIStatus,
+} from '../types'
 
-export async function listRFIs(projectId: number, filters: RFIFilters = {}): Promise<RFI[]> {
-  let query = supabase
+async function currentActor() {
+  const { data } = await supabase.auth.getUser()
+  const user = data.user
+  return {
+    id: user?.id ?? null,
+    name:
+      user?.user_metadata?.full_name ??
+      user?.user_metadata?.name ??
+      user?.email ??
+      null,
+  }
+}
+
+export async function listRFIs(projectId: number): Promise<RFI[]> {
+  const { data, error } = await supabase
     .from('rfis')
     .select('*')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
-
-  if (filters.status && filters.status !== 'All') query = query.eq('status', filters.status)
-  if (filters.priority && filters.priority !== 'All') query = query.eq('priority', filters.priority)
-  if (filters.discipline && filters.discipline !== 'All') query = query.eq('discipline', filters.discipline)
-
-  const { data, error } = await query
   if (error) throw error
-
-  const rows = (data || []) as RFI[]
-  const search = filters.search?.trim().toLowerCase()
-  if (!search) return rows
-
-  return rows.filter(rfi =>
-    [rfi.reference_no, rfi.title, rfi.question, rfi.discipline]
-      .filter(Boolean)
-      .some(value => value.toLowerCase().includes(search))
-  )
+  return (data || []) as RFI[]
 }
 
 export async function getRFI(id: string): Promise<RFI> {
@@ -34,54 +37,76 @@ export async function getRFI(id: string): Promise<RFI> {
 }
 
 export async function createRFI(input: CreateRFIInput): Promise<RFI> {
-  const { data: auth } = await supabase.auth.getUser()
-  if (!auth.user) throw new Error('You must be signed in.')
-
-  const payload = {
-    ...input,
-    title: input.title.trim(),
-    question: input.question.trim(),
-    created_by: auth.user.id,
-  }
-
-  const { data, error } = await supabase.from('rfis').insert(payload).select('*').single()
+  const actor = await currentActor()
+  if (!actor.id) throw new Error('You must be signed in.')
+  const { data, error } = await supabase
+    .from('rfis')
+    .insert({ ...input, created_by: actor.id })
+    .select('*')
+    .single()
   if (error) throw error
   return data as RFI
 }
 
-export async function updateRFI(id: string, values: UpdateRFIInput): Promise<RFI> {
-  const payload = {
-    ...values,
-    ...(values.title !== undefined ? { title: values.title.trim() } : {}),
-    ...(values.question !== undefined ? { question: values.question.trim() } : {}),
-  }
-
-  const { data, error } = await supabase.from('rfis').update(payload).eq('id', id).select('*').single()
+export async function updateRFI(id: string, values: Partial<RFI>): Promise<RFI> {
+  const { data, error } = await supabase
+    .from('rfis')
+    .update(values)
+    .eq('id', id)
+    .select('*')
+    .single()
   if (error) throw error
   return data as RFI
 }
 
 export async function transitionRFI(id: string, status: RFIStatus, response?: string): Promise<RFI> {
-  const current = await getRFI(id)
-  const allowed = getAllowedRFITransitions(current.status)
-  if (!allowed.includes(status)) {
-    throw new Error(`An RFI cannot move from ${current.status} to ${status}.`)
-  }
-
-  if (status === 'Answered' && !response?.trim()) {
-    throw new Error('Enter the formal response before answering the RFI.')
-  }
-
   const now = new Date().toISOString()
-  const patch: Record<string, string | null> = { status }
+  const patch: Partial<RFI> = { status }
   if (status === 'Submitted') patch.submitted_at = now
   if (status === 'Answered') {
     patch.answered_at = now
-    patch.response = response!.trim()
+    patch.response = response?.trim() || null
   }
   if (status === 'Closed') patch.closed_at = now
+  return updateRFI(id, patch)
+}
 
-  const { data, error } = await supabase.from('rfis').update(patch).eq('id', id).select('*').single()
+export async function listRFIComments(rfiId: string): Promise<RFIComment[]> {
+  const { data, error } = await supabase
+    .from('rfi_comments')
+    .select('*')
+    .eq('rfi_id', rfiId)
+    .order('created_at', { ascending: true })
   if (error) throw error
-  return data as RFI
+  return (data || []) as RFIComment[]
+}
+
+export async function addRFIComment(rfiId: string, body: string): Promise<RFIComment> {
+  const actor = await currentActor()
+  if (!actor.id) throw new Error('You must be signed in.')
+  const cleanBody = body.trim()
+  if (!cleanBody) throw new Error('Comment cannot be empty.')
+
+  const { data, error } = await supabase
+    .from('rfi_comments')
+    .insert({
+      rfi_id: rfiId,
+      body: cleanBody,
+      author_id: actor.id,
+      author_name: actor.name,
+    })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data as RFIComment
+}
+
+export async function listRFIHistory(rfiId: string): Promise<RFIHistoryEvent[]> {
+  const { data, error } = await supabase
+    .from('rfi_history')
+    .select('*')
+    .eq('rfi_id', rfiId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data || []) as RFIHistoryEvent[]
 }
