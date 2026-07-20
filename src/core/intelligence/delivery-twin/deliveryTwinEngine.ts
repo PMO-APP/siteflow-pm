@@ -15,32 +15,63 @@ function normalize(value?: string | null) {
   return String(value || '').trim().toLowerCase()
 }
 
-function activityMatchesStage(
+function includesAlias(value: string, aliases: string[]) {
+  return aliases.some(alias => value.includes(normalize(alias)))
+}
+
+/**
+ * Returns a confidence score for assigning one schedule activity to one stage.
+ * Discipline is deliberately only a tie-breaker. It must never assign every
+ * Housebuild task to every Housebuild stage.
+ */
+function stageMatchScore(
   stage: DeliveryStageTemplate,
   activity: ProjectState['schedule']['activities'][number]
 ) {
-  const haystack = [
-    activity.name,
-    activity.phase,
-    activity.discipline,
-  ]
-    .map(normalize)
-    .join(' ')
+  const phase = normalize(activity.phase)
+  const name = normalize(activity.name)
+  const discipline = normalize(activity.discipline)
 
+  let score = 0
+
+  if (phase && includesAlias(phase, stage.aliases)) score += 100
+  if (name && includesAlias(name, stage.aliases)) score += 60
+
+  // Exact stage id/name matches are stronger than loose aliases.
+  if (phase === normalize(stage.id) || phase === normalize(stage.name)) score += 120
+  if (name === normalize(stage.name)) score += 80
+
+  // Discipline only confirms an already identified stage.
   if (
-    stage.disciplines?.length &&
-    activity.discipline &&
-    stage.disciplines.some(
-      discipline =>
-        normalize(discipline) === normalize(activity.discipline)
-    )
+    score > 0 &&
+    stage.disciplines?.some(item => normalize(item) === discipline)
   ) {
-    return true
+    score += 5
   }
 
-  return stage.aliases.some(alias =>
-    haystack.includes(normalize(alias))
-  )
+  return score
+}
+
+function assignActivitiesToStages(
+  templates: DeliveryStageTemplate[],
+  activities: ProjectState['schedule']['activities']
+) {
+  const assigned = new Map<string, ProjectState['schedule']['activities']>()
+  templates.forEach(stage => assigned.set(stage.id, []))
+
+  activities.forEach(activity => {
+    const ranked = templates
+      .map(stage => ({ stage, score: stageMatchScore(stage, activity) }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.stage.order - b.stage.order)
+
+    const best = ranked[0]?.stage
+    if (!best) return
+
+    assigned.get(best.id)?.push(activity)
+  })
+
+  return assigned
 }
 
 function getStatus({
@@ -133,18 +164,15 @@ function buildGlobalBlockers(
 export function calculateDeliveryTwin(
   state: ProjectState
 ): DeliveryTwinResult {
-  const scopeTemplate = resolveProjectScopeTemplate(
-    state.project.scope
-  )
-
-  const templates = getApplicableStageTemplates(
-    state.project.scope
+  const scopeTemplate = resolveProjectScopeTemplate(state.project.scope)
+  const templates = getApplicableStageTemplates(state.project.scope)
+  const assignedActivities = assignActivitiesToStages(
+    templates,
+    state.schedule.activities
   )
 
   const stages: DeliveryStage[] = templates.map(stage => {
-    const activities = state.schedule.activities.filter(activity =>
-      activityMatchesStage(stage, activity)
-    )
+    const activities = assignedActivities.get(stage.id) || []
 
     const activityWeight = activities.reduce(
       (sum, activity) => sum + Number(activity.weight || 0),
@@ -160,53 +188,43 @@ export function calculateDeliveryTwin(
               (sum, activity) =>
                 sum +
                 activity.progress *
-                  (Number(activity.weight || 0) /
-                    activityWeight),
+                  (Number(activity.weight || 0) / activityWeight),
               0
             )
           )
         : Math.round(
-            activities.reduce(
-              (sum, activity) => sum + activity.progress,
-              0
-            ) / activities.length
+            activities.reduce((sum, activity) => sum + activity.progress, 0) /
+              activities.length
           )
 
-    const scheduleBlockers: DeliveryStageBlocker[] =
-      activities
-        .filter(
-          activity =>
-            activity.isBlocked &&
-            activity.progress < 100
-        )
-        .map(activity => ({
-          id: `schedule-${activity.id}`,
-          title: `${activity.name} is blocked`,
-          source: 'schedule',
-          ownerId: null,
-          ownerName: activity.discipline || 'Project Team',
-          route: '/app/schedule',
-          severity: activity.isCritical ? 'critical' : 'warning',
-        }))
+    const scheduleBlockers: DeliveryStageBlocker[] = activities
+      .filter(activity => activity.isBlocked && activity.progress < 100)
+      .map(activity => ({
+        id: `schedule-${activity.id}`,
+        title: `${activity.name} is blocked`,
+        source: 'schedule',
+        ownerId: null,
+        ownerName: activity.discipline || 'Project Team',
+        route: '/app/schedule',
+        severity: activity.isCritical ? 'critical' : 'warning',
+      }))
+
+    const hasStarted = activities.some(activity => activity.progress > 0)
+    const hasActiveCritical = activities.some(
+      activity => activity.isCritical && activity.progress > 0 && activity.progress < 100
+    )
 
     const shouldApplyGlobalBlockers =
-      progress < 100 &&
-      (
-        activities.some(activity => activity.isCritical) ||
-        activities.some(activity => activity.progress > 0)
-      )
+      progress < 100 && (hasActiveCritical || hasStarted)
 
     const blockers = [
       ...scheduleBlockers,
-      ...(shouldApplyGlobalBlockers
-        ? buildGlobalBlockers(state, stage)
-        : []),
+      ...(shouldApplyGlobalBlockers ? buildGlobalBlockers(state, stage) : []),
     ]
 
     const criticalActivityCount = activities.filter(
       activity =>
-        activity.isCritical &&
-        activity.progress < 100
+        activity.isCritical && activity.progress > 0 && activity.progress < 100
     ).length
 
     const readinessScore = Math.max(
@@ -218,10 +236,6 @@ export function calculateDeliveryTwin(
           blockers.filter(item => item.severity === 'warning').length * 10 -
           criticalActivityCount * 5
       )
-    )
-
-    const hasStarted = activities.some(
-      activity => activity.progress > 0
     )
 
     return {
@@ -241,17 +255,14 @@ export function calculateDeliveryTwin(
       route: stage.defaultRoute,
       blockers,
       ownerLabel:
-        activities.find(activity => activity.discipline)
-          ?.discipline || null,
+        activities.find(activity => activity.discipline)?.discipline || null,
       applicable: true,
     }
   })
 
   const activeStage =
     stages.find(
-      stage =>
-        stage.status === 'in_progress' ||
-        stage.status === 'blocked'
+      stage => stage.status === 'in_progress' || stage.status === 'blocked'
     ) || null
 
   const activeIndex = activeStage
@@ -270,9 +281,7 @@ export function calculateDeliveryTwin(
     stages,
     activeStage,
     nextStage,
-    completedStages: stages.filter(
-      stage => stage.status === 'completed'
-    ).length,
+    completedStages: stages.filter(stage => stage.status === 'completed').length,
     totalApplicableStages: stages.length,
     overallProgress: state.schedule.weightedProgress,
     generatedAt: new Date().toISOString(),
