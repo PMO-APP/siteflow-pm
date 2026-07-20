@@ -79,10 +79,27 @@ function rootScore(activity: ScheduleActivity) {
 }
 
 export function calculateRootCause(
-  state: ProjectState
+  state: ProjectState,
+  options: { enabled?: boolean; today?: Date } = {}
 ): RootCauseResult {
   const activities =
     state.schedule.activities
+  const today = options.today || new Date()
+
+  if (options.enabled === false) {
+    return {
+      primaryCause: null,
+      secondaryCause: null,
+      dependencyChain: [],
+      blockedActivities: [],
+      impactedActivities: [],
+      confidence: 0,
+      explanation: 'No root cause analysis is required because the project is currently on track.',
+      recommendedOwner: null,
+      recommendedAction: 'Continue monitoring the current workfront and maintain planned production.',
+      generatedAt: new Date().toISOString(),
+    }
+  }
 
   if (!activities.length) {
     return {
@@ -106,28 +123,27 @@ export function calculateRootCause(
 
   const candidates =
     activities
-      .filter(
-        activity =>
+      .filter(activity => {
+        const plannedStart = activity.plannedStart
+          ? new Date(activity.plannedStart)
+          : null
+        const isDueOrStarted =
+          activity.progress > 0 ||
+          activity.isBlocked ||
+          (plannedStart && !Number.isNaN(plannedStart.getTime()) && plannedStart <= today)
+
+        return (
           activity.progress < 100 &&
-          (
-            activity.isBlocked ||
-            activity.isCritical ||
-            activity.status === 'Not Started'
-          )
-      )
+          isDueOrStarted &&
+          (activity.isBlocked || activity.isCritical)
+        )
+      })
       .sort(
         (a, b) =>
           rootScore(b) - rootScore(a)
       )
 
-  const primary =
-    candidates[0] ||
-    activities.find(
-      activity =>
-        activity.progress > 0 &&
-        activity.progress < 100
-    ) ||
-    null
+  const primary = candidates[0] || null
 
   const secondary =
     candidates.find(
