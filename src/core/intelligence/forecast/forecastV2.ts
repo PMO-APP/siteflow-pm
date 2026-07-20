@@ -193,10 +193,12 @@ export function calculateForecastV2(
     )
 
   const primaryConstraint =
-    blockedCritical[0]?.name ||
-    criticalOpen[0]?.name ||
-    actualPosition?.name ||
-    null
+    delayDays > 0 || blockedCritical.length > 0
+      ? blockedCritical[0]?.name ||
+        criticalOpen[0]?.name ||
+        actualPosition?.name ||
+        null
+      : null
 
   const recoveryConfidence = clamp(
     100 -
