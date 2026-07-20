@@ -231,7 +231,9 @@ export default function RoleBasedCommandCenter({
       <DeliveryTwinPanel
   twin={intelligence.deliveryTwin}
 />
-<V6IntelligenceComparison project={project} />
+{import.meta.env.DEV ? (
+        <V6IntelligenceComparison project={project} />
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <RoleAwareCommandSections project={project} />
