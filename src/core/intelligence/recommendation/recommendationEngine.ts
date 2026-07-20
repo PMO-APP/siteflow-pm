@@ -18,8 +18,9 @@ export function calculateRecommendations({
   const items: RecommendationItem[] = []
 
   if (
+    forecast.delayDays > 0 &&
     forecast.production.actualPerDay <
-    forecast.production.requiredPerDay
+      forecast.production.requiredPerDay
   ) {
     items.push({
       id: 'increase-production',
