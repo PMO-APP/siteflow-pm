@@ -38,6 +38,7 @@ import {
   ClipboardCheck,
   UserCircle,
   Building2,
+  MessageSquareText,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -73,6 +74,7 @@ const NAV: NavItem[] = [
   { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates' },
   { to: '/app/hse', icon: HardHat, label: 'HSE', },
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
+  { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
   { to: '/app/costing', icon: Wallet, label: 'Costing' },
   { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
