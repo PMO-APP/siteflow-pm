@@ -75,7 +75,9 @@ export function buildExecutiveNarrative({
   }
 
   const outlook =
-    forecast.recoverable
+    forecast.delayDays === 0
+      ? 'The project is on track. Maintain the current workfront, protect upcoming approvals and monitor the next scheduled activity.'
+      : forecast.recoverable
       ? `Recovery remains achievable with ${forecast.recoveryConfidence}% confidence if the primary constraint is resolved and the required production rate is sustained.`
       : 'Executive intervention is required because the current production and constraint position does not support recovery.'
 
