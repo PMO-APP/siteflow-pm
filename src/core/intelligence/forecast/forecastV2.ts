@@ -1,4 +1,4 @@
-import { addDays, differenceInDays } from 'date-fns'
+import { addDays, differenceInCalendarDays } from 'date-fns'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { toDate } from '@/core/intelligence/normalizers/dateUtils'
 
@@ -22,26 +22,19 @@ export type ForecastV2Result = {
 
   production: ProductionRate
 
-  status:
-    | 'on_track'
-    | 'watch'
-    | 'recovery_required'
-    | 'critical'
-
+  status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
   primaryConstraint: string | null
 }
+
+type Activity = ProjectState['schedule']['activities'][number]
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
 }
 
-function sortActivities(
-  activities: ProjectState['schedule']['activities']
-) {
+function sortActivities(activities: Activity[]) {
   return [...activities].sort((a, b) => {
-    if (a.taskNumber !== b.taskNumber) {
-      return a.taskNumber - b.taskNumber
-    }
+    if (a.taskNumber !== b.taskNumber) return a.taskNumber - b.taskNumber
 
     const aStart = toDate(a.plannedStart)?.getTime() || 0
     const bStart = toDate(b.plannedStart)?.getTime() || 0
@@ -49,75 +42,63 @@ function sortActivities(
   })
 }
 
-function getElapsedDays(state: ProjectState, today: Date) {
-  const start = toDate(state.schedule.startDate)
-  if (!start) return 0
-  return Math.max(1, differenceInDays(today, start))
+/**
+ * Imported MS Project schedules commonly contain summary rows whose progress is
+ * rolled up from their children. Those rows must not be treated as the physical
+ * workfront. Without an explicit `is_summary` field, we conservatively identify
+ * obvious headings and roll-up rows from their names and date spans.
+ */
+function isLikelySummaryActivity(activity: Activity, activities: Activity[]) {
+  const name = activity.name.trim()
+  const words = name.split(/\s+/).filter(Boolean)
+  const isUppercaseHeading =
+    name.length > 2 &&
+    name === name.toUpperCase() &&
+    /[A-Z]/.test(name) &&
+    words.length <= 8
+
+  const start = toDate(activity.plannedStart)
+  const finish = toDate(activity.plannedFinish)
+  const duration =
+    start && finish
+      ? Math.max(0, differenceInCalendarDays(finish, start))
+      : 0
+
+  const hasContainedActivities =
+    start && finish
+      ? activities.some(candidate => {
+          if (candidate.id === activity.id) return false
+          const childStart = toDate(candidate.plannedStart)
+          const childFinish = toDate(candidate.plannedFinish)
+          return (
+            childStart &&
+            childFinish &&
+            childStart >= start &&
+            childFinish <= finish &&
+            candidate.taskNumber > activity.taskNumber
+          )
+        })
+      : false
+
+  return isUppercaseHeading || (duration >= 30 && hasContainedActivities)
 }
 
-function getRemainingDays(state: ProjectState, today: Date) {
-  const finish =
-    toDate(state.project.handoverDate) ||
-    toDate(state.project.targetDate) ||
-    toDate(state.schedule.finishDate)
-
-  if (!finish) return 0
-  return Math.max(1, differenceInDays(finish, today))
-}
-
-function getActualWorkfront(
-  activities: ProjectState['schedule']['activities']
-) {
-  const active = activities.find(
-    activity => activity.progress > 0 && activity.progress < 100
+function getDetailedActivities(activities: Activity[]) {
+  const detailed = activities.filter(
+    activity => !isLikelySummaryActivity(activity, activities)
   )
 
-  if (active) return active
-
-  const latestStartedIndex = activities.reduce(
-    (latestIndex, activity, index) =>
-      activity.progress > 0 ? index : latestIndex,
-    -1
-  )
-
-  if (latestStartedIndex >= 0) {
-    const nextIncomplete = activities
-      .slice(latestStartedIndex + 1)
-      .find(activity => activity.progress < 100)
-
-    if (nextIncomplete) return nextIncomplete
-  }
-
-  return activities.find(activity => activity.progress < 100) || null
+  // Never return an empty schedule merely because an imported programme uses
+  // unusual naming. Falling back is safer than producing no intelligence.
+  return detailed.length > 0 ? detailed : activities
 }
 
-function getWorkfrontDelayDays(
-  actualPosition: ProjectState['schedule']['activities'][number] | null,
-  today: Date
-) {
-  if (!actualPosition || actualPosition.progress >= 100) return 0
-
-  const plannedStart = toDate(actualPosition.plannedStart)
-  if (!plannedStart || plannedStart >= today) return 0
-
-  const actualStart = toDate(actualPosition.actualStart)
-  const comparisonDate = actualStart && actualStart <= today ? actualStart : today
-
-  return Math.max(0, differenceInDays(comparisonDate, plannedStart))
-}
-
-export function calculateForecastV2(
-  state: ProjectState,
-  today = new Date()
-): ForecastV2Result {
-  const activities = sortActivities(state.schedule.activities)
-
-  const plannedPosition =
+function getPlannedPosition(activities: Activity[], today: Date) {
+  return (
     activities
       .filter(activity => {
         const start = toDate(activity.plannedStart)
         const finish = toDate(activity.plannedFinish)
-
         return start && finish && start <= today && finish >= today
       })
       .slice(-1)[0] ||
@@ -128,13 +109,113 @@ export function calculateForecastV2(
       })
       .slice(-1)[0] ||
     null
+  )
+}
 
+/**
+ * The current workfront is the first incomplete detailed activity after the
+ * latest completed detailed activity. This avoids selecting programme summary
+ * rows such as “MAIN BUILDING”, whose rolled-up progress can span years.
+ */
+function getActualWorkfront(activities: Activity[]) {
+  let latestCompletedIndex = -1
+
+  activities.forEach((activity, index) => {
+    if (activity.progress >= 100) latestCompletedIndex = index
+  })
+
+  if (latestCompletedIndex >= 0) {
+    const nextIncomplete = activities
+      .slice(latestCompletedIndex + 1)
+      .find(activity => activity.progress < 100)
+
+    if (nextIncomplete) return nextIncomplete
+  }
+
+  return activities.find(activity => activity.progress < 100) || null
+}
+
+/**
+ * Calculates delay from the current physical workfront rather than from the
+ * overall percentage gap.
+ *
+ * - Not started after planned start: calendar days from planned start to today.
+ * - In progress: compare actual progress with linear planned progress today.
+ *   A task that is ahead of its expected progress returns zero delay.
+ * - Completed: no current workfront delay.
+ */
+function getWorkfrontDelayDays(activity: Activity | null, today: Date) {
+  if (!activity || activity.progress >= 100) return 0
+
+  const plannedStart = toDate(activity.plannedStart)
+  const plannedFinish = toDate(activity.plannedFinish)
+
+  if (!plannedStart || plannedStart > today) return 0
+
+  if (activity.progress <= 0) {
+    return Math.max(0, differenceInCalendarDays(today, plannedStart))
+  }
+
+  if (!plannedFinish) {
+    const actualStart = toDate(activity.actualStart)
+    return actualStart
+      ? Math.max(0, differenceInCalendarDays(actualStart, plannedStart))
+      : 0
+  }
+
+  const durationDays = Math.max(
+    1,
+    differenceInCalendarDays(plannedFinish, plannedStart) + 1
+  )
+
+  const elapsedPlannedDays = clamp(
+    differenceInCalendarDays(today, plannedStart) + 1,
+    0,
+    durationDays
+  )
+
+  const expectedProgress = clamp(
+    (elapsedPlannedDays / durationDays) * 100
+  )
+
+  if (activity.progress >= expectedProgress) return 0
+
+  const progressShortfall = expectedProgress - activity.progress
+  return Math.max(
+    0,
+    Math.ceil((progressShortfall / 100) * durationDays)
+  )
+}
+
+function getElapsedDays(state: ProjectState, today: Date) {
+  const start = toDate(state.schedule.startDate)
+  if (!start) return 0
+  return Math.max(1, differenceInCalendarDays(today, start))
+}
+
+function getRemainingDays(state: ProjectState, today: Date) {
+  const finish =
+    toDate(state.project.handoverDate) ||
+    toDate(state.project.targetDate) ||
+    toDate(state.schedule.finishDate)
+
+  if (!finish) return 0
+  return Math.max(1, differenceInCalendarDays(finish, today))
+}
+
+export function calculateForecastV2(
+  state: ProjectState,
+  today = new Date()
+): ForecastV2Result {
+  const allActivities = sortActivities(state.schedule.activities)
+  const activities = getDetailedActivities(allActivities)
+
+  const plannedPosition = getPlannedPosition(activities, today)
   const actualPosition = getActualWorkfront(activities)
 
   const plannedIndex = plannedPosition
     ? activities.findIndex(activity => activity.id === plannedPosition.id)
     : -1
-
   const actualIndex = actualPosition
     ? activities.findIndex(activity => activity.id === actualPosition.id)
     : -1
@@ -146,27 +227,20 @@ export function calculateForecastV2(
 
   const elapsedDays = getElapsedDays(state, today)
   const remainingDays = getRemainingDays(state, today)
-
   const actualPerDay =
     elapsedDays > 0 ? state.schedule.weightedProgress / elapsedDays : 0
-
   const remainingProgress = Math.max(0, 100 - state.schedule.weightedProgress)
-
   const requiredPerDay =
     remainingDays > 0 ? remainingProgress / remainingDays : remainingProgress
-
   const efficiency =
     requiredPerDay > 0
       ? clamp((actualPerDay / requiredPerDay) * 100)
       : 100
 
-  // Delivery variance is based on the current physical workfront.
-  // Example: if the next activity should have started on 5 June but is only
-  // starting on 20 July, the project is 45 calendar days behind that workfront.
   const delayDays = getWorkfrontDelayDays(actualPosition, today)
 
-  // The project target date represents the approved scope completion date.
-  // The schedule finish is only a fallback when the project has no target date.
+  // The approved project target defines the relevant scope completion. The
+  // imported programme finish is used only when no project target is available.
   const targetDate =
     toDate(state.project.handoverDate) ||
     toDate(state.project.targetDate) ||
@@ -175,13 +249,16 @@ export function calculateForecastV2(
   const forecastDate =
     targetDate && delayDays > 0 ? addDays(targetDate, delayDays) : targetDate
 
-  const blockedCritical = activities.filter(
-    activity =>
+  const blockedCritical = activities.filter(activity => {
+    const plannedStart = toDate(activity.plannedStart)
+    return (
       activity.isCritical &&
       activity.isBlocked &&
       activity.progress < 100 &&
-      (toDate(activity.plannedStart)?.getTime() || Infinity) <= today.getTime()
-  )
+      !!plannedStart &&
+      plannedStart <= today
+    )
+  })
 
   const primaryConstraint =
     delayDays > 0 || blockedCritical.length > 0
@@ -197,7 +274,6 @@ export function calculateForecastV2(
   )
 
   const recoverable = recoveryConfidence >= 55 && delayDays <= 60
-
   const status =
     delayDays === 0
       ? 'on_track'
