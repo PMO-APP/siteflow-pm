@@ -23,22 +23,39 @@ export interface RFI {
   updated_at: string
 }
 
-export type CreateRFIInput = Pick<
-  RFI,
-  'project_id' | 'title' | 'question' | 'discipline' | 'priority'
-> & {
+export interface RFIComment {
+  id: string
+  rfi_id: string
+  body: string
+  author_id: string
+  author_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type RFIHistoryEventType =
+  | 'created'
+  | 'submitted'
+  | 'status_changed'
+  | 'answered'
+  | 'closed'
+  | 'comment_added'
+  | 'updated'
+
+export interface RFIHistoryEvent {
+  id: string
+  rfi_id: string
+  event_type: RFIHistoryEventType
+  from_status: RFIStatus | null
+  to_status: RFIStatus | null
+  description: string
+  actor_id: string | null
+  actor_name: string | null
+  created_at: string
+}
+
+export type CreateRFIInput = Pick<RFI, 'project_id'|'title'|'question'|'discipline'|'priority'> & {
   organization_id?: string | null
   assigned_to?: string | null
   due_date?: string | null
-}
-
-export type UpdateRFIInput = Partial<
-  Pick<RFI, 'title' | 'question' | 'discipline' | 'priority' | 'organization_id' | 'assigned_to' | 'due_date'>
->
-
-export interface RFIFilters {
-  search?: string
-  status?: RFIStatus | 'All'
-  priority?: RFIPriority | 'All'
-  discipline?: RFIDiscipline | 'All'
 }
