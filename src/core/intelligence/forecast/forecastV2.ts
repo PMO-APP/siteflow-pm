@@ -39,23 +39,20 @@ function sortActivities(
   activities: ProjectState['schedule']['activities']
 ) {
   return [...activities].sort((a, b) => {
+    if (a.taskNumber !== b.taskNumber) {
+      return a.taskNumber - b.taskNumber
+    }
+
     const aStart = toDate(a.plannedStart)?.getTime() || 0
     const bStart = toDate(b.plannedStart)?.getTime() || 0
-
-    if (aStart !== bStart) return aStart - bStart
-    return a.taskNumber - b.taskNumber
+    return aStart - bStart
   })
 }
 
 function getElapsedDays(state: ProjectState, today: Date) {
   const start = toDate(state.schedule.startDate)
-
   if (!start) return 0
-
-  return Math.max(
-    1,
-    differenceInDays(today, start)
-  )
+  return Math.max(1, differenceInDays(today, start))
 }
 
 function getRemainingDays(state: ProjectState, today: Date) {
@@ -65,63 +62,81 @@ function getRemainingDays(state: ProjectState, today: Date) {
     toDate(state.schedule.finishDate)
 
   if (!finish) return 0
+  return Math.max(1, differenceInDays(finish, today))
+}
 
-  return Math.max(
-    1,
-    differenceInDays(finish, today)
+function getActualWorkfront(
+  activities: ProjectState['schedule']['activities']
+) {
+  const active = activities.find(
+    activity => activity.progress > 0 && activity.progress < 100
   )
+
+  if (active) return active
+
+  const latestStartedIndex = activities.reduce(
+    (latestIndex, activity, index) =>
+      activity.progress > 0 ? index : latestIndex,
+    -1
+  )
+
+  if (latestStartedIndex >= 0) {
+    const nextIncomplete = activities
+      .slice(latestStartedIndex + 1)
+      .find(activity => activity.progress < 100)
+
+    if (nextIncomplete) return nextIncomplete
+  }
+
+  return activities.find(activity => activity.progress < 100) || null
+}
+
+function getWorkfrontDelayDays(
+  actualPosition: ProjectState['schedule']['activities'][number] | null,
+  today: Date
+) {
+  if (!actualPosition || actualPosition.progress >= 100) return 0
+
+  const plannedStart = toDate(actualPosition.plannedStart)
+  if (!plannedStart || plannedStart >= today) return 0
+
+  const actualStart = toDate(actualPosition.actualStart)
+  const comparisonDate = actualStart && actualStart <= today ? actualStart : today
+
+  return Math.max(0, differenceInDays(comparisonDate, plannedStart))
 }
 
 export function calculateForecastV2(
   state: ProjectState,
   today = new Date()
 ): ForecastV2Result {
-  const activities = sortActivities(
-    state.schedule.activities
-  )
+  const activities = sortActivities(state.schedule.activities)
 
   const plannedPosition =
-    activities.filter(activity => {
-      const start = toDate(activity.plannedStart)
-      const finish = toDate(activity.plannedFinish)
-
-      return (
-        start &&
-        finish &&
-        start <= today &&
-        finish >= today
-      )
-    }).slice(-1)[0] ||
-    activities.filter(activity => {
-      const finish = toDate(activity.plannedFinish)
-      return finish && finish <= today
-    }).slice(-1)[0] ||
-    null
-
-  const actualPosition =
     activities
-      .filter(
-        activity =>
-          activity.progress > 0 &&
-          activity.progress < 100
-      )
-      .sort((a, b) => a.taskNumber - b.taskNumber)[0] ||
-    activities
-      .filter(activity => activity.progress >= 100)
+      .filter(activity => {
+        const start = toDate(activity.plannedStart)
+        const finish = toDate(activity.plannedFinish)
+
+        return start && finish && start <= today && finish >= today
+      })
       .slice(-1)[0] ||
-    activities.find(activity => activity.progress === 0) ||
+    activities
+      .filter(activity => {
+        const finish = toDate(activity.plannedFinish)
+        return finish && finish <= today
+      })
+      .slice(-1)[0] ||
     null
+
+  const actualPosition = getActualWorkfront(activities)
 
   const plannedIndex = plannedPosition
-    ? activities.findIndex(
-        activity => activity.id === plannedPosition.id
-      )
+    ? activities.findIndex(activity => activity.id === plannedPosition.id)
     : -1
 
   const actualIndex = actualPosition
-    ? activities.findIndex(
-        activity => activity.id === actualPosition.id
-      )
+    ? activities.findIndex(activity => activity.id === actualPosition.id)
     : -1
 
   const activityGap =
@@ -133,71 +148,44 @@ export function calculateForecastV2(
   const remainingDays = getRemainingDays(state, today)
 
   const actualPerDay =
-    elapsedDays > 0
-      ? state.schedule.weightedProgress / elapsedDays
-      : 0
+    elapsedDays > 0 ? state.schedule.weightedProgress / elapsedDays : 0
 
-  const remainingProgress =
-    Math.max(
-      0,
-      100 - state.schedule.weightedProgress
-    )
+  const remainingProgress = Math.max(0, 100 - state.schedule.weightedProgress)
 
   const requiredPerDay =
-    remainingDays > 0
-      ? remainingProgress / remainingDays
-      : remainingProgress
+    remainingDays > 0 ? remainingProgress / remainingDays : remainingProgress
 
   const efficiency =
     requiredPerDay > 0
       ? clamp((actualPerDay / requiredPerDay) * 100)
       : 100
 
-  const progressGap =
-    Math.max(
-      0,
-      state.schedule.plannedProgress -
-        state.schedule.weightedProgress
-    )
+  // Delivery variance is based on the current physical workfront.
+  // Example: if the next activity should have started on 5 June but is only
+  // starting on 20 July, the project is 45 calendar days behind that workfront.
+  const delayDays = getWorkfrontDelayDays(actualPosition, today)
 
-  const delayDays =
-    progressGap > 0 && actualPerDay > 0
-      ? Math.ceil(progressGap / actualPerDay)
-      : activityGap > 0
-      ? activityGap * 3
-      : 0
-
+  // The project target date represents the approved scope completion date.
+  // The schedule finish is only a fallback when the project has no target date.
   const targetDate =
     toDate(state.project.handoverDate) ||
     toDate(state.project.targetDate) ||
     toDate(state.schedule.finishDate)
 
   const forecastDate =
-    targetDate && delayDays > 0
-      ? addDays(targetDate, delayDays)
-      : targetDate
+    targetDate && delayDays > 0 ? addDays(targetDate, delayDays) : targetDate
 
-  const blockedCritical =
-    activities.filter(
-      activity =>
-        activity.isCritical &&
-        activity.isBlocked &&
-        activity.progress < 100
-    )
-
-  const criticalOpen =
-    activities.filter(
-      activity =>
-        activity.isCritical &&
-        activity.progress < 100
-    )
+  const blockedCritical = activities.filter(
+    activity =>
+      activity.isCritical &&
+      activity.isBlocked &&
+      activity.progress < 100 &&
+      (toDate(activity.plannedStart)?.getTime() || Infinity) <= today.getTime()
+  )
 
   const primaryConstraint =
     delayDays > 0 || blockedCritical.length > 0
-      ? blockedCritical[0]?.name ||
-        criticalOpen[0]?.name ||
-        actualPosition?.name ||
-        null
+      ? blockedCritical[0]?.name || actualPosition?.name || null
       : null
 
   const recoveryConfidence = clamp(
@@ -208,18 +196,16 @@ export function calculateForecastV2(
       Math.min(15, state.schedule.weightedProgress * 0.1)
   )
 
-  const recoverable =
-    recoveryConfidence >= 55 &&
-    delayDays <= 60
+  const recoverable = recoveryConfidence >= 55 && delayDays <= 60
 
   const status =
     delayDays === 0
       ? 'on_track'
       : delayDays <= 7
-      ? 'watch'
-      : delayDays <= 30
-      ? 'recovery_required'
-      : 'critical'
+        ? 'watch'
+        : delayDays <= 30
+          ? 'recovery_required'
+          : 'critical'
 
   return {
     targetDate,
