@@ -54,7 +54,9 @@ import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
 import ProjectControlsPage from '@/pages/ProjectControlsPage'
 import ScheduleRevisionsPage from '@/pages/ScheduleRevisionsPage'
 import OrganizationsPage from '@/features/organizations/pages/OrganizationsPage'
-import { CreateRFIPage, EditRFIPage, RFIDetailPage, RFIRegisterPage } from '@/features/rfi'
+import CreateRFIPage from '@/features/rfi/pages/CreateRFIPage'
+import RFIDetailPage from '@/features/rfi/pages/RFIDetailPage'
+import RFIRegisterPage from '@/features/rfi/pages/RFIRegisterPage'
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
@@ -374,7 +376,6 @@ export default function App() {
           <Route path="snags" element={<SnagsPage />} />
           <Route path="rfis" element={<RFIRegisterPage />} />
           <Route path="rfis/new" element={<CreateRFIPage />} />
-          <Route path="rfis/:rfiId/edit" element={<EditRFIPage />} />
           <Route path="rfis/:rfiId" element={<RFIDetailPage />} />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="risk" element={<RiskPage />} />
