@@ -494,7 +494,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <main className="min-w-0 flex-1 flex flex-col h-full overflow-hidden">
         <header className="layout-header sticky top-0 z-20 border-b backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
           <button
             className="lg:hidden sidebar-muted hover:text-slate-200 transition-colors"
@@ -569,7 +569,7 @@ export default function Layout() {
           </div>
         )}
 
-        <div className="layout-content flex-1 overflow-y-auto p-4 lg:p-6 animate-in">
+        <div className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
         </div>
       </main>
