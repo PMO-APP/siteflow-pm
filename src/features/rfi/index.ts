@@ -1,6 +1,0 @@
-export { default as CreateRFIPage } from './pages/CreateRFIPage'
-export { default as EditRFIPage } from './pages/EditRFIPage'
-export { default as RFIDetailPage } from './pages/RFIDetailPage'
-export { default as RFIRegisterPage } from './pages/RFIRegisterPage'
-export * from './hooks/useRFIs'
-export * from './types'
