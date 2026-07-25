@@ -2,659 +2,403 @@ import {
   ArrowRight,
   BarChart3,
   Building2,
-  Check,
-  ChevronDown,
-  ClipboardCheck,
+  CheckCircle2,
+  ChevronRight,
+  CircleDot,
   Clock3,
   FileCheck2,
-  FileText,
-  Gauge,
   HardHat,
   Layers3,
-  LockKeyhole,
   Menu,
   Network,
-  Quote,
   ShieldCheck,
   Sparkles,
   X,
-  Zap,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
-const PLATFORM_FEATURES = [
+const capabilities = [
   {
+    number: '01',
+    title: 'Portfolio command',
+    copy: 'See project health, delivery pressure and leadership priorities across your entire portfolio.',
     icon: Layers3,
-    title: 'Portfolio command centre',
-    copy: 'Bring every project, milestone, risk and decision into one executive control layer.',
   },
   {
-    icon: Clock3,
+    number: '02',
     title: 'Schedule intelligence',
-    copy: 'Track progress, variance, critical activities and recovery actions before delays compound.',
+    copy: 'Turn programmes into clear milestones, critical activities, delay signals and recovery actions.',
+    icon: Clock3,
   },
   {
-    icon: ShieldCheck,
-    title: 'Risk and issue control',
-    copy: 'Convert scattered project concerns into structured risks with owners, exposure and escalation.',
+    number: '03',
+    title: 'Controls in one place',
+    copy: 'Connect approvals, procurement, RFIs, quality, HSE, documents and handover readiness.',
+    icon: Network,
   },
   {
-    icon: ClipboardCheck,
-    title: 'Quality and handover',
-    copy: 'Control inspections, snags, close-out evidence and handover readiness in one workflow.',
-  },
-  {
-    icon: FileCheck2,
-    title: 'Approvals, RFIs and documents',
-    copy: 'Keep drawings, submissions, decisions and technical queries traceable from request to closure.',
-  },
-  {
+    number: '04',
+    title: 'Decision-ready reporting',
+    copy: 'Give executives a reliable view of what changed, what is at risk and what needs action.',
     icon: BarChart3,
-    title: 'Executive reporting',
-    copy: 'Turn live project data into decision-ready portfolio, project and management reports.',
   },
 ]
 
-const INDUSTRIES = [
-  ['Real estate development', 'Residential estates, mixed-use communities and multi-project portfolios.'],
-  ['Infrastructure', 'Roads, utilities, public realm and enabling works across complex programmes.'],
-  ['Hospitality', 'Hotels, resorts, wellness facilities and guest-sensitive delivery environments.'],
-  ['Commercial and institutional', 'Offices, schools, healthcare and other operationally critical assets.'],
+const operatingAreas = [
+  'Portfolio dashboard',
+  'Command centre',
+  'Schedule & recovery',
+  'Risk and issues',
+  'Approvals & RFIs',
+  'Procurement control',
+  'Quality & snagging',
+  'HSE management',
+  'Document control',
+  'Executive reporting',
 ]
 
-const FAQS = [
-  {
-    q: 'Can anyone create an account?',
-    a: 'No. PMOCorex is provisioned for subscribed organisations. Workspace access is created by an authorised administrator and users join through controlled invitations.',
-  },
-  {
-    q: 'Can PMOCorex support multiple projects?',
-    a: 'Yes. It is designed for portfolio-level oversight while preserving project-level schedules, risks, approvals, documents, quality records and delivery controls.',
-  },
-  {
-    q: 'Is the platform only for PMO teams?',
-    a: 'No. PMOCorex supports executives, project owners, consultants, contractors, design, costing, infrastructure, MEP, HSE and other delivery stakeholders through role-based access.',
-  },
-  {
-    q: 'How do we start?',
-    a: 'Book a product demonstration. We will understand your delivery structure, configure the right workspace and propose an onboarding plan for your organisation.',
-  },
-]
+function Brand({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-[#173f5f] shadow-[0_8px_24px_rgba(23,63,95,0.18)]">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />
+        <svg viewBox="0 0 40 40" className="h-7 w-7" aria-hidden="true">
+          <path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="white" />
+          <path d="M27.8 25.4 32 29.6" stroke="#ef8354" strokeWidth="2.8" strokeLinecap="round" />
+        </svg>
+      </div>
+      {!compact && (
+        <div className="leading-none">
+          <div className="text-[17px] font-extrabold tracking-[-0.04em] text-[#102a3c]">PMOCorex</div>
+          <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#6d7f8b]">Project delivery control</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
-function scrollToSection(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+function ProductPreview() {
+  return (
+    <div className="relative mx-auto w-full max-w-[760px]">
+      <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full border border-[#ef8354]/30" />
+      <div className="absolute -bottom-8 -right-8 h-36 w-36 bg-[linear-gradient(90deg,rgba(23,63,95,.12)_1px,transparent_1px),linear-gradient(rgba(23,63,95,.12)_1px,transparent_1px)] bg-[size:16px_16px]" />
+      <div className="relative overflow-hidden rounded-[22px] border border-[#cbd7de] bg-white shadow-[0_28px_80px_rgba(20,49,68,0.16)]">
+        <div className="flex h-12 items-center justify-between border-b border-[#e2e9ed] bg-[#f8fafb] px-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ef8354]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#f2c14e]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#4f9d69]" />
+          </div>
+          <div className="rounded-full border border-[#d8e2e7] bg-white px-3 py-1 text-[10px] font-semibold text-[#6d7f8b]">Portfolio command centre</div>
+        </div>
+
+        <div className="grid min-h-[430px] grid-cols-[72px_minmax(0,1fr)] bg-[#f4f7f8] sm:grid-cols-[150px_minmax(0,1fr)]">
+          <aside className="border-r border-[#dce5e9] bg-[#173f5f] p-3 sm:p-4">
+            <div className="mb-7 flex items-center gap-2 text-white">
+              <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/10"><CircleDot size={14} /></div>
+              <span className="hidden text-[11px] font-semibold sm:block">PMOCorex</span>
+            </div>
+            {['Overview', 'Schedule', 'Risks', 'Approvals', 'Quality', 'Reports'].map((item, index) => (
+              <div key={item} className={`mb-2 rounded-lg px-2 py-2 text-[10px] ${index === 0 ? 'bg-white text-[#173f5f]' : 'text-white/55'}`}>
+                <span className="hidden sm:inline">{item}</span>
+                <span className="sm:hidden">•</span>
+              </div>
+            ))}
+          </aside>
+
+          <div className="min-w-0 p-4 sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[.16em] text-[#7c8d97]">Executive view</div>
+                <div className="mt-1 text-lg font-bold tracking-[-.03em] text-[#173f5f] sm:text-xl">Portfolio delivery position</div>
+              </div>
+              <span className="rounded-full bg-[#eaf4ed] px-3 py-1 text-[10px] font-bold text-[#347a4a]">Live</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {[
+                ['18', 'Active projects'],
+                ['71%', 'Portfolio progress'],
+                ['6', 'Need attention'],
+                ['84%', 'Delivery confidence'],
+              ].map(([value, label], index) => (
+                <div key={label} className={`rounded-xl border p-3 ${index === 2 ? 'border-[#ef8354]/35 bg-[#fff7f3]' : 'border-[#dce5e9] bg-white'}`}>
+                  <div className="text-xl font-extrabold tracking-[-.04em] text-[#173f5f]">{value}</div>
+                  <div className="mt-1 text-[9px] leading-tight text-[#758690]">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-3 lg:grid-cols-[1.35fr_.65fr]">
+              <div className="rounded-xl border border-[#dce5e9] bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold text-[#173f5f]">Programme movement</div>
+                  <div className="text-[9px] text-[#7c8d97]">Last 8 weeks</div>
+                </div>
+                <div className="mt-5 flex h-32 items-end gap-2">
+                  {[35, 44, 40, 58, 54, 67, 73, 78].map((height, index) => (
+                    <div key={index} className="flex-1 rounded-t-sm bg-[#dbe7ec]" style={{ height: `${height}%` }}>
+                      <div className={`h-full w-full rounded-t-sm ${index > 5 ? 'bg-[#2f6f91]' : ''}`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#dce5e9] bg-[#173f5f] p-4 text-white">
+                <Sparkles size={16} className="text-[#ffb08f]" />
+                <div className="mt-4 text-[10px] font-bold uppercase tracking-[.14em] text-white/55">Recovery signal</div>
+                <div className="mt-1 text-2xl font-extrabold">3 actions</div>
+                <p className="mt-2 text-[10px] leading-relaxed text-white/65">Accelerate façade approvals and protect the finishing sequence.</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {[
+                ['Schedule', '4 projects slipping'],
+                ['Approvals', '11 due this week'],
+                ['Quality', '87% close-out'],
+              ].map(([label, detail]) => (
+                <div key={label} className="rounded-xl border border-[#dce5e9] bg-white p-3">
+                  <div className="text-[10px] font-bold text-[#173f5f]">{label}</div>
+                  <div className="mt-1 truncate text-[9px] text-[#7c8d97]">{detail}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function LandingPage() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(0)
 
-  const signIn = () => navigate('/mixta-admin-login')
-  const contactSales = () => {
-    window.location.href =
-      'mailto:hello@pmocorex.com?subject=PMOCorex%20Product%20Enquiry&body=Hello%20PMOCorex%20team%2C%0A%0AI%20would%20like%20to%20learn%20more%20about%20the%20platform.'
+  const requestDemo = () => {
+    window.location.href = 'mailto:hello@pmocorex.com?subject=PMOCorex%20Demo%20Request'
   }
-  const bookDemo = () => {
-    window.location.href =
-      'mailto:hello@pmocorex.com?subject=Book%20a%20PMOCorex%20Demo&body=Hello%20PMOCorex%20team%2C%0A%0AI%20would%20like%20to%20book%20a%20product%20demonstration.%0A%0AOrganisation%3A%0ARole%3A%0APreferred%20date%2Ftime%3A'
-  }
-
-  const navItems = [
-    ['Platform', 'platform'],
-    ['Solutions', 'solutions'],
-    ['Security', 'security'],
-    ['Pricing', 'pricing'],
-  ]
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#071018] text-white selection:bg-[#d6b25e]/30">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_4%,rgba(60,125,171,0.12),transparent_27%),radial-gradient(circle_at_88%_2%,rgba(214,178,94,0.13),transparent_25%)]" />
+    <div className="min-h-screen overflow-x-hidden bg-[#f7f8f6] font-sans text-[#183044]">
+      <header className="sticky top-0 z-50 border-b border-[#dfe7e6]/90 bg-[#f7f8f6]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] max-w-[1380px] items-center justify-between px-5 sm:px-8 lg:px-12">
+          <Brand />
 
-      <div className="relative z-10">
-        <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#071018]/85 backdrop-blur-xl">
-          <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 sm:px-6 lg:px-8">
-            <button type="button" onClick={() => scrollToSection('top')} aria-label="PMOCorex home">
-              <PMOCorexLogo size={39} />
-            </button>
+          <nav className="hidden items-center gap-8 lg:flex">
+            <a href="#platform" className="text-sm font-semibold text-[#536974] transition hover:text-[#173f5f]">Platform</a>
+            <a href="#why" className="text-sm font-semibold text-[#536974] transition hover:text-[#173f5f]">Why PMOCorex</a>
+            <a href="#security" className="text-sm font-semibold text-[#536974] transition hover:text-[#173f5f]">Security</a>
+          </nav>
 
-            <nav className="hidden items-center gap-8 lg:flex">
-              {navItems.map(([label, id]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => scrollToSection(id)}
-                  className="text-sm font-medium text-slate-300 transition hover:text-white"
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-
-            <div className="hidden items-center gap-3 lg:flex">
-              <button
-                type="button"
-                onClick={signIn}
-                className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06] hover:text-white"
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                onClick={bookDemo}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#d6b25e] px-4 py-2.5 text-sm font-bold text-[#101317] transition hover:bg-[#e4c574]"
-              >
-                Book a demo
-                <ArrowRight size={15} />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMenuOpen(value => !value)}
-              className="rounded-lg border border-white/10 p-2 text-slate-200 lg:hidden"
-              aria-label="Toggle navigation"
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          <div className="hidden items-center gap-3 lg:flex">
+            <button onClick={() => navigate('/login')} className="rounded-lg px-4 py-2.5 text-sm font-bold text-[#173f5f] transition hover:bg-[#e9eff1]">Sign in</button>
+            <button onClick={requestDemo} className="inline-flex items-center gap-2 rounded-lg bg-[#ef8354] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(239,131,84,.22)] transition hover:-translate-y-0.5 hover:bg-[#e87545]">
+              Book a demo <ArrowRight size={16} />
             </button>
           </div>
 
-          {menuOpen && (
-            <div className="border-t border-white/[0.07] bg-[#08121b] px-5 py-5 lg:hidden">
-              <div className="grid gap-2">
-                {navItems.map(([label, id]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      scrollToSection(id)
-                    }}
-                    className="rounded-lg px-3 py-3 text-left text-sm font-medium text-slate-200 hover:bg-white/[0.05]"
-                  >
-                    {label}
-                  </button>
-                ))}
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <button type="button" onClick={signIn} className="rounded-lg border border-white/10 px-4 py-3 text-sm font-semibold">
-                    Sign in
-                  </button>
-                  <button type="button" onClick={bookDemo} className="rounded-lg bg-[#d6b25e] px-4 py-3 text-sm font-bold text-[#101317]">
-                    Book a demo
-                  </button>
-                </div>
-              </div>
+          <button className="grid h-10 w-10 place-items-center rounded-lg border border-[#d8e2e5] bg-white lg:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+            {menuOpen ? <X size={19} /> : <Menu size={19} />}
+          </button>
+        </div>
+
+        {menuOpen && (
+          <div className="border-t border-[#dfe7e6] bg-white px-5 py-5 lg:hidden">
+            <div className="grid gap-2">
+              <a href="#platform" className="rounded-lg px-3 py-3 text-sm font-semibold text-[#536974]">Platform</a>
+              <a href="#why" className="rounded-lg px-3 py-3 text-sm font-semibold text-[#536974]">Why PMOCorex</a>
+              <a href="#security" className="rounded-lg px-3 py-3 text-sm font-semibold text-[#536974]">Security</a>
+              <button onClick={() => navigate('/login')} className="mt-2 rounded-lg border border-[#cfdcdf] px-4 py-3 text-sm font-bold text-[#173f5f]">Sign in</button>
+              <button onClick={requestDemo} className="rounded-lg bg-[#ef8354] px-4 py-3 text-sm font-bold text-white">Book a demo</button>
             </div>
-          )}
-        </header>
+          </div>
+        )}
+      </header>
 
-        <main id="top">
-          <section className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-24 pt-20 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8 lg:pb-32 lg:pt-28">
+      <main>
+        <section className="relative border-b border-[#dfe7e6]">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(23,63,95,.045)_1px,transparent_1px),linear-gradient(rgba(23,63,95,.045)_1px,transparent_1px)] bg-[size:36px_36px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
+          <div className="relative mx-auto grid max-w-[1380px] items-center gap-16 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[.86fr_1.14fr] lg:px-12 lg:py-28">
             <div>
-              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#d6b25e]/25 bg-[#d6b25e]/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-[#e0c379]">
-                <Sparkles size={13} />
-                Construction delivery intelligence
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#bfd0d7] bg-white px-3 py-1.5 text-xs font-bold text-[#45606e] shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-[#ef8354]" />
+                Built for complex project delivery
               </div>
 
-              <h1 className="max-w-3xl text-5xl font-black leading-[1.04] tracking-[-0.045em] text-white sm:text-6xl lg:text-[4.5rem]">
-                Control every project.
-                <span className="block bg-gradient-to-r from-[#e4c574] to-[#b98d35] bg-clip-text text-transparent">
-                  Deliver with certainty.
-                </span>
+              <h1 className="max-w-[720px] text-[44px] font-extrabold leading-[1.03] tracking-[-0.055em] text-[#173f5f] sm:text-[58px] lg:text-[68px]">
+                See the whole project.
+                <span className="block text-[#ef8354]">Act before it slips.</span>
               </h1>
 
-              <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
-                PMOCorex is an intelligent project delivery platform for construction and real estate organisations. It connects schedules, risks, approvals, procurement, quality, HSE, documents and executive reporting in one controlled workspace.
+              <p className="mt-7 max-w-[610px] text-lg leading-8 text-[#536974]">
+                PMOCorex gives real estate and construction leaders one reliable place to control schedules, risks, approvals, procurement, quality and executive reporting.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={bookDemo}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d6b25e] px-6 py-3.5 text-sm font-extrabold text-[#11161a] shadow-[0_16px_45px_rgba(214,178,94,0.20)] transition hover:-translate-y-0.5 hover:bg-[#e4c574]"
-                >
-                  Book a product demo
-                  <ArrowRight size={17} />
+                <button onClick={requestDemo} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#173f5f] px-6 py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_rgba(23,63,95,.22)] transition hover:-translate-y-0.5 hover:bg-[#0f334e]">
+                  Book a product walkthrough <ArrowRight size={17} />
                 </button>
-                <button
-                  type="button"
-                  onClick={signIn}
-                  className="inline-flex items-center justify-center rounded-xl border border-white/12 bg-white/[0.03] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-white/[0.07]"
-                >
+                <button onClick={() => navigate('/login')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#c9d6da] bg-white px-6 py-3.5 text-sm font-bold text-[#173f5f] transition hover:border-[#9fb4bd]">
                   Sign in to your workspace
                 </button>
               </div>
 
-              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm text-slate-400">
-                {['No public sign-up', 'Role-based access', 'Portfolio-ready'].map(item => (
-                  <span key={item} className="inline-flex items-center gap-2">
-                    <Check size={15} className="text-[#d6b25e]" />
-                    {item}
-                  </span>
-                ))}
+              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 border-t border-[#d9e2e4] pt-6 text-xs font-semibold text-[#607580]">
+                <span className="flex items-center gap-2"><CheckCircle2 size={15} className="text-[#4f9d69]" /> No public sign-up</span>
+                <span className="flex items-center gap-2"><CheckCircle2 size={15} className="text-[#4f9d69]" /> Role-based access</span>
+                <span className="flex items-center gap-2"><CheckCircle2 size={15} className="text-[#4f9d69]" /> Built for portfolio teams</span>
               </div>
             </div>
 
-            <ProductHero />
-          </section>
+            <ProductPreview />
+          </div>
+        </section>
 
-          <section className="border-y border-white/[0.07] bg-white/[0.018]">
-            <div className="mx-auto grid max-w-7xl gap-8 px-5 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
-              {[
-                ['One source of truth', 'Replace fragmented project information with a controlled delivery record.'],
-                ['Early warning', 'See schedule, approval, risk and quality threats before they become surprises.'],
-                ['Executive clarity', 'Give leadership a portfolio view built for decisions, not data chasing.'],
-                ['Controlled access', 'Give every stakeholder the right level of visibility and responsibility.'],
-              ].map(([title, copy]) => (
-                <div key={title} className="border-l border-[#d6b25e]/35 pl-5">
-                  <div className="font-bold text-white">{title}</div>
-                  <div className="mt-1.5 text-sm leading-6 text-slate-400">{copy}</div>
-                </div>
-              ))}
+        <section className="border-b border-[#dfe7e6] bg-white">
+          <div className="mx-auto grid max-w-[1380px] gap-8 px-5 py-9 sm:px-8 md:grid-cols-[280px_1fr] md:items-center lg:px-12">
+            <p className="text-sm font-bold leading-6 text-[#173f5f]">One operating view for the teams responsible for delivery.</p>
+            <div className="grid grid-cols-2 gap-3 text-center text-xs font-bold uppercase tracking-[.12em] text-[#71838d] sm:grid-cols-4">
+              <span className="rounded-lg bg-[#f3f6f6] px-3 py-3">Real estate</span>
+              <span className="rounded-lg bg-[#f3f6f6] px-3 py-3">Infrastructure</span>
+              <span className="rounded-lg bg-[#f3f6f6] px-3 py-3">Hospitality</span>
+              <span className="rounded-lg bg-[#f3f6f6] px-3 py-3">Mixed-use</span>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section id="platform" className="scroll-mt-24 mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-32">
-            <SectionHeading
-              eyebrow="The platform"
-              title="One operating layer for project delivery"
-              copy="PMOCorex brings the controls that usually live across spreadsheets, emails, messaging apps and disconnected systems into one structured platform."
-            />
+        <section id="why" className="mx-auto max-w-[1380px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+          <div className="grid gap-12 lg:grid-cols-[.72fr_1.28fr]">
+            <div>
+              <div className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ef8354]">Why PMOCorex</div>
+              <h2 className="mt-4 text-4xl font-extrabold leading-tight tracking-[-.045em] text-[#173f5f]">Project information is everywhere. Control should not be.</h2>
+              <p className="mt-5 text-base leading-7 text-[#5e737e]">PMOCorex replaces fragmented updates and reactive reporting with a connected delivery control layer.</p>
+            </div>
 
-            <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {PLATFORM_FEATURES.map(feature => {
-                const Icon = feature.icon
+            <div className="grid gap-px overflow-hidden rounded-2xl border border-[#d7e1e4] bg-[#d7e1e4] sm:grid-cols-2">
+              {capabilities.map(item => {
+                const Icon = item.icon
                 return (
-                  <article
-                    key={feature.title}
-                    className="group rounded-2xl border border-white/[0.08] bg-[#0b1620]/80 p-6 transition hover:-translate-y-1 hover:border-[#d6b25e]/30 hover:bg-[#0d1a25]"
-                  >
-                    <div className="grid h-11 w-11 place-items-center rounded-xl border border-[#d6b25e]/20 bg-[#d6b25e]/10 text-[#dfbf70]">
-                      <Icon size={20} />
+                  <div key={item.title} className="group bg-white p-7 transition hover:bg-[#f9fbfb] sm:p-8">
+                    <div className="flex items-center justify-between">
+                      <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#eaf1f4] text-[#2f6f91]"><Icon size={20} /></div>
+                      <span className="text-xs font-extrabold text-[#b3c0c6]">{item.number}</span>
                     </div>
-                    <h3 className="mt-5 text-lg font-bold text-white">{feature.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-400">{feature.copy}</p>
-                  </article>
+                    <h3 className="mt-7 text-xl font-extrabold tracking-[-.03em] text-[#173f5f]">{item.title}</h3>
+                    <p className="mt-3 text-sm leading-6 text-[#607580]">{item.copy}</p>
+                  </div>
                 )
               })}
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="border-y border-white/[0.07] bg-[#09131d]">
-            <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 py-24 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-32">
-              <IntelligenceVisual />
-              <div>
-                <div className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#d6b25e]">Delivery intelligence</div>
-                <h2 className="mt-4 text-4xl font-black tracking-[-0.035em] sm:text-5xl">Move from reporting delays to preventing them.</h2>
-                <p className="mt-6 text-lg leading-8 text-slate-300">
-                  PMOCorex turns live project activity into practical intelligence. It identifies critical delays, highlights exposure and helps teams focus recovery efforts where they matter most.
-                </p>
-                <div className="mt-8 grid gap-5">
+        <section id="platform" className="bg-[#173f5f] text-white">
+          <div className="mx-auto grid max-w-[1380px] gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:px-12 lg:py-28">
+            <div>
+              <div className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ffad89]">The platform</div>
+              <h2 className="mt-4 max-w-xl text-4xl font-extrabold leading-tight tracking-[-.045em]">From site activity to executive decisions, without losing the thread.</h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-white/65">Every control area contributes to one shared picture of delivery. Teams work in their own modules. Leadership sees the combined position.</p>
+              <button onClick={requestDemo} className="mt-8 inline-flex items-center gap-2 border-b border-[#ffad89] pb-1 text-sm font-bold text-[#ffad89]">Explore PMOCorex with us <ChevronRight size={16} /></button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {operatingAreas.map((item, index) => (
+                <div key={item} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[.045] px-5 py-4">
+                  <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-white/10 text-[10px] font-extrabold text-[#ffad89]">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="text-sm font-semibold text-white/88">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-[1380px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+          <div className="overflow-hidden rounded-[26px] border border-[#d7e1e4] bg-white">
+            <div className="grid lg:grid-cols-2">
+              <div className="p-8 sm:p-12 lg:p-16">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fff0e9] text-[#e87545]"><Sparkles size={22} /></div>
+                <h2 className="mt-8 text-4xl font-extrabold leading-tight tracking-[-.045em] text-[#173f5f]">Recovery intelligence that leads to action.</h2>
+                <p className="mt-5 text-base leading-7 text-[#5e737e]">PMOCorex surfaces critical delayed activities, pressure points and practical recovery priorities so teams can respond before reporting becomes explanation.</p>
+                <div className="mt-8 grid gap-3">
+                  {['Identify schedule pressure early', 'Connect delays to owners and dependencies', 'Translate project data into executive summaries'].map(item => (
+                    <div key={item} className="flex items-center gap-3 text-sm font-semibold text-[#405b69]"><CheckCircle2 size={17} className="text-[#4f9d69]" />{item}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="relative min-h-[420px] overflow-hidden bg-[#eef3f4] p-8 sm:p-12">
+                <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(23,63,95,.07)_1px,transparent_1px),linear-gradient(rgba(23,63,95,.07)_1px,transparent_1px)] bg-[size:24px_24px]" />
+                <div className="relative space-y-4">
+                  <div className="rounded-2xl border border-[#cfdde2] bg-white p-5 shadow-sm">
+                    <div className="flex items-start justify-between"><div><div className="text-[10px] font-bold uppercase tracking-[.15em] text-[#82939c]">Executive signal</div><div className="mt-2 text-xl font-extrabold text-[#173f5f]">Completion date under pressure</div></div><span className="rounded-full bg-[#fff0e9] px-3 py-1 text-[10px] font-bold text-[#d86335]">Action required</span></div>
+                  </div>
                   {[
-                    ['Recovery forecasting', 'Understand whether the current plan can still meet the delivery target.'],
-                    ['Critical activity focus', 'Direct attention to delayed work with the greatest programme impact.'],
-                    ['Management summaries', 'Translate project data into clear executive actions and decisions.'],
-                  ].map(([title, copy]) => (
-                    <div key={title} className="flex gap-4">
-                      <div className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#d6b25e]/12 text-[#d6b25e]">
-                        <Check size={15} />
-                      </div>
-                      <div>
-                        <div className="font-bold text-white">{title}</div>
-                        <div className="mt-1 text-sm leading-6 text-slate-400">{copy}</div>
-                      </div>
+                    ['01', 'Close long-lead procurement decisions', 'Owner: Commercial'],
+                    ['02', 'Protect façade approval sequence', 'Owner: Design'],
+                    ['03', 'Rebalance finishing resources', 'Owner: Delivery'],
+                  ].map(([number, title, owner]) => (
+                    <div key={number} className="flex items-center gap-4 rounded-2xl border border-[#cfdde2] bg-white p-5 shadow-sm">
+                      <div className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-[#173f5f] text-xs font-extrabold text-white">{number}</div>
+                      <div><div className="text-sm font-bold text-[#173f5f]">{title}</div><div className="mt-1 text-xs text-[#7b8c95]">{owner}</div></div>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section id="solutions" className="scroll-mt-24 mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-32">
-            <SectionHeading
-              eyebrow="Built for complex delivery"
-              title="A platform for organisations that cannot afford blind spots"
-              copy="Configure PMOCorex around the way your portfolio, projects and delivery teams actually operate."
-            />
-            <div className="mt-14 grid gap-5 md:grid-cols-2">
-              {INDUSTRIES.map(([title, copy], index) => (
-                <article key={title} className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b1620] p-7">
-                  <div className="absolute right-5 top-3 text-7xl font-black text-white/[0.025]">0{index + 1}</div>
-                  <Building2 size={22} className="text-[#d6b25e]" />
-                  <h3 className="mt-8 text-xl font-bold">{title}</h3>
-                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">{copy}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section id="security" className="scroll-mt-24 border-y border-white/[0.07] bg-white/[0.018]">
-            <div className="mx-auto grid max-w-7xl gap-12 px-5 py-24 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:px-8 lg:py-28">
-              <div>
-                <div className="grid h-12 w-12 place-items-center rounded-xl border border-[#d6b25e]/25 bg-[#d6b25e]/10 text-[#d6b25e]">
-                  <LockKeyhole size={22} />
-                </div>
-                <h2 className="mt-6 text-4xl font-black tracking-[-0.035em]">Access by invitation. Control by design.</h2>
-                <p className="mt-5 text-lg leading-8 text-slate-300">
-                  PMOCorex is not an open consumer platform. Workspaces are provisioned for subscribed organisations, and access is managed through controlled roles and invitations.
-                </p>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[
-                  [ShieldCheck, 'Role-based permissions', 'Control what administrators, project owners, consultants, contractors and viewers can see or change.'],
-                  [Network, 'Scoped access', 'Assign access at workspace, portfolio or project level based on responsibility.'],
-                  [FileText, 'Traceable records', 'Preserve structured records for approvals, RFIs, risks, quality and project decisions.'],
-                  [LockKeyhole, 'Protected application', 'Public visitors can understand the product, but operational content remains behind authentication.'],
-                ].map(([Icon, title, copy]) => {
-                  const SecurityIcon = Icon as typeof ShieldCheck
-                  return (
-                    <div key={title as string} className="rounded-xl border border-white/[0.08] bg-[#0a151e] p-5">
-                      <SecurityIcon size={20} className="text-[#d6b25e]" />
-                      <div className="mt-4 font-bold text-white">{title as string}</div>
-                      <div className="mt-1.5 text-sm leading-6 text-slate-400">{copy as string}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section id="pricing" className="scroll-mt-24 mx-auto max-w-7xl px-5 py-24 sm:px-6 lg:px-8 lg:py-32">
-            <SectionHeading
-              eyebrow="Plans and onboarding"
-              title="Configured for your portfolio, not sold as a generic login"
-              copy="PMOCorex subscriptions are tailored to organisation size, project portfolio, implementation needs and user access."
-            />
-
-            <div className="mx-auto mt-14 max-w-4xl rounded-3xl border border-[#d6b25e]/25 bg-[linear-gradient(135deg,rgba(214,178,94,0.11),rgba(13,27,38,0.92)_46%)] p-7 sm:p-10">
-              <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div>
-                  <div className="text-sm font-bold uppercase tracking-[0.2em] text-[#d6b25e]">Organisation subscription</div>
-                  <h3 className="mt-3 text-3xl font-black">Professional and enterprise workspaces</h3>
-                  <p className="mt-4 max-w-2xl leading-7 text-slate-300">
-                    Start with a guided demonstration and solution review. We will recommend the right workspace structure, access model, onboarding support and commercial plan.
-                  </p>
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    {['Workspace and portfolio setup', 'Controlled user invitations', 'Implementation support', 'Role and access configuration'].map(item => (
-                      <div key={item} className="flex items-center gap-2 text-sm text-slate-300">
-                        <Check size={15} className="text-[#d6b25e]" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex min-w-[210px] flex-col gap-3">
-                  <button type="button" onClick={bookDemo} className="rounded-xl bg-[#d6b25e] px-6 py-3.5 text-sm font-extrabold text-[#11161a] hover:bg-[#e4c574]">
-                    Book a demo
-                  </button>
-                  <button type="button" onClick={contactSales} className="rounded-xl border border-white/12 px-6 py-3.5 text-sm font-bold hover:bg-white/[0.05]">
-                    Contact sales
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="border-y border-white/[0.07] bg-[#09131d]">
-            <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-20 sm:px-6 lg:grid-cols-[auto_1fr] lg:px-8">
-              <div className="grid h-16 w-16 place-items-center rounded-2xl border border-[#d6b25e]/20 bg-[#d6b25e]/10 text-[#d6b25e]">
-                <Quote size={28} />
-              </div>
-              <div>
-                <blockquote className="max-w-4xl text-2xl font-semibold leading-10 tracking-[-0.02em] text-white sm:text-3xl">
-                  “PMOCorex is being built from inside real project delivery environments, where small gaps in information can become expensive delays, quality failures or management surprises.”
-                </blockquote>
-                <p className="mt-5 text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Product philosophy</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="mx-auto max-w-4xl px-5 py-24 sm:px-6 lg:py-28">
-            <SectionHeading eyebrow="Frequently asked questions" title="What prospective organisations ask" centered />
-            <div className="mt-12 divide-y divide-white/[0.08] border-y border-white/[0.08]">
-              {FAQS.map((item, index) => (
-                <div key={item.q}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                    className="flex w-full items-center justify-between gap-5 py-6 text-left"
-                  >
-                    <span className="text-base font-bold text-white sm:text-lg">{item.q}</span>
-                    <ChevronDown size={19} className={`shrink-0 text-slate-400 transition ${openFaq === index ? 'rotate-180' : ''}`} />
-                  </button>
-                  {openFaq === index && <p className="max-w-3xl pb-6 text-sm leading-7 text-slate-400 sm:text-base">{item.a}</p>}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="px-5 pb-24 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-7xl overflow-hidden rounded-3xl border border-[#d6b25e]/25 bg-[radial-gradient(circle_at_85%_20%,rgba(214,178,94,0.20),transparent_30%),linear-gradient(135deg,#102231,#0a151e)] px-7 py-12 sm:px-12 lg:flex lg:items-center lg:justify-between lg:gap-10 lg:px-16 lg:py-16">
-              <div>
-                <div className="text-sm font-extrabold uppercase tracking-[0.2em] text-[#d6b25e]">See the platform</div>
-                <h2 className="mt-3 max-w-3xl text-4xl font-black tracking-[-0.035em] sm:text-5xl">Bring portfolio-level control to every project.</h2>
-                <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-300">Book a private product demonstration and explore how PMOCorex can support your delivery organisation.</p>
-              </div>
-              <div className="mt-8 flex shrink-0 flex-col gap-3 sm:flex-row lg:mt-0 lg:flex-col">
-                <button type="button" onClick={bookDemo} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d6b25e] px-6 py-3.5 text-sm font-extrabold text-[#11161a] hover:bg-[#e4c574]">
-                  Book a demo <ArrowRight size={16} />
-                </button>
-                <button type="button" onClick={signIn} className="rounded-xl border border-white/15 bg-white/[0.04] px-6 py-3.5 text-sm font-bold hover:bg-white/[0.08]">
-                  Existing customer sign in
-                </button>
-              </div>
-            </div>
-          </section>
-        </main>
-
-        <footer className="border-t border-white/[0.07] bg-[#050b11]">
-          <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-6 md:grid-cols-[1.2fr_0.8fr_0.8fr] lg:px-8">
+        <section id="security" className="border-y border-[#dfe7e6] bg-[#edf2f2]">
+          <div className="mx-auto grid max-w-[1380px] items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[.85fr_1.15fr] lg:px-12 lg:py-24">
             <div>
-              <PMOCorexLogo size={38} />
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">
-                Intelligent project delivery control for construction and real estate organisations.
-              </p>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-[#2f6f91] shadow-sm"><ShieldCheck size={23} /></div>
+              <h2 className="mt-7 text-4xl font-extrabold tracking-[-.045em] text-[#173f5f]">Public product story. Private project information.</h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-[#5e737e]">Visitors can understand PMOCorex without accessing your workspace. Accounts are created through approved onboarding and invitations, not public registration.</p>
             </div>
-            <div>
-              <div className="text-sm font-bold text-white">Platform</div>
-              <div className="mt-4 grid gap-3 text-sm text-slate-500">
-                <button type="button" onClick={() => scrollToSection('platform')} className="text-left hover:text-white">Capabilities</button>
-                <button type="button" onClick={() => scrollToSection('security')} className="text-left hover:text-white">Security</button>
-                <button type="button" onClick={() => scrollToSection('pricing')} className="text-left hover:text-white">Pricing</button>
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-white">Get in touch</div>
-              <div className="mt-4 grid gap-3 text-sm text-slate-500">
-                <button type="button" onClick={bookDemo} className="text-left hover:text-white">Book a demo</button>
-                <button type="button" onClick={contactSales} className="text-left hover:text-white">Contact sales</button>
-                <button type="button" onClick={signIn} className="text-left hover:text-white">Sign in</button>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-white/[0.07]">
-            <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-              <span>© {new Date().getFullYear()} PMOCorex. All rights reserved.</span>
-              <span>Project delivery, controlled.</span>
-            </div>
-          </div>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function SectionHeading({
-  eyebrow,
-  title,
-  copy,
-  centered = false,
-}: {
-  eyebrow: string
-  title: string
-  copy?: string
-  centered?: boolean
-}) {
-  return (
-    <div className={centered ? 'mx-auto max-w-3xl text-center' : 'max-w-3xl'}>
-      <div className="text-xs font-extrabold uppercase tracking-[0.24em] text-[#d6b25e]">{eyebrow}</div>
-      <h2 className="mt-4 text-4xl font-black tracking-[-0.035em] text-white sm:text-5xl">{title}</h2>
-      {copy && <p className="mt-5 text-lg leading-8 text-slate-400">{copy}</p>}
-    </div>
-  )
-}
-
-function ProductHero() {
-  return (
-    <div className="relative mx-auto w-full max-w-3xl">
-      <div className="absolute -inset-8 rounded-full bg-[#d6b25e]/10 blur-3xl" />
-      <div className="relative overflow-hidden rounded-2xl border border-white/[0.10] bg-[#0b151e] shadow-[0_35px_100px_rgba(0,0,0,0.52)]">
-        <div className="flex h-11 items-center border-b border-white/[0.07] bg-[#081119] px-4">
-          <div className="flex gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ef6a65]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#e8b34a]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#54ba78]" />
-          </div>
-          <div className="mx-auto rounded-md border border-white/[0.06] bg-white/[0.025] px-20 py-1 text-[9px] text-slate-600">app.pmocorex.com</div>
-        </div>
-
-        <div className="grid min-h-[460px] grid-cols-[62px_1fr] sm:grid-cols-[82px_1fr]">
-          <div className="border-r border-white/[0.07] bg-[#081119] px-2 py-4">
-            <div className="mx-auto mb-8 grid h-8 w-8 place-items-center rounded-lg bg-[#d6b25e] text-[10px] font-black text-[#11161a]">PX</div>
-            <div className="grid gap-3">
-              {[Gauge, Layers3, Clock3, ShieldCheck, FileText, HardHat].map((Icon, index) => (
-                <div key={index} className={`mx-auto grid h-8 w-8 place-items-center rounded-lg ${index === 0 ? 'bg-[#d6b25e]/15 text-[#d6b25e]' : 'text-slate-600'}`}>
-                  <Icon size={15} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="min-w-0 p-4 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#d6b25e]">Command centre</div>
-                <div className="mt-1 text-lg font-extrabold">Portfolio delivery overview</div>
-              </div>
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-bold text-emerald-300">LIVE</span>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               {[
-                ['68%', 'Portfolio progress'],
-                ['12', 'Active projects'],
-                ['7', 'Critical risks'],
-                ['19', 'Pending approvals'],
-              ].map(([value, label]) => (
-                <div key={label} className="rounded-xl border border-white/[0.06] bg-[#101d28] p-3">
-                  <div className="text-xl font-black text-white">{value}</div>
-                  <div className="mt-1 text-[9px] leading-4 text-slate-500">{label}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 grid gap-3 xl:grid-cols-[1.35fr_0.65fr]">
-              <div className="rounded-xl border border-white/[0.06] bg-[#101d28] p-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold text-slate-300">Portfolio performance</div>
-                  <div className="text-[9px] text-slate-600">Last 8 weeks</div>
-                </div>
-                <div className="mt-5 flex h-28 items-end gap-2">
-                  {[42, 51, 47, 62, 58, 71, 67, 78, 72, 85, 79, 91].map((height, index) => (
-                    <div key={index} className="flex-1 rounded-t-sm bg-gradient-to-t from-[#8d6b2b] to-[#d6b25e]" style={{ height: `${height}%`, opacity: 0.48 + index * 0.035 }} />
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/[0.06] bg-[#101d28] p-4">
-                <div className="text-[11px] font-bold text-slate-300">Delivery confidence</div>
-                <div className="mt-5 grid place-items-center">
-                  <div className="relative grid h-24 w-24 place-items-center rounded-full bg-[conic-gradient(#d6b25e_0_74%,rgba(255,255,255,0.06)_74%_100%)]">
-                    <div className="grid h-[72px] w-[72px] place-items-center rounded-full bg-[#101d28]">
-                      <div className="text-center">
-                        <div className="text-xl font-black">74%</div>
-                        <div className="text-[8px] text-slate-500">RECOVERABLE</div>
-                      </div>
-                    </div>
+                [ShieldCheck, 'Controlled access', 'Only approved users can sign in.'],
+                [Building2, 'Workspace isolation', 'Organisation and project access are scoped.'],
+                [FileCheck2, 'Role permissions', 'Teams see and edit only what they should.'],
+              ].map(([Icon, title, copy]) => {
+                const SecurityIcon = Icon as typeof ShieldCheck
+                return (
+                  <div key={String(title)} className="rounded-2xl border border-[#d2dddf] bg-white p-6">
+                    <SecurityIcon size={20} className="text-[#ef8354]" />
+                    <h3 className="mt-5 text-base font-extrabold text-[#173f5f]">{String(title)}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#6a7d87]">{String(copy)}</p>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-xl border border-white/[0.06] bg-[#101d28] p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-[11px] font-bold text-slate-300">Management focus</div>
-                <Zap size={13} className="text-[#d6b25e]" />
-              </div>
-              <div className="mt-3 grid gap-2">
-                {[
-                  ['Procurement lead time threatens finishes sequence', 'Critical'],
-                  ['Five technical approvals exceed target response time', 'Watch'],
-                  ['Quality close-out improved across two projects', 'Positive'],
-                ].map(([label, state], index) => (
-                  <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.025] px-3 py-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${index === 0 ? 'bg-red-400' : index === 1 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                      <span className="truncate text-[9px] text-slate-400">{label}</span>
-                    </div>
-                    <span className="text-[8px] text-slate-600">{state}</span>
-                  </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div className="absolute -bottom-7 -left-4 hidden w-56 rounded-xl border border-white/[0.10] bg-[#0d1a24]/95 p-4 shadow-2xl backdrop-blur sm:block">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-          <Sparkles size={12} className="text-[#d6b25e]" /> AI recovery insight
-        </div>
-        <div className="mt-2 text-xs font-semibold leading-5 text-slate-200">Resequence external works to protect the handover date.</div>
-      </div>
-    </div>
-  )
-}
+        <section className="mx-auto max-w-[1380px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
+          <div className="relative overflow-hidden rounded-[26px] bg-[#ef8354] px-7 py-12 text-white sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16 lg:py-16">
+            <div className="absolute right-0 top-0 h-full w-2/5 bg-[linear-gradient(90deg,rgba(255,255,255,.13)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.13)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:linear-gradient(to_left,black,transparent)]" />
+            <div className="relative max-w-2xl">
+              <div className="text-xs font-extrabold uppercase tracking-[.18em] text-white/70">A clearer way to deliver</div>
+              <h2 className="mt-4 text-4xl font-extrabold leading-tight tracking-[-.045em]">Give your next project review one source of truth.</h2>
+              <p className="mt-4 text-base leading-7 text-white/80">See the platform, discuss your delivery model and explore how PMOCorex can fit your organisation.</p>
+            </div>
+            <button onClick={requestDemo} className="relative mt-8 inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3.5 text-sm font-extrabold text-[#173f5f] shadow-lg transition hover:-translate-y-0.5 lg:mt-0">Book a demo <ArrowRight size={17} /></button>
+          </div>
+        </section>
+      </main>
 
-function IntelligenceVisual() {
-  return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#0b1721] p-5 shadow-2xl sm:p-7">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Recovery engine</div>
-          <div className="mt-1 text-lg font-bold">Project delivery forecast</div>
+      <footer className="border-t border-[#dfe7e6] bg-white">
+        <div className="mx-auto flex max-w-[1380px] flex-col gap-7 px-5 py-9 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
+          <Brand />
+          <div className="flex flex-wrap gap-x-7 gap-y-3 text-xs font-semibold text-[#6f818a]">
+            <button onClick={requestDemo}>Contact</button>
+            <button onClick={() => navigate('/login')}>Sign in</button>
+            <span>Privacy</span>
+            <span>© {new Date().getFullYear()} PMOCorex</span>
+          </div>
         </div>
-        <div className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-300">ON WATCH</div>
-      </div>
-      <div className="mt-7 grid gap-4 sm:grid-cols-3">
-        {[
-          ['31 days', 'Forecast delay'],
-          ['6', 'Critical activities'],
-          ['74%', 'Recovery probability'],
-        ].map(([value, label]) => (
-          <div key={label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-4">
-            <div className="text-2xl font-black text-white">{value}</div>
-            <div className="mt-1 text-xs text-slate-500">{label}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.025] p-4">
-        <div className="flex justify-between text-xs text-slate-400"><span>Recovery probability</span><span className="font-bold text-[#d6b25e]">74%</span></div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full w-[74%] rounded-full bg-gradient-to-r from-[#8d6b2b] to-[#d6b25e]" /></div>
-      </div>
-      <div className="mt-4 grid gap-2">
-        {[
-          ['Accelerate long-lead procurement package', 'High impact'],
-          ['Resolve structural drawing approval dependency', '7 days'],
-          ['Increase finishing resources in Zone B', 'Recommended'],
-        ].map(([action, tag], index) => (
-          <div key={action} className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.05] px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#d6b25e]/10 text-[10px] font-black text-[#d6b25e]">{index + 1}</span><span className="truncate text-sm text-slate-300">{action}</span></div>
-            <span className="shrink-0 text-[10px] font-semibold text-slate-500">{tag}</span>
-          </div>
-        ))}
-      </div>
+      </footer>
     </div>
   )
 }
