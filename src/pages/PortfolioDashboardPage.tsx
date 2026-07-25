@@ -7,9 +7,12 @@ import {
   BarChart3,
   Building2,
   CheckCircle,
+  ChevronRight,
   Clock,
   FileText,
+  Search,
   ShieldAlert,
+  Sparkles,
   TrendingDown,
   Wallet,
 } from 'lucide-react'
@@ -85,6 +88,8 @@ export default function PortfolioDashboardPage() {
   const [hseToolboxTalks, setHseToolboxTalks] = useState<any[]>([])
 
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [focusLens, setFocusLens] = useState<'Executive' | 'Delivery' | 'Commercial' | 'Quality' | 'Risk'>('Executive')
 
   useEffect(() => {
     loadPortfolioData()
@@ -474,355 +479,203 @@ export default function PortfolioDashboardPage() {
     .sort((a, b) => a.score - b.score)
     .slice(0, 6)
 
+  const portfolioHealth = projectRows.length
+    ? Math.round(projectRows.reduce((sum, row) => sum + row.score, 0) / projectRows.length)
+    : 0
+
+  const portfolioProgress = projectRows.length
+    ? Math.round(projectRows.reduce((sum, row) => sum + row.progress, 0) / projectRows.length)
+    : 0
+
+  const projectsRequiringAttention = projectRows.filter(row => row.score < 65).length
+  const projectsOnTrack = projectRows.filter(row => row.score >= 65).length
+  const recoveryConfidence = Math.max(0, Math.min(100, portfolioHealth - Math.min(18, summary.totalHighRisks * 2)))
+
+  const filteredRows = projectRows
+    .filter(row => projectName(row.project).toLowerCase().includes(searchQuery.toLowerCase()))
+    .slice()
+    .sort((a, b) => a.score - b.score)
+
+  const attentionLeader = executiveAlerts[0]
+  const summarySentence = attentionLeader
+    ? `${projectName(attentionLeader.project)} currently carries the greatest delivery pressure. ${projectsRequiringAttention} project${projectsRequiringAttention === 1 ? '' : 's'} require intervention, led by ${summary.totalHighRisks} high risks and ${summary.totalPendingApprovals} pending approvals across the portfolio.`
+    : `Portfolio delivery remains stable. ${projectsOnTrack} project${projectsOnTrack === 1 ? '' : 's'} are currently on track, with no critical executive intervention identified.`
+
   if (loading) {
     return (
-      <div className="min-h-dvh bg-[#0c1014] text-white flex items-center justify-center">
-        <div className="card p-6 text-slate-400">Loading portfolio dashboard…</div>
+      <div className="min-h-dvh bg-[#f4f6f5] text-[#173f5f] flex items-center justify-center">
+        <div className="rounded-2xl border border-[#dce4e7] bg-white px-6 py-5 text-sm text-[#6c7f89] shadow-sm">
+          Loading portfolio intelligence…
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh bg-[#0c1014] text-white">
-      <div className="mx-auto w-full max-w-[1500px] px-5 sm:px-6 lg:px-8 py-8 space-y-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <PMOCorexLogo size={42} />
+    <div className="min-h-dvh bg-[#f4f6f5] text-[#18384c]">
+      <div className="mx-auto w-full max-w-[1540px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <header className="mb-6 flex flex-col gap-4 border-b border-[#dce4e7] pb-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <PMOCorexLogo size={38} />
+            <div className="hidden h-8 w-px bg-[#dce4e7] sm:block" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7d909a]">Executive portfolio</div>
+              <div className="mt-1 text-sm font-semibold text-[#173f5f]">{organizations[0]?.name || 'Organization workspace'}</div>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => navigate(-1)} className="btn btn-ghost">
-              <ArrowLeft size={15} />
-              Back
+            <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-[#d7e0e4] bg-white px-4 py-2.5 text-sm font-semibold text-[#405d6d] shadow-sm transition hover:border-[#b9c9d0]">
+              <ArrowLeft size={15} /> Back
             </button>
-
-            <button onClick={() => navigate('/projects')} className="btn btn-gold">
-              Workspace Hub
+            <button onClick={() => navigate('/projects')} className="rounded-xl bg-[#173f5f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#12344f]">
+              Workspace hub
             </button>
           </div>
         </header>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-          <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[#c49e48]/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-[28px] border border-[#d8e2e6] bg-white p-6 shadow-[0_10px_35px_rgba(24,56,76,0.05)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'linear-gradient(#edf1f2 1px, transparent 1px), linear-gradient(90deg, #edf1f2 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
+          <div className="relative grid gap-8 xl:grid-cols-[1.5fr_.7fr] xl:items-end">
+            <div>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#c9dbe4] bg-[#eef5f8] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#356684]">
+                <Activity size={13} /> Portfolio overview
+              </div>
+              <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-[#173f5f] sm:text-5xl">
+                A clear view of where delivery needs attention.
+              </h1>
+              <p className="mt-5 max-w-3xl text-[15px] leading-7 text-[#607781]">{summarySentence}</p>
 
-          <div className="relative">
-            <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-              Executive Portfolio Control
+              <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm">
+                <span className="font-semibold text-[#173f5f]">{summary.totalProjects} projects</span>
+                <span className="text-[#71858f]">{projectsOnTrack} on track</span>
+                <span className={projectsRequiringAttention ? 'font-semibold text-[#c56142]' : 'text-[#71858f]'}>{projectsRequiringAttention} require attention</span>
+              </div>
             </div>
 
-            <h1 className="text-3xl sm:text-5xl font-black text-[#ede8de]">
-              Portfolio Dashboard
-            </h1>
-
-            <p className="text-slate-400 mt-4 max-w-3xl">
-              Workspace-level view of project delivery, financial exposure,
-              risks, snags, HSE performance, approvals, procurement, reporting
-              compliance, and intervention priorities across all projects.
-            </p>
-
-            <div className="mt-5 text-xs text-[#6e7d8c]">
-              Workspace:{' '}
-              <span className="text-[#c49e48]">
-                {organizations[0]?.name || 'Organization'}
-              </span>
+            <div className="rounded-2xl border border-[#dce5e8] bg-[#f8faf9]/95 p-5 backdrop-blur">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#84969e]">Portfolio health</div>
+                  <div className="mt-2 text-5xl font-semibold tracking-[-0.06em] text-[#173f5f]">{portfolioHealth}%</div>
+                </div>
+                <HealthBadge health={getHealth(portfolioHealth)} />
+              </div>
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#e6ecee]">
+                <div className="h-full rounded-full bg-[#3e7894] transition-all" style={{ width: `${portfolioHealth}%` }} />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e1e8ea] pt-4">
+                <MiniStat label="Portfolio progress" value={`${portfolioProgress}%`} />
+                <MiniStat label="Recovery confidence" value={`${recoveryConfidence}%`} />
+              </div>
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-          <Metric icon={Building2} title="Total Projects" value={summary.totalProjects} />
-          <Metric icon={Activity} title="Active" value={summary.activeProjects} />
-          <Metric icon={CheckCircle} title="Healthy" value={summary.healthy} good />
-          <Metric icon={TrendingDown} title="Slow" value={summary.slow} warning />
-          <Metric icon={ShieldAlert} title="Critical" value={summary.critical} danger />
-          <Metric icon={Clock} title="Overdue Tasks" value={summary.overdueTasks} danger={summary.overdueTasks > 0} />
-        </div>
+        <section className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#dce4e7] bg-white shadow-sm md:grid-cols-4 xl:grid-cols-8">
+          <KpiStrip label="Active projects" value={summary.activeProjects} />
+          <KpiStrip label="Portfolio progress" value={`${portfolioProgress}%`} />
+          <KpiStrip label="Open risks" value={summary.totalOpenRisks} alert={summary.totalHighRisks > 0} />
+          <KpiStrip label="High risks" value={summary.totalHighRisks} alert={summary.totalHighRisks > 0} />
+          <KpiStrip label="Approvals waiting" value={summary.totalPendingApprovals} />
+          <KpiStrip label="Procurement issues" value={summary.totalPendingProcurement} />
+          <KpiStrip label="Open snags" value={summary.totalOpenSnags} />
+          <KpiStrip label="Overdue tasks" value={summary.overdueTasks} alert={summary.overdueTasks > 0} />
+        </section>
 
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-          <div className="card p-5 xl:col-span-3">
-            <SectionTitle icon={Wallet} title="Financial Overview" />
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <MoneyCard title="Total Contract Sum" value={summary.totalContractSum} />
-              <MoneyCard title="Paid To Date" value={summary.paidToDate} />
-              <MoneyCard title="Outstanding Exposure" value={summary.outstanding} />
-              <MoneyCard title="Approved Variations" value={summary.variations} />
+        <section className="mt-6 grid gap-5 xl:grid-cols-[1.45fr_.75fr]">
+          <div className="rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <SectionHeading eyebrow="Portfolio register" title="Project health" description="Sorted by projects requiring the earliest intervention." />
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8ca0a9]" size={16} />
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search projects" className="w-full rounded-xl border border-[#d8e2e6] bg-[#f8faf9] py-2.5 pl-9 pr-3 text-sm text-[#173f5f] outline-none transition placeholder:text-[#9aabb2] focus:border-[#7fa4b6] focus:bg-white" />
+              </div>
             </div>
-          </div>
 
-          <div className="card p-5">
-            <SectionTitle icon={AlertTriangle} title="Portfolio Pressure" />
-
-            <PressureRow label="Open Risks" value={summary.totalOpenRisks} />
-            <PressureRow label="High Risks" value={summary.totalHighRisks} danger />
-            <PressureRow label="Open Snags" value={summary.totalOpenSnags} />
-            <PressureRow label="Pending Approvals" value={summary.totalPendingApprovals} />
-            <PressureRow label="Procurement Issues" value={summary.totalPendingProcurement} />
-          </div>
-
-          <div className="card p-5">
-            <SectionTitle icon={ShieldAlert} title="Portfolio Safety" />
-
-            <PressureRow label="Open Observations" value={summary.totalOpenObservations} />
-            <PressureRow label="Critical Observations" value={summary.totalCriticalObservations} danger />
-            <PressureRow label="Open Incidents" value={summary.totalOpenIncidents} danger />
-            <PressureRow label="Toolbox Talks" value={summary.totalToolboxTalks} />
-            <PressureRow label="Talks This Month" value={summary.totalToolboxTalksThisMonth} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <ChartCard title="Projects by Health Status">
-            <ResponsiveContainer width="100%" height={270}>
-              <BarChart data={healthChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                <XAxis dataKey="name" stroke="#6e7d8c" fontSize={11} />
-                <YAxis stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
-                <Tooltip content={<ProjectListTooltip />} />
-                <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                  {healthChartData.map(entry => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-
-            <ProjectGroupDetails
-              title="Health Status Details"
-              groups={healthChartData}
-              showScore
-            />
-          </ChartCard>
-
-          <ChartCard title="Project Status Distribution">
-            <ResponsiveContainer width="100%" height={270}>
-              <PieChart>
-                <Pie
-                  data={statusChartData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={95}
-                  paddingAngle={3}
-                >
-                  {statusChartData.map((_, index) => (
-                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ProjectListTooltip />} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-
-            <ProjectGroupDetails
-              title="Status Distribution Details"
-              groups={statusChartData}
-              showHealth
-            />
-          </ChartCard>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <ChartCard title="Top Projects by Open Risks">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={riskChartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                <XAxis type="number" stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
-                <YAxis dataKey="name" type="category" stroke="#6e7d8c" fontSize={11} width={120} />
-                <Tooltip content={<DarkTooltip />} />
-                <Legend />
-                <Bar dataKey="risks" fill="#c49e48" radius={[0, 8, 8, 0]} />
-                <Bar dataKey="highRisks" fill="#ef4444" radius={[0, 8, 8, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard title="Top Projects by Open Snags">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={snagChartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                <XAxis type="number" stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
-                <YAxis dataKey="name" type="category" stroke="#6e7d8c" fontSize={11} width={120} />
-                <Tooltip content={<DarkTooltip />} />
-                <Legend />
-                <Bar dataKey="snags" fill="#f59e0b" radius={[0, 8, 8, 0]} />
-                <Bar dataKey="critical" fill="#ef4444" radius={[0, 8, 8, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard title="Top Projects by HSE Pressure">
-            {hseChartData.length === 0 ? (
-              <EmptyChart message="No open HSE pressure recorded yet." />
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={hseChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                  <XAxis type="number" stroke="#6e7d8c" fontSize={11} allowDecimals={false} />
-                  <YAxis dataKey="name" type="category" stroke="#6e7d8c" fontSize={11} width={120} />
-                  <Tooltip content={<DarkTooltip />} />
-                  <Legend />
-                  <Bar dataKey="observations" fill="#c49e48" radius={[0, 8, 8, 0]} />
-                  <Bar dataKey="critical" fill="#f59e0b" radius={[0, 8, 8, 0]} />
-                  <Bar dataKey="incidents" fill="#ef4444" radius={[0, 8, 8, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
-        </div>
-
-        <ChartCard title="Financial Exposure by Project">
-          {financeChartData.length === 0 ? (
-            <EmptyChart message="No financial data available yet from financial_items." />
-          ) : (
-            <ResponsiveContainer width="100%" height={340}>
-              <BarChart data={financeChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                <XAxis dataKey="name" stroke="#6e7d8c" fontSize={11} />
-                <YAxis stroke="#6e7d8c" fontSize={11} tickFormatter={shortCurrency} />
-                <Tooltip content={<MoneyTooltip />} />
-                <Legend />
-                <Bar dataKey="contract" fill="#c49e48" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="paid" fill="#10b981" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="outstanding" fill="#ef4444" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="card p-5 xl:col-span-1">
-            <SectionTitle icon={ShieldAlert} title="Executive Attention Required" />
-
-            {executiveAlerts.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-500">
-                No critical intervention required.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {executiveAlerts.map(row => (
-                  <div key={row.project.id} className="rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-[#ede8de]">
-                        {projectName(row.project)}
-                      </div>
-                      <HealthBadge health={row.health} />
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
-                      <span>Risks: {row.openRisks}</span>
-                      <span>Snags: {row.openSnags}</span>
-                      <span>HSE Obs: {row.openObservations}</span>
-                      <span>Incidents: {row.openIncidents}</span>
-                      <span>Approvals: {row.pendingApprovals}</span>
-                      <span>Procurement: {row.pendingProcurement}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card p-5 xl:col-span-2">
-            <SectionTitle icon={BarChart3} title="Portfolio Heatmap" />
-
-            <div className="overflow-x-auto">
-              <table className="tbl">
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[900px] border-collapse text-left">
                 <thead>
-                  <tr>
-                    <th>Project</th>
-                    <th>Schedule</th>
-                    <th>Risk</th>
-                    <th>Snags</th>
-                    <th>HSE</th>
-                    <th>Approvals</th>
-                    <th>Procurement</th>
-                    <th>Finance</th>
-                    <th>Reports</th>
+                  <tr className="border-b border-[#dfe7e9] text-[10px] font-bold uppercase tracking-[0.14em] text-[#81949d]">
+                    <th className="px-3 py-3">Project</th><th className="px-3 py-3">Health</th><th className="px-3 py-3">Progress</th><th className="px-3 py-3">Schedule</th><th className="px-3 py-3">Risks</th><th className="px-3 py-3">Approvals</th><th className="px-3 py-3">Recovery</th><th className="px-3 py-3"></th>
                   </tr>
                 </thead>
-
                 <tbody>
-                  {projectRows.map(row => (
-                    <tr key={row.project.id}>
-                      <td className="font-semibold text-[#ede8de]">
-                        {projectName(row.project)}
-                      </td>
-                      <td><HeatCell value={row.scheduleVariance < -10 ? 3 : row.scheduleVariance < -5 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.highRisks > 0 ? 3 : row.openRisks > 3 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.criticalSnags > 0 ? 3 : row.openSnags > 5 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.openIncidents > 0 ? 3 : row.criticalObservations > 0 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.pendingApprovals > 5 ? 3 : row.pendingApprovals > 0 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.delayedProcurement > 0 ? 3 : row.pendingProcurement > 3 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.budgetConsumption > 100 ? 3 : row.budgetConsumption > 85 ? 2 : 1} /></td>
-                      <td><HeatCell value={row.daysSinceReport === null ? 3 : row.daysSinceReport > 14 ? 3 : row.daysSinceReport > 7 ? 2 : 1} /></td>
+                  {filteredRows.map(row => (
+                    <tr key={row.project.id} className="group border-b border-[#edf1f2] transition hover:bg-[#f7faf9]">
+                      <td className="px-3 py-4"><div className="font-semibold text-[#173f5f]">{projectName(row.project)}</div><div className="mt-1 text-xs text-[#8a9da5]">{row.project.status || row.project.phase || 'Active'}</div></td>
+                      <td className="px-3 py-4"><HealthBadge health={row.health} /></td>
+                      <td className="px-3 py-4"><div className="font-semibold text-[#294b5e]">{row.progress}%</div><div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-[#e8edef]"><div className="h-full rounded-full bg-[#5f8fa5]" style={{ width: `${Math.min(100, row.progress)}%` }} /></div></td>
+                      <td className="px-3 py-4"><span className={row.scheduleVariance < -10 ? 'font-semibold text-[#c4573e]' : row.scheduleVariance < -5 ? 'font-semibold text-[#b17a2c]' : 'text-[#55717f]'}>{row.scheduleVariance}%</span></td>
+                      <td className="px-3 py-4"><span className="font-semibold text-[#294b5e]">{row.openRisks}</span>{row.highRisks > 0 && <span className="ml-2 text-xs font-semibold text-[#c4573e]">{row.highRisks} high</span>}</td>
+                      <td className="px-3 py-4 text-[#55717f]">{row.pendingApprovals}</td>
+                      <td className="px-3 py-4"><span className="text-sm font-semibold text-[#356684]">{Math.max(0, Math.min(100, row.score - row.highRisks * 2))}%</span></td>
+                      <td className="px-3 py-4"><button onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="rounded-lg p-2 text-[#78909b] transition hover:bg-[#eaf1f4] hover:text-[#173f5f]"><ChevronRight size={17} /></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {filteredRows.length === 0 && <div className="py-10 text-center text-sm text-[#82959e]">No project matches your search.</div>}
             </div>
           </div>
-        </div>
 
-        <div className="card p-5">
-          <SectionTitle icon={FileText} title="Portfolio Project Register" />
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-[#dce4e7] bg-[#173f5f] p-6 text-white shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#a8c3d1]"><Sparkles size={15} /> Executive intelligence</div>
+              <h2 className="mt-5 text-2xl font-semibold tracking-[-0.035em]">Portfolio delivery remains {portfolioHealth >= 65 ? 'recoverable' : 'under pressure'}.</h2>
+              <p className="mt-4 text-sm leading-6 text-[#c8d8df]">{summarySentence}</p>
+              <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.06] p-4">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9db8c6]">Recommended focus</div>
+                <div className="mt-2 text-sm font-semibold">{attentionLeader ? `Resolve the leading constraints on ${projectName(attentionLeader.project)} before they increase schedule exposure.` : 'Maintain current controls and protect reporting cadence.'}</div>
+              </div>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Status</th>
-                  <th>Health</th>
-                  <th>Score</th>
-                  <th>Progress</th>
-                  <th>Schedule Var.</th>
-                  <th>Contract Sum</th>
-                  <th>Paid</th>
-                  <th>Risks</th>
-                  <th>Snags</th>
-                  <th>HSE Obs</th>
-                  <th>Incidents</th>
-                  <th>Approvals</th>
-                  <th>Procurement</th>
-                  <th>Last Report</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {projectRows
-                  .slice()
-                  .sort((a, b) => a.score - b.score)
-                  .map(row => (
-                    <tr key={row.project.id}>
-                      <td className="font-semibold text-[#ede8de]">
-                        {projectName(row.project)}
-                      </td>
-                      <td>{row.project.status || 'Active'}</td>
-                      <td><HealthBadge health={row.health} /></td>
-                      <td>{row.score}%</td>
-                      <td>{row.progress}%</td>
-                      <td>{row.scheduleVariance}%</td>
-                      <td>{formatCurrency(row.contractSum || 0)}</td>
-                      <td>{formatCurrency(row.paidToDate || 0)}</td>
-                      <td>{row.openRisks}</td>
-                      <td>{row.openSnags}</td>
-                      <td>{row.openObservations}</td>
-                      <td>{row.openIncidents}</td>
-                      <td>{row.pendingApprovals}</td>
-                      <td>{row.pendingProcurement}</td>
-                      <td>
-                        {row.lastReport?.report_date || row.lastReport?.created_at
-                          ? new Date(
-                              row.lastReport.report_date ||
-                                row.lastReport.created_at
-                            ).toLocaleDateString('en-GB')
-                          : 'No report'}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div className="rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm">
+              <SectionHeading eyebrow="Executive watchlist" title="Attention required" />
+              <div className="mt-4 space-y-3">
+                {executiveAlerts.length ? executiveAlerts.slice(0, 4).map(row => (
+                  <button key={row.project.id} onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="w-full rounded-xl border border-[#e0e7e9] p-4 text-left transition hover:border-[#b8ccd5] hover:bg-[#f8faf9]">
+                    <div className="flex items-center justify-between gap-3"><span className="font-semibold text-[#173f5f]">{projectName(row.project)}</span><HealthBadge health={row.health} /></div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[#758a94]"><span>{row.highRisks} high risks</span><span>{row.pendingApprovals} approvals</span><span>{row.overdueTasks} overdue</span></div>
+                  </button>
+                )) : <div className="rounded-xl bg-[#f3f7f5] p-4 text-sm text-[#648074]">No critical intervention required.</div>}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <SectionHeading eyebrow="Focus mode" title="Review the portfolio through the right lens" description="Switch emphasis without changing the underlying project data." />
+            <div className="flex flex-wrap gap-2">
+              {(['Executive', 'Delivery', 'Commercial', 'Quality', 'Risk'] as const).map(lens => <button key={lens} onClick={() => setFocusLens(lens)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${focusLens === lens ? 'bg-[#173f5f] text-white' : 'border border-[#d9e2e5] bg-[#f8faf9] text-[#607985] hover:border-[#a9c0ca]'}`}>{lens}</button>)}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {focusLens === 'Commercial' ? <>
+              <FocusCard icon={Wallet} label="Total contract sum" value={formatCurrency(summary.totalContractSum)} note="Portfolio baseline" />
+              <FocusCard icon={Wallet} label="Paid to date" value={formatCurrency(summary.paidToDate)} note="Certified and recorded" />
+              <FocusCard icon={AlertTriangle} label="Outstanding exposure" value={formatCurrency(summary.outstanding)} note="Unpaid portfolio balance" alert />
+              <FocusCard icon={TrendingDown} label="Variations" value={formatCurrency(summary.variations)} note="Recorded change exposure" />
+            </> : focusLens === 'Quality' ? <>
+              <FocusCard icon={CheckCircle} label="Open snags" value={summary.totalOpenSnags} note="Across all projects" />
+              <FocusCard icon={ShieldAlert} label="Open observations" value={summary.totalOpenObservations} note="HSE and site observations" />
+              <FocusCard icon={AlertTriangle} label="Critical observations" value={summary.totalCriticalObservations} note="Immediate attention" alert />
+              <FocusCard icon={Activity} label="Toolbox talks" value={summary.totalToolboxTalksThisMonth} note="Completed this month" />
+            </> : focusLens === 'Risk' ? <>
+              <FocusCard icon={AlertTriangle} label="Open risks" value={summary.totalOpenRisks} note="Portfolio-wide" />
+              <FocusCard icon={ShieldAlert} label="High risks" value={summary.totalHighRisks} note="Executive review" alert />
+              <FocusCard icon={Clock} label="Overdue tasks" value={summary.overdueTasks} note="Not yet closed" alert />
+              <FocusCard icon={FileText} label="Approvals waiting" value={summary.totalPendingApprovals} note="Decision queue" />
+            </> : <>
+              <FocusCard icon={Activity} label="Portfolio health" value={`${portfolioHealth}%`} note="Weighted project position" />
+              <FocusCard icon={BarChart3} label="Portfolio progress" value={`${portfolioProgress}%`} note="Average recorded progress" />
+              <FocusCard icon={Building2} label="Projects on track" value={projectsOnTrack} note={`${projectsRequiringAttention} require attention`} />
+              <FocusCard icon={TrendingDown} label="Recovery confidence" value={`${recoveryConfidence}%`} note="Current control confidence" />
+            </>}
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -918,246 +771,23 @@ function shortCurrency(value: number) {
   return `₦${value}`
 }
 
-function SectionTitle({ icon: Icon, title }: any) {
-  return (
-    <div className="flex items-center gap-2 mb-4">
-      <Icon size={18} className="text-[#c49e48]" />
-      <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
-    </div>
-  )
+function SectionHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
+  return <div><div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#84979f]">{eyebrow}</div><h2 className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[#173f5f]">{title}</h2>{description && <p className="mt-1 text-sm text-[#738892]">{description}</p>}</div>
 }
 
-function Metric({ icon: Icon, title, value, good, warning, danger }: any) {
-  const color = danger
-    ? 'text-red-400'
-    : warning
-    ? 'text-amber-400'
-    : good
-    ? 'text-emerald-400'
-    : 'text-[#c49e48]'
-
-  return (
-    <div className="card p-4">
-      <Icon size={18} className={color} />
-      <div className={`font-display text-3xl font-bold mt-3 ${color}`}>
-        {value}
-      </div>
-      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
-        {title}
-      </div>
-    </div>
-  )
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return <div><div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8b9da4]">{label}</div><div className="mt-1 text-lg font-semibold text-[#294b5e]">{value}</div></div>
 }
 
-function MoneyCard({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c]">
-        {title}
-      </div>
-      <div className="text-xl font-bold text-[#ede8de] mt-2">
-        {formatCurrency(value || 0)}
-      </div>
-    </div>
-  )
+function KpiStrip({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
+  return <div className="min-h-[92px] border-b border-r border-[#e5ebed] px-4 py-4 last:border-r-0 md:border-b-0"><div className={`text-2xl font-semibold tracking-[-0.035em] ${alert ? 'text-[#c4573e]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#83969f]">{label}</div></div>
 }
 
-function PressureRow({ label, value, danger }: any) {
-  return (
-    <div className="flex items-center justify-between border-b border-white/10 py-2 text-sm">
-      <span className="text-slate-400">{label}</span>
-      <span className={danger ? 'text-red-400 font-bold' : 'text-[#ede8de]'}>
-        {value}
-      </span>
-    </div>
-  )
-}
-
-function ChartCard({ title, children }: any) {
-  return (
-    <div className="card p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 size={18} className="text-[#c49e48]" />
-        <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function EmptyChart({ message }: { message: string }) {
-  return (
-    <div className="h-[250px] rounded-xl border border-white/10 bg-white/[0.03] flex items-center justify-center text-sm text-slate-500">
-      {message}
-    </div>
-  )
-}
-
-function ProjectGroupDetails({
-  title,
-  groups,
-  showScore,
-  showHealth,
-}: {
-  title: string
-  groups: any[]
-  showScore?: boolean
-  showHealth?: boolean
-}) {
-  return (
-    <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="text-xs font-bold uppercase tracking-widest text-[#6e7d8c] mb-3">
-        {title}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {groups.map(group => (
-          <div key={group.name} className="rounded-xl border border-white/10 bg-[#0c1014]/50 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-bold text-[#ede8de]">
-                {group.name}
-              </div>
-
-              <span className="rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 px-2 py-1 text-[10px] font-bold text-[#c49e48]">
-                {group.value}
-              </span>
-            </div>
-
-            {group.projects?.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {group.projects.map((project: ChartProject) => (
-                  <div
-                    key={`${group.name}-${project.id}`}
-                    className="flex items-center justify-between gap-3 text-xs"
-                  >
-                    <span className="text-slate-300 truncate">
-                      {project.name}
-                    </span>
-
-                    <span className="text-[#6e7d8c] flex-shrink-0">
-                      {showScore && typeof project.score === 'number'
-                        ? `${project.score}%`
-                        : showHealth && project.health
-                        ? project.health
-                        : project.status || ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 text-xs text-slate-500">No projects</div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+function FocusCard({ icon: Icon, label, value, note, alert }: any) {
+  return <div className="rounded-2xl border border-[#e0e7e9] bg-[#f9fbfa] p-5"><div className={`flex h-9 w-9 items-center justify-center rounded-xl ${alert ? 'bg-[#f8e9e5] text-[#bd573f]' : 'bg-[#e9f1f4] text-[#3f7189]'}`}><Icon size={17} /></div><div className={`mt-5 text-2xl font-semibold tracking-[-0.04em] ${alert ? 'text-[#bd573f]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-sm font-semibold text-[#45616f]">{label}</div><div className="mt-2 text-xs text-[#84969e]">{note}</div></div>
 }
 
 function HealthBadge({ health }: { health: ProjectHealth }) {
-  const style =
-    health === 'Healthy'
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
-      : health === 'Minor Attention'
-      ? 'border-blue-500/20 bg-blue-500/10 text-blue-400'
-      : health === 'Slow'
-      ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
-      : health === 'Stuck'
-      ? 'border-orange-500/20 bg-orange-500/10 text-orange-400'
-      : 'border-red-500/20 bg-red-500/10 text-red-400'
-
-  return (
-    <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${style}`}>
-      {health}
-    </span>
-  )
-}
-
-function HeatCell({ value }: { value: 1 | 2 | 3 }) {
-  const style =
-    value === 1
-      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
-      : value === 2
-      ? 'bg-amber-500/20 text-amber-400 border-amber-500/20'
-      : 'bg-red-500/20 text-red-400 border-red-500/20'
-
-  const label = value === 1 ? 'Low' : value === 2 ? 'Med' : 'High'
-
-  return (
-    <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${style}`}>
-      {label}
-    </span>
-  )
-}
-
-function ProjectListTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-
-  const data = payload[0]?.payload
-  const projects: ChartProject[] = data?.projects || []
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0c1014] p-3 shadow-xl max-w-[320px]">
-      <div className="text-xs font-bold text-[#ede8de] mb-1">
-        {label || data?.name}
-      </div>
-
-      <div className="text-xs text-slate-400 mb-2">
-        {data?.value || 0} project{data?.value === 1 ? '' : 's'}
-      </div>
-
-      {projects.length > 0 ? (
-        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-          {projects.map(project => (
-            <div
-              key={project.id}
-              className="flex items-center justify-between gap-3 text-xs"
-            >
-              <span className="text-[#c49e48] truncate">
-                • {project.name}
-              </span>
-
-              <span className="text-slate-500 flex-shrink-0">
-                {typeof project.score === 'number'
-                  ? `${project.score}%`
-                  : project.health || project.status || ''}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-xs text-slate-500">No projects</div>
-      )}
-    </div>
-  )
-}
-
-function DarkTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0c1014] p-3 shadow-xl">
-      <div className="text-xs font-bold text-[#ede8de] mb-2">{label}</div>
-      {payload.map((item: any) => (
-        <div key={item.dataKey} className="text-xs text-slate-400">
-          {item.name}: <span className="text-[#c49e48]">{item.value}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function MoneyTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#0c1014] p-3 shadow-xl">
-      <div className="text-xs font-bold text-[#ede8de] mb-2">{label}</div>
-      {payload.map((item: any) => (
-        <div key={item.dataKey} className="text-xs text-slate-400">
-          {item.name}: <span className="text-[#c49e48]">{formatCurrency(item.value || 0)}</span>
-        </div>
-      ))}
-    </div>
-  )
+  const style = health === 'Healthy' ? 'border-[#b9daca] bg-[#edf7f1] text-[#317458]' : health === 'Minor Attention' ? 'border-[#bfd7e2] bg-[#edf5f8] text-[#356d87]' : health === 'Slow' ? 'border-[#e8d5ad] bg-[#fbf5e9] text-[#9a6b22]' : health === 'Stuck' ? 'border-[#edc7b4] bg-[#fcf0ea] text-[#b65c35]' : 'border-[#e8bdb3] bg-[#faece8] text-[#bd4f39]'
+  return <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-bold ${style}`}>{health}</span>
 }
