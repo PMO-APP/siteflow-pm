@@ -371,19 +371,19 @@ if (inviteRole === 'infrastructure_project_owner') {
   )
 
   return (
-    <div className="min-h-dvh bg-[#0c1014] text-white">
+    <div className="min-h-dvh bg-[#f4f7fb] text-[#102a43]">
       <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Shield className="text-[#c49e48]" size={22} />
+              <Shield className="text-[#f26b38]" size={22} />
 
-              <h1 className="text-2xl font-bold text-[#ede8de]">
-                Workspace Admin Console
+              <h1 className="text-2xl font-bold text-[#102a43]">
+                Administration & Access Control
               </h1>
             </div>
 
-            <p className="text-sm text-[#6e7d8c] mt-1">
+            <p className="text-sm text-[#64748b] mt-1">
               Manage workspace users, roles, organizations, portfolios, and
               system preferences.
             </p>
@@ -419,7 +419,7 @@ if (inviteRole === 'infrastructure_project_owner') {
         </div>
 
         {loading ? (
-          <div className="card p-6 text-[#6e7d8c]">
+          <div className="card p-6 text-[#64748b]">
             Loading workspace admin…
           </div>
         ) : (
@@ -427,12 +427,12 @@ if (inviteRole === 'infrastructure_project_owner') {
             {activeTab === 'Overview' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-[#ede8de]">
+                  <h2 className="text-lg font-semibold text-[#102a43]">
                     Workspace Overview
                   </h2>
 
-                  <p className="text-sm text-[#6e7d8c] mt-1">
-                    Company-level control centre for PMOCorex.
+                  <p className="text-sm text-[#64748b] mt-1">
+                    Workspace governance, access and delivery oversight at a glance.
                   </p>
                 </div>
 
@@ -473,22 +473,22 @@ if (inviteRole === 'infrastructure_project_owner') {
             {activeTab === 'Security' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-[#ede8de]">
+                  <h2 className="text-lg font-semibold text-[#102a43]">
                     Security & Preferences
                   </h2>
 
-                  <p className="text-sm text-[#6e7d8c] mt-1">
+                  <p className="text-sm text-[#64748b] mt-1">
                     Manage your password, account session, and display theme.
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+                <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4 space-y-4">
                   <div>
-                    <div className="text-sm font-semibold text-[#ede8de]">
+                    <div className="text-sm font-semibold text-[#102a43]">
                       Change Password
                     </div>
 
-                    <p className="text-xs text-[#6e7d8c] mt-1">
+                    <p className="text-xs text-[#64748b] mt-1">
                       Update your password for future PMOCorex sign-ins.
                     </p>
                   </div>
@@ -518,7 +518,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(current => !current)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#102a43]"
                       >
                         {showNewPassword ? (
                           <EyeOff size={16} />
@@ -542,7 +542,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                         onClick={() =>
                           setShowConfirmPassword(current => !current)
                         }
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#102a43]"
                       >
                         {showConfirmPassword ? (
                           <EyeOff size={16} />
@@ -562,12 +562,12 @@ if (inviteRole === 'infrastructure_project_owner') {
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-sm font-semibold text-[#ede8de]">
+                <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4">
+                  <div className="text-sm font-semibold text-[#102a43]">
                     Appearance
                   </div>
 
-                  <p className="text-xs text-[#6e7d8c] mt-1">
+                  <p className="text-xs text-[#64748b] mt-1">
                     Choose your preferred PMOCorex theme.
                   </p>
 
@@ -597,7 +597,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                     Account Session
                   </div>
 
-                  <p className="text-xs text-[#6e7d8c] mt-1">
+                  <p className="text-xs text-[#64748b] mt-1">
                     Sign out of this PMOCorex session.
                   </p>
 
@@ -610,18 +610,18 @@ if (inviteRole === 'infrastructure_project_owner') {
 
             {activeTab === 'Users & Roles' && canManageUsers(role) && (
               <div className="space-y-6">
-                <h2 className="text-lg font-semibold text-[#ede8de]">
+                <h2 className="text-lg font-semibold text-[#102a43]">
                   Users & Roles
                 </h2>
 
                 {notice && (
-                  <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+                  <div className="rounded-xl border border-[#f26b38]/20 bg-[#f26b38]/10 p-3 text-sm text-[#102a43]">
                     {notice}
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
-                  <div className="text-sm font-semibold text-[#ede8de]">
+                <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4 space-y-4">
+                  <div className="text-sm font-semibold text-[#102a43]">
                     Invite Scope
                   </div>
 
@@ -651,7 +651,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                     </button>
                   </div>
 
-                  <p className="text-xs text-[#6e7d8c]">
+                  <p className="text-xs text-[#64748b]">
                     Workspace access is for internal users who can view all
                     projects. Project access is for project owners, viewers,
                     guests, or external partners assigned to selected projects.
@@ -673,12 +673,12 @@ if (inviteRole === 'infrastructure_project_owner') {
                     onChange={e => setInviteEmail(e.target.value)}
                   />
 
-                  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                  <div className="rounded-xl border border-[#dbe5ef] bg-white px-4 py-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#64748b]">
                       Organization
                     </div>
 
-                    <div className="text-sm font-semibold text-[#ede8de] mt-1">
+                    <div className="text-sm font-semibold text-[#102a43] mt-1">
                       {organizations[0]?.name || 'Organization'}
                     </div>
                   </div>
@@ -713,34 +713,34 @@ if (inviteRole === 'infrastructure_project_owner') {
                 </div>
 
                 {inviteScope === 'project' && (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                  <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-[#ede8de]">
+                        <div className="text-sm font-semibold text-[#102a43]">
                           Select Project(s)
                         </div>
 
-                        <p className="text-xs text-[#6e7d8c] mt-1">
+                        <p className="text-xs text-[#64748b] mt-1">
                           One invitation email will grant access to all selected
                           projects.
                         </p>
                       </div>
 
-                      <div className="text-xs rounded-full border border-[#c49e48]/20 bg-[#c49e48]/10 text-[#c49e48] px-2 py-1">
+                      <div className="text-xs rounded-full border border-[#f26b38]/20 bg-[#f26b38]/10 text-[#f26b38] px-2 py-1">
                         {selectedProjectIds.length} selected
                       </div>
                     </div>
 
-                    <div className="max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#0c1014] p-3 space-y-2">
+                    <div className="max-h-72 overflow-y-auto rounded-xl border border-[#dbe5ef] bg-[#f4f7fb] p-3 space-y-2">
                       {filteredProjects.length === 0 ? (
-                        <div className="text-sm text-[#6e7d8c]">
+                        <div className="text-sm text-[#64748b]">
                           No projects available.
                         </div>
                       ) : (
                         filteredProjects.map(project => (
                           <label
                             key={project.id}
-                            className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-sm hover:border-[#c49e48]/20 cursor-pointer"
+                            className="flex items-center gap-3 rounded-lg border border-[#e7eef5] bg-[#f8fafc] px-3 py-2 text-sm hover:border-[#f26b38]/20 cursor-pointer"
                           >
                             <input
                               type="checkbox"
@@ -750,7 +750,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                               }
                             />
 
-                            <span className="text-[#ede8de]">
+                            <span className="text-[#102a43]">
                               {project.project_name}
                             </span>
                           </label>
@@ -765,12 +765,12 @@ if (inviteRole === 'infrastructure_project_owner') {
                 </button>
 
                 {inviteLink && (
-                  <div className="rounded-xl border border-white/10 p-4 bg-white/5">
-                    <div className="font-semibold text-[#ede8de]">
+                  <div className="rounded-xl border border-[#dbe5ef] p-4 bg-white">
+                    <div className="font-semibold text-[#102a43]">
                       Invitation Link
                     </div>
 
-                    <div className="text-xs mt-2 break-all text-[#6e7d8c]">
+                    <div className="text-xs mt-2 break-all text-[#64748b]">
                       {inviteLink}
                     </div>
 
@@ -796,14 +796,14 @@ if (inviteRole === 'infrastructure_project_owner') {
 
 function AdminMetric({ title, value, icon: Icon }: any) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-4">
+    <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-2xl font-black text-white">{value}</div>
-          <div className="text-xs text-[#6e7d8c] mt-1">{title}</div>
+          <div className="text-2xl font-black text-[#102a43]">{value}</div>
+          <div className="text-xs text-[#64748b] mt-1">{title}</div>
         </div>
 
-        <Icon size={18} className="text-[#c49e48]" />
+        <Icon size={18} className="text-[#f26b38]" />
       </div>
     </div>
   )
