@@ -503,8 +503,8 @@ export default function PortfolioDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-[#f4f6f5] text-[#173f5f] flex items-center justify-center">
-        <div className="rounded-2xl border border-[#dce4e7] bg-white px-6 py-5 text-sm text-[#6c7f89] shadow-sm">
+      <div className="min-h-dvh bg-[#f7f8f6] text-[#173f5f] flex items-center justify-center">
+        <div className="rounded-2xl border border-[#dfe7e6] bg-white px-6 py-5 text-sm text-[#6c7f89] shadow-sm">
           Loading portfolio intelligence…
         </div>
       </div>
@@ -512,12 +512,12 @@ export default function PortfolioDashboardPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#f4f6f5] text-[#18384c]">
+    <div className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
       <div className="mx-auto w-full max-w-[1540px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <header className="mb-6 flex flex-col gap-4 border-b border-[#dce4e7] pb-5 lg:flex-row lg:items-center lg:justify-between">
+        <header className="mb-6 flex flex-col gap-4 border-b border-[#dfe7e6] pb-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <PMOCorexLogo size={38} />
-            <div className="hidden h-8 w-px bg-[#dce4e7] sm:block" />
+            <PMOCorexLogo size={38} tone="light" />
+            <div className="hidden h-8 w-px bg-[#dfe7e6] sm:block" />
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7d909a]">Executive portfolio</div>
               <div className="mt-1 text-sm font-semibold text-[#173f5f]">{organizations[0]?.name || 'Organization workspace'}</div>
@@ -525,44 +525,44 @@ export default function PortfolioDashboardPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-[#d7e0e4] bg-white px-4 py-2.5 text-sm font-semibold text-[#405d6d] shadow-sm transition hover:border-[#b9c9d0]">
+            <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 rounded-xl border border-[#d7e1e4] bg-white px-4 py-2.5 text-sm font-semibold text-[#405b69] shadow-sm transition hover:border-[#b9c9d0]">
               <ArrowLeft size={15} /> Back
             </button>
-            <button onClick={() => navigate('/projects')} className="rounded-xl bg-[#173f5f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#12344f]">
+            <button onClick={() => navigate('/projects')} className="rounded-xl bg-[#173f5f] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f334e]">
               Workspace hub
             </button>
           </div>
         </header>
 
-        <section className="relative overflow-hidden rounded-[28px] border border-[#d8e2e6] bg-white p-6 shadow-[0_10px_35px_rgba(24,56,76,0.05)] sm:p-8">
-          <div className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'linear-gradient(#edf1f2 1px, transparent 1px), linear-gradient(90deg, #edf1f2 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
+        <section className="relative overflow-hidden rounded-[28px] border border-[#dfe7e6] bg-white p-6 shadow-[0_10px_35px_rgba(24,56,76,0.05)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'linear-gradient(#edf2f2 1px, transparent 1px), linear-gradient(90deg, #edf2f2 1px, transparent 1px)', backgroundSize: '34px 34px' }} />
           <div className="relative grid gap-8 xl:grid-cols-[1.5fr_.7fr] xl:items-end">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#c9dbe4] bg-[#eef5f8] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#356684]">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#cfdde2] bg-[#eef3f4] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#2f6f91]">
                 <Activity size={13} /> Portfolio overview
               </div>
               <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.045em] text-[#173f5f] sm:text-5xl">
                 A clear view of where delivery needs attention.
               </h1>
-              <p className="mt-5 max-w-3xl text-[15px] leading-7 text-[#607781]">{summarySentence}</p>
+              <p className="mt-5 max-w-3xl text-[15px] leading-7 text-[#607580]">{summarySentence}</p>
 
               <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3 text-sm">
                 <span className="font-semibold text-[#173f5f]">{summary.totalProjects} projects</span>
-                <span className="text-[#71858f]">{projectsOnTrack} on track</span>
-                <span className={projectsRequiringAttention ? 'font-semibold text-[#c56142]' : 'text-[#71858f]'}>{projectsRequiringAttention} require attention</span>
+                <span className="text-[#71838d]">{projectsOnTrack} on track</span>
+                <span className={projectsRequiringAttention ? 'font-semibold text-[#d86335]' : 'text-[#71838d]'}>{projectsRequiringAttention} require attention</span>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#dce5e8] bg-[#f8faf9]/95 p-5 backdrop-blur">
+            <div className="rounded-2xl border border-[#dfe7e6] bg-[#f9fbfb]/95 p-5 backdrop-blur">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#84969e]">Portfolio health</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#82939c]">Portfolio health</div>
                   <div className="mt-2 text-5xl font-semibold tracking-[-0.06em] text-[#173f5f]">{portfolioHealth}%</div>
                 </div>
                 <HealthBadge health={getHealth(portfolioHealth)} />
               </div>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#e6ecee]">
-                <div className="h-full rounded-full bg-[#3e7894] transition-all" style={{ width: `${portfolioHealth}%` }} />
+                <div className="h-full rounded-full bg-[#2f6f91] transition-all" style={{ width: `${portfolioHealth}%` }} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#e1e8ea] pt-4">
                 <MiniStat label="Portfolio progress" value={`${portfolioProgress}%`} />
@@ -572,7 +572,7 @@ export default function PortfolioDashboardPage() {
           </div>
         </section>
 
-        <section className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#dce4e7] bg-white shadow-sm md:grid-cols-4 xl:grid-cols-8">
+        <section className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#dfe7e6] bg-white shadow-sm md:grid-cols-4 xl:grid-cols-8">
           <KpiStrip label="Active projects" value={summary.activeProjects} />
           <KpiStrip label="Portfolio progress" value={`${portfolioProgress}%`} />
           <KpiStrip label="Open risks" value={summary.totalOpenRisks} alert={summary.totalHighRisks > 0} />
@@ -584,32 +584,32 @@ export default function PortfolioDashboardPage() {
         </section>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.45fr_.75fr]">
-          <div className="rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm sm:p-6">
+          <div className="rounded-2xl border border-[#dfe7e6] bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <SectionHeading eyebrow="Portfolio register" title="Project health" description="Sorted by projects requiring the earliest intervention." />
               <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8ca0a9]" size={16} />
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search projects" className="w-full rounded-xl border border-[#d8e2e6] bg-[#f8faf9] py-2.5 pl-9 pr-3 text-sm text-[#173f5f] outline-none transition placeholder:text-[#9aabb2] focus:border-[#7fa4b6] focus:bg-white" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#82939c]" size={16} />
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search projects" className="w-full rounded-xl border border-[#dfe7e6] bg-[#f9fbfb] py-2.5 pl-9 pr-3 text-sm text-[#173f5f] outline-none transition placeholder:text-[#9fb4bd] focus:border-[#2f6f91] focus:bg-white" />
               </div>
             </div>
 
             <div className="mt-5 overflow-x-auto">
               <table className="w-full min-w-[900px] border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-[#dfe7e9] text-[10px] font-bold uppercase tracking-[0.14em] text-[#81949d]">
+                  <tr className="border-b border-[#dfe7e6] text-[10px] font-bold uppercase tracking-[0.14em] text-[#7c8d97]">
                     <th className="px-3 py-3">Project</th><th className="px-3 py-3">Health</th><th className="px-3 py-3">Progress</th><th className="px-3 py-3">Schedule</th><th className="px-3 py-3">Risks</th><th className="px-3 py-3">Approvals</th><th className="px-3 py-3">Recovery</th><th className="px-3 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.map(row => (
-                    <tr key={row.project.id} className="group border-b border-[#edf1f2] transition hover:bg-[#f7faf9]">
+                    <tr key={row.project.id} className="group border-b border-[#edf2f2] transition hover:bg-[#f9fbfb]">
                       <td className="px-3 py-4"><div className="font-semibold text-[#173f5f]">{projectName(row.project)}</div><div className="mt-1 text-xs text-[#8a9da5]">{row.project.status || row.project.phase || 'Active'}</div></td>
                       <td className="px-3 py-4"><HealthBadge health={row.health} /></td>
-                      <td className="px-3 py-4"><div className="font-semibold text-[#294b5e]">{row.progress}%</div><div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-[#e8edef]"><div className="h-full rounded-full bg-[#5f8fa5]" style={{ width: `${Math.min(100, row.progress)}%` }} /></div></td>
-                      <td className="px-3 py-4"><span className={row.scheduleVariance < -10 ? 'font-semibold text-[#c4573e]' : row.scheduleVariance < -5 ? 'font-semibold text-[#b17a2c]' : 'text-[#55717f]'}>{row.scheduleVariance}%</span></td>
-                      <td className="px-3 py-4"><span className="font-semibold text-[#294b5e]">{row.openRisks}</span>{row.highRisks > 0 && <span className="ml-2 text-xs font-semibold text-[#c4573e]">{row.highRisks} high</span>}</td>
-                      <td className="px-3 py-4 text-[#55717f]">{row.pendingApprovals}</td>
-                      <td className="px-3 py-4"><span className="text-sm font-semibold text-[#356684]">{Math.max(0, Math.min(100, row.score - row.highRisks * 2))}%</span></td>
+                      <td className="px-3 py-4"><div className="font-semibold text-[#405b69]">{row.progress}%</div><div className="mt-2 h-1.5 w-24 overflow-hidden rounded-full bg-[#e9eff1]"><div className="h-full rounded-full bg-[#2f6f91]" style={{ width: `${Math.min(100, row.progress)}%` }} /></div></td>
+                      <td className="px-3 py-4"><span className={row.scheduleVariance < -10 ? 'font-semibold text-[#d86335]' : row.scheduleVariance < -5 ? 'font-semibold text-[#b17a2c]' : 'text-[#536974]'}>{row.scheduleVariance}%</span></td>
+                      <td className="px-3 py-4"><span className="font-semibold text-[#405b69]">{row.openRisks}</span>{row.highRisks > 0 && <span className="ml-2 text-xs font-semibold text-[#d86335]">{row.highRisks} high</span>}</td>
+                      <td className="px-3 py-4 text-[#536974]">{row.pendingApprovals}</td>
+                      <td className="px-3 py-4"><span className="text-sm font-semibold text-[#2f6f91]">{Math.max(0, Math.min(100, row.score - row.highRisks * 2))}%</span></td>
                       <td className="px-3 py-4"><button onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="rounded-lg p-2 text-[#78909b] transition hover:bg-[#eaf1f4] hover:text-[#173f5f]"><ChevronRight size={17} /></button></td>
                     </tr>
                   ))}
@@ -620,23 +620,23 @@ export default function PortfolioDashboardPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-2xl border border-[#dce4e7] bg-[#173f5f] p-6 text-white shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#a8c3d1]"><Sparkles size={15} /> Executive intelligence</div>
+            <div className="rounded-2xl border border-[#dfe7e6] bg-[#173f5f] p-6 text-white shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#bfd0d7]"><Sparkles size={15} /> Executive intelligence</div>
               <h2 className="mt-5 text-2xl font-semibold tracking-[-0.035em]">Portfolio delivery remains {portfolioHealth >= 65 ? 'recoverable' : 'under pressure'}.</h2>
-              <p className="mt-4 text-sm leading-6 text-[#c8d8df]">{summarySentence}</p>
+              <p className="mt-4 text-sm leading-6 text-[#cfdcdf]">{summarySentence}</p>
               <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.06] p-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9db8c6]">Recommended focus</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#bfd0d7]">Recommended focus</div>
                 <div className="mt-2 text-sm font-semibold">{attentionLeader ? `Resolve the leading constraints on ${projectName(attentionLeader.project)} before they increase schedule exposure.` : 'Maintain current controls and protect reporting cadence.'}</div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-[#dfe7e6] bg-white p-5 shadow-sm">
               <SectionHeading eyebrow="Executive watchlist" title="Attention required" />
               <div className="mt-4 space-y-3">
                 {executiveAlerts.length ? executiveAlerts.slice(0, 4).map(row => (
-                  <button key={row.project.id} onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="w-full rounded-xl border border-[#e0e7e9] p-4 text-left transition hover:border-[#b8ccd5] hover:bg-[#f8faf9]">
+                  <button key={row.project.id} onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="w-full rounded-xl border border-[#e2e9ed] p-4 text-left transition hover:border-[#b8ccd5] hover:bg-[#f9fbfb]">
                     <div className="flex items-center justify-between gap-3"><span className="font-semibold text-[#173f5f]">{projectName(row.project)}</span><HealthBadge health={row.health} /></div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[#758a94]"><span>{row.highRisks} high risks</span><span>{row.pendingApprovals} approvals</span><span>{row.overdueTasks} overdue</span></div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[#71838d]"><span>{row.highRisks} high risks</span><span>{row.pendingApprovals} approvals</span><span>{row.overdueTasks} overdue</span></div>
                   </button>
                 )) : <div className="rounded-xl bg-[#f3f7f5] p-4 text-sm text-[#648074]">No critical intervention required.</div>}
               </div>
@@ -644,11 +644,11 @@ export default function PortfolioDashboardPage() {
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-[#dce4e7] bg-white p-5 shadow-sm sm:p-6">
+        <section className="mt-6 rounded-2xl border border-[#dfe7e6] bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <SectionHeading eyebrow="Focus mode" title="Review the portfolio through the right lens" description="Switch emphasis without changing the underlying project data." />
             <div className="flex flex-wrap gap-2">
-              {(['Executive', 'Delivery', 'Commercial', 'Quality', 'Risk'] as const).map(lens => <button key={lens} onClick={() => setFocusLens(lens)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${focusLens === lens ? 'bg-[#173f5f] text-white' : 'border border-[#d9e2e5] bg-[#f8faf9] text-[#607985] hover:border-[#a9c0ca]'}`}>{lens}</button>)}
+              {(['Executive', 'Delivery', 'Commercial', 'Quality', 'Risk'] as const).map(lens => <button key={lens} onClick={() => setFocusLens(lens)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${focusLens === lens ? 'bg-[#173f5f] text-white' : 'border border-[#d9e2e5] bg-[#f9fbfb] text-[#607985] hover:border-[#a9c0ca]'}`}>{lens}</button>)}
             </div>
           </div>
 
@@ -772,22 +772,22 @@ function shortCurrency(value: number) {
 }
 
 function SectionHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description?: string }) {
-  return <div><div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#84979f]">{eyebrow}</div><h2 className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[#173f5f]">{title}</h2>{description && <p className="mt-1 text-sm text-[#738892]">{description}</p>}</div>
+  return <div><div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#82939c]">{eyebrow}</div><h2 className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[#173f5f]">{title}</h2>{description && <p className="mt-1 text-sm text-[#71838d]">{description}</p>}</div>
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8b9da4]">{label}</div><div className="mt-1 text-lg font-semibold text-[#294b5e]">{value}</div></div>
+  return <div><div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#8b9da4]">{label}</div><div className="mt-1 text-lg font-semibold text-[#405b69]">{value}</div></div>
 }
 
 function KpiStrip({ label, value, alert }: { label: string; value: string | number; alert?: boolean }) {
-  return <div className="min-h-[92px] border-b border-r border-[#e5ebed] px-4 py-4 last:border-r-0 md:border-b-0"><div className={`text-2xl font-semibold tracking-[-0.035em] ${alert ? 'text-[#c4573e]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#83969f]">{label}</div></div>
+  return <div className="min-h-[92px] border-b border-r border-[#e5ebed] px-4 py-4 last:border-r-0 md:border-b-0"><div className={`text-2xl font-semibold tracking-[-0.035em] ${alert ? 'text-[#d86335]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#83969f]">{label}</div></div>
 }
 
 function FocusCard({ icon: Icon, label, value, note, alert }: any) {
-  return <div className="rounded-2xl border border-[#e0e7e9] bg-[#f9fbfa] p-5"><div className={`flex h-9 w-9 items-center justify-center rounded-xl ${alert ? 'bg-[#f8e9e5] text-[#bd573f]' : 'bg-[#e9f1f4] text-[#3f7189]'}`}><Icon size={17} /></div><div className={`mt-5 text-2xl font-semibold tracking-[-0.04em] ${alert ? 'text-[#bd573f]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-sm font-semibold text-[#45616f]">{label}</div><div className="mt-2 text-xs text-[#84969e]">{note}</div></div>
+  return <div className="rounded-2xl border border-[#e2e9ed] bg-[#f9fbfa] p-5"><div className={`flex h-9 w-9 items-center justify-center rounded-xl ${alert ? 'bg-[#fff0e9] text-[#d86335]' : 'bg-[#eaf1f4] text-[#2f6f91]'}`}><Icon size={17} /></div><div className={`mt-5 text-2xl font-semibold tracking-[-0.04em] ${alert ? 'text-[#d86335]' : 'text-[#173f5f]'}`}>{value}</div><div className="mt-1 text-sm font-semibold text-[#45606e]">{label}</div><div className="mt-2 text-xs text-[#82939c]">{note}</div></div>
 }
 
 function HealthBadge({ health }: { health: ProjectHealth }) {
-  const style = health === 'Healthy' ? 'border-[#b9daca] bg-[#edf7f1] text-[#317458]' : health === 'Minor Attention' ? 'border-[#bfd7e2] bg-[#edf5f8] text-[#356d87]' : health === 'Slow' ? 'border-[#e8d5ad] bg-[#fbf5e9] text-[#9a6b22]' : health === 'Stuck' ? 'border-[#edc7b4] bg-[#fcf0ea] text-[#b65c35]' : 'border-[#e8bdb3] bg-[#faece8] text-[#bd4f39]'
+  const style = health === 'Healthy' ? 'border-[#b9daca] bg-[#edf7f1] text-[#317458]' : health === 'Minor Attention' ? 'border-[#cfdde2] bg-[#eef3f4] text-[#2f6f91]' : health === 'Slow' ? 'border-[#e8d5ad] bg-[#fbf5e9] text-[#9a6b22]' : health === 'Stuck' ? 'border-[#f0c4b2] bg-[#fff0e9] text-[#d86335]' : 'border-[#f0c4b2] bg-[#fff0e9] text-[#bd4f39]'
   return <span className={`inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-bold ${style}`}>{health}</span>
 }
