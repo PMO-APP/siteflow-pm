@@ -39,6 +39,8 @@ import {
   UserCircle,
   Building2,
   MessageSquareText,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -53,58 +55,43 @@ type NavItem = {
   roles?: string[]
 }
 
-const NAV: NavItem[] = [
-  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
+const CORE_NAV: NavItem[] = [
+  { to: '/app', icon: LayoutDashboard, label: 'Command Center', exact: true },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
-  {
-  to: '/app/project-controls',
-  icon: Activity,
-  label: 'Project Controls',
-},
-   {
-  to: '/app/schedule-revisions',
-  icon: FileSpreadsheet,
-  label: 'Schedule Revisions',
-},
-  { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
-  { to: '/app/planner', icon: CalendarCheck, label: 'Planner', },
+  { to: '/app/project-controls', icon: Activity, label: 'Project Controls' },
   { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
   { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
+  { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
+]
+
+const DELIVERY_NAV: NavItem[] = [
+  { to: '/app/schedule-revisions', icon: FileSpreadsheet, label: 'Schedule Revisions' },
+  { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
+  { to: '/app/planner', icon: CalendarCheck, label: 'Planner' },
   { to: '/app/site', icon: HardHat, label: 'Site Progress' },
+  { to: '/app/project-packages', icon: Building2, label: 'Project Packages' },
+]
+
+const ASSURANCE_NAV: NavItem[] = [
   { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates' },
-  { to: '/app/hse', icon: HardHat, label: 'HSE', },
+  { to: '/app/hse', icon: HardHat, label: 'HSE' },
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
   { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs' },
-  { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
-  { to: '/app/costing', icon: Wallet, label: 'Costing' },
-  { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register' },
-  { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
-  { to: '/app/reports', icon: FileText, label: 'IPD Reports' },
+  { to: '/app/risk-trends', icon: BarChart3, label: 'Risk Trends' },
   { to: '/app/handover', icon: PackageCheck, label: 'Handover' },
+]
 
-   {
-  to: '/app/project-packages',
-  icon: Building2,
-  label: 'Project Packages',
-},
- 
-  {
-  to: '/app/pmo-weekly-report',
-  icon: FileText,
-  label: 'Executive Reports',
-},
- 
-  {
-    to: '/app/internal-assignments',
-    icon: ClipboardList,
-    label: 'Internal Assignments',
-  },
-  {
-  to: '/app/business-intelligence',
-  icon: Brain,
-  label: 'Business Intelligence',
-},
+const REPORT_NAV: NavItem[] = [
+  { to: '/app/reports', icon: ClipboardList, label: 'IPD / Site Report' },
+  { to: '/app/design-reports', icon: PenTool, label: 'Design Report' },
+  { to: '/app/pmo-weekly-report', icon: FileText, label: 'Executive Report' },
+  { to: '/app/costing', icon: Wallet, label: 'Cost & Commercial' },
+]
+
+const WORKSPACE_NAV: NavItem[] = [
+  { to: '/app/internal-assignments', icon: ClipboardList, label: 'Internal Assignments' },
+  { to: '/app/business-intelligence', icon: Brain, label: 'Business Intelligence' },
   {
     to: '/app/administration',
     icon: Shield,
@@ -113,6 +100,8 @@ const NAV: NavItem[] = [
   },
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
+
+const NAV = [...CORE_NAV, ...DELIVERY_NAV, ...ASSURANCE_NAV, ...REPORT_NAV, ...WORKSPACE_NAV]
 
 const VIEWER_NAV = [
   '/app',
@@ -153,6 +142,10 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
+  const [reportsOpen, setReportsOpen] = useState(() =>
+    REPORT_NAV.some(item => window.location.pathname.startsWith(item.to))
+  )
+  const [moreOpen, setMoreOpen] = useState(false)
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
@@ -344,6 +337,13 @@ export default function Layout() {
     return true
   })
 
+  const allowedPaths = new Set(allowedNav.map(item => item.to))
+  const visibleCoreNav = CORE_NAV.filter(item => allowedPaths.has(item.to))
+  const visibleDeliveryNav = DELIVERY_NAV.filter(item => allowedPaths.has(item.to))
+  const visibleAssuranceNav = ASSURANCE_NAV.filter(item => allowedPaths.has(item.to))
+  const visibleReportNav = REPORT_NAV.filter(item => allowedPaths.has(item.to))
+  const visibleWorkspaceNav = WORKSPACE_NAV.filter(item => allowedPaths.has(item.to))
+
   const currentPage = allowedNav.find(n =>
     n.exact ? location.pathname === n.to : location.pathname.startsWith(n.to)
   )
@@ -434,25 +434,86 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-          {allowedNav.map(({ to, icon: Icon, label, exact }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
-                  isActive
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+          <NavSection label="Workspace">
+            {visibleCoreNav.map(item => (
+              <SidebarLink key={item.to} item={item} onNavigate={() => setSidebarOpen(false)} />
+            ))}
+          </NavSection>
+
+          <NavSection label="Delivery">
+            {visibleDeliveryNav.map(item => (
+              <SidebarLink key={item.to} item={item} onNavigate={() => setSidebarOpen(false)} />
+            ))}
+          </NavSection>
+
+          <NavSection label="Assurance">
+            {visibleAssuranceNav.map(item => (
+              <SidebarLink key={item.to} item={item} onNavigate={() => setSidebarOpen(false)} />
+            ))}
+          </NavSection>
+
+          {visibleReportNav.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setReportsOpen(open => !open)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
+                  visibleReportNav.some(item => location.pathname.startsWith(item.to))
                     ? 'nav-active'
                     : 'nav-inactive'
-                }`
-              }
-            >
-              <Icon size={15} className="flex-shrink-0" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+                }`}
+              >
+                <FileText size={16} className="flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">Reports</span>
+                {reportsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              </button>
+
+              {reportsOpen && (
+                <div className="mt-2 ml-4 pl-3 border-l border-blue-500/20 space-y-1">
+                  {visibleReportNav.map(item => (
+                    <SidebarLink
+                      key={item.to}
+                      item={item}
+                      compact
+                      onNavigate={() => setSidebarOpen(false)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {visibleWorkspaceNav.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(open => !open)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
+                  visibleWorkspaceNav.some(item => location.pathname.startsWith(item.to))
+                    ? 'nav-active'
+                    : 'nav-inactive'
+                }`}
+              >
+                <Building2 size={16} className="flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">Workspace Tools</span>
+                {moreOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              </button>
+
+              {moreOpen && (
+                <div className="mt-2 ml-4 pl-3 border-l border-blue-500/20 space-y-1">
+                  {visibleWorkspaceNav.map(item => (
+                    <SidebarLink
+                      key={item.to}
+                      item={item}
+                      compact
+                      onNavigate={() => setSidebarOpen(false)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
@@ -574,6 +635,45 @@ export default function Layout() {
         </div>
       </main>
     </div>
+  )
+}
+
+function NavSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="px-3 mb-2 text-[9px] font-bold uppercase tracking-[0.22em] sidebar-muted">
+        {label}
+      </div>
+      <div className="space-y-1">{children}</div>
+    </section>
+  )
+}
+
+function SidebarLink({
+  item,
+  compact = false,
+  onNavigate,
+}: {
+  item: NavItem
+  compact?: boolean
+  onNavigate: () => void
+}) {
+  const Icon = item.icon
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.exact}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `flex items-center gap-3 rounded-xl text-sm transition-all border ${
+          compact ? 'px-3 py-2' : 'px-3 py-2.5'
+        } ${isActive ? 'nav-active' : 'nav-inactive'}`
+      }
+    >
+      <Icon size={compact ? 14 : 16} className="flex-shrink-0" />
+      <span className={compact ? 'text-[12px]' : 'font-medium'}>{item.label}</span>
+    </NavLink>
   )
 }
 
