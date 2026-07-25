@@ -389,11 +389,11 @@ export default function ProjectsPage() {
   const greeting = getGreeting()
 
   return (
-    <div className="min-h-dvh bg-[#f5f7fb] text-[#17324d]">
-      <header className="sticky top-0 z-30 border-b border-[#dce5ee] bg-white/95 backdrop-blur-xl">
+    <div className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
+      <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
           <button type="button" onClick={() => navigate('/')} className="text-left">
-            <PMOCorexLogo size={40} />
+            <PMOCorexLogo size={40} tone="light" />
           </button>
 
           <div className="flex items-center gap-2">
@@ -424,25 +424,25 @@ export default function ProjectsPage() {
         <section className="overflow-hidden rounded-[28px] border border-[#d8e4ee] bg-white shadow-[0_18px_60px_rgba(30,67,101,0.08)]">
           <div className="grid lg:grid-cols-[1.3fr_0.7fr]">
             <div className="relative overflow-hidden px-6 py-8 sm:px-9 lg:px-11 lg:py-10">
-              <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#f47c55]/10" />
-              <div className="absolute right-20 top-8 h-28 w-28 rounded-full border border-[#f47c55]/20" />
+              <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#ef8354]/10" />
+              <div className="absolute right-20 top-8 h-28 w-28 rounded-full border border-[#ef8354]/20" />
               <div className="relative">
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f0c8bb] bg-[#fff4ef] px-3 py-1.5 text-xs font-semibold text-[#c95c38]">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f0c4b2] bg-[#fff0e9] px-3 py-1.5 text-xs font-semibold text-[#d86335]">
                   <CircleDot size={13} /> Workspace control tower
                 </div>
-                <p className="text-sm font-medium text-[#6b8094]">{greeting}</p>
-                <h1 className="mt-1 text-3xl font-black tracking-[-0.035em] text-[#153b5d] sm:text-4xl">
+                <p className="text-sm font-medium text-[#607580]">{greeting}</p>
+                <h1 className="mt-1 text-3xl font-black tracking-[-0.035em] text-[#173f5f] sm:text-4xl">
                   {capitalize(displayName || 'there')}, here is your delivery position.
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-[#667c90] sm:text-base">
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-[#607580] sm:text-base">
                   See what needs attention, understand your capacity on each project, and move directly into the work you can control.
                 </p>
               </div>
             </div>
 
-            <div className="border-t border-[#dce5ee] bg-[#eef5fa] p-6 sm:p-8 lg:border-l lg:border-t-0">
+            <div className="border-t border-[#dfe7e6] bg-[#eef3f4] p-6 sm:p-8 lg:border-l lg:border-t-0">
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#6d8396]">Workspace</div>
-              <div className="mt-2 text-2xl font-black text-[#153b5d]">{workspaceName}</div>
+              <div className="mt-2 text-2xl font-black text-[#173f5f]">{workspaceName}</div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <MiniMetric label="Portfolios" value={portfolios.length} />
                 <MiniMetric label="Projects" value={projects.length} />
@@ -458,9 +458,9 @@ export default function ProjectsPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="hub-eyebrow">My work today</div>
-                <h2 className="mt-1 text-xl font-extrabold text-[#173b5c]">Your immediate delivery focus</h2>
+                <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">Your immediate delivery focus</h2>
               </div>
-              <span className="rounded-full bg-[#e8f2f8] px-3 py-1 text-xs font-semibold text-[#315d7b]">
+              <span className="rounded-full bg-[#eaf1f4] px-3 py-1 text-xs font-semibold text-[#2f6f91]">
                 {primaryRoleLabel(userRoles)}
               </span>
             </div>
@@ -472,15 +472,15 @@ export default function ProjectsPage() {
               <FocusItem icon={Activity} value={activeProjects} label="Projects currently active" />
             </div>
 
-            <button onClick={() => navigate('/portfolio-dashboard')} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#1d5b83] hover:text-[#f06f46]">
+            <button onClick={() => navigate('/portfolio-dashboard')} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#2f6f91] hover:text-[#ef8354]">
               Open portfolio command centre <ArrowRight size={16} />
             </button>
           </div>
 
           <div className="hub-panel p-6 sm:p-7">
             <div className="hub-eyebrow">Permission principle</div>
-            <h2 className="mt-1 text-xl font-extrabold text-[#173b5c]">One truth. Relevant controls.</h2>
-            <p className="mt-4 text-sm leading-6 text-[#667c90]">
+            <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">One truth. Relevant controls.</h2>
+            <p className="mt-4 text-sm leading-6 text-[#607580]">
               Everyone can see the delivery position. Editing tools appear only where your responsibility gives you control.
             </p>
             <div className="mt-6 space-y-3">
@@ -495,7 +495,7 @@ export default function ProjectsPage() {
           <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="hub-eyebrow">Portfolio overview</div>
-              <h2 className="mt-1 text-2xl font-black text-[#173b5c]">Choose a delivery environment</h2>
+              <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
             </div>
             <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
               <BarChart3 size={16} /> Portfolio Dashboard
@@ -521,13 +521,13 @@ export default function ProjectsPage() {
                   className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf3f8] text-[#1f5d84]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf1f4] text-[#2f6f91]">
                       <Briefcase size={21} />
                     </div>
-                    <ChevronRight className="text-[#9ab0c1] transition group-hover:translate-x-1 group-hover:text-[#f06f46]" size={20} />
+                    <ChevronRight className="text-[#9fb4bd] transition group-hover:translate-x-1 group-hover:text-[#ef8354]" size={20} />
                   </div>
-                  <h3 className="mt-5 text-lg font-extrabold text-[#173b5c]">{portfolio.name}</h3>
-                  <p className="mt-1 min-h-10 text-sm leading-5 text-[#76899a]">
+                  <h3 className="mt-5 text-lg font-extrabold text-[#173f5f]">{portfolio.name}</h3>
+                  <p className="mt-1 min-h-10 text-sm leading-5 text-[#6d7f8b]">
                     {portfolio.description || 'Project delivery portfolio'}
                   </p>
                   <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
@@ -545,13 +545,13 @@ export default function ProjectsPage() {
                   setSelectedOrgId(organizations[0]?.id || '')
                   setShowPortfolioModal(true)
                 }}
-                className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cbd9e4] bg-[#f8fbfd] p-5 text-center transition hover:border-[#f1a58d] hover:bg-[#fff7f3]"
+                className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cfdde2] bg-[#f9fbfb] p-5 text-center transition hover:border-[#ffad89] hover:bg-[#fff7f3]"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#f06f46] shadow-sm">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#ef8354] shadow-sm">
                   <Plus size={21} />
                 </div>
-                <div className="mt-4 font-bold text-[#244a68]">Create portfolio</div>
-                <div className="mt-1 text-sm text-[#7a8ea0]">Add another delivery environment</div>
+                <div className="mt-4 font-bold text-[#405b69]">Create portfolio</div>
+                <div className="mt-1 text-sm text-[#71838d]">Add another delivery environment</div>
               </button>
             )}
           </div>
@@ -562,13 +562,13 @@ export default function ProjectsPage() {
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
                 <div className="hub-eyebrow">Project register</div>
-                <h2 className="mt-1 text-2xl font-black text-[#173b5c]">Projects and working capacity</h2>
-                <p className="mt-1 text-sm text-[#76899a]">Your role is resolved project by project, not from one generic title.</p>
+                <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Projects and working capacity</h2>
+                <p className="mt-1 text-sm text-[#6d7f8b]">Your role is resolved project by project, not from one generic title.</p>
               </div>
 
               <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
                 <div className="relative sm:col-span-2 xl:col-span-1 xl:w-72">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8ba0b1]" />
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#82939c]" />
                   <input className="hub-input pl-9" placeholder="Search project or location" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <select className="hub-input" value={portfolioFilter} onChange={e => setPortfolioFilter(e.target.value)}>
@@ -595,7 +595,7 @@ export default function ProjectsPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1050px] border-collapse">
                 <thead>
-                  <tr className="bg-[#f6f9fb] text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#718699]">
+                  <tr className="bg-[#f3f6f6] text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#71838d]">
                     <th className="px-6 py-4">Project</th>
                     <th className="px-5 py-4">Portfolio</th>
                     <th className="px-5 py-4">Health</th>
@@ -624,7 +624,7 @@ export default function ProjectsPage() {
                 </tbody>
               </table>
               {filteredProjects.length === 0 && (
-                <div className="p-12 text-center text-sm text-[#7a8ea0]">No projects match the selected filters.</div>
+                <div className="p-12 text-center text-sm text-[#71838d]">No projects match the selected filters.</div>
               )}
             </div>
           )}
@@ -683,18 +683,18 @@ export default function ProjectsPage() {
 
 function MiniMetric({ label, value, accent = false }: any) {
   return (
-    <div className={`rounded-2xl border p-4 ${accent ? 'border-[#f2c4b5] bg-[#fff4ef]' : 'border-[#d6e3ec] bg-white'}`}>
-      <div className={`text-2xl font-black ${accent ? 'text-[#d85f38]' : 'text-[#173b5c]'}`}>{value}</div>
-      <div className="mt-1 text-xs font-medium text-[#718699]">{label}</div>
+    <div className={`rounded-2xl border p-4 ${accent ? 'border-[#f0c4b2] bg-[#fff0e9]' : 'border-[#d7e1e4] bg-white'}`}>
+      <div className={`text-2xl font-black ${accent ? 'text-[#d86335]' : 'text-[#173f5f]'}`}>{value}</div>
+      <div className="mt-1 text-xs font-medium text-[#71838d]">{label}</div>
     </div>
   )
 }
 
 function FocusItem({ icon: Icon, value, label, urgent = false }: any) {
   return (
-    <div className={`flex items-center gap-4 rounded-2xl border p-4 ${urgent ? 'border-[#f3c6b8] bg-[#fff5f1]' : 'border-[#dce6ee] bg-[#f8fbfd]'}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${urgent ? 'bg-[#ffe5dc] text-[#d85f38]' : 'bg-[#e5f0f6] text-[#285f82]'}`}><Icon size={19} /></div>
-      <div><div className="text-xl font-black text-[#183c5c]">{value}</div><div className="text-xs leading-5 text-[#718699]">{label}</div></div>
+    <div className={`flex items-center gap-4 rounded-2xl border p-4 ${urgent ? 'border-[#f0c4b2] bg-[#fff7f3]' : 'border-[#dfe7e6] bg-[#f9fbfb]'}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${urgent ? 'bg-[#fff0e9] text-[#d86335]' : 'bg-[#eaf1f4] text-[#2f6f91]'}`}><Icon size={19} /></div>
+      <div><div className="text-xl font-black text-[#173f5f]">{value}</div><div className="text-xs leading-5 text-[#71838d]">{label}</div></div>
     </div>
   )
 }
@@ -702,14 +702,14 @@ function FocusItem({ icon: Icon, value, label, urgent = false }: any) {
 function PermissionLine({ icon: Icon, title, text }: any) {
   return (
     <div className="flex gap-3">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e9f3f8] text-[#285f82]"><Icon size={16} /></div>
-      <div><div className="text-sm font-bold text-[#244863]">{title}</div><div className="mt-0.5 text-xs leading-5 text-[#778b9c]">{text}</div></div>
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#eaf1f4] text-[#2f6f91]"><Icon size={16} /></div>
+      <div><div className="text-sm font-bold text-[#405b69]">{title}</div><div className="mt-0.5 text-xs leading-5 text-[#778b9c]">{text}</div></div>
     </div>
   )
 }
 
 function PortfolioMetric({ label, value, attention = false }: any) {
-  return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d85f38]' : 'text-[#234967]'}`}>{value}</div><div className="text-[11px] text-[#8193a2]">{label}</div></div>
+  return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d86335]' : 'text-[#405b69]'}`}>{value}</div><div className="text-[11px] text-[#7c8d97]">{label}</div></div>
 }
 
 function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit }: any) {
@@ -718,18 +718,18 @@ function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit 
   const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : status === 'Completed' ? 'Complete' : 'Healthy'
 
   return (
-    <tr className="border-t border-[#e5ecf2] bg-white transition hover:bg-[#f8fbfd]">
+    <tr className="border-t border-[#e2e9ed] bg-white transition hover:bg-[#f9fbfb]">
       <td className="px-6 py-4">
         <button onClick={onOpen} className="text-left">
-          <div className="font-bold text-[#173b5c] hover:text-[#e86e48]">{project.project_name}</div>
-          <div className="mt-1 text-xs text-[#8193a2]">{project.location || 'No location set'}</div>
+          <div className="font-bold text-[#173f5f] hover:text-[#e87545]">{project.project_name}</div>
+          <div className="mt-1 text-xs text-[#7c8d97]">{project.location || 'No location set'}</div>
         </button>
       </td>
-      <td className="px-5 py-4 text-sm text-[#587084]">{portfolioName}</td>
-      <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${isAttention ? 'border-[#f0c3b4] bg-[#fff2ed] text-[#cc5b37]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${isAttention ? 'bg-[#e56d47]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
-      <td className="px-5 py-4"><span className="rounded-full bg-[#eaf3f8] px-2.5 py-1 text-xs font-semibold text-[#2b6080]">{capacity}</span></td>
-      <td className="px-5 py-4 text-sm text-[#587084]">{project.phase || 'Not set'}</td>
-      <td className="px-5 py-4 text-sm text-[#587084]">{formatDate(project.handover_date)}</td>
+      <td className="px-5 py-4 text-sm text-[#536974]">{portfolioName}</td>
+      <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${isAttention ? 'border-[#f0c4b2] bg-[#fff0e9] text-[#d86335]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${isAttention ? 'bg-[#e56d47]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
+      <td className="px-5 py-4"><span className="rounded-full bg-[#eaf1f4] px-2.5 py-1 text-xs font-semibold text-[#2f6f91]">{capacity}</span></td>
+      <td className="px-5 py-4 text-sm text-[#536974]">{project.phase || 'Not set'}</td>
+      <td className="px-5 py-4 text-sm text-[#536974]">{formatDate(project.handover_date)}</td>
       <td className="px-5 py-4">
         <div className="flex items-center justify-end gap-2">
           {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
@@ -743,8 +743,8 @@ function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit 
 function OwnerFields({ values, setters }: any) {
   const labels = ['Overall Project Owner', 'Housebuild Owner', 'MEP Owner', 'Infrastructure Owner']
   return (
-    <div className="rounded-2xl border border-[#dce6ee] bg-[#f8fbfd] p-4">
-      <div className="mb-3 text-sm font-bold text-[#244863]">Project ownership</div>
+    <div className="rounded-2xl border border-[#dfe7e6] bg-[#f9fbfb] p-4">
+      <div className="mb-3 text-sm font-bold text-[#405b69]">Project ownership</div>
       <div className="space-y-3">
         {labels.map((label, index) => (
           <div key={label}><FieldLabel>{label}</FieldLabel><input className="hub-input" type="email" placeholder={`${label} email`} value={values[index]} onChange={e => setters[index](e.target.value)} /></div>
@@ -755,15 +755,15 @@ function OwnerFields({ values, setters }: any) {
 }
 
 function FieldLabel({ children }: any) {
-  return <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#718699]">{children}</label>
+  return <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#71838d]">{children}</label>
 }
 
 function EmptyHub({ title, message, action }: any) {
   return (
     <div className="p-12 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2f8] text-[#285f82]"><Building2 size={24} /></div>
-      <div className="mt-4 text-xl font-bold text-[#173b5c]">{title}</div>
-      <div className="mt-2 text-sm text-[#718699]">{message}</div>
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eaf1f4] text-[#2f6f91]"><Building2 size={24} /></div>
+      <div className="mt-4 text-xl font-bold text-[#173f5f]">{title}</div>
+      <div className="mt-2 text-sm text-[#71838d]">{message}</div>
       <button onClick={action} className="hub-primary-button mt-5">Back to Login</button>
     </div>
   )
@@ -771,10 +771,10 @@ function EmptyHub({ title, message, action }: any) {
 
 function Modal({ title, children, onClose }: any) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17324d]/45 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#183044]/45 p-4 backdrop-blur-sm">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] border border-[#dbe5ed] bg-white p-6 shadow-[0_30px_90px_rgba(18,50,76,0.25)]">
         <div className="mb-6 flex items-center justify-between">
-          <div><div className="hub-eyebrow">Workspace setup</div><h2 className="mt-1 text-xl font-black text-[#173b5c]">{title}</h2></div>
+          <div><div className="hub-eyebrow">Workspace setup</div><h2 className="mt-1 text-xl font-black text-[#173f5f]">{title}</h2></div>
           <button onClick={onClose} className="hub-icon-button"><X size={18} /></button>
         </div>
         {children}
