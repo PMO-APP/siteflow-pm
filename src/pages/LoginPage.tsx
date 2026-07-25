@@ -1,12 +1,29 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { getWorkspaceHome, resolveWorkspace } from '@/platform/access'
 
+function LoginBrand() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-[#173f5f]">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />
+        <svg viewBox="0 0 40 40" className="h-7 w-7" aria-hidden="true">
+          <path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="white" />
+          <path d="M27.8 25.4 32 29.6" stroke="#ef8354" strokeWidth="2.8" strokeLinecap="round" />
+        </svg>
+      </div>
+      <div className="leading-none">
+        <div className="text-[17px] font-extrabold tracking-[-0.04em] text-[#173f5f]">PMOCorex</div>
+        <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#71838d]">Project delivery control</div>
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
@@ -18,7 +35,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
-
     if (savedEmail) {
       setEmail(savedEmail)
       setRememberMe(true)
@@ -27,81 +43,46 @@ export default function LoginPage() {
 
   async function getLoginRedirectPath(userId: string, userEmail: string) {
     const cleanEmail = userEmail.toLowerCase().trim()
-
     const { data: memberships, error } = await supabase
       .from('memberships')
       .select('role, workspace_type, access_scope')
       .or(`user_id.eq.${userId},email.eq.${cleanEmail}`)
 
-    if (error) {
-      throw error
-    }
-
+    if (error) throw error
     const rows = memberships || []
-
-    const externalMembership = rows.find(item =>
-      resolveWorkspace(item.role, item.workspace_type) !== 'internal'
-    )
-
-    const workspaceMembership = rows.find(
-      item => item.access_scope === 'workspace'
-    )
-
-    const selectedMembership =
-      externalMembership || workspaceMembership || rows[0]
-
-    const workspace = resolveWorkspace(
-      selectedMembership?.role,
-      selectedMembership?.workspace_type
-    )
-
-    return getWorkspaceHome(workspace)
+    const externalMembership = rows.find(item => resolveWorkspace(item.role, item.workspace_type) !== 'internal')
+    const workspaceMembership = rows.find(item => item.access_scope === 'workspace')
+    const selectedMembership = externalMembership || workspaceMembership || rows[0]
+    return getWorkspaceHome(resolveWorkspace(selectedMembership?.role, selectedMembership?.workspace_type))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-
     setLoading(true)
     setError('')
     setNotice('')
 
     try {
       const cleanEmail = email.toLowerCase().trim()
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password,
-      })
-
+      const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password })
       if (error) {
         setError(error.message)
         return
       }
 
-      if (rememberMe) {
-        localStorage.setItem('savedEmail', cleanEmail)
-      } else {
-        localStorage.removeItem('savedEmail')
-      }
+      if (rememberMe) localStorage.setItem('savedEmail', cleanEmail)
+      else localStorage.removeItem('savedEmail')
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError) {
         setError(userError.message)
         return
       }
-
       if (!user) {
         navigate('/projects')
         return
       }
-
-      const redirectPath = await getLoginRedirectPath(user.id, cleanEmail)
-
-      navigate(redirectPath)
+      navigate(await getLoginRedirectPath(user.id, cleanEmail))
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Please try again.')
     } finally {
@@ -112,184 +93,97 @@ export default function LoginPage() {
   async function handleForgotPassword() {
     setError('')
     setNotice('')
-
     const cleanEmail = email.toLowerCase().trim()
-
     if (!cleanEmail) {
-      setError('Enter your email address first, then click Forgot Password.')
+      setError('Enter your email address first, then select Forgot password.')
       return
     }
 
     setResetLoading(true)
-
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setNotice('Password reset link sent. Please check your email.')
-    }
-
+    if (error) setError(error.message)
+    else setNotice('A password reset link has been sent to your email.')
     setResetLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-[#0c1014] text-white grid lg:grid-cols-2 overflow-hidden">
-      <div className="relative hidden lg:flex flex-col justify-between p-12 border-r border-white/[0.06] bg-gradient-to-br from-[#101820] via-[#121b24] to-[#0c1014]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(196,158,72,0.20),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(69,153,212,0.12),transparent_35%)]" />
+    <div className="min-h-screen bg-[#f7f8f6] text-[#183044]">
+      <div className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr]">
+        <section className="relative hidden overflow-hidden bg-[#173f5f] p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,.055)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.055)_1px,transparent_1px)] bg-[size:34px_34px]" />
+          <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full border border-white/10" />
+          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#ef8354]/55" />
 
-        <div className="relative z-10">
-          <div className="text-3xl font-black text-[#c49e48]">
-            PMOCorex
+          <div className="relative flex items-center gap-3">
+            <div className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-[13px] bg-white">
+              <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />
+              <svg viewBox="0 0 40 40" className="h-7 w-7"><path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="#173f5f" /><path d="M27.8 25.4 32 29.6" stroke="#ef8354" strokeWidth="2.8" strokeLinecap="round" /></svg>
+            </div>
+            <div><div className="text-lg font-extrabold tracking-[-.04em]">PMOCorex</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[.2em] text-white/50">Project delivery control</div></div>
           </div>
 
-          <div className="text-xs uppercase tracking-[0.35em] text-slate-500 mt-1">
-            Portfolio Control System
-          </div>
-        </div>
-
-        <div className="relative z-10 max-w-xl">
-          <div className="inline-flex mb-5 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-            Authorized Access
-          </div>
-
-          <h1 className="text-5xl font-black leading-tight">
-            Continue controlling delivery with confidence.
-          </h1>
-
-          <p className="mt-5 text-slate-400 text-lg leading-relaxed">
-            Access your project hub, review active risks, track approvals,
-            manage schedules, and keep portfolio delivery under control.
-          </p>
-        </div>
-
-        <div className="relative z-10 text-xs text-slate-500">
-          Built for construction, real estate, and PMO-led delivery teams.
-        </div>
-      </div>
-
-      <div className="flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-[#c49e48] mb-6"
-          >
-            <ArrowLeft size={15} />
-            Back to home
-          </button>
-
-          <div className="card relative overflow-hidden">
-            <div className="gold-bar" />
-
-            <div className="p-7">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-[#ede8de]">
-                  Secure sign in
-                </h2>
-
-                <p className="text-sm text-slate-500 mt-1">
-                  Authorized PMOCorex users only.
-                </p>
-              </div>
-
-              <div className="mb-4 p-3 rounded-md bg-[#c49e48]/10 border border-[#c49e48]/20 text-[#c49e48] text-sm flex gap-2">
-                <ShieldCheck size={16} className="mt-0.5 flex-shrink-0" />
-                <span>
-                  Access is restricted to approved workspace members.
-                </span>
-              </div>
-
-              {error && (
-                <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  {error}
-                </div>
-              )}
-
-              {notice && (
-                <div className="mb-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-                  {notice}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="form-label">Email</label>
-
-                  <input
-                    className="form-control"
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label">Password</label>
-
-                  <div className="relative">
-                    <input
-                      className="form-control pr-10"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      minLength={6}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(current => !current)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-white"
-                    >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-2 text-sm text-slate-400">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={() => setRememberMe(current => !current)}
-                    />
-                    Remember me
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    disabled={resetLoading}
-                    className="text-sm text-[#c49e48] hover:underline disabled:opacity-60"
-                  >
-                    {resetLoading ? 'Sending…' : 'Forgot Password?'}
-                  </button>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-gold btn w-full justify-center mt-2 py-3"
-                >
-                  {loading ? 'Signing in…' : 'Sign In'}
-                </button>
-              </form>
-
-              <div className="mt-6 text-center text-xs text-slate-500">
-                No public registration. Access is managed by the administrator.
-              </div>
+          <div className="relative max-w-xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.06] px-3 py-1.5 text-xs font-bold text-white/75"><LockKeyhole size={14} className="text-[#ffad89]" /> Authorised workspace access</div>
+            <h1 className="text-5xl font-extrabold leading-[1.05] tracking-[-.055em] xl:text-6xl">Return to the work that moves delivery forward.</h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-white/65">Review your portfolio position, respond to project risks and keep every control area connected.</p>
+            <div className="mt-9 grid gap-3">
+              {['One view across active projects', 'Role-based access for every delivery team', 'Live controls, decisions and reporting'].map(item => (
+                <div key={item} className="flex items-center gap-3 text-sm font-semibold text-white/78"><CheckCircle2 size={17} className="text-[#ffad89]" />{item}</div>
+              ))}
             </div>
           </div>
 
-          <div className="text-center mt-5 text-[10px] text-[#6e7d8c]">
-            © PMOCorex. Built for project delivery intelligence.
+          <div className="relative text-xs text-white/40">PMOCorex · Built for disciplined project delivery</div>
+        </section>
+
+        <section className="relative flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(23,63,95,.035)_1px,transparent_1px),linear-gradient(rgba(23,63,95,.035)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+          <div className="relative w-full max-w-[470px]">
+            <div className="mb-10 flex items-center justify-between lg:hidden">
+              <LoginBrand />
+            </div>
+
+            <button onClick={() => navigate('/')} className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-[#627985] transition hover:text-[#173f5f]"><ArrowLeft size={16} /> Back to PMOCorex</button>
+
+            <div className="rounded-[22px] border border-[#d6e0e3] bg-white p-6 shadow-[0_22px_60px_rgba(21,55,73,.10)] sm:p-9">
+              <div className="mb-7">
+                <div className="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-[#eaf1f4] text-[#2f6f91]"><ShieldCheck size={21} /></div>
+                <h2 className="text-3xl font-extrabold tracking-[-.045em] text-[#173f5f]">Sign in to your workspace</h2>
+                <p className="mt-2 text-sm leading-6 text-[#6b7f89]">Access is available to approved PMOCorex users only.</p>
+              </div>
+
+              {error && <div className="mb-5 rounded-xl border border-[#f0c4b2] bg-[#fff5f1] px-4 py-3 text-sm font-semibold text-[#b84f27]">{error}</div>}
+              {notice && <div className="mb-5 rounded-xl border border-[#bddbc5] bg-[#f0f8f2] px-4 py-3 text-sm font-semibold text-[#347a4a]">{notice}</div>}
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="mb-2 block text-xs font-extrabold uppercase tracking-[.11em] text-[#526975]">Work email</label>
+                  <input className="h-12 w-full rounded-xl border border-[#cdd9de] bg-[#fbfcfc] px-4 text-sm text-[#173f5f] outline-none transition placeholder:text-[#9aa9b0] focus:border-[#2f6f91] focus:bg-white focus:ring-4 focus:ring-[#2f6f91]/10" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between"><label className="block text-xs font-extrabold uppercase tracking-[.11em] text-[#526975]">Password</label><button type="button" onClick={handleForgotPassword} disabled={resetLoading} className="text-xs font-bold text-[#2f6f91] hover:underline disabled:opacity-60">{resetLoading ? 'Sending…' : 'Forgot password?'}</button></div>
+                  <div className="relative">
+                    <input className="h-12 w-full rounded-xl border border-[#cdd9de] bg-[#fbfcfc] px-4 pr-12 text-sm text-[#173f5f] outline-none transition placeholder:text-[#9aa9b0] focus:border-[#2f6f91] focus:bg-white focus:ring-4 focus:ring-[#2f6f91]/10" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required minLength={6} />
+                    <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7a8c95] hover:text-[#173f5f]" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                  </div>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-[#607580]">
+                  <input type="checkbox" checked={rememberMe} onChange={() => setRememberMe(value => !value)} className="h-4 w-4 rounded border-[#bdcbd1] accent-[#173f5f]" /> Remember my email
+                </label>
+
+                <button type="submit" disabled={loading} className="flex h-12 w-full items-center justify-center rounded-xl bg-[#173f5f] text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(23,63,95,.18)] transition hover:-translate-y-0.5 hover:bg-[#0f334e] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0">{loading ? 'Signing in…' : 'Sign in'}</button>
+              </form>
+
+              <div className="mt-7 border-t border-[#e1e8ea] pt-5 text-center text-xs leading-5 text-[#7a8c95]">There is no public registration. New workspaces and users are onboarded by invitation.</div>
+            </div>
+
+            <div className="mt-6 text-center text-xs text-[#84949b]">Need access? Contact your PMOCorex workspace administrator.</div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   )
