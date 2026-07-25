@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Building2,
-  Briefcase,
-  FolderKanban,
-  Plus,
-  ArrowRight,
-  Layers,
   Activity,
-  Shield,
-  Search,
-  Filter,
-  UserCircle,
-  Pencil,
+  AlertTriangle,
+  ArrowRight,
   BarChart3,
+  Briefcase,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  ChevronRight,
+  CircleDot,
+  FolderKanban,
+  Pencil,
+  Plus,
+  Search,
+  Shield,
+  SlidersHorizontal,
+  UserCircle,
+  X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -49,10 +54,34 @@ const PROJECT_PHASES = [
   'Closed Out',
 ]
 
+const INTERNAL_ROLE_LABELS: Record<string, string> = {
+  workspace_admin: 'Workspace Admin',
+  admin: 'Admin',
+  pmo: 'PMO',
+  portfolio_manager: 'Portfolio Manager',
+  design: 'Design',
+  housebuild: 'Housebuild',
+  costing: 'Costing',
+  infrastructure: 'Infrastructure',
+  mep: 'MEP',
+  hse: 'HSE',
+  hse_lead: 'HSE Lead',
+  hse_manager: 'HSE Manager',
+  viewer: 'Viewer',
+  guest: 'Guest',
+  consultant: 'Consultant',
+  contractor: 'Contractor',
+  vendor: 'Vendor',
+  subcontractor: 'Subcontractor',
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
+  const [memberships, setMemberships] = useState<any[]>([])
+  const [currentUserEmail, setCurrentUserEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(true)
 
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
@@ -62,7 +91,6 @@ export default function ProjectsPage() {
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
-
   const [editingProject, setEditingProject] = useState<any>(null)
 
   const [newProjectName, setNewProjectName] = useState('')
@@ -75,20 +103,17 @@ export default function ProjectsPage() {
   const [newOverallOwnerEmail, setNewOverallOwnerEmail] = useState('')
   const [newHousebuildOwnerEmail, setNewHousebuildOwnerEmail] = useState('')
   const [newMepOwnerEmail, setNewMepOwnerEmail] = useState('')
-  const [newInfrastructureOwnerEmail, setNewInfrastructureOwnerEmail] =
-    useState('')
+  const [newInfrastructureOwnerEmail, setNewInfrastructureOwnerEmail] = useState('')
 
   const [editProjectName, setEditProjectName] = useState('')
   const [editProjectStatus, setEditProjectStatus] = useState('Planning')
   const [editProjectPhase, setEditProjectPhase] = useState('Concept')
   const [editProjectLocation, setEditProjectLocation] = useState('')
   const [editProjectHandoverDate, setEditProjectHandoverDate] = useState('')
-
   const [editOverallOwnerEmail, setEditOverallOwnerEmail] = useState('')
   const [editHousebuildOwnerEmail, setEditHousebuildOwnerEmail] = useState('')
   const [editMepOwnerEmail, setEditMepOwnerEmail] = useState('')
-  const [editInfrastructureOwnerEmail, setEditInfrastructureOwnerEmail] =
-    useState('')
+  const [editInfrastructureOwnerEmail, setEditInfrastructureOwnerEmail] = useState('')
 
   const [searchTerm, setSearchTerm] = useState('')
   const [portfolioFilter, setPortfolioFilter] = useState('All')
@@ -114,6 +139,12 @@ export default function ProjectsPage() {
     }
 
     const cleanEmail = currentUser.email.toLowerCase().trim()
+    setCurrentUserEmail(cleanEmail)
+    setDisplayName(
+      currentUser.user_metadata?.full_name ||
+        currentUser.user_metadata?.name ||
+        cleanEmail.split('@')[0].split(/[._-]/)[0]
+    )
 
     const { data: membershipRows, error: membershipError } = await supabase
       .from('memberships')
@@ -126,9 +157,10 @@ export default function ProjectsPage() {
       return
     }
 
-    const memberships = membershipRows || []
+    const memberRows = membershipRows || []
+    setMemberships(memberRows)
 
-    if (memberships.length === 0) {
+    if (memberRows.length === 0) {
       setOrganizations([])
       setPortfolios([])
       setProjects([])
@@ -139,7 +171,7 @@ export default function ProjectsPage() {
       return
     }
 
-    const userRoles = memberships.map(membership =>
+    const userRoles = memberRows.map(membership =>
       String(membership.role || '').toLowerCase().trim()
     )
 
@@ -180,33 +212,23 @@ export default function ProjectsPage() {
     }
 
     if (isExternalUser) {
-      const allowedProjectIds = memberships
+      const allowedProjectIds = memberRows
         .filter(membership => membership.access_scope === 'project')
-        .map(membership => membership.project_id)
+        .flatMap(membership => [membership.project_id, ...(membership.project_ids || [])])
         .filter(Boolean)
 
       const visibleProjects = (projs || []).filter(project =>
         allowedProjectIds.includes(project.id)
       )
-
       const visiblePortfolioIds = [
-        ...new Set(
-          visibleProjects.map(project => project.portfolio_id).filter(Boolean)
-        ),
+        ...new Set(visibleProjects.map(project => project.portfolio_id).filter(Boolean)),
       ]
-
       const visibleOrgIds = [
-        ...new Set(
-          visibleProjects.map(project => project.organization_id).filter(Boolean)
-        ),
+        ...new Set(visibleProjects.map(project => project.organization_id).filter(Boolean)),
       ]
 
       setOrganizations((orgs || []).filter(org => visibleOrgIds.includes(org.id)))
-      setPortfolios(
-        (ports || []).filter(portfolio =>
-          visiblePortfolioIds.includes(portfolio.id)
-        )
-      )
+      setPortfolios((ports || []).filter(portfolio => visiblePortfolioIds.includes(portfolio.id)))
       setProjects(visibleProjects)
       setLoading(false)
       return
@@ -229,30 +251,25 @@ export default function ProjectsPage() {
       project.mep_owner_email ?? null,
       project.infrastructure_owner_email ?? null
     )
-
     navigate('/app')
   }
 
   function openEditProject(project: any) {
     setEditingProject(project)
-
     setEditProjectName(project.project_name || '')
     setEditProjectStatus(project.status || 'Planning')
     setEditProjectPhase(project.phase || 'Concept')
     setEditProjectLocation(project.location || '')
     setEditProjectHandoverDate(project.handover_date || '')
-
     setEditOverallOwnerEmail(project.overall_owner_email || '')
     setEditHousebuildOwnerEmail(project.housebuild_owner_email || '')
     setEditMepOwnerEmail(project.mep_owner_email || '')
     setEditInfrastructureOwnerEmail(project.infrastructure_owner_email || '')
-
     setShowEditProjectModal(true)
   }
 
   async function updateProject() {
-    if (!canEditProjects) return
-    if (!editingProject || !editProjectName.trim()) return
+    if (!canEditProjects || !editingProject || !editProjectName.trim()) return
 
     const { error } = await supabase
       .from('projects')
@@ -262,15 +279,9 @@ export default function ProjectsPage() {
         phase: editProjectPhase,
         location: editProjectLocation.trim() || null,
         handover_date: editProjectHandoverDate || null,
-
-        overall_owner_email:
-          editOverallOwnerEmail.trim().toLowerCase() || null,
-
-        housebuild_owner_email:
-          editHousebuildOwnerEmail.trim().toLowerCase() || null,
-
+        overall_owner_email: editOverallOwnerEmail.trim().toLowerCase() || null,
+        housebuild_owner_email: editHousebuildOwnerEmail.trim().toLowerCase() || null,
         mep_owner_email: editMepOwnerEmail.trim().toLowerCase() || null,
-
         infrastructure_owner_email:
           editInfrastructureOwnerEmail.trim().toLowerCase() || null,
       })
@@ -312,20 +323,11 @@ export default function ProjectsPage() {
       project_name: newProjectName.trim(),
       status: newProjectStatus,
       phase: newProjectPhase,
-
       organization_id: selectedOrgId || organizations[0]?.id || null,
-
       portfolio_id: selectedPortfolioId || null,
-
-      overall_owner_email:
-        newOverallOwnerEmail.trim().toLowerCase() || null,
-
-      housebuild_owner_email:
-        newHousebuildOwnerEmail.trim().toLowerCase() || null,
-
-      mep_owner_email:
-        newMepOwnerEmail.trim().toLowerCase() || null,
-
+      overall_owner_email: newOverallOwnerEmail.trim().toLowerCase() || null,
+      housebuild_owner_email: newHousebuildOwnerEmail.trim().toLowerCase() || null,
+      mep_owner_email: newMepOwnerEmail.trim().toLowerCase() || null,
       infrastructure_owner_email:
         newInfrastructureOwnerEmail.trim().toLowerCase() || null,
     })
@@ -340,89 +342,202 @@ export default function ProjectsPage() {
     setNewProjectPhase('Concept')
     setSelectedOrgId('')
     setSelectedPortfolioId('')
-
     setNewOverallOwnerEmail('')
     setNewHousebuildOwnerEmail('')
     setNewMepOwnerEmail('')
     setNewInfrastructureOwnerEmail('')
-
     setShowProjectModal(false)
     loadHub()
   }
 
-  const filteredProjects = projects.filter(project => {
-    const search = searchTerm.toLowerCase().trim()
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter(project => {
+        const search = searchTerm.toLowerCase().trim()
+        return (
+          (!search ||
+            String(project.project_name || '').toLowerCase().includes(search) ||
+            String(project.location || '').toLowerCase().includes(search)) &&
+          (portfolioFilter === 'All' ||
+            String(project.portfolio_id || '') === portfolioFilter) &&
+          (statusFilter === 'All' ||
+            String(project.status || 'Not set') === statusFilter) &&
+          (phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter)
+        )
+      }),
+    [projects, searchTerm, portfolioFilter, statusFilter, phaseFilter]
+  )
 
-    const matchesSearch =
-      !search ||
-      String(project.project_name || '').toLowerCase().includes(search) ||
-      String(project.location || '').toLowerCase().includes(search)
-
-    const matchesPortfolio =
-      portfolioFilter === 'All' ||
-      String(project.portfolio_id || '') === portfolioFilter
-
-    const matchesStatus =
-      statusFilter === 'All' ||
-      String(project.status || 'Not set') === statusFilter
-
-    const matchesPhase =
-      phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter
-
-    return matchesSearch && matchesPortfolio && matchesStatus && matchesPhase
-  })
-
-  const totalProjects = filteredProjects.length
-
-  const activeProjects = filteredProjects.filter(
-    project => (project.status || 'Not set') === 'Active'
+  const userRoles = memberships.map(m => String(m.role || '').toLowerCase().trim())
+  const workspaceName = organizations[0]?.name || 'Workspace'
+  const activeProjects = projects.filter(project => project.status === 'Active').length
+  const attentionProjects = projects.filter(project =>
+    ['Delayed', 'On Hold'].includes(project.status)
+  ).length
+  const healthyProjects = projects.filter(project =>
+    ['Active', 'Completed'].includes(project.status)
+  ).length
+  const missingTargets = projects.filter(
+    project => !project.handover_date && !['Completed', 'Cancelled'].includes(project.status)
   ).length
 
-  const workspaceName = organizations[0]?.name || 'Workspace'
+  const myAssignedProjects = projects.filter(project => {
+    const capacity = resolveProjectCapacity(project, currentUserEmail, userRoles, memberships)
+    return capacity !== 'Viewer' && capacity !== 'Guest'
+  })
+
+  const greeting = getGreeting()
 
   return (
-    <div className="projects-page min-h-dvh overflow-x-hidden overflow-y-auto">
-      <div className="mx-auto w-full max-w-7xl px-5 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-[calc(10rem+env(safe-area-inset-bottom))] space-y-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-left w-fit"
-          >
-            <PMOCorexLogo size={42} />
+    <div className="min-h-dvh bg-[#f5f7fb] text-[#17324d]">
+      <header className="sticky top-0 z-30 border-b border-[#dce5ee] bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
+          <button type="button" onClick={() => navigate('/')} className="text-left">
+            <PMOCorexLogo size={40} />
           </button>
 
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:justify-end">
-            <div className="btn-ghost btn-sm btn justify-center pointer-events-none">
-              <Building2 size={14} />
-              {workspaceName}
-            </div>
-
-            <button
-              onClick={() => navigate('/profile')}
-              className="btn-ghost btn-sm btn justify-center"
-            >
-              <UserCircle size={14} />
-              My Profile
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/profile')} className="hub-icon-button" title="My profile">
+              <UserCircle size={19} />
             </button>
-
-            <button
-              onClick={() => navigate('/portfolio-dashboard')}
-              className="btn-ghost btn-sm btn justify-center"
-            >
-              <BarChart3 size={14} />
-              Portfolio Dashboard
-            </button>
-
             {canAccessAdmin && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="btn-ghost btn-sm btn justify-center"
-              >
-                <Shield size={14} />
-                Admin Console
+              <button onClick={() => navigate('/admin')} className="hub-secondary-button hidden sm:inline-flex">
+                <Shield size={16} /> Admin Console
               </button>
             )}
+            {canCreateItems && (
+              <button
+                onClick={() => {
+                  setSelectedOrgId(organizations[0]?.id || '')
+                  setShowProjectModal(true)
+                }}
+                className="hub-primary-button"
+              >
+                <Plus size={17} /> New Project
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-[1500px] space-y-7 px-5 py-7 pb-24 sm:px-7 lg:px-10 lg:py-9">
+        <section className="overflow-hidden rounded-[28px] border border-[#d8e4ee] bg-white shadow-[0_18px_60px_rgba(30,67,101,0.08)]">
+          <div className="grid lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="relative overflow-hidden px-6 py-8 sm:px-9 lg:px-11 lg:py-10">
+              <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#f47c55]/10" />
+              <div className="absolute right-20 top-8 h-28 w-28 rounded-full border border-[#f47c55]/20" />
+              <div className="relative">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#f0c8bb] bg-[#fff4ef] px-3 py-1.5 text-xs font-semibold text-[#c95c38]">
+                  <CircleDot size={13} /> Workspace control tower
+                </div>
+                <p className="text-sm font-medium text-[#6b8094]">{greeting}</p>
+                <h1 className="mt-1 text-3xl font-black tracking-[-0.035em] text-[#153b5d] sm:text-4xl">
+                  {capitalize(displayName || 'there')}, here is your delivery position.
+                </h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-[#667c90] sm:text-base">
+                  See what needs attention, understand your capacity on each project, and move directly into the work you can control.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-[#dce5ee] bg-[#eef5fa] p-6 sm:p-8 lg:border-l lg:border-t-0">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#6d8396]">Workspace</div>
+              <div className="mt-2 text-2xl font-black text-[#153b5d]">{workspaceName}</div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <MiniMetric label="Portfolios" value={portfolios.length} />
+                <MiniMetric label="Projects" value={projects.length} />
+                <MiniMetric label="Healthy" value={healthyProjects} />
+                <MiniMetric label="Need attention" value={attentionProjects} accent />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+          <div className="hub-panel p-6 sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="hub-eyebrow">My work today</div>
+                <h2 className="mt-1 text-xl font-extrabold text-[#173b5c]">Your immediate delivery focus</h2>
+              </div>
+              <span className="rounded-full bg-[#e8f2f8] px-3 py-1 text-xs font-semibold text-[#315d7b]">
+                {primaryRoleLabel(userRoles)}
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <FocusItem icon={FolderKanban} value={myAssignedProjects.length} label="Projects within your working scope" />
+              <FocusItem icon={AlertTriangle} value={attentionProjects} label="Projects requiring attention" urgent={attentionProjects > 0} />
+              <FocusItem icon={CalendarClock} value={missingTargets} label="Projects without a target date" urgent={missingTargets > 0} />
+              <FocusItem icon={Activity} value={activeProjects} label="Projects currently active" />
+            </div>
+
+            <button onClick={() => navigate('/portfolio-dashboard')} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#1d5b83] hover:text-[#f06f46]">
+              Open portfolio command centre <ArrowRight size={16} />
+            </button>
+          </div>
+
+          <div className="hub-panel p-6 sm:p-7">
+            <div className="hub-eyebrow">Permission principle</div>
+            <h2 className="mt-1 text-xl font-extrabold text-[#173b5c]">One truth. Relevant controls.</h2>
+            <p className="mt-4 text-sm leading-6 text-[#667c90]">
+              Everyone can see the delivery position. Editing tools appear only where your responsibility gives you control.
+            </p>
+            <div className="mt-6 space-y-3">
+              <PermissionLine icon={CheckCircle2} title="Workspace visibility" text="See every project available to your membership." />
+              <PermissionLine icon={Shield} title="Contextual access" text="Work only within your project or discipline permissions." />
+              <PermissionLine icon={SlidersHorizontal} title="Cleaner interface" text="Irrelevant controls stay out of your way." />
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="hub-eyebrow">Portfolio overview</div>
+              <h2 className="mt-1 text-2xl font-black text-[#173b5c]">Choose a delivery environment</h2>
+            </div>
+            <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
+              <BarChart3 size={16} /> Portfolio Dashboard
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {portfolios.map(portfolio => {
+              const portfolioProjects = projects.filter(p => p.portfolio_id === portfolio.id)
+              const attention = portfolioProjects.filter(p => ['Delayed', 'On Hold'].includes(p.status)).length
+              const active = portfolioProjects.filter(p => p.status === 'Active').length
+              const health = portfolioProjects.length
+                ? Math.round(((portfolioProjects.length - attention) / portfolioProjects.length) * 100)
+                : 0
+
+              return (
+                <button
+                  key={portfolio.id}
+                  onClick={() => {
+                    setPortfolioFilter(String(portfolio.id))
+                    document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                  className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf3f8] text-[#1f5d84]">
+                      <Briefcase size={21} />
+                    </div>
+                    <ChevronRight className="text-[#9ab0c1] transition group-hover:translate-x-1 group-hover:text-[#f06f46]" size={20} />
+                  </div>
+                  <h3 className="mt-5 text-lg font-extrabold text-[#173b5c]">{portfolio.name}</h3>
+                  <p className="mt-1 min-h-10 text-sm leading-5 text-[#76899a]">
+                    {portfolio.description || 'Project delivery portfolio'}
+                  </p>
+                  <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
+                    <PortfolioMetric label="Projects" value={portfolioProjects.length} />
+                    <PortfolioMetric label="Active" value={active} />
+                    <PortfolioMetric label="Health" value={`${health}%`} attention={attention > 0} />
+                  </div>
+                </button>
+              )
+            })}
 
             {canCreateItems && (
               <button
@@ -430,727 +545,282 @@ export default function ProjectsPage() {
                   setSelectedOrgId(organizations[0]?.id || '')
                   setShowPortfolioModal(true)
                 }}
-                className="btn-ghost btn-sm btn justify-center"
+                className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cbd9e4] bg-[#f8fbfd] p-5 text-center transition hover:border-[#f1a58d] hover:bg-[#fff7f3]"
               >
-                <Briefcase size={14} />
-                New Portfolio
-              </button>
-            )}
-
-            {canCreateItems && (
-              <button
-                onClick={() => {
-                  setSelectedOrgId(organizations[0]?.id || '')
-                  setShowProjectModal(true)
-                }}
-                className="btn-gold btn-sm btn justify-center col-span-2 sm:col-span-1"
-              >
-                <Plus size={14} />
-                New Project
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="workspace-hero relative overflow-hidden rounded-[2rem] border p-6 sm:p-8 lg:p-10">
-          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
-
-          <div className="relative max-w-3xl">
-            <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-              Workspace Hub
-            </div>
-
-            <h1 className="text-[34px] leading-[1.05] sm:text-4xl lg:text-5xl font-black tracking-tight max-w-3xl">
-              Choose your delivery environment.
-            </h1>
-
-            <p className="text-slate-400 mt-4 leading-relaxed max-w-2xl text-sm sm:text-base">
-              Manage portfolios, projects, team access, and delivery command
-              centres from one organization workspace.
-            </p>
-          </div>
-
-          <div className="relative mt-8 grid grid-cols-2 xl:grid-cols-5 gap-4">
-            <MetricCard title={workspaceName} value="Workspace" icon={Building2} />
-            <MetricCard title="Portfolios" value={portfolios.length} icon={Briefcase} />
-            <MetricCard title="Projects" value={totalProjects} icon={FolderKanban} />
-            <MetricCard title="Active" value={activeProjects} icon={Activity} />
-
-            <button
-              onClick={() => navigate('/portfolio-dashboard')}
-              className="group text-left rounded-2xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-4 sm:p-5 hover:border-[#c49e48]/50 hover:bg-[#c49e48]/15 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-lg sm:text-xl font-black text-[#ede8de]">
-                    Portfolio
-                  </div>
-
-                  <div className="text-xs text-[#c49e48] mt-1">
-                    Executive Dashboard
-                  </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#f06f46] shadow-sm">
+                  <Plus size={21} />
                 </div>
-
-                <BarChart3
-                  size={22}
-                  className="text-[#c49e48] group-hover:scale-110 transition"
-                />
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <div className="card p-4 space-y-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
-            <Filter size={15} className="text-[#c49e48]" />
-            Project Search & Filters
-          </div>
-
-          <div className="relative">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
-            />
-
-            <input
-              className="form-control pl-9"
-              placeholder="Search by project name or location..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#ede8de]">
-              <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-                Organization
-              </div>
-
-              <div className="mt-1 font-semibold">{workspaceName}</div>
-            </div>
-
-            <select
-              className="form-control"
-              value={portfolioFilter}
-              onChange={e => setPortfolioFilter(e.target.value)}
-            >
-              <option value="All">All Portfolios</option>
-
-              {portfolios.map(portfolio => (
-                <option key={portfolio.id} value={String(portfolio.id)}>
-                  {portfolio.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="form-control"
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Statuses</option>
-
-              {PROJECT_STATUSES.map(status => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="form-control"
-              value={phaseFilter}
-              onChange={e => setPhaseFilter(e.target.value)}
-            >
-              <option value="All">All Phases</option>
-
-              {PROJECT_PHASES.map(phase => (
-                <option key={phase} value={phase}>
-                  {phase}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="card p-8 text-slate-400">Loading workspace…</div>
-        ) : (
-          <div className="space-y-10">
-            {organizations.length === 0 ? (
-              <EmptyHub
-                title="No workspace access"
-                message="You do not currently have access to any organization, portfolio, or project."
-                action={() => navigate('/mixta-admin-login')}
-              />
-            ) : (
-              organizations.map(org => {
-                const orgPortfolios = portfolios.filter(
-                  portfolio => portfolio.organization_id === org.id
-                )
-
-                const orgProjects = filteredProjects.filter(
-                  project => project.organization_id === org.id
-                )
-
-                if (orgProjects.length === 0 && searchTerm) return null
-
-                return (
-                  <div key={org.id} className="card p-5 sm:p-6 lg:p-7">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Building2 size={18} className="text-[#c49e48]" />
-
-                          <h2 className="text-xl font-bold text-[#ede8de]">
-                            {org.name}
-                          </h2>
-                        </div>
-
-                        <p className="text-sm text-slate-500 mt-1">
-                          {orgPortfolios.length} portfolio(s) •{' '}
-                          {orgProjects.length} visible project(s)
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => navigate('/portfolio-dashboard')}
-                          className="btn-ghost btn-sm btn w-fit"
-                        >
-                          <BarChart3 size={14} />
-                          Portfolio Dashboard
-                        </button>
-
-                        {canAccessAdmin && (
-                          <button
-                            onClick={() => navigate('/admin')}
-                            className="btn-ghost btn-sm btn w-fit"
-                          >
-                            <Shield size={14} />
-                            Manage Access
-                          </button>
-                        )}
-
-                        {canCreateItems && (
-                          <button
-                            onClick={() => {
-                              setSelectedOrgId(org.id)
-                              setShowPortfolioModal(true)
-                            }}
-                            className="btn-ghost btn-sm btn w-fit"
-                          >
-                            <Briefcase size={14} />
-                            Add Portfolio
-                          </button>
-                        )}
-
-                        {canCreateItems && (
-                          <button
-                            onClick={() => {
-                              setSelectedOrgId(org.id)
-                              setShowProjectModal(true)
-                            }}
-                            className="btn-gold btn-sm btn w-fit"
-                          >
-                            <Plus size={14} />
-                            Add Project
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
-                      {orgPortfolios.map(portfolio => {
-                        const portfolioProjects = filteredProjects.filter(
-                          project => project.portfolio_id === portfolio.id
-                        )
-
-                        if (portfolioProjects.length === 0 && searchTerm) {
-                          return null
-                        }
-
-                        return (
-                          <div
-                            key={portfolio.id}
-                            className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5"
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <Layers size={16} className="text-[#c49e48]" />
-
-                                  <div className="portfolio-title font-semibold">
-                                    {portfolio.name}
-                                  </div>
-                                </div>
-
-                                <div className="text-xs text-slate-500 mt-1">
-                                  {portfolio.description ||
-                                    'Project delivery portfolio'}
-                                </div>
-                              </div>
-
-                              <div className="text-xs text-slate-500">
-                                {portfolioProjects.length} project(s)
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              {portfolioProjects.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-sm text-slate-500 text-center">
-                                  No projects in this portfolio yet.
-                                </div>
-                              ) : (
-                                portfolioProjects.map(project => (
-                                  <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    canEdit={canEditProjects}
-                                    onClick={() => openProject(project)}
-                                    onEdit={() => openEditProject(project)}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {orgProjects.filter(project => !project.portfolio_id).length >
-                      0 && (
-                      <div className="mt-6">
-                        <div className="text-sm font-semibold text-[#ede8de] mb-3">
-                          Projects not assigned to a portfolio
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                          {orgProjects
-                            .filter(project => !project.portfolio_id)
-                            .map(project => (
-                              <ProjectCard
-                                key={project.id}
-                                project={project}
-                                canEdit={canEditProjects}
-                                onClick={() => openProject(project)}
-                                onEdit={() => openEditProject(project)}
-                              />
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
+                <div className="mt-4 font-bold text-[#244a68]">Create portfolio</div>
+                <div className="mt-1 text-sm text-[#7a8ea0]">Add another delivery environment</div>
+              </button>
             )}
           </div>
-        )}
+        </section>
 
-        <div className="h-40" />
-      </div>
+        <section id="projects-register" className="hub-panel overflow-hidden">
+          <div className="border-b border-[#e1e9f0] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="hub-eyebrow">Project register</div>
+                <h2 className="mt-1 text-2xl font-black text-[#173b5c]">Projects and working capacity</h2>
+                <p className="mt-1 text-sm text-[#76899a]">Your role is resolved project by project, not from one generic title.</p>
+              </div>
+
+              <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+                <div className="relative sm:col-span-2 xl:col-span-1 xl:w-72">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8ba0b1]" />
+                  <input className="hub-input pl-9" placeholder="Search project or location" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                </div>
+                <select className="hub-input" value={portfolioFilter} onChange={e => setPortfolioFilter(e.target.value)}>
+                  <option value="All">All portfolios</option>
+                  {portfolios.map(portfolio => <option key={portfolio.id} value={String(portfolio.id)}>{portfolio.name}</option>)}
+                </select>
+                <select className="hub-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <option value="All">All statuses</option>
+                  {PROJECT_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                </select>
+                <select className="hub-input" value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)}>
+                  <option value="All">All phases</option>
+                  {PROJECT_PHASES.map(phase => <option key={phase} value={phase}>{phase}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="p-10 text-center text-[#75899a]">Loading workspace…</div>
+          ) : organizations.length === 0 ? (
+            <EmptyHub title="No workspace access" message="You do not currently have access to an organization, portfolio, or project." action={() => navigate('/mixta-admin-login')} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1050px] border-collapse">
+                <thead>
+                  <tr className="bg-[#f6f9fb] text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#718699]">
+                    <th className="px-6 py-4">Project</th>
+                    <th className="px-5 py-4">Portfolio</th>
+                    <th className="px-5 py-4">Health</th>
+                    <th className="px-5 py-4">My capacity</th>
+                    <th className="px-5 py-4">Phase</th>
+                    <th className="px-5 py-4">Target</th>
+                    <th className="px-5 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProjects.map(project => {
+                    const portfolio = portfolios.find(p => p.id === project.portfolio_id)
+                    const capacity = resolveProjectCapacity(project, currentUserEmail, userRoles, memberships)
+                    return (
+                      <ProjectRow
+                        key={project.id}
+                        project={project}
+                        portfolioName={portfolio?.name || 'Unassigned'}
+                        capacity={capacity}
+                        canEdit={canEditProjects}
+                        onOpen={() => openProject(project)}
+                        onEdit={() => openEditProject(project)}
+                      />
+                    )
+                  })}
+                </tbody>
+              </table>
+              {filteredProjects.length === 0 && (
+                <div className="p-12 text-center text-sm text-[#7a8ea0]">No projects match the selected filters.</div>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
 
       {showPortfolioModal && canCreateItems && (
-        <Modal
-          title="Create Portfolio"
-          onClose={() => setShowPortfolioModal(false)}
-        >
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
-            <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-              Organization
-            </div>
-
-            <div className="text-sm font-semibold text-[#ede8de] mt-1">
-              {workspaceName}
-            </div>
-          </div>
-
-          <input
-            className="form-control mb-4"
-            placeholder="Portfolio name"
-            value={newPortfolioName}
-            onChange={e => setNewPortfolioName(e.target.value)}
-          />
-
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={createPortfolio}
-          >
-            Create Portfolio
-          </button>
+        <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
+          <FieldLabel>Organization</FieldLabel>
+          <div className="hub-readonly-field mb-4">{workspaceName}</div>
+          <FieldLabel>Portfolio name</FieldLabel>
+          <input className="hub-input mb-5" placeholder="e.g. Luxury Projects" value={newPortfolioName} onChange={e => setNewPortfolioName(e.target.value)} />
+          <button className="hub-primary-button w-full justify-center" onClick={createPortfolio}>Create Portfolio</button>
         </Modal>
       )}
 
       {showProjectModal && canCreateItems && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 mb-4">
-            <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
-              Organization
-            </div>
-
-            <div className="text-sm font-semibold text-[#ede8de] mt-1">
-              {workspaceName}
-            </div>
-          </div>
-
-          <select
-            className="form-control mb-4"
-            value={selectedPortfolioId}
-            onChange={e => setSelectedPortfolioId(Number(e.target.value))}
-          >
+          <FieldLabel>Organization</FieldLabel>
+          <div className="hub-readonly-field mb-4">{workspaceName}</div>
+          <FieldLabel>Portfolio</FieldLabel>
+          <select className="hub-input mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(e.target.value ? Number(e.target.value) : '')}>
             <option value="">Select portfolio</option>
-
-            {portfolios
-              .filter(
-                portfolio =>
-                  !selectedOrgId || portfolio.organization_id === selectedOrgId
-              )
-              .map(portfolio => (
-                <option key={portfolio.id} value={portfolio.id}>
-                  {portfolio.name}
-                </option>
-              ))}
+            {portfolios.filter(p => !selectedOrgId || p.organization_id === selectedOrgId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-
-          <input
-            className="form-control mb-4"
-            placeholder="Project name"
-            value={newProjectName}
-            onChange={e => setNewProjectName(e.target.value)}
-          />
-
-          <select
-            className="form-control mb-4"
-            value={newProjectStatus}
-            onChange={e => setNewProjectStatus(e.target.value)}
-          >
-            {PROJECT_STATUSES.map(status => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="form-control mb-4"
-            value={newProjectPhase}
-            onChange={e => setNewProjectPhase(e.target.value)}
-          >
-            {PROJECT_PHASES.map(phase => (
-              <option key={phase} value={phase}>
-                {phase}
-              </option>
-            ))}
-          </select>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4 space-y-3">
-            <div>
-              <div className="text-sm font-semibold text-[#ede8de]">
-                Project Ownership
-              </div>
-
-              <div className="text-xs text-[#6e7d8c] mt-1">
-                Assign owners who will control their project sections.
-              </div>
-            </div>
-
-            <input
-              className="form-control"
-              placeholder="Overall Project Owner Email"
-              value={newOverallOwnerEmail}
-              onChange={e => setNewOverallOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="Housebuild Owner Email"
-              value={newHousebuildOwnerEmail}
-              onChange={e => setNewHousebuildOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="MEP Owner Email"
-              value={newMepOwnerEmail}
-              onChange={e => setNewMepOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="Infrastructure Owner Email"
-              value={newInfrastructureOwnerEmail}
-              onChange={e => setNewInfrastructureOwnerEmail(e.target.value)}
-            />
+          <FieldLabel>Project name</FieldLabel>
+          <input className="hub-input mb-4" placeholder="Project name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Status</FieldLabel><select className="hub-input mb-4" value={newProjectStatus} onChange={e => setNewProjectStatus(e.target.value)}>{PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
+            <div><FieldLabel>Phase</FieldLabel><select className="hub-input mb-4" value={newProjectPhase} onChange={e => setNewProjectPhase(e.target.value)}>{PROJECT_PHASES.map(p => <option key={p}>{p}</option>)}</select></div>
           </div>
-
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={createProject}
-          >
-            Create Project
-          </button>
+          <OwnerFields values={[newOverallOwnerEmail, newHousebuildOwnerEmail, newMepOwnerEmail, newInfrastructureOwnerEmail]} setters={[setNewOverallOwnerEmail, setNewHousebuildOwnerEmail, setNewMepOwnerEmail, setNewInfrastructureOwnerEmail]} />
+          <button className="hub-primary-button mt-5 w-full justify-center" onClick={createProject}>Create Project</button>
         </Modal>
       )}
 
       {showEditProjectModal && editingProject && canEditProjects && (
         <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
-          <input
-            className="form-control mb-4"
-            placeholder="Project name"
-            value={editProjectName}
-            onChange={e => setEditProjectName(e.target.value)}
-          />
-
-          <select
-            className="form-control mb-4"
-            value={editProjectStatus}
-            onChange={e => setEditProjectStatus(e.target.value)}
-          >
-            {PROJECT_STATUSES.map(status => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="form-control mb-4"
-            value={editProjectPhase}
-            onChange={e => setEditProjectPhase(e.target.value)}
-          >
-            {PROJECT_PHASES.map(phase => (
-              <option key={phase} value={phase}>
-                {phase}
-              </option>
-            ))}
-          </select>
-
-          <input
-            className="form-control mb-4"
-            placeholder="Location"
-            value={editProjectLocation}
-            onChange={e => setEditProjectLocation(e.target.value)}
-          />
-
-          <input
-            className="form-control mb-4"
-            type="date"
-            value={editProjectHandoverDate}
-            onChange={e => setEditProjectHandoverDate(e.target.value)}
-          />
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4 space-y-3">
-            <div>
-              <div className="text-sm font-semibold text-[#ede8de]">
-                Project Ownership
-              </div>
-
-              <div className="text-xs text-[#6e7d8c] mt-1">
-                These users can update only their assigned schedule discipline.
-              </div>
-            </div>
-
-            <input
-              className="form-control"
-              placeholder="Overall Project Owner Email"
-              value={editOverallOwnerEmail}
-              onChange={e => setEditOverallOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="Housebuild Owner Email"
-              value={editHousebuildOwnerEmail}
-              onChange={e => setEditHousebuildOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="MEP Owner Email"
-              value={editMepOwnerEmail}
-              onChange={e => setEditMepOwnerEmail(e.target.value)}
-            />
-
-            <input
-              className="form-control"
-              placeholder="Infrastructure Owner Email"
-              value={editInfrastructureOwnerEmail}
-              onChange={e => setEditInfrastructureOwnerEmail(e.target.value)}
-            />
+          <FieldLabel>Project name</FieldLabel>
+          <input className="hub-input mb-4" value={editProjectName} onChange={e => setEditProjectName(e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><FieldLabel>Status</FieldLabel><select className="hub-input mb-4" value={editProjectStatus} onChange={e => setEditProjectStatus(e.target.value)}>{PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
+            <div><FieldLabel>Phase</FieldLabel><select className="hub-input mb-4" value={editProjectPhase} onChange={e => setEditProjectPhase(e.target.value)}>{PROJECT_PHASES.map(p => <option key={p}>{p}</option>)}</select></div>
           </div>
-
-          <button
-            className="btn-gold btn w-full justify-center"
-            onClick={updateProject}
-          >
-            Save Project Changes
-          </button>
+          <FieldLabel>Location</FieldLabel>
+          <input className="hub-input mb-4" value={editProjectLocation} onChange={e => setEditProjectLocation(e.target.value)} />
+          <FieldLabel>Target handover date</FieldLabel>
+          <input className="hub-input mb-4" type="date" value={editProjectHandoverDate} onChange={e => setEditProjectHandoverDate(e.target.value)} />
+          <OwnerFields values={[editOverallOwnerEmail, editHousebuildOwnerEmail, editMepOwnerEmail, editInfrastructureOwnerEmail]} setters={[setEditOverallOwnerEmail, setEditHousebuildOwnerEmail, setEditMepOwnerEmail, setEditInfrastructureOwnerEmail]} />
+          <button className="hub-primary-button mt-5 w-full justify-center" onClick={updateProject}>Save Project Changes</button>
         </Modal>
       )}
     </div>
   )
 }
 
-function MetricCard({ title, value, icon: Icon }: any) {
+function MiniMetric({ label, value, accent = false }: any) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.04] p-4 sm:p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-2xl sm:text-3xl font-black text-white">
-            {value}
-          </div>
+    <div className={`rounded-2xl border p-4 ${accent ? 'border-[#f2c4b5] bg-[#fff4ef]' : 'border-[#d6e3ec] bg-white'}`}>
+      <div className={`text-2xl font-black ${accent ? 'text-[#d85f38]' : 'text-[#173b5c]'}`}>{value}</div>
+      <div className="mt-1 text-xs font-medium text-[#718699]">{label}</div>
+    </div>
+  )
+}
 
-          <div className="text-xs text-slate-500 mt-1">{title}</div>
+function FocusItem({ icon: Icon, value, label, urgent = false }: any) {
+  return (
+    <div className={`flex items-center gap-4 rounded-2xl border p-4 ${urgent ? 'border-[#f3c6b8] bg-[#fff5f1]' : 'border-[#dce6ee] bg-[#f8fbfd]'}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${urgent ? 'bg-[#ffe5dc] text-[#d85f38]' : 'bg-[#e5f0f6] text-[#285f82]'}`}><Icon size={19} /></div>
+      <div><div className="text-xl font-black text-[#183c5c]">{value}</div><div className="text-xs leading-5 text-[#718699]">{label}</div></div>
+    </div>
+  )
+}
+
+function PermissionLine({ icon: Icon, title, text }: any) {
+  return (
+    <div className="flex gap-3">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#e9f3f8] text-[#285f82]"><Icon size={16} /></div>
+      <div><div className="text-sm font-bold text-[#244863]">{title}</div><div className="mt-0.5 text-xs leading-5 text-[#778b9c]">{text}</div></div>
+    </div>
+  )
+}
+
+function PortfolioMetric({ label, value, attention = false }: any) {
+  return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d85f38]' : 'text-[#234967]'}`}>{value}</div><div className="text-[11px] text-[#8193a2]">{label}</div></div>
+}
+
+function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit }: any) {
+  const status = project.status || 'Not set'
+  const isAttention = ['Delayed', 'On Hold'].includes(status)
+  const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : status === 'Completed' ? 'Complete' : 'Healthy'
+
+  return (
+    <tr className="border-t border-[#e5ecf2] bg-white transition hover:bg-[#f8fbfd]">
+      <td className="px-6 py-4">
+        <button onClick={onOpen} className="text-left">
+          <div className="font-bold text-[#173b5c] hover:text-[#e86e48]">{project.project_name}</div>
+          <div className="mt-1 text-xs text-[#8193a2]">{project.location || 'No location set'}</div>
+        </button>
+      </td>
+      <td className="px-5 py-4 text-sm text-[#587084]">{portfolioName}</td>
+      <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${isAttention ? 'border-[#f0c3b4] bg-[#fff2ed] text-[#cc5b37]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${isAttention ? 'bg-[#e56d47]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
+      <td className="px-5 py-4"><span className="rounded-full bg-[#eaf3f8] px-2.5 py-1 text-xs font-semibold text-[#2b6080]">{capacity}</span></td>
+      <td className="px-5 py-4 text-sm text-[#587084]">{project.phase || 'Not set'}</td>
+      <td className="px-5 py-4 text-sm text-[#587084]">{formatDate(project.handover_date)}</td>
+      <td className="px-5 py-4">
+        <div className="flex items-center justify-end gap-2">
+          {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
+          <button onClick={onOpen} className="hub-secondary-button py-2">Open <ArrowRight size={14} /></button>
         </div>
+      </td>
+    </tr>
+  )
+}
 
-        <Icon size={20} className="text-[#c49e48]" />
+function OwnerFields({ values, setters }: any) {
+  const labels = ['Overall Project Owner', 'Housebuild Owner', 'MEP Owner', 'Infrastructure Owner']
+  return (
+    <div className="rounded-2xl border border-[#dce6ee] bg-[#f8fbfd] p-4">
+      <div className="mb-3 text-sm font-bold text-[#244863]">Project ownership</div>
+      <div className="space-y-3">
+        {labels.map((label, index) => (
+          <div key={label}><FieldLabel>{label}</FieldLabel><input className="hub-input" type="email" placeholder={`${label} email`} value={values[index]} onChange={e => setters[index](e.target.value)} /></div>
+        ))}
       </div>
     </div>
   )
 }
 
-function ProjectCard({ project, onClick, onEdit, canEdit }: any) {
-  const status = project.status || 'Not set'
-  const phase = project.phase || 'Not set'
-
-  const statusStyles: Record<string, string> = {
-    Planning: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    Active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    'On Hold': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    Inactive: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-    Delayed: 'bg-red-500/10 text-red-400 border-red-500/20',
-    Completed: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    Cancelled: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-  }
-
-  const phaseBadgeStyles: Record<string, string> = {
-    Concept: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-    Design: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    Procurement: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-    Mobilization: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    Execution: 'bg-lime-500/10 text-lime-400 border-lime-500/20',
-    Finishing: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    'Testing & Commissioning':
-      'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-    Handover: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-    'Defects Liability':
-      'bg-stone-500/10 text-stone-400 border-stone-500/20',
-    'Closed Out': 'bg-gray-500/10 text-gray-400 border-gray-500/20',
-  }
-
-  const stripColors: Record<string, string> = {
-    Planning: 'bg-blue-500',
-    Active: 'bg-emerald-500',
-    'On Hold': 'bg-amber-500',
-    Inactive: 'bg-slate-500',
-    Delayed: 'bg-red-500',
-    Completed: 'bg-purple-500',
-    Cancelled: 'bg-rose-500',
-  }
-
-  return (
-    <div
-      onClick={onClick}
-      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111820] p-4 sm:p-5 cursor-pointer hover:border-[#c49e48]/40 hover:bg-[#141d26] transition-all duration-200"
-    >
-      <div
-        className={`absolute left-0 top-0 h-full w-1 ${
-          stripColors[status] || 'bg-slate-500'
-        }`}
-      />
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 pl-2">
-          <div className="font-semibold text-white truncate">
-            {project.project_name}
-          </div>
-
-          <div className="text-xs text-slate-500 mt-1 truncate">
-            {project.location || 'No location set'}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <button
-              onClick={event => {
-                event.stopPropagation()
-                onEdit()
-              }}
-              className="text-slate-500 hover:text-[#c49e48] transition"
-            >
-              <Pencil size={15} />
-            </button>
-          )}
-
-          <ArrowRight
-            size={16}
-            className="text-slate-500 group-hover:text-[#c49e48] transition flex-shrink-0"
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pl-2">
-        <div className="flex flex-wrap gap-2">
-          <span
-            className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
-              phaseBadgeStyles[phase] ||
-              'bg-white/5 text-slate-400 border-white/10'
-            }`}
-          >
-            Phase: {phase}
-          </span>
-
-          <span
-            className={`text-xs rounded-full border px-2 py-1 flex-shrink-0 ${
-              statusStyles[status] ||
-              'bg-white/5 text-slate-400 border-white/10'
-            }`}
-          >
-            Status: {status}
-          </span>
-        </div>
-
-        <span className="text-xs text-slate-500 truncate">
-          Target: {project.handover_date || 'Not set'}
-        </span>
-      </div>
-    </div>
-  )
+function FieldLabel({ children }: any) {
+  return <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#718699]">{children}</label>
 }
 
 function EmptyHub({ title, message, action }: any) {
   return (
-    <div className="card p-10 text-center">
-      <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-        <Building2 size={24} className="text-[#c49e48]" />
-      </div>
-
-      <div className="text-xl font-bold text-white">{title}</div>
-
-      <div className="text-sm text-slate-500 mt-2">{message}</div>
-
-      <button onClick={action} className="btn-gold btn mt-5">
-        Back to Login
-      </button>
+    <div className="p-12 text-center">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e8f2f8] text-[#285f82]"><Building2 size={24} /></div>
+      <div className="mt-4 text-xl font-bold text-[#173b5c]">{title}</div>
+      <div className="mt-2 text-sm text-[#718699]">{message}</div>
+      <button onClick={action} className="hub-primary-button mt-5">Back to Login</button>
     </div>
   )
 }
 
 function Modal({ title, children, onClose }: any) {
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="card w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-white">{title}</h2>
-
-          <button onClick={onClose} className="text-slate-500 hover:text-white">
-            ✕
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17324d]/45 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] border border-[#dbe5ed] bg-white p-6 shadow-[0_30px_90px_rgba(18,50,76,0.25)]">
+        <div className="mb-6 flex items-center justify-between">
+          <div><div className="hub-eyebrow">Workspace setup</div><h2 className="mt-1 text-xl font-black text-[#173b5c]">{title}</h2></div>
+          <button onClick={onClose} className="hub-icon-button"><X size={18} /></button>
         </div>
-
         {children}
       </div>
     </div>
   )
+}
+
+function resolveProjectCapacity(project: any, email: string, roles: string[], memberships: any[]) {
+  const clean = (value: unknown) => String(value || '').toLowerCase().trim()
+  if (email && clean(project.overall_owner_email) === email) return 'Project Owner'
+  if (email && clean(project.housebuild_owner_email) === email) return 'Housebuild Owner'
+  if (email && clean(project.mep_owner_email) === email) return 'MEP Owner'
+  if (email && clean(project.infrastructure_owner_email) === email) return 'Infrastructure Owner'
+
+  const projectMembership = memberships.find(m => {
+    const ids = [m.project_id, ...(m.project_ids || [])].filter(Boolean)
+    return m.access_scope === 'project' && ids.includes(project.id)
+  })
+  if (projectMembership?.role) return INTERNAL_ROLE_LABELS[clean(projectMembership.role)] || String(projectMembership.role)
+
+  const priority = ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'design', 'costing', 'hse_manager', 'hse_lead', 'hse', 'housebuild', 'infrastructure', 'mep', 'viewer', 'guest']
+  const role = priority.find(item => roles.includes(item))
+  return INTERNAL_ROLE_LABELS[role || 'viewer'] || 'Viewer'
+}
+
+function primaryRoleLabel(roles: string[]) {
+  const priority = ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'design', 'costing', 'hse_manager', 'hse_lead', 'hse', 'housebuild', 'infrastructure', 'mep', 'viewer', 'guest']
+  const role = priority.find(item => roles.includes(item)) || roles[0] || 'viewer'
+  return INTERNAL_ROLE_LABELS[role] || capitalize(role.split('_').join(' '))
+}
+
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value
+}
+
+function formatDate(value: string | null) {
+  if (!value) return 'Not set'
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
