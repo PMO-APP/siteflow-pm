@@ -152,7 +152,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
   const hasNumber = /[0-9]/.test(newPassword)
 
   return (
-    <div className="min-h-dvh bg-[#0c1014] text-white">
+    <div className="min-h-dvh bg-[#f4f7fb] text-[#102a43]">
       <div className="mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <button
@@ -178,38 +178,38 @@ const projectIds = useMembershipStore(state => state.projectIds)
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#c49e48]/10 blur-3xl" />
+        <div className="relative overflow-hidden rounded-[2rem] border border-[#f26b38]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
+          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-[#f26b38]/10 blur-3xl" />
 
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-5">
-              <div className="h-20 w-20 rounded-3xl bg-[#c49e48]/20 border border-[#c49e48]/30 flex items-center justify-center text-2xl font-black text-[#c49e48]">
+              <div className="h-20 w-20 rounded-3xl bg-[#f26b38]/15 border border-[#f26b38]/30 flex items-center justify-center text-2xl font-black text-[#f26b38]">
                 {getInitials(displayName)}
               </div>
 
               <div>
-                <div className="inline-flex mb-2 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-                  PMOCorex Account
+                <div className="inline-flex mb-2 px-3 py-1 rounded-full border border-[#f26b38]/30 bg-[#f26b38]/10 text-[#f26b38] text-xs">
+                  My PMOCorex Account
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
+                <h1 className="text-3xl sm:text-4xl font-black text-[#102a43]">
                   {displayName}
                 </h1>
 
-                <p className="text-sm text-[#6e7d8c] mt-1">{displayEmail}</p>
+                <p className="text-sm text-[#64748b] mt-1">{displayEmail}</p>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 min-w-[220px]">
-              <div className="text-xs uppercase tracking-wider text-[#6e7d8c]">
+            <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4 min-w-[220px]">
+              <div className="text-xs uppercase tracking-wider text-[#64748b]">
                 Current Role
               </div>
 
-              <div className="text-lg font-bold text-[#c49e48] mt-1">
+              <div className="text-lg font-bold text-[#f26b38] mt-1">
                 {displayRole}
               </div>
 
-              <div className="text-xs text-[#6e7d8c] mt-1">
+              <div className="text-xs text-[#64748b] mt-1">
                 Access scope: {accessScope || '—'}
               </div>
             </div>
@@ -220,14 +220,14 @@ const projectIds = useMembershipStore(state => state.projectIds)
           <div className="xl:col-span-2 space-y-5">
             <section className="card p-6">
               <div className="flex items-center gap-2 mb-5">
-                <User size={18} className="text-[#c49e48]" />
+                <User size={18} className="text-[#f26b38]" />
 
                 <div>
-                  <h2 className="text-lg font-bold text-[#ede8de]">
+                  <h2 className="text-lg font-bold text-[#102a43]">
                     Account Details
                   </h2>
 
-                  <p className="text-xs text-[#6e7d8c]">
+                  <p className="text-xs text-[#64748b]">
                     Your personal login and account information.
                   </p>
                 </div>
@@ -249,14 +249,14 @@ const projectIds = useMembershipStore(state => state.projectIds)
 
             <section className="card p-6">
               <div className="flex items-center gap-2 mb-5">
-                <Lock size={18} className="text-[#c49e48]" />
+                <Lock size={18} className="text-[#f26b38]" />
 
                 <div>
-                  <h2 className="text-lg font-bold text-[#ede8de]">
+                  <h2 className="text-lg font-bold text-[#102a43]">
                     Security
                   </h2>
 
-                  <p className="text-xs text-[#6e7d8c]">
+                  <p className="text-xs text-[#64748b]">
                     Change your password.
                   </p>
                 </div>
@@ -290,7 +290,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(current => !current)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#102a43]"
                     >
                       {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -320,7 +320,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
                       onClick={() =>
                         setShowConfirmPassword(current => !current)
                       }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6e7d8c] hover:text-[#ede8de]"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#102a43]"
                     >
                       {showConfirmPassword ? (
                         <EyeOff size={16} />
@@ -345,14 +345,14 @@ const projectIds = useMembershipStore(state => state.projectIds)
           <div className="space-y-5">
             <section className="card p-6">
               <div className="flex items-center gap-2 mb-5">
-                <Palette size={18} className="text-[#c49e48]" />
+                <Palette size={18} className="text-[#f26b38]" />
 
                 <div>
-                  <h2 className="text-lg font-bold text-[#ede8de]">
+                  <h2 className="text-lg font-bold text-[#102a43]">
                     Appearance
                   </h2>
 
-                  <p className="text-xs text-[#6e7d8c]">
+                  <p className="text-xs text-[#64748b]">
                     Choose your preferred display theme.
                   </p>
                 </div>
@@ -388,7 +388,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
                     Account Session
                   </h2>
 
-                  <p className="text-xs text-[#6e7d8c] mt-1">
+                  <p className="text-xs text-[#64748b] mt-1">
                     Sign out of your account.
                   </p>
                 </div>
@@ -404,7 +404,7 @@ const projectIds = useMembershipStore(state => state.projectIds)
             </section>
 
             <section className="card p-6">
-              <h2 className="text-lg font-bold text-[#ede8de]">
+              <h2 className="text-lg font-bold text-[#102a43]">
                 Quick Actions
               </h2>
 
@@ -445,13 +445,13 @@ function InfoCard({
   value: string
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#6e7d8c]">
-        <Icon size={14} className="text-[#c49e48]" />
+    <div className="rounded-2xl border border-[#dbe5ef] bg-white p-4">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-[#64748b]">
+        <Icon size={14} className="text-[#f26b38]" />
         {label}
       </div>
 
-      <div className="text-sm text-[#ede8de] mt-2 break-all">
+      <div className="text-sm text-[#102a43] mt-2 break-all">
         {value}
       </div>
     </div>
@@ -468,7 +468,7 @@ function Requirement({
   return (
     <div
       className={`flex items-center gap-2 ${
-        passed ? 'text-emerald-400' : 'text-[#6e7d8c]'
+        passed ? 'text-emerald-400' : 'text-[#64748b]'
       }`}
     >
       <span>{passed ? '✓' : '•'}</span>
