@@ -8,6 +8,7 @@ import { useThemeStore } from '@/store/theme'
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 
+import LandingPage from '@/pages/LandingPage'
 import ComingSoonPage from '@/pages/ComingSoonPage'
 import LoginPage from '@/pages/LoginPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
@@ -247,11 +248,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<ComingSoonPage />} />
+        <Route path="/" element={<LandingPage />} />
 
-        <Route path="/pricing" element={<Navigate to="/" replace />} />
-        <Route path="/login" element={<Navigate to="/" replace />} />
-        <Route path="/signin" element={<Navigate to="/" replace />} />
+        <Route path="/pricing" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signin" element={<LoginPage />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
 
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
