@@ -965,3 +965,53 @@ html.light .modal {
   border-color: #e3e8ef !important;
   box-shadow: none !important;
 }
+
+@layer components {
+  .hub-panel {
+    @apply rounded-[24px] border border-[#dbe5ee] bg-white;
+    box-shadow: 0 12px 38px rgba(31, 70, 104, 0.07);
+  }
+
+  .hub-eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.16em] text-[#e86e48];
+  }
+
+  .hub-primary-button {
+    @apply inline-flex items-center gap-2 rounded-xl bg-[#f47c55] px-4 py-2.5 text-sm font-bold text-white transition;
+    box-shadow: 0 10px 24px rgba(244, 124, 85, 0.22);
+  }
+
+  .hub-primary-button:hover {
+    @apply bg-[#e86e48];
+    transform: translateY(-1px);
+  }
+
+  .hub-secondary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#cfdae4] bg-white px-3.5 py-2.5 text-sm font-bold text-[#315773] transition;
+  }
+
+  .hub-secondary-button:hover {
+    @apply border-[#aebfcd] bg-[#f5f9fb] text-[#e86e48];
+  }
+
+  .hub-icon-button {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#d5e0e8] bg-white text-[#486a83] transition;
+  }
+
+  .hub-icon-button:hover {
+    @apply border-[#f0b29e] bg-[#fff6f2] text-[#e86e48];
+  }
+
+  .hub-input {
+    @apply w-full rounded-xl border border-[#d5e1e9] bg-white px-3 py-2.5 text-sm text-[#173b5c] outline-none transition placeholder:text-[#9aacba];
+  }
+
+  .hub-input:focus {
+    @apply border-[#6d9ab7];
+    box-shadow: 0 0 0 3px rgba(72, 126, 160, 0.1);
+  }
+
+  .hub-readonly-field {
+    @apply rounded-xl border border-[#dce6ee] bg-[#f5f8fa] px-3 py-2.5 text-sm font-semibold text-[#45647b];
+  }
+}
