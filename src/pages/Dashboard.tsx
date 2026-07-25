@@ -822,395 +822,133 @@ export default function Dashboard() {
     },
   ]
 
+  const projectHealth = Math.max(
+    20,
+    Math.min(
+      96,
+      Math.round(
+        (handoverConfidence ?? 60) * 0.45 +
+          progressPct * 0.25 +
+          Math.max(0, 100 - overdue * 6) * 0.15 +
+          Math.max(0, 100 - highRisks * 10) * 0.15
+      )
+    )
+  )
+
+  const healthLabel =
+    projectHealth >= 80 ? 'Healthy' : projectHealth >= 60 ? 'Watch' : 'Critical'
+
+  const healthTone =
+    projectHealth >= 80
+      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+      : projectHealth >= 60
+      ? 'text-amber-700 bg-amber-50 border-amber-200'
+      : 'text-red-700 bg-red-50 border-red-200'
+
+  const executiveBrief =
+    overdue > 0 || procRisks > 0 || overdueApprovals > 0
+      ? `${projectName || project?.name || 'This project'} remains recoverable, but ${[
+          overdue > 0 ? `${overdue} overdue programme task${overdue === 1 ? '' : 's'}` : '',
+          procRisks > 0 ? `${procRisks} procurement exposure${procRisks === 1 ? '' : 's'}` : '',
+          overdueApprovals > 0 ? `${overdueApprovals} overdue approval${overdueApprovals === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' and ')} require attention. Current handover confidence is ${handoverConfidence ?? 'not yet available'}%.`
+      : `${projectName || project?.name || 'This project'} is progressing without a critical live exception. Current handover confidence is ${handoverConfidence ?? 'not yet available'}% and delivery remains ${varianceStatus.toLowerCase()}.`
+
+  const priorities = [
+    ...alerts.map(alert => ({
+      title: alert.msg,
+      level: alert.level,
+      route: alert.action,
+      meta: alert.level === 'red' ? 'Immediate attention' : 'Review this week',
+    })),
+    ...deadlines.slice(0, 4).map(item => ({
+      title: item.name,
+      level: item.days <= 3 ? ('red' as const) : ('amber' as const),
+      route: item.type === 'Approval' ? route('/approvals') : route('/schedule'),
+      meta: `${item.type} · ${item.days === 0 ? 'Due today' : `${item.days} days`}`,
+    })),
+  ].slice(0, 5)
+
+  const healthAreas = [
+    { label: 'Schedule', score: variancePct === null ? 60 : clamp(82 + variancePct * 2), detail: varianceStatus },
+    { label: 'Procurement', score: clamp(92 - procRisks * 12), detail: procRisks ? `${procRisks} exposed` : 'Clear' },
+    { label: 'Approvals', score: clamp(94 - overdueApprovals * 16 - pendingApprovals * 2), detail: `${pendingApprovals} pending` },
+    { label: 'Quality', score: clamp(94 - criticalSnags * 18 - openSnags * 2), detail: `${openSnags} open snags` },
+    { label: 'Risk', score: clamp(92 - highRisks * 15 - openRisks * 2), detail: `${highRisks} high` },
+    { label: 'Commercial', score: clamp(90 - Math.max(0, costOverrunPct) * 3), detail: `${costOverrunPct >= 0 ? '+' : ''}${costOverrunPct.toFixed(1)}% forecast` },
+  ]
+
   return (
-    <div className="space-y-6">
-      <div className="dashboard-hero relative rounded-xl p-5 overflow-hidden">
-        <div className="absolute inset-0 bg-transparent" />
-
-        <div className="relative flex flex-col lg:flex-row lg:items-center gap-8">
-          <div>
-            <div
-              className={`font-display text-7xl font-black leading-none ${
-                daysLeft !== null && daysLeft < 60
-                  ? 'text-red-400'
-                  : 'text-[#3b82f6]'
-              }`}
-            >
-              {daysLeft ?? '-'}
+    <div className="min-w-0 space-y-6 pb-10 text-slate-900">
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-[#f8f7f3] px-5 py-6 sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.28]" style={{ backgroundImage: 'linear-gradient(rgba(30,64,175,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(30,64,175,.08) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+        <div className="relative grid gap-8 xl:grid-cols-[minmax(0,1fr)_310px] xl:items-end">
+          <div className="min-w-0">
+            <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+              <span>Project Control Room</span><span className="h-1 w-1 rounded-full bg-blue-300"/><span>{project?.phase || 'Delivery phase'}</span>
             </div>
-
-            <div className="text-[10px] font-mono uppercase tracking-widest text-[#6e7d8c] mt-1">
-              Days Remaining
+            <h1 className="max-w-4xl text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl">{projectName || project?.name || 'Selected Project'}</h1>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-slate-600">{executiveBrief}</p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button onClick={() => navigate(route('/schedule'))} className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800">Open schedule</button>
+              <button onClick={() => navigate(route('/recovery-forecast'))} className="rounded-xl border border-slate-300 bg-white/80 px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white">View recovery forecast</button>
             </div>
           </div>
-
-          <div className="flex-1">
-            <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
-              {projectName || project?.name || 'Selected Project'}
+          <div className="rounded-2xl border border-white/80 bg-white/85 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div><div className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Project health</div><div className="mt-2 text-5xl font-semibold tracking-[-0.06em] text-slate-950">{projectHealth}<span className="text-xl text-slate-400">%</span></div></div>
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${healthTone}`}>{healthLabel}</span>
             </div>
-
-            <div className="text-[10px] text-[#6e7d8c] uppercase tracking-widest mb-1">
-              Formal Handover Target
-            </div>
-
-            <div className="font-display text-xl font-semibold text-[#ede8de]">
-              {targetDate
-                ? targetDate.toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric',
-                  })
-                : 'No handover date set'}
-            </div>
-
-            {handoverSource && (
-              <div className="text-[10px] text-[#6e7d8c] mt-1">
-                Source: {handoverSource}
-              </div>
-            )}
-
-            <div className="mt-3 h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-blue-500"
-                style={{ width: `${timelinePct}%` }}
-              />
-            </div>
-
-            <div className="text-[10px] text-[#6e7d8c] mt-1">
-              {timelinePct}% of timeline elapsed
-            </div>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-700" style={{ width: `${projectHealth}%` }}/></div>
+            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm"><div><div className="text-slate-500">Handover</div><div className="mt-1 font-semibold text-slate-900">{targetDate ? targetDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Not set'}</div></div><div><div className="text-slate-500">Confidence</div><div className="mt-1 font-semibold text-slate-900">{handoverConfidence ?? '—'}%</div></div></div>
           </div>
         </div>
+      </section>
+
+      <section className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-4 xl:grid-cols-8">
+        {[
+          ['Progress', `${progressPct}%`], ['Variance', variancePct === null ? '—' : `${variancePct > 0 ? '+' : ''}${variancePct}%`], ['Days left', daysLeft ?? '—'], ['Overdue', overdue], ['Approvals', pendingApprovals], ['Procurement', procRisks], ['Risks', openRisks], ['Snags', openSnags],
+        ].map(([label,value],index)=><button key={String(label)} onClick={()=>navigate(index<4?route('/schedule'):index===4?route('/approvals'):index===5?route('/procurement'):index===6?route('/risk'):route('/snags'))} className="min-w-0 border-b border-r border-slate-200 p-4 text-left transition hover:bg-slate-50 sm:p-5"><div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div><div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{value}</div></button>)}
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.75fr)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <div className="flex items-end justify-between gap-4"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Action queue</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Today’s priorities</h2></div><span className="text-sm text-slate-500">{priorities.length} requiring attention</span></div>
+          <div className="mt-5 divide-y divide-slate-100">
+            {priorities.length ? priorities.map((item,index)=><button key={`${item.title}-${index}`} onClick={()=>navigate(item.route)} className="group flex w-full items-center gap-4 py-4 text-left"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.level==='red'?'bg-red-500':'bg-amber-500'}`}/><div className="min-w-0 flex-1"><div className="font-medium text-slate-900 group-hover:text-blue-700">{item.title}</div><div className="mt-1 text-sm text-slate-500">{item.meta}</div></div><span className="text-sm font-semibold text-blue-700">Open</span></button>) : <div className="rounded-xl bg-emerald-50 p-5 text-sm text-emerald-800">No critical priority is currently open.</div>}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-blue-200 bg-blue-950 p-6 text-white">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">Project intelligence</div>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.035em]">{handoverConfidence && handoverConfidence >= 75 ? 'Delivery remains achievable.' : 'Recovery action is required.'}</h2>
+          <p className="mt-4 text-sm leading-6 text-blue-100">{overdue > 0 ? `The primary schedule pressure is ${activeDelayedTask?.name || `${overdue} overdue activities`}.` : 'No overdue activity is currently driving the forecast.'} {procRisks > 0 ? `Resolve ${procRisks} procurement exposure${procRisks===1?'':'s'} to protect available float.` : 'Procurement is not currently reducing available float.'}</p>
+          <div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-blue-200">Recovery confidence</div><div className="mt-1 text-3xl font-semibold">{handoverConfidence ?? '—'}%</div></div><div className="rounded-xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-blue-200">Schedule position</div><div className="mt-1 text-xl font-semibold">{varianceStatus}</div></div></div>
+        </section>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-        {kpiCards.map((k: any) => {
-          const Icon = k.icon
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,.75fr)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Delivery</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Phase progress</h2></div><button onClick={()=>navigate(route('/schedule'))} className="text-sm font-semibold text-blue-700">Full schedule</button></div>
+          <div className="mt-6 space-y-5">{phaseData.length ? phaseData.slice(0,7).map(phase=><div key={phase.name}><div className="mb-2 flex items-center justify-between gap-4 text-sm"><span className="font-medium text-slate-800">{phase.name}</span><span className="font-semibold text-slate-950">{phase.pct}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-700" style={{width:`${phase.pct}%`}}/></div></div>) : <div className="text-sm text-slate-500">No phase data available.</div>}</div>
+        </section>
 
-          return (
-            <div
-              key={k.label}
-              className="stat-card cursor-pointer hover:border-white/[0.12] transition-colors group"
-              onClick={() => navigate(k.link)}
-            >
-              <div
-                className={`absolute left-0 top-0 h-full w-[3px] ${
-                  k.color === 'c-red'
-                    ? 'bg-red-500'
-                    : k.color === 'c-amr'
-                    ? 'bg-amber-500'
-                    : k.color === 'c-grn'
-                    ? 'bg-emerald-500'
-                    : k.color === 'c-blue'
-                    ? 'bg-blue-500'
-                    : 'bg-transparent'
-                }`}
-              />
-
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="stat-number text-3xl">{k.value}</div>
-                  <div className="stat-label">{k.label}</div>
-                  <div className="stat-sub">{k.sub}</div>
-                </div>
-
-                <Icon
-                  size={16}
-                  className="text-[#6e7d8c] group-hover:text-slate-200 transition-colors mt-1"
-                />
-              </div>
-            </div>
-          )
-        })}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Project health matrix</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Control areas</h2>
+          <div className="mt-5 divide-y divide-slate-100">{healthAreas.map(area=>{const tone=area.score>=80?'bg-emerald-500':area.score>=60?'bg-amber-500':'bg-red-500';return <div key={area.label} className="flex items-center gap-4 py-3.5"><span className={`h-2.5 w-2.5 rounded-full ${tone}`}/><div className="min-w-0 flex-1"><div className="font-medium text-slate-900">{area.label}</div><div className="text-sm text-slate-500">{area.detail}</div></div><div className="text-sm font-semibold text-slate-900">{Math.round(area.score)}%</div></div>})}</div>
+        </section>
       </div>
 
-      <div className="grid xl:grid-cols-2 gap-5">
-        <DeliveryPulse
-          progress={progressPct}
-          variance={variancePct}
-          openRisks={openRisks}
-          overdueTasks={overdue}
-        />
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Commercial pulse</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Financial snapshot</h2></div><button onClick={()=>navigate(route('/costing'))} className="text-sm font-semibold text-blue-700">Open commercial register</button></div>
+        <div className="mt-6 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-5">{[
+          ['Contract value',formatCurrency(contractSum)],['Approved variations',formatCurrency(variationsTotal)],['Paid to date',formatCurrency(paidTotal)],['Pending payments',formatCurrency(pendingPayments)],['Final forecast',formatCurrency(projectedFinalContractSum)]
+        ].map(([label,value])=><div key={label} className="bg-white p-5"><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-2 truncate text-xl font-semibold tracking-[-0.03em] text-slate-950">{value}</div></div>)}</div>
+      </section>
 
-        <AIInsights
-          overdueTasks={overdue}
-          procurementRisks={procRisks}
-          highRisks={highRisks}
-          variance={variancePct ?? 0}
-          handoverConfidence={handoverConfidence ?? 0}
-        />
-      </div>
-
-      <ExecutiveSummary
-        projectName={projectName}
-        progress={progressPct}
-        variance={variancePct}
-        overdueTasks={overdue}
-        openRisks={openRisks}
-        highRisks={highRisks}
-        pendingApprovals={pendingApprovals}
-        procurementRisks={procRisks}
-      />
-
-      {alerts.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="card-head">
-            <div className="card-title">Live Alerts</div>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {alerts.slice(0, 8).map(alert => (
-              <button
-                key={alert.msg}
-                onClick={() => navigate(alert.action)}
-                className="w-full flex items-center justify-between gap-4 text-left rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 hover:border-white/[0.12]"
-              >
-                <div className="flex items-center gap-3">
-                  <AlertTriangle
-                    size={16}
-                    className={
-                      alert.level === 'red'
-                        ? 'text-red-400'
-                        : 'text-amber-400'
-                    }
-                  />
-                  <span className="text-sm text-[#ede8de]">{alert.msg}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Contract Sum</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(contractSum)}
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Approved Variations</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(variationsTotal)}
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Paid To Date</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(paidTotal)}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-1">
-            {Math.round(paidPct)}% of forecast
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Final Forecast</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(projectedFinalContractSum)}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-1">
-            {costOverrunPct >= 0 ? '+' : ''}
-            {costOverrunPct.toFixed(1)}% vs contract
-          </div>
-        </div>
-      </div>
-
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Outstanding Balance</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(finalAccountForecast)}
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Pending Payments</div>
-          <div className="text-2xl font-bold text-[#ede8de]">
-            {formatCurrency(pendingPayments)}
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Latest Cost Report</div>
-          <div className="text-lg font-bold text-[#ede8de]">
-            {latestCostReport ? fdate(latestCostReport.report_week) : 'No report'}
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="text-xs text-slate-500">Latest Design Report</div>
-          <div className="text-lg font-bold text-[#ede8de]">
-            {latestDesignReport ? fdate(latestDesignReport.report_week) : 'No report'}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid xl:grid-cols-2 gap-5">
-        <div className="card overflow-hidden">
-          <div className="card-head">
-            <div className="card-title">Current Activities</div>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {tasks.filter(t => getTaskStatus(t) === 'In Progress').length === 0 ? (
-              <div className="text-sm text-slate-500">
-                No current activities in progress.
-              </div>
-            ) : (
-              tasks
-                .filter(t => getTaskStatus(t) === 'In Progress')
-                .slice(0, 8)
-                .map(task => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between gap-4 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[#ede8de] font-medium truncate">
-                        {task.name}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        {task.phase || task.discipline || 'No phase'}
-                      </div>
-                    </div>
-
-                    <div className="text-blue-400 font-semibold">
-                      {getTaskProgress(task)}%
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-
-        <div className="card overflow-hidden">
-          <div className="card-head">
-            <div className="card-title">Upcoming Deadlines</div>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {deadlines.length === 0 ? (
-              <div className="text-sm text-slate-500">
-                No deadlines due within the next 21 days.
-              </div>
-            ) : (
-              deadlines.slice(0, 10).map(item => (
-                <div
-                  key={`${item.name}-${item.date}-${item.type}`}
-                  className="flex items-center justify-between gap-4 text-sm"
-                >
-                  <div className="min-w-0">
-                    <div className="text-[#ede8de] font-medium truncate">
-                      {item.name}
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      {item.type} • {fdate(item.date)}
-                    </div>
-                  </div>
-
-                  <span className={urgencyColor(item.days)}>
-                    {item.days}d
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid xl:grid-cols-3 gap-5">
-        <div className="card xl:col-span-2 overflow-hidden">
-          <div className="card-head">
-            <div className="card-title">Phase Progress</div>
-          </div>
-
-          <div className="p-4 space-y-4">
-            {phaseData.length === 0 ? (
-              <div className="text-sm text-slate-500">
-                No phase data available.
-              </div>
-            ) : (
-              phaseData.map(phase => (
-                <div key={phase.name}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-[#ede8de]">{phase.name}</span>
-                    <span className="text-[#ede8de]">{phase.pct}%</span>
-                  </div>
-
-                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${phase.pct}%`,
-                        background: phase.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="card overflow-hidden">
-          <div className="card-head">
-            <div className="card-title">Task Status Breakdown</div>
-          </div>
-
-          <div className="p-4">
-            {statusPie.length === 0 ? (
-              <div className="h-[260px] flex items-center justify-center text-sm text-slate-500">
-                No task status data available.
-              </div>
-            ) : (
-              <>
-                <div className="h-[220px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={statusPie}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                      >
-                        {statusPie.map((entry, index) => (
-                          <Cell key={index} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-2 mt-3">
-                  {statusPie.map(item => (
-                    <div
-                      key={item.name}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ background: item.color }}
-                        />
-                        <span className="text-slate-400">{item.name}</span>
-                      </div>
-
-                      <span className="text-[#ede8de] font-semibold">
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Now</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Current activities</h2></div><span className="text-sm text-slate-500">{inProg} active</span></div><div className="mt-5 divide-y divide-slate-100">{tasks.filter(t=>getTaskStatus(t)==='In Progress').slice(0,7).map(task=><div key={task.id} className="flex items-center gap-4 py-3.5"><div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{task.name}</div><div className="mt-1 text-sm text-slate-500">{task.phase || task.discipline || 'Unassigned phase'}</div></div><span className="font-semibold text-blue-700">{getTaskProgress(task)}%</span></div>)}{inProg===0&&<div className="py-5 text-sm text-slate-500">No activities are currently marked in progress.</div>}</div></section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Next</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Upcoming deadlines</h2></div><span className="text-sm text-slate-500">21-day view</span></div><div className="mt-5 divide-y divide-slate-100">{deadlines.slice(0,7).map(item=><div key={`${item.name}-${item.date}`} className="flex items-center gap-4 py-3.5"><div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{item.name}</div><div className="mt-1 text-sm text-slate-500">{item.type} · {fdate(item.date)}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.days<=3?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700'}`}>{item.days===0?'Today':`${item.days}d`}</span></div>)}{deadlines.length===0&&<div className="py-5 text-sm text-slate-500">No deadline is due within the next 21 days.</div>}</div></section>
       </div>
     </div>
   )
