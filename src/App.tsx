@@ -9,7 +9,6 @@ import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 
 import LandingPage from '@/pages/LandingPage'
-import ComingSoonPage from '@/pages/ComingSoonPage'
 import LoginPage from '@/pages/LoginPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
 import AcceptInvitePage from '@/pages/AcceptInvitePage'
@@ -82,7 +81,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user) return <Navigate to="/mixta-admin-login" replace />
+  if (!user) return <Navigate to="/login" replace />
 
   return <>{children}</>
 }
@@ -250,13 +249,13 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
-        <Route path="/pricing" element={<LandingPage />} />
+        <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/signin" element={<LoginPage />} />
+        <Route path="/signin" element={<Navigate to="/login" replace />} />
         <Route path="/signup" element={<Navigate to="/" replace />} />
 
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
-        <Route path="/mixta-admin-login" element={<LoginPage />} />
+        <Route path="/mixta-admin-login" element={<Navigate to="/login" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route
