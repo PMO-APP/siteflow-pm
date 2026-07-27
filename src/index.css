@@ -143,3 +143,24 @@
   color: #74818d;
   font-size: .75rem;
 }
+
+/* Phase 3 information, commercial and governance centres */
+.pmx-command-page > section.pmx-command-hero,
+.pmx-command-page > .pmx-command-hero { max-width: 1600px; margin-inline: auto; }
+.pmx-command-page .pmx-command-hero > div:first-child { position: relative; z-index: 1; }
+.pmx-command-page .pmx-command-hero [class*="rounded-full"] { border-color:#ffd1c5!important; background:#fff2ec!important; color:#df5f41!important; font-weight:700; }
+.pmx-command-page .pmx-command-hero h1 { color:#102943!important; font-weight:700!important; }
+.pmx-command-page .pmx-command-hero p { color:#65717c!important; }
+.pmx-command-page .form-label { display:block; margin-bottom:.45rem; color:#536170; font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.pmx-command-page .form-control { width:100%; border:1px solid #dfe3e7!important; border-radius:12px!important; background:#fff!important; color:#26384a!important; padding:.72rem .85rem!important; outline:none; }
+.pmx-command-page .form-control:focus { border-color:#123a60!important; box-shadow:0 0 0 3px rgba(18,58,96,.08); }
+.pmx-command-page table { color:#536170; }
+.pmx-command-page table thead { background:#f7f8f8; }
+.pmx-command-page table th { color:#74818d!important; font-size:.65rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.pmx-command-page table td { border-color:#edf0f2!important; color:#536170; }
+.pmx-command-page .font-display { font-family:inherit!important; letter-spacing:-.03em; }
+.pmx-command-page .text-red-400,.pmx-command-page .text-red-500 { color:#b42318!important; }
+.pmx-command-page .text-amber-400 { color:#9a6700!important; }
+.pmx-command-page .text-emerald-400 { color:#18794e!important; }
+.pmx-command-page .rounded-\[2rem\] { border-radius:24px!important; }
+@media (max-width:800px){.pmx-command-hero{padding:1.4rem;flex-direction:column}.pmx-command-page{margin:-1rem!important;padding:1rem!important}}
