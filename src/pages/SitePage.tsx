@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { supabase, uploadFile } from '@/lib/supabase'
 import { fdate } from '@/lib/utils'
 import type { SiteReport } from '@/types'
+import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 
 const WEATHER = ['Sunny','Partly Cloudy','Overcast','Light Rain','Heavy Rain','Harmattan']
 
@@ -67,7 +68,13 @@ export default function SitePage() {
   const latest = reports[0]
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page space-y-5">
+      <CommandHero
+        eyebrow="Site execution"
+        title="Site Command Centre"
+        description="Capture daily production, labour, weather, safety, constraints and the next-day plan without losing the project delivery narrative."
+      />
+
       {/* Summary cards */}
       {latest && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
