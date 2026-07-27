@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
 
+import { pmoConfirm } from '@/lib/notifications'
 const PACKAGE_TYPES = [
   'Building',
   'Block',
@@ -147,7 +148,7 @@ export default function ProjectPackagesPage() {
   }
 
   async function deletePackage(id: string) {
-    const confirmed = window.confirm(
+    const confirmed = await pmoConfirm(
       'Delete this project package? Reports linked to it may lose their package reference.'
     )
 
