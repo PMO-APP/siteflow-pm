@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 
+import { pmoConfirm } from '@/lib/notifications'
 const TABS = [
   ['report', 'Design Report'],
   ['drawings', 'Drawing Register'],
@@ -320,7 +321,7 @@ export default function DesignReportsPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this design report item?')
+    const confirmed = await pmoConfirm('Delete this design report item?')
     if (!confirmed) return
 
     const { error } = await supabase.from('design_reports').delete().eq('id', id)
