@@ -1,92 +1,16 @@
-import {
-  Building2,
-  Users,
-  MailPlus,
-  KeyRound,
-  Layers3,
-  ClipboardList,
-  Briefcase,
-  Settings,
-} from 'lucide-react'
-import AdminCard from '@/components/administration/AdminCard'
-
-const modules = [
-  {
-    title: 'Organizations',
-    description: 'Manage consultants, contractors, vendors, clients and project assignments.',
-    to: '/app/administration/organizations',
-    icon: Building2,
-    status: 'ready' as const,
-  },
-  {
-    title: 'Users',
-    description: 'Review workspace users and organization associations.',
-    to: '/app/administration/users',
-    icon: Users,
-    status: 'coming-soon' as const,
-  },
-  {
-    title: 'Invitations',
-    description: 'Track and issue internal or external invitations.',
-    to: '/app/administration/invitations',
-    icon: MailPlus,
-    status: 'coming-soon' as const,
-  },
-  {
-    title: 'Roles & Permissions',
-    description: 'Control workspace, portfolio, project and organization access.',
-    to: '/app/administration/roles',
-    icon: KeyRound,
-    status: 'coming-soon' as const,
-  },
-  {
-    title: 'Workspaces',
-    description: 'Configure internal, external and future client workspaces.',
-    to: '/app/administration/workspaces',
-    icon: Layers3,
-    status: 'coming-soon' as const,
-  },
-  {
-    title: 'Audit Log',
-    description: 'Review important administrative activity.',
-    to: '/app/administration/audit',
-    icon: ClipboardList,
-    status: 'ready' as const,
-  },
-  {
-    title: 'Portfolios',
-    description: 'Manage portfolios and project assignments.',
-    to: '/app/administration/portfolios',
-    icon: Briefcase,
-    status: 'coming-soon' as const,
-  },
-  {
-    title: 'System Settings',
-    description: 'Configure platform-wide settings.',
-    to: '/app/administration/settings',
-    icon: Settings,
-    status: 'coming-soon' as const,
-  },
-]
-
-export default function AdministrationPage() {
-  return (
-    <section className="space-y-6">
-      <header className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
-        <div className="text-[10px] uppercase tracking-[0.28em] text-blue-400">
-          Workspace control
-        </div>
-        <h1 className="mt-2 font-display text-2xl font-semibold text-slate-100">
-          Administration
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Manage organizations, users, access, workspaces and system configuration.
-        </p>
-      </header>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {modules.map(module => <AdminCard key={module.title} {...module} />)}
-      </div>
-    </section>
-  )
-}
+import { Building2, Users, MailPlus, KeyRound, Layers3, ClipboardList, Briefcase, Settings, ArrowUpRight, ShieldCheck, Activity } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+const modules=[
+{title:'Organizations',description:'Manage consultants, contractors, vendors and project associations.',to:'/app/administration/organizations',icon:Building2,ready:true},
+{title:'Users',description:'Review workspace users and their access relationships.',to:'/app/team-access',icon:Users,ready:true},
+{title:'Invitations',description:'Issue and track invitations to the PMOCorex workspace.',to:'/app/team-access',icon:MailPlus,ready:true},
+{title:'Roles & Permissions',description:'Control workspace, portfolio and project editing rights.',to:'/app/administration/roles',icon:KeyRound,ready:false},
+{title:'Workspaces',description:'Configure internal and future external workspaces.',to:'/app/administration/workspaces',icon:Layers3,ready:false},
+{title:'Audit Log',description:'Review important administrative activity and changes.',to:'/app/administration/audit',icon:ClipboardList,ready:true},
+{title:'Portfolios',description:'Manage portfolio structures and project assignments.',to:'/projects',icon:Briefcase,ready:true},
+{title:'System Settings',description:'Configure platform-wide defaults and preferences.',to:'/app/administration/settings',icon:Settings,ready:false},]
+export default function AdministrationPage(){const navigate=useNavigate();return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px] space-y-5">
+<section className="overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white"><div className="grid lg:grid-cols-[1fr_360px]"><div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Workspace control</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Administration Centre</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">Manage organizations, users, permissions and the operating structure behind your project portfolio.</p></div><div className="bg-[#123a60] p-7 text-white"><ShieldCheck size={26} className="text-[#ff9b83]"/><div className="mt-5 text-[11px] uppercase tracking-[.18em] text-white/60">Administrative posture</div><div className="mt-2 text-2xl font-semibold">Workspace controlled</div><p className="mt-3 text-sm leading-6 text-white/65">Deletion and sensitive access controls remain restricted to authorized administrators.</p></div></div></section>
+<section className="grid grid-cols-2 gap-3 md:grid-cols-4">{[['Control areas',modules.length,Layers3],['Available now',modules.filter(x=>x.ready).length,Activity],['Access areas',3,KeyRound],['Governance',1,ShieldCheck]].map(([l,v,I]:any)=><div key={l} className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><I size={17} className="text-[#6b7b88]"/><div className="mt-4 text-3xl font-semibold text-[#102943]">{v}</div><div className="mt-1 text-xs text-[#7b8791]">{l}</div></div>)}</section>
+<section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6"><div><div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#6f7d89]">Configuration areas</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Workspace administration</h2><p className="mt-1 text-sm text-[#7b8791]">Open an available module or review what is planned next.</p></div><div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">{modules.map(({title,description,to,icon:Icon,ready})=><button key={title} disabled={!ready} onClick={()=>ready&&navigate(to)} className={`group rounded-2xl border p-5 text-left transition ${ready?'border-[#dfe3e7] hover:border-[#8fb0c7] hover:shadow-sm':'border-[#edf0f2] bg-[#fafbfb] opacity-65'}`}><div className="flex items-start justify-between"><span className="rounded-xl bg-[#eaf1f7] p-2.5 text-[#1f668f]"><Icon size={19}/></span>{ready?<ArrowUpRight size={16} className="text-[#94a0aa] group-hover:text-[#df5f41]"/>:<span className="rounded-full bg-[#eef2f4] px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#7c8994]">Planned</span>}</div><h3 className="mt-4 font-semibold text-[#102943]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#6f7d89]">{description}</p></button>)}</div></section>
+</div></div>}
