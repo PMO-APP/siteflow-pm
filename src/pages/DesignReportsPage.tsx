@@ -487,22 +487,22 @@ export default function DesignReportsPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-6 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
+      <section className="pmx-command-hero">
+        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#ffd1c5] bg-[#ff7657]/10 text-[#df5f41] text-xs">
           Design Management
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
+        <h1 className="text-3xl sm:text-4xl font-black text-[#102943]">
           Design Reports
         </h1>
 
-        <p className="text-slate-400 mt-3 max-w-2xl">
+        <p className="text-[#65717c] mt-3 max-w-2xl">
           Weekly design reporting, consultant updates, drawing register, design issues and management attention items.
         </p>
 
-        <div className="text-xs text-[#6e7d8c] mt-4">
-          Project: <span className="text-[#c49e48]">{projectName || 'No project selected'}</span>
+        <div className="text-xs text-[#74818d] mt-4">
+          Project: <span className="text-[#df5f41]">{projectName || 'No project selected'}</span>
         </div>
 
         {!canEdit && (
@@ -513,7 +513,7 @@ export default function DesignReportsPage() {
       </section>
 
       {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           {notice}
         </div>
       )}
@@ -583,7 +583,7 @@ export default function DesignReportsPage() {
       </div>
 
       {selectedSubmission && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           Viewing historical design report for {fdate(selectedSubmission.report_week)}.
           This report is a saved snapshot and will not change when new design records are added.
         </div>
@@ -608,7 +608,7 @@ export default function DesignReportsPage() {
       </div>
 
       {loading ? (
-        <div className="card p-6 text-slate-400">Loading design data…</div>
+        <div className="card p-6 text-[#65717c]">Loading design data…</div>
       ) : (
         <>
           {activeTab === 'report' && (
@@ -710,15 +710,15 @@ function NoSubmittedDesignReport({
 }) {
   return (
     <div className="card p-8 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48]">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#ffd1c5] bg-[#ff7657]/10 text-[#df5f41]">
         <PenTool size={22} />
       </div>
 
-      <h3 className="text-lg font-semibold text-[#ede8de]">
+      <h3 className="text-lg font-semibold text-[#102943]">
         No design report submitted for {fdate(reportWeek)}
       </h3>
 
-      <p className="mx-auto mt-2 max-w-xl text-sm text-[#6e7d8c]">
+      <p className="mx-auto mt-2 max-w-xl text-sm text-[#74818d]">
         This tab only displays locked weekly design report snapshots. Use the Drawing Register,
         Consultants, Design Issues and Weekly Commentary tabs to update live records, then submit
         the weekly report to generate the snapshot for this date.
@@ -753,7 +753,7 @@ function DesignReportHistoryTab({
 }) {
   if (!submissions.length) {
     return (
-      <div className="card p-8 text-center text-[#6e7d8c]">
+      <div className="card p-8 text-center text-[#74818d]">
         No submitted design reports yet. Submit a weekly report to save it into history.
       </div>
     )
@@ -776,7 +776,7 @@ function DesignReportHistoryTab({
         <tbody>
           {submissions.map(submission => (
             <tr key={submission.id}>
-              <td className="font-medium text-[#ede8de]">
+              <td className="font-medium text-[#102943]">
                 {fdate(submission.report_week)}
               </td>
               <td>
@@ -957,13 +957,13 @@ function Info({ label, value }: { label: string; value: any }) {
 function DrawingRegister({ drawings }: { drawings: any[] }) {
   return (
     <div className="card overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/[0.06]">
-        <div className="font-bold text-[#ede8de]">Drawing Register</div>
-        <div className="text-xs text-[#6e7d8c]">Auto-filled from Document Control.</div>
+      <div className="px-4 py-3 border-b border-[#dfe3e7]">
+        <div className="font-bold text-[#102943]">Drawing Register</div>
+        <div className="text-xs text-[#74818d]">Auto-filled from Document Control.</div>
       </div>
 
       {drawings.length === 0 ? (
-        <div className="p-6 text-sm text-[#6e7d8c]">
+        <div className="p-6 text-sm text-[#74818d]">
           No drawings found. Upload drawings from the Documents page first.
         </div>
       ) : (
@@ -984,8 +984,8 @@ function DrawingRegister({ drawings }: { drawings: any[] }) {
             <tbody>
               {drawings.map(drawing => (
                 <tr key={drawing.id}>
-                  <td className="font-mono text-[#c49e48]">{drawing.drawing_number || drawing.document_number || '—'}</td>
-                  <td className="font-medium text-[#ede8de]">{drawing.title}</td>
+                  <td className="font-mono text-[#df5f41]">{drawing.drawing_number || drawing.document_number || '—'}</td>
+                  <td className="font-medium text-[#102943]">{drawing.title}</td>
                   <td>{drawing.discipline || '—'}</td>
                   <td>{drawing.revision_no || drawing.revision || '—'}</td>
                   <td>
@@ -1016,7 +1016,7 @@ function ConsultantsTab({
   canEdit,
 }: any) {
   return (
-    <div className="space-y-5">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       <MetricGrid
         values={[
           ['Consultants', consultantSummary.length],
@@ -1040,7 +1040,7 @@ function ConsultantsTab({
           <tbody>
             {consultantSummary.map((item: any) => (
               <tr key={item.consultant}>
-                <td className="font-medium text-[#ede8de]">{item.consultant}</td>
+                <td className="font-medium text-[#102943]">{item.consultant}</td>
                 <td>{item.total}</td>
                 <td>{item.approved}</td>
                 <td>{item.pending}</td>
@@ -1098,8 +1098,8 @@ function ManualTab({
     <div className="space-y-5">
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
-          <h2 className="font-bold text-[#ede8de]">{title}</h2>
+          <Plus size={17} className="text-[#df5f41]" />
+          <h2 className="font-bold text-[#102943]">{title}</h2>
         </div>
 
         {!canEdit && (
@@ -1158,7 +1158,7 @@ function ManualTab({
           onChange={e => setForm({ ...form, description: e.target.value, category })}
         />
 
-        <label className={`flex items-center gap-2 text-sm text-slate-400 mt-3 ${!canEdit ? 'opacity-60' : ''}`}>
+        <label className={`flex items-center gap-2 text-sm text-[#65717c] mt-3 ${!canEdit ? 'opacity-60' : ''}`}>
           <input
             type="checkbox"
             checked={form.management_attention}
@@ -1176,7 +1176,7 @@ function ManualTab({
       </div>
 
       {items.length === 0 ? (
-        <div className="card p-6 text-sm text-[#6e7d8c]">No updates submitted yet.</div>
+        <div className="card p-6 text-sm text-[#74818d]">No updates submitted yet.</div>
       ) : (
         <div className="card overflow-x-auto">
           <table className="tbl min-w-[1200px]">
@@ -1195,20 +1195,20 @@ function ManualTab({
               {items.map((item: any) => (
                 <tr key={item.id}>
                   <td>{item.category}</td>
-                  <td className="font-medium text-[#ede8de]">{item.title}</td>
+                  <td className="font-medium text-[#102943]">{item.title}</td>
                   <td>{item.consultant_name || '—'}</td>
                   <td>
                     <span className={`badge ${statusBadge(item.status)}`}>{item.status || 'Open'}</span>
                   </td>
                   <td>{item.due_date ? fdate(item.due_date) : '—'}</td>
-                  <td className="max-w-[360px] text-slate-400">{item.description || '—'}</td>
+                  <td className="max-w-[360px] text-[#65717c]">{item.description || '—'}</td>
                   <td>
                     {canEdit ? (
                       <button className="tbl-action text-red-400" onClick={() => deleteItem(item.id)}>
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#74818d]">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -1234,9 +1234,9 @@ function MetricGrid({ values }: { values: [string, string | number][] }) {
 function Metric({ title, value }: { title: string | number; value: string | number }) {
   return (
     <div className="card p-4">
-      <PenTool size={18} className="text-[#c49e48]" />
-      <div className="text-2xl font-black text-white mt-3">{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">{title}</div>
+      <PenTool size={18} className="text-[#df5f41]" />
+      <div className="text-2xl font-black text-[#102943] mt-3">{value}</div>
+      <div className="text-[9px] uppercase tracking-widest text-[#74818d] mt-1">{title}</div>
     </div>
   )
 }
