@@ -17,6 +17,7 @@ import {
   Shield,
   SlidersHorizontal,
   UserCircle,
+  Trash2,
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -27,6 +28,7 @@ import {
   canAccessAdminConsole,
   canCreateWorkspaceItems,
   canEditProjectInfo,
+  canManageWorkspace,
   canViewInternalPages,
   isExternalRole,
 } from '@/lib/permissions'
@@ -87,16 +89,21 @@ export default function ProjectsPage() {
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
   const [canCreateItems, setCanCreateItems] = useState(false)
   const [canEditProjects, setCanEditProjects] = useState(false)
+  const [canDeleteItems, setCanDeleteItems] = useState(false)
 
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
+  const [showEditPortfolioModal, setShowEditPortfolioModal] = useState(false)
   const [editingProject, setEditingProject] = useState<any>(null)
+  const [editingPortfolio, setEditingPortfolio] = useState<any>(null)
 
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectStatus, setNewProjectStatus] = useState('Planning')
   const [newProjectPhase, setNewProjectPhase] = useState('Concept')
   const [newPortfolioName, setNewPortfolioName] = useState('')
+  const [editPortfolioName, setEditPortfolioName] = useState('')
+  const [editPortfolioDescription, setEditPortfolioDescription] = useState('')
   const [selectedOrgId, setSelectedOrgId] = useState<number | ''>('')
   const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('')
 
@@ -110,6 +117,7 @@ export default function ProjectsPage() {
   const [editProjectPhase, setEditProjectPhase] = useState('Concept')
   const [editProjectLocation, setEditProjectLocation] = useState('')
   const [editProjectHandoverDate, setEditProjectHandoverDate] = useState('')
+  const [editProjectPortfolioId, setEditProjectPortfolioId] = useState<number | ''>('')
   const [editOverallOwnerEmail, setEditOverallOwnerEmail] = useState('')
   const [editHousebuildOwnerEmail, setEditHousebuildOwnerEmail] = useState('')
   const [editMepOwnerEmail, setEditMepOwnerEmail] = useState('')
@@ -167,6 +175,7 @@ export default function ProjectsPage() {
       setCanAccessAdmin(false)
       setCanCreateItems(false)
       setCanEditProjects(false)
+      setCanDeleteItems(false)
       setLoading(false)
       return
     }
@@ -181,6 +190,7 @@ export default function ProjectsPage() {
     setCanAccessAdmin(userRoles.some(role => canAccessAdminConsole(role)))
     setCanCreateItems(userRoles.some(role => canCreateWorkspaceItems(role)))
     setCanEditProjects(userRoles.some(role => canEditProjectInfo(role)))
+    setCanDeleteItems(userRoles.some(role => canManageWorkspace(role)))
 
     const [
       { data: orgs, error: orgError },
@@ -261,6 +271,7 @@ export default function ProjectsPage() {
     setEditProjectPhase(project.phase || 'Concept')
     setEditProjectLocation(project.location || '')
     setEditProjectHandoverDate(project.handover_date || '')
+    setEditProjectPortfolioId(project.portfolio_id || '')
     setEditOverallOwnerEmail(project.overall_owner_email || '')
     setEditHousebuildOwnerEmail(project.housebuild_owner_email || '')
     setEditMepOwnerEmail(project.mep_owner_email || '')
@@ -279,6 +290,7 @@ export default function ProjectsPage() {
         phase: editProjectPhase,
         location: editProjectLocation.trim() || null,
         handover_date: editProjectHandoverDate || null,
+        portfolio_id: editProjectPortfolioId || null,
         overall_owner_email: editOverallOwnerEmail.trim().toLowerCase() || null,
         housebuild_owner_email: editHousebuildOwnerEmail.trim().toLowerCase() || null,
         mep_owner_email: editMepOwnerEmail.trim().toLowerCase() || null,
@@ -294,6 +306,89 @@ export default function ProjectsPage() {
 
     setEditingProject(null)
     setShowEditProjectModal(false)
+    await loadHub()
+  }
+
+
+  function openEditPortfolio(portfolio: any) {
+    if (!canDeleteItems) return
+    setEditingPortfolio(portfolio)
+    setEditPortfolioName(portfolio.name || '')
+    setEditPortfolioDescription(portfolio.description || '')
+    setShowEditPortfolioModal(true)
+  }
+
+  async function updatePortfolio() {
+    if (!canDeleteItems || !editingPortfolio || !editPortfolioName.trim()) return
+
+    const { error } = await supabase
+      .from('portfolios')
+      .update({
+        name: editPortfolioName.trim(),
+        description: editPortfolioDescription.trim() || null,
+      })
+      .eq('id', editingPortfolio.id)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setEditingPortfolio(null)
+    setShowEditPortfolioModal(false)
+    await loadHub()
+  }
+
+  async function deleteProject(project: any) {
+    if (!canDeleteItems) return
+
+    const confirmed = window.confirm(
+      `Delete “${project.project_name}”?\n\nThis permanently removes the project and any records configured to cascade with it. This action cannot be undone.`
+    )
+    if (!confirmed) return
+
+    const typedName = window.prompt(
+      `Type the project name exactly to confirm deletion:\n${project.project_name}`
+    )
+    if (typedName?.trim() !== String(project.project_name || '').trim()) {
+      if (typedName !== null) alert('Project name did not match. Nothing was deleted.')
+      return
+    }
+
+    const { error } = await supabase.from('projects').delete().eq('id', project.id)
+
+    if (error) {
+      alert(`Unable to delete project: ${error.message}`)
+      return
+    }
+
+    await loadHub()
+  }
+
+  async function deletePortfolio(portfolio: any) {
+    if (!canDeleteItems) return
+
+    const linkedProjects = projects.filter(project => project.portfolio_id === portfolio.id)
+    if (linkedProjects.length > 0) {
+      alert(
+        `This portfolio still contains ${linkedProjects.length} project${linkedProjects.length === 1 ? '' : 's'}. Move or delete those projects before deleting the portfolio.`
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete the portfolio “${portfolio.name}”? This action cannot be undone.`
+    )
+    if (!confirmed) return
+
+    const { error } = await supabase.from('portfolios').delete().eq('id', portfolio.id)
+
+    if (error) {
+      alert(`Unable to delete portfolio: ${error.message}`)
+      return
+    }
+
+    if (portfolioFilter === String(portfolio.id)) setPortfolioFilter('All')
     await loadHub()
   }
 
@@ -512,30 +607,43 @@ export default function ProjectsPage() {
                 : 0
 
               return (
-                <button
+                <div
                   key={portfolio.id}
-                  onClick={() => {
-                    setPortfolioFilter(String(portfolio.id))
-                    document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth' })
-                  }}
                   className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf1f4] text-[#2f6f91]">
                       <Briefcase size={21} />
                     </div>
-                    <ChevronRight className="text-[#9fb4bd] transition group-hover:translate-x-1 group-hover:text-[#ef8354]" size={20} />
+                    <div className="flex items-center gap-2">
+                      {canDeleteItems && (
+                        <>
+                          <button type="button" onClick={() => openEditPortfolio(portfolio)} className="hub-icon-button h-9 w-9" title="Edit portfolio"><Pencil size={15} /></button>
+                          <button type="button" onClick={() => deletePortfolio(portfolio)} className="hub-icon-button h-9 w-9 text-[#c94f3b] hover:border-[#efb8ad] hover:bg-[#fff0ed]" title="Delete portfolio"><Trash2 size={15} /></button>
+                        </>
+                      )}
+                      <ChevronRight className="text-[#9fb4bd] transition group-hover:translate-x-1 group-hover:text-[#ef8354]" size={20} />
+                    </div>
                   </div>
-                  <h3 className="mt-5 text-lg font-extrabold text-[#173f5f]">{portfolio.name}</h3>
-                  <p className="mt-1 min-h-10 text-sm leading-5 text-[#6d7f8b]">
-                    {portfolio.description || 'Project delivery portfolio'}
-                  </p>
-                  <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
-                    <PortfolioMetric label="Projects" value={portfolioProjects.length} />
-                    <PortfolioMetric label="Active" value={active} />
-                    <PortfolioMetric label="Health" value={`${health}%`} attention={attention > 0} />
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPortfolioFilter(String(portfolio.id))
+                      document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    className="block w-full text-left"
+                  >
+                    <h3 className="mt-5 text-lg font-extrabold text-[#173f5f]">{portfolio.name}</h3>
+                    <p className="mt-1 min-h-10 text-sm leading-5 text-[#6d7f8b]">
+                      {portfolio.description || 'Project delivery portfolio'}
+                    </p>
+                    <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
+                      <PortfolioMetric label="Projects" value={portfolioProjects.length} />
+                      <PortfolioMetric label="Active" value={active} />
+                      <PortfolioMetric label="Health" value={`${health}%`} attention={attention > 0} />
+                    </div>
+                  </button>
+                </div>
               )
             })}
 
@@ -616,8 +724,10 @@ export default function ProjectsPage() {
                         portfolioName={portfolio?.name || 'Unassigned'}
                         capacity={capacity}
                         canEdit={canEditProjects}
+                        canDelete={canDeleteItems}
                         onOpen={() => openProject(project)}
                         onEdit={() => openEditProject(project)}
+                        onDelete={() => deleteProject(project)}
                       />
                     )
                   })}
@@ -661,6 +771,16 @@ export default function ProjectsPage() {
         </Modal>
       )}
 
+      {showEditPortfolioModal && editingPortfolio && canDeleteItems && (
+        <Modal title="Edit Portfolio" onClose={() => setShowEditPortfolioModal(false)}>
+          <FieldLabel>Portfolio name</FieldLabel>
+          <input className="hub-input mb-4" value={editPortfolioName} onChange={e => setEditPortfolioName(e.target.value)} />
+          <FieldLabel>Description</FieldLabel>
+          <textarea className="hub-input min-h-24 resize-y" value={editPortfolioDescription} onChange={e => setEditPortfolioDescription(e.target.value)} placeholder="Optional portfolio description" />
+          <button className="hub-primary-button mt-5 w-full justify-center" onClick={updatePortfolio}>Save Portfolio Changes</button>
+        </Modal>
+      )}
+
       {showEditProjectModal && editingProject && canEditProjects && (
         <Modal title="Edit Project" onClose={() => setShowEditProjectModal(false)}>
           <FieldLabel>Project name</FieldLabel>
@@ -673,6 +793,11 @@ export default function ProjectsPage() {
           <input className="hub-input mb-4" value={editProjectLocation} onChange={e => setEditProjectLocation(e.target.value)} />
           <FieldLabel>Target handover date</FieldLabel>
           <input className="hub-input mb-4" type="date" value={editProjectHandoverDate} onChange={e => setEditProjectHandoverDate(e.target.value)} />
+          <FieldLabel>Portfolio</FieldLabel>
+          <select className="hub-input mb-4" value={editProjectPortfolioId} onChange={e => setEditProjectPortfolioId(e.target.value ? Number(e.target.value) : '')}>
+            <option value="">Unassigned</option>
+            {portfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
+          </select>
           <OwnerFields values={[editOverallOwnerEmail, editHousebuildOwnerEmail, editMepOwnerEmail, editInfrastructureOwnerEmail]} setters={[setEditOverallOwnerEmail, setEditHousebuildOwnerEmail, setEditMepOwnerEmail, setEditInfrastructureOwnerEmail]} />
           <button className="hub-primary-button mt-5 w-full justify-center" onClick={updateProject}>Save Project Changes</button>
         </Modal>
@@ -712,7 +837,7 @@ function PortfolioMetric({ label, value, attention = false }: any) {
   return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d86335]' : 'text-[#405b69]'}`}>{value}</div><div className="text-[11px] text-[#7c8d97]">{label}</div></div>
 }
 
-function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit }: any) {
+function ProjectRow({ project, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
   const status = project.status || 'Not set'
   const isAttention = ['Delayed', 'On Hold'].includes(status)
   const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : status === 'Completed' ? 'Complete' : 'Healthy'
@@ -733,6 +858,7 @@ function ProjectRow({ project, portfolioName, capacity, canEdit, onOpen, onEdit 
       <td className="px-5 py-4">
         <div className="flex items-center justify-end gap-2">
           {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
+          {canDelete && <button onClick={onDelete} className="hub-icon-button h-9 w-9 text-[#c94f3b] hover:border-[#efb8ad] hover:bg-[#fff0ed]" title="Delete project"><Trash2 size={15} /></button>}
           <button onClick={onOpen} className="hub-secondary-button py-2">Open <ArrowRight size={14} /></button>
         </div>
       </td>
