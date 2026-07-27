@@ -597,7 +597,12 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="team-page -m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
+      <section className="mb-5 overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white p-7 sm:p-9">
+        <div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Project collaboration</div>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Project Team</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">Manage project organizations, performance assessments and meeting records from one structured workspace.</p>
+      </section>
       <div className="card">
         <div className="card-head">
           <div>
