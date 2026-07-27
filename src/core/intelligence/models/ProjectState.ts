@@ -28,6 +28,8 @@ export type ProjectState = {
       isCritical: boolean
       isBlocked: boolean
       updatedAt: string | null
+      deliveryPackageId: string | null
+      deliveryPackageName: string | null
     }>
     totalActivities: number
     completedActivities: number
@@ -38,6 +40,14 @@ export type ProjectState = {
     startDate: string | null
     finishDate: string | null
     lastUpdatedAt: string | null
+    packages: Array<{
+      id: string
+      name: string
+      discipline: string | null
+      contractorName: string | null
+      weight: number
+      packageType: string | null
+    }>
   }
   commercial: {
     contractSum: number
