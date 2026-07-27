@@ -43,6 +43,7 @@ function predecessors(value: unknown): string[] {
 export function normalizeProjectState({
   project,
   tasks = [],
+  deliveryPackages = [],
   financial = [],
   snags = [],
   risks = [],
@@ -58,6 +59,7 @@ export function normalizeProjectState({
 }: {
   project?: any
   tasks?: any[]
+  deliveryPackages?: any[]
   financial?: any[]
   snags?: any[]
   risks?: any[]
@@ -71,7 +73,12 @@ export function normalizeProjectState({
   inspections?: any[]
   today?: Date
 }): ProjectState {
-  const activities = tasks.map(task => ({
+  const packageMap = new Map(deliveryPackages.map((pkg: any) => [String(pkg.id), pkg]))
+
+  const activities = tasks.map(task => {
+    const packageId = task.delivery_package_id ? String(task.delivery_package_id) : null
+    const deliveryPackage = packageId ? packageMap.get(packageId) : null
+    return ({
     id: id(task.id),
     taskNumber: Number(task.task_number || 0),
     name: task.name || task.task_name || 'Untitled activity',
@@ -88,7 +95,10 @@ export function normalizeProjectState({
     isCritical: Boolean(task.is_critical || task.critical_path || task.total_float === 0),
     isBlocked: Boolean(task.is_blocked || task.is_on_hold || task.status === 'Blocked'),
     updatedAt: toISO(task.updated_at),
-  }))
+    deliveryPackageId: packageId,
+    deliveryPackageName: deliveryPackage?.name || task.delivery_package_name || null,
+  })
+  })
 
   const scheduleStart =
     toDate(project?.start_date) ||
@@ -184,6 +194,14 @@ export function normalizeProjectState({
       variancePercent: actual - planned,
       startDate: toISO(scheduleStart),
       finishDate: toISO(scheduleFinish),
+      packages: deliveryPackages.map((pkg: any) => ({
+        id: id(pkg.id),
+        name: pkg.name || 'Unnamed package',
+        discipline: pkg.discipline || null,
+        contractorName: pkg.contractor_name || null,
+        weight: Number(pkg.weight_pct || 0),
+        packageType: pkg.package_type || null,
+      })),
       lastUpdatedAt: activities
         .map(item => toDate(item.updatedAt))
         .filter(Boolean)
