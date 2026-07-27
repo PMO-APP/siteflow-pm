@@ -17,6 +17,7 @@ function toNode(activity: ScheduleActivity): DependencyNode {
     status: activity.status,
     isCritical: activity.isCritical,
     isBlocked: activity.isBlocked,
+    deliveryPackageName: activity.deliveryPackageName,
   }
 }
 
@@ -195,8 +196,10 @@ export function calculateRootCause(
       )
   )
 
+  const packagePrefix = primary?.deliveryPackageName ? `${primary.deliveryPackageName}: ` : ''
+
   const explanation = primary
-    ? `${primary.name} is the most likely root cause because it is ${
+    ? `${packagePrefix}${primary.name} is the most likely root cause because it is ${
         primary.isBlocked
           ? 'blocked'
           : 'not complete'
@@ -227,9 +230,9 @@ export function calculateRootCause(
     confidence,
     explanation,
     recommendedOwner:
-      primary?.discipline || null,
+      primary?.deliveryPackageName || primary?.discipline || null,
     recommendedAction: primary
-      ? `Resolve the blocker affecting ${primary.name}, confirm ownership and establish a dated recovery action.`
+      ? `Resolve the blocker affecting ${primary.deliveryPackageName ? `${primary.deliveryPackageName} — ` : ''}${primary.name}, confirm ownership and establish a dated recovery action.`
       : 'Review the active workfront and update blocked or critical activities.',
     generatedAt:
       new Date().toISOString(),
