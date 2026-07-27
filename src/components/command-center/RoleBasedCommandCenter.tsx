@@ -26,6 +26,7 @@ import RootCausePanel from './RootCausePanel'
 import RecommendationsPanel from './RecommendationsPanel'
 import HealthTrend from './HealthTrend'
 import DeliveryTwinPanel from './DeliveryTwinPanel'
+import PackagePerformancePanel from './PackagePerformancePanel'
 
 import {
   ActivityFeed,
@@ -204,6 +205,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         </section>
       </div>
 
+      <PackagePerformancePanel packages={intelligence.deliveryTwin.packages} />
       <DeliveryTwinPanel twin={intelligence.deliveryTwin} />
       {import.meta.env.DEV ? <V6IntelligenceComparison project={project} /> : null}
 
