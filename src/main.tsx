@@ -10,7 +10,7 @@ import './index.css'
 import './styles/index.css'
 
 const savedTheme =
-  localStorage.getItem('pmocorex-theme') || 'dark'
+  localStorage.getItem('pmocorex-theme') || 'light'
 
 document.documentElement.classList.remove(
   'dark',
