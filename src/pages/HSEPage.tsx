@@ -24,6 +24,7 @@ import {
   canCloseHSE,
   canEditOwnOrAdmin,
 } from '@/lib/permissions'
+import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 
 type Tab =
   | 'observations'
@@ -284,7 +285,13 @@ export default function HSEPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page space-y-5">
+      <CommandHero
+        eyebrow="Health, safety & environment"
+        title="Safety Command Centre"
+        description="Manage observations, incidents, toolbox talks and safety evidence while keeping outstanding corrective actions visible."
+      />
+
       {!canCreate && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           HSE View Only — you can view HSE records, but you cannot create or
@@ -292,12 +299,7 @@ export default function HSEPage() {
         </div>
       )}
 
-      <div>
-        <div className="text-xl font-semibold text-[#ede8de]">HSE</div>
-        <div className="text-[11px] text-[#6e7d8c] mt-1">
-          {projectName || 'No project selected'}
-        </div>
-      </div>
+      <div className="pmx-context-line">{projectName || 'No project selected'}</div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricCard
