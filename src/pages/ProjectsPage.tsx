@@ -994,11 +994,11 @@ function ProjectRow({ project, portfolioName, capacity, canEdit, canDelete, onOp
       <td className="px-5 py-4"><span className="rounded-full bg-[#eaf1f4] px-2.5 py-1 text-xs font-semibold text-[#2f6f91]">{capacity}</span></td>
       <td className="px-5 py-4 text-sm text-[#536974]">{project.phase || 'Not set'}</td>
       <td className="px-5 py-4 text-sm text-[#536974]">{formatDate(project.handover_date)}</td>
-      <td className="px-5 py-4">
-        <div className="flex items-center justify-end gap-2">
+      <td className="w-[190px] px-5 py-4">
+        <div className="flex flex-nowrap items-center justify-end gap-2">
           {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
           {canDelete && <button onClick={onDelete} className="hub-icon-button h-9 w-9 text-[#c56b43] hover:border-[#efc3af] hover:bg-[#fff4ee]" title="Archive project"><Archive size={15} /></button>}
-          <button onClick={onOpen} className="hub-secondary-button py-2">Open <ArrowRight size={14} /></button>
+          <button onClick={onOpen} className="hub-secondary-button flex-shrink-0 whitespace-nowrap py-2">Open <ArrowRight size={14} className="shrink-0" /></button>
         </div>
       </td>
     </tr>
