@@ -153,7 +153,7 @@ export default function PlannerPage() {
   const pending = reminders.filter(item => item.status !== 'Completed')
 
   return (
-    <div className="space-y-6">
+    <div className="pmx-command-page space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
         <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
           Personal Productivity
