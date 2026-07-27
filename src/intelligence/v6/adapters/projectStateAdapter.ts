@@ -617,6 +617,8 @@ export function adaptV6StateToLegacy(
             task.isBlocked,
           updatedAt:
             task.updatedAt,
+          deliveryPackageId: null,
+          deliveryPackageName: null,
         })
       ),
 
@@ -644,6 +646,8 @@ export function adaptV6StateToLegacy(
 
       lastUpdatedAt:
         latestScheduleUpdate(state),
+
+      packages: [],
     },
 
     commercial,
