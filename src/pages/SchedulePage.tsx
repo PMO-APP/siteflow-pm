@@ -267,7 +267,7 @@ export default function SchedulePage() {
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 sm:p-6">
-            <div className="flex items-center gap-2"><Sparkles size={17} className="text-[#ff7657]" /><span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Schedule intelligence</span></div>
+            <div className="flex min-w-0 items-center gap-1.5"><Sparkles size={17} className="text-[#ff7657]" /><span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Schedule intelligence</span></div>
             <h2 className="mt-4 text-xl font-semibold tracking-[-0.025em] text-[#102943]">Recovery opportunity</h2>
             <p className="mt-3 max-w-4xl text-sm leading-7 text-[#536170]">{recoveryText}</p>
             <div className="mt-5 flex flex-wrap gap-2">
@@ -309,26 +309,42 @@ export default function SchedulePage() {
 
           {view === 'gantt' && <div className="p-4"><GanttView tasks={filtered} onTaskClick={(task: Task) => { if (canManageScheduleUpload) openTaskModal(task) }} /></div>}
           {view === 'milestones' && <div className="p-4"><MilestoneTracker tasks={tasks} /></div>}
-          {view === 'list' && <div className="overflow-x-auto">
-            <table className="w-full min-w-[1300px] border-collapse text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[10px] font-semibold uppercase tracking-[0.12em] text-[#74818d]"><tr><th className="px-4 py-3">WBS</th><th className="px-4 py-3">Activity</th>{disciplineTab === 'Overall' && <th className="px-4 py-3">Discipline</th>}<th className="px-4 py-3">Dependencies</th><th className="px-4 py-3">Start</th><th className="px-4 py-3">Finish</th><th className="px-4 py-3">Duration</th><th className="px-4 py-3">Procurement</th><th className="px-4 py-3">Approval</th><th className="px-4 py-3">Health</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Progress</th><th className="px-4 py-3">Owner</th><th className="px-4 py-3"></th></tr></thead>
+          {view === 'list' && <div className="w-full overflow-hidden">
+            <table className="w-full table-fixed border-collapse text-left text-[10px] xl:text-[11px]">
+              <colgroup>
+                <col className="w-[4%]" />
+                <col className={disciplineTab === 'Overall' ? 'w-[16%]' : 'w-[19%]'} />
+                {disciplineTab === 'Overall' && <col className="w-[7%]" />}
+                <col className="w-[6%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
+                <col className="w-[5%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
+                <col className="w-[6%]" />
+                <col className="w-[8%]" />
+                <col className="w-[9%]" />
+                <col className="w-[7%]" />
+                <col className="w-[5%]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <th className="px-2 py-3">Discipline</th>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={14} className="px-4 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={14} className="px-4 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
-                  <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={14} className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#123a60]">{phase}</td></tr>
+                {isLoading ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
+                  <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={14} className="px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#123a60]">{phase}</td></tr>
                   {phaseTasks.map(task => {
                     const rag = task.status === 'Completed' ? 'DONE' : getRag(task) || computeRAG(task)
                     const procDays = task.procurement_deadline ? differenceInDays(new Date(task.procurement_deadline), today) : null
                     const apprDays = task.approval_deadline ? differenceInDays(new Date(task.approval_deadline), today) : null
                     const tone = rag === 'RED' ? 'bg-red-50 text-red-700 border-red-200' : rag === 'AMBER' ? 'bg-amber-50 text-amber-700 border-amber-200' : rag === 'DONE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'
                     return <tr key={task.id} className="border-b border-[#edf0f2] hover:bg-[#fafbfb]">
-                      <td className="px-4 py-3 font-mono text-[10px] text-[#86919a]">{task.task_number}</td>
-                      <td className="max-w-[280px] px-4 py-3"><div className="font-medium text-[#26384a]">{task.name}{task.is_milestone && <span className="ml-1.5 text-[#ff7657]">◆</span>}</div></td>
-                      {disciplineTab === 'Overall' && <td className="px-4 py-3"><span className="rounded-full bg-[#edf3f7] px-2.5 py-1 text-[10px] font-semibold text-[#31526d]">{(task as any).discipline || 'Housebuild'}</span></td>}
-                      <td className="px-4 py-3 font-mono text-[10px] text-[#7d8993]">{task.dependencies || '—'}</td><td className="px-4 py-3 text-[#536170]">{fdate(task.start_date)}</td><td className="px-4 py-3 text-[#536170]">{fdate(task.finish_date)}</td><td className="px-4 py-3 text-center text-[#536170]">{task.duration_days || '—'}</td>
-                      <td className="px-4 py-3">{task.procurement_deadline ? <span className={urgencyColor(procDays)}>{fdate(task.procurement_deadline)}</span> : '—'}</td><td className="px-4 py-3">{task.approval_deadline ? <span className={urgencyColor(apprDays)}>{fdate(task.approval_deadline)}</span> : '—'}</td>
-                      <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{rag}</span></td><td className="px-4 py-3 text-[#536170]">{task.status || 'Not Started'}</td>
-                      <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-[#e7ebee]"><div className="h-full rounded-full bg-[#123a60]" style={{ width: `${getTaskProgress(task)}%` }} /></div><span className="text-[10px] text-[#6f7c87]">{getTaskProgress(task)}%</span></div></td>
-                      <td className="px-4 py-3 text-[#536170]">{task.responsible || '—'}</td><td className="px-4 py-3">{isTaskLocked(task) ? <div><span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-semibold text-red-700">LOCKED</span><div className="mt-1 max-w-[120px] text-[9px] text-[#87929b]">{getBlockingGate(task)?.gate_name || 'Quality gate'}</div></div> : canManageScheduleUpload ? <button className="text-[11px] font-semibold text-[#123a60] hover:underline" onClick={() => openTaskModal(task)}>Edit</button> : <span className="text-[10px] text-[#9aa3ab]">View</span>}</td>
+                      <td className="px-2 py-3 font-mono text-[9px] text-[#86919a]">{task.task_number}</td>
+                      <td className="px-2 py-3"><div className="break-words font-medium leading-4 text-[#26384a]">{task.name}{task.is_milestone && <span className="ml-1.5 text-[#ff7657]">◆</span>}</div></td>
+                      {disciplineTab === 'Overall' && <td className="px-2 py-3"><span className="rounded-full bg-[#edf3f7] px-2.5 py-1 text-[10px] font-semibold text-[#31526d]">{(task as any).discipline || 'Housebuild'}</span></td>}
+                      <td className="break-words px-2 py-3 font-mono text-[9px] leading-4 text-[#7d8993]">{task.dependencies || '—'}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.start_date)}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.finish_date)}</td><td className="px-2 py-3 text-center text-[#536170]">{task.duration_days || '—'}</td>
+                      <td className="px-2 py-3">{task.procurement_deadline ? <span className={urgencyColor(procDays)}>{fdate(task.procurement_deadline)}</span> : '—'}</td><td className="px-2 py-3">{task.approval_deadline ? <span className={urgencyColor(apprDays)}>{fdate(task.approval_deadline)}</span> : '—'}</td>
+                      <td className="px-2 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{rag}</span></td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.status || 'Not Started'}</td>
+                      <td className="px-2 py-3"><div className="flex min-w-0 items-center gap-1.5"><div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e7ebee]"><div className="h-full rounded-full bg-[#123a60]" style={{ width: `${getTaskProgress(task)}%` }} /></div><span className="text-[10px] text-[#6f7c87]">{getTaskProgress(task)}%</span></div></td>
+                      <td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.responsible || '—'}</td><td className="px-2 py-3">{isTaskLocked(task) ? <div><span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-semibold text-red-700">LOCKED</span><div className="mt-1 break-words text-[8px] leading-3 text-[#87929b]">{getBlockingGate(task)?.gate_name || 'Quality gate'}</div></div> : canManageScheduleUpload ? <button className="text-[11px] font-semibold text-[#123a60] hover:underline" onClick={() => openTaskModal(task)}>Edit</button> : <span className="text-[10px] text-[#9aa3ab]">View</span>}</td>
                     </tr>
                   })}
                 </Fragment>)}
