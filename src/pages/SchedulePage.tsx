@@ -13,12 +13,16 @@ import {
   SlidersHorizontal,
   TrendingUp,
   LockKeyhole,
+  Building2,
+  Layers3,
+  X,
 } from 'lucide-react'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useScheduleImport } from '@/features/schedule/imports'
+import { useCreateDeliveryPackage, useDeliveryPackages, type DeliveryPackage } from '@/features/schedule/deliveryPackages'
 import { useQualityGates } from '@/hooks/useData'
 import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
@@ -47,20 +51,32 @@ export default function SchedulePage() {
   const [ragFilter, setRagFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('all')
+  const [showPackageModal, setShowPackageModal] = useState(false)
+  const [packageError, setPackageError] = useState('')
+  const [packageForm, setPackageForm] = useState({ name: '', code: '', discipline: 'Housebuild' as ScheduleDiscipline, package_type: 'Block' as 'Block' | 'Shared' | 'Other', contractor_name: '', weight_pct: 0 })
 
   const { importExcel, importXml, uploadBackup } = useScheduleImport()
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
+  const { data: deliveryPackages = [] } = useDeliveryPackages()
+  const createDeliveryPackage = useCreateDeliveryPackage()
 
   const activeDiscipline = disciplineTab === 'Overall' ? undefined : (disciplineTab as ScheduleDiscipline)
   const canManageScheduleUpload =
-    disciplineTab !== 'Overall' && ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+    disciplineTab !== 'Overall' && selectedPackageId !== 'all' && ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+  const canConfigurePackages = ['workspace_admin', 'admin', 'pmo'].includes(role || '')
 
   const today = new Date()
   const projectTasks: Task[] = allTasks.filter((task: Task) => task.project_id === projectId)
-  const tasks: Task[] = disciplineTab === 'Overall'
+  const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => pkg.discipline === disciplineTab)
+  const selectedPackage = deliveryPackages.find(pkg => pkg.id === selectedPackageId)
+  const disciplineTasks = disciplineTab === 'Overall'
     ? projectTasks
     : projectTasks.filter(task => ((task as any).discipline || 'Housebuild') === disciplineTab)
+  const tasks: Task[] = selectedPackageId === 'all'
+    ? disciplineTasks
+    : disciplineTasks.filter(task => task.delivery_package_id === selectedPackageId)
 
   const getTaskProgress = (task: Task): number => {
     if (task.status === 'Completed') return 100
@@ -89,6 +105,7 @@ export default function SchedulePage() {
     setRagFilter('')
     setStatusFilter('')
     setSearch('')
+    setSelectedPackageId('all')
   }, [disciplineTab])
 
   useEffect(() => {
@@ -185,7 +202,7 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { await uploadBackup(file, activeDiscipline); alert(`${activeDiscipline} schedule backup uploaded successfully.`) }
+    try { await uploadBackup(file, activeDiscipline, selectedPackageId); alert(`${activeDiscipline} schedule backup uploaded successfully.`) }
     catch (error) { alert(error instanceof Error ? error.message : 'Unable to upload backup.') }
     finally { event.target.value = '' }
   }
@@ -193,7 +210,7 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { const count = await importExcel(file, activeDiscipline); alert(`${count} ${activeDiscipline} Excel tasks imported successfully.`) }
+    try { const count = await importExcel(file, activeDiscipline, selectedPackageId); alert(`${count} ${activeDiscipline} Excel tasks imported successfully.`) }
     catch (error) { alert(error instanceof Error ? error.message : 'Unable to import Excel schedule.') }
     finally { event.target.value = '' }
   }
@@ -201,9 +218,36 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { const count = await importXml(file, activeDiscipline); alert(`${count} ${activeDiscipline} MS Project XML tasks imported successfully.`) }
+    try { const count = await importXml(file, activeDiscipline, selectedPackageId); alert(`${count} ${activeDiscipline} MS Project XML tasks imported successfully.`) }
     catch (error) { alert(error instanceof Error ? error.message : 'Unable to import MS Project XML.') }
     finally { event.target.value = '' }
+  }
+
+  const packageSummaries = useMemo(() => deliveryPackages.map(pkg => {
+    const packageTasks = projectTasks.filter(task => task.delivery_package_id === pkg.id)
+    const total = packageTasks.length
+    const progress = total ? Math.round(packageTasks.reduce((sum, task) => sum + getTaskProgress(task), 0) / total) : 0
+    const delayed = packageTasks.filter(task => getRag(task) === 'RED').length
+    const atRisk = packageTasks.filter(task => getRag(task) === 'AMBER').length
+    const health = delayed > Math.max(3, total * 0.2) ? 'Critical' : delayed > 0 || atRisk > Math.max(2, total * 0.15) ? 'Watch' : 'Healthy'
+    return { ...pkg, total, progress, delayed, atRisk, health }
+  }), [deliveryPackages, projectTasks])
+
+  const saveDeliveryPackage = async () => {
+    setPackageError('')
+    if (!packageForm.name.trim()) { setPackageError('Package or block name is required.'); return }
+    try {
+      const created = await createDeliveryPackage.mutateAsync({
+        ...packageForm,
+        is_shared: packageForm.discipline !== 'Housebuild' || packageForm.package_type === 'Shared',
+      })
+      setShowPackageModal(false)
+      setPackageForm({ name: '', code: '', discipline: 'Housebuild', package_type: 'Block', contractor_name: '', weight_pct: 0 })
+      setDisciplineTab(created.discipline)
+      setSelectedPackageId(created.id)
+    } catch (error) {
+      setPackageError(error instanceof Error ? error.message : 'Unable to create delivery package.')
+    }
   }
 
   return (
@@ -228,6 +272,11 @@ export default function SchedulePage() {
                   <button key={tab} onClick={() => setDisciplineTab(tab)} className={`rounded-full px-4 py-2 text-xs font-semibold transition ${disciplineTab === tab ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170] hover:border-[#9da9b3]'}`}>{tab}</button>
                 ))}
               </div>
+              {disciplineTab !== 'Overall' && <div className="mt-5 flex flex-wrap items-center gap-2">
+                <button onClick={() => setSelectedPackageId('all')} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === 'all' ? 'bg-[#eaf1f7] text-[#123a60]' : 'border border-[#dfe3e7] text-[#536170]'}`}>All {disciplineTab}</button>
+                {disciplinePackages.map(pkg => <button key={pkg.id} onClick={() => setSelectedPackageId(pkg.id)} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === pkg.id ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170]'}`}>{pkg.name}</button>)}
+                {canConfigurePackages && <button onClick={() => { setPackageForm(prev => ({ ...prev, discipline: disciplineTab, package_type: disciplineTab === 'Housebuild' ? 'Block' : 'Shared' })); setShowPackageModal(true) }} className="rounded-xl border border-dashed border-[#ff9b83] px-3.5 py-2 text-xs font-semibold text-[#df5f41]"><Plus size={13} className="mr-1 inline" />Add package</button>}
+              </div>}
             </div>
             <div className="border-t border-[#e7eaed] bg-[#123a60] p-7 text-white lg:border-l lg:border-t-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Overall progress</div>
@@ -247,6 +296,14 @@ export default function SchedulePage() {
             <span>{disciplineTab === 'Overall' ? 'The master schedule is generated from approved discipline schedules and cannot be edited directly.' : 'View only. PMO and administrators can upload or edit approved schedules; project owners update delivery progress through Project Controls.'}</span>
           </div>
         )}
+
+        {disciplineTab === 'Overall' && <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Delivery packages</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Blocks and shared workstreams</h2><p className="mt-1 text-sm text-[#6f7d89]">Each contractor programme remains separate while progress rolls up to the project.</p></div>{canConfigurePackages && <button onClick={() => setShowPackageModal(true)} className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={14} className="mr-1.5 inline" />Create package</button>}</div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {packageSummaries.map(pkg => <button key={pkg.id} onClick={() => { setDisciplineTab(pkg.discipline); setSelectedPackageId(pkg.id) }} className="rounded-2xl border border-[#dfe3e7] p-4 text-left transition hover:border-[#8fb0c7] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#eaf1f7] p-2 text-[#1f668f]">{pkg.package_type === 'Block' ? <Building2 size={18}/> : <Layers3 size={18}/>}</div><div><div className="font-semibold text-[#102943]">{pkg.name}</div><div className="mt-0.5 text-xs text-[#7a8792]">{pkg.contractor_name || pkg.discipline}</div></div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${pkg.health === 'Critical' ? 'bg-red-50 text-red-700' : pkg.health === 'Watch' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{pkg.health}</span></div><div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#edf0f2] pt-3 text-xs"><div><div className="font-semibold text-[#102943]">{pkg.progress}%</div><div className="text-[#8a96a0]">Progress</div></div><div><div className="font-semibold text-[#102943]">{pkg.total}</div><div className="text-[#8a96a0]">Activities</div></div><div><div className={pkg.delayed ? 'font-semibold text-red-600' : 'font-semibold text-[#102943]'}>{pkg.delayed}</div><div className="text-[#8a96a0]">Delayed</div></div></div></button>)}
+            {!packageSummaries.length && <div className="col-span-full rounded-2xl border border-dashed border-[#cfdbe3] p-8 text-center text-sm text-[#788591]">No delivery packages yet. Create blocks for Housebuild and shared packages for Infrastructure and External MEP.</div>}
+          </div>
+        </section>}
 
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#dfe3e7] bg-[#dfe3e7] sm:grid-cols-4 xl:grid-cols-7">
           {[
@@ -314,7 +371,7 @@ export default function SchedulePage() {
               <colgroup>
                 <col className="w-[4%]" />
                 <col className={disciplineTab === 'Overall' ? 'w-[16%]' : 'w-[19%]'} />
-                {disciplineTab === 'Overall' && <col className="w-[7%]" />}
+                {disciplineTab === 'Overall' && <><col className="w-[7%]" /><col className="w-[9%]" /></>}
                 <col className="w-[6%]" />
                 <col className="w-[7%]" />
                 <col className="w-[7%]" />
@@ -327,7 +384,7 @@ export default function SchedulePage() {
                 <col className="w-[7%]" />
                 <col className="w-[5%]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <th className="px-2 py-3">Discipline</th>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
+              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <><th className="px-2 py-3">Discipline</th><th className="px-2 py-3">Package</th></>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
               <tbody>
                 {isLoading ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
                   <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={14} className="px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#123a60]">{phase}</td></tr>
@@ -339,7 +396,7 @@ export default function SchedulePage() {
                     return <tr key={task.id} className="border-b border-[#edf0f2] hover:bg-[#fafbfb]">
                       <td className="px-2 py-3 font-mono text-[9px] text-[#86919a]">{task.task_number}</td>
                       <td className="px-2 py-3"><div className="break-words font-medium leading-4 text-[#26384a]">{task.name}{task.is_milestone && <span className="ml-1.5 text-[#ff7657]">◆</span>}</div></td>
-                      {disciplineTab === 'Overall' && <td className="px-2 py-3"><span className="rounded-full bg-[#edf3f7] px-2.5 py-1 text-[10px] font-semibold text-[#31526d]">{(task as any).discipline || 'Housebuild'}</span></td>}
+                      {disciplineTab === 'Overall' && <><td className="px-2 py-3"><span className="rounded-full bg-[#edf3f7] px-2.5 py-1 text-[10px] font-semibold text-[#31526d]">{(task as any).discipline || 'Housebuild'}</span></td><td className="break-words px-2 py-3 text-[#536170]">{deliveryPackages.find(pkg => pkg.id === task.delivery_package_id)?.name || 'Legacy / unassigned'}</td></>}
                       <td className="break-words px-2 py-3 font-mono text-[9px] leading-4 text-[#7d8993]">{task.dependencies || '—'}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.start_date)}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.finish_date)}</td><td className="px-2 py-3 text-center text-[#536170]">{task.duration_days || '—'}</td>
                       <td className="px-2 py-3">{task.procurement_deadline ? <span className={urgencyColor(procDays)}>{fdate(task.procurement_deadline)}</span> : '—'}</td><td className="px-2 py-3">{task.approval_deadline ? <span className={urgencyColor(apprDays)}>{fdate(task.approval_deadline)}</span> : '—'}</td>
                       <td className="px-2 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{rag}</span></td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.status || 'Not Started'}</td>
@@ -354,7 +411,9 @@ export default function SchedulePage() {
         </section>
       </div>
 
-      {modalTask !== null && canManageScheduleUpload && <TaskModal task={modalTask === 'new' ? null : modalTask} onClose={() => setModalTask(null)} />}
+      {modalTask !== null && canManageScheduleUpload && <TaskModal task={modalTask === 'new' ? null : modalTask} onClose={() => setModalTask(null)} deliveryPackageId={selectedPackageId !== 'all' ? selectedPackageId : undefined} discipline={activeDiscipline} />}
+
+      {showPackageModal && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#102943]/45 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setShowPackageModal(false) }}><div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl"><div className="h-1.5 bg-[#ff7657]"/><div className="flex items-start justify-between border-b border-[#e5e8eb] p-6"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#df5f41]">Schedule structure</div><h2 className="mt-2 text-2xl font-semibold text-[#102943]">Create delivery package</h2><p className="mt-1 text-sm text-[#6f7d89]">Create a block or a shared Infrastructure / External MEP workstream.</p></div><button onClick={() => setShowPackageModal(false)} className="rounded-lg p-2 text-[#6f7d89] hover:bg-[#f2f5f7]"><X size={18}/></button></div><div className="grid gap-4 p-6 sm:grid-cols-2"><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Package or block name</span><input value={packageForm.name} onChange={e => setPackageForm({...packageForm,name:e.target.value})} placeholder="e.g. Block A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm outline-none focus:border-[#123a60]"/></label><label><span className="text-xs font-semibold text-[#536170]">Discipline</span><select value={packageForm.discipline} onChange={e => setPackageForm({...packageForm,discipline:e.target.value as ScheduleDiscipline,package_type:e.target.value === 'Housebuild' ? 'Block' : 'Shared'})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Housebuild</option><option>Infrastructure</option><option>MEP</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Package type</span><select value={packageForm.package_type} onChange={e => setPackageForm({...packageForm,package_type:e.target.value as any})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Block</option><option>Shared</option><option>Other</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Code</span><input value={packageForm.code} onChange={e => setPackageForm({...packageForm,code:e.target.value})} placeholder="PV-A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label><span className="text-xs font-semibold text-[#536170]">Contractor</span><input value={packageForm.contractor_name} onChange={e => setPackageForm({...packageForm,contractor_name:e.target.value})} placeholder="Contractor name" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Project weighting (%)</span><input type="number" min="0" max="100" value={packageForm.weight_pct} onChange={e => setPackageForm({...packageForm,weight_pct:Number(e.target.value)})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/><span className="mt-1 block text-xs text-[#8a96a0]">Used later for weighted project progress. It can be adjusted as the package structure is confirmed.</span></label>{packageError && <div className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{packageError}</div>}</div><div className="flex justify-end gap-3 border-t border-[#e5e8eb] p-5"><button onClick={() => setShowPackageModal(false)} className="rounded-xl border border-[#dfe3e7] px-4 py-2.5 text-sm font-semibold text-[#536170]">Cancel</button><button onClick={saveDeliveryPackage} disabled={createDeliveryPackage.isPending} className="rounded-xl bg-[#123a60] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{createDeliveryPackage.isPending ? 'Creating…' : 'Create package'}</button></div></div></div>}
     </div>
   )
 }
