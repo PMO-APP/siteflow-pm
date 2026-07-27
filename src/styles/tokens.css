@@ -1,20 +1,41 @@
 :root {
-  /* Brand */
-  --pmx-primary: #0f766e;
-  --pmx-primary-hover: #115e59;
-  --pmx-primary-soft: rgba(15, 118, 110, 0.12);
+  /* PMOCorex brand */
+  --pmx-primary: #123a60;
+  --pmx-primary-hover: #0d2e4d;
+  --pmx-primary-soft: #eaf1f7;
+  --pmx-coral: #ff7657;
+  --pmx-coral-hover: #e86548;
+  --pmx-coral-soft: #fff1ec;
 
-  /* Status */
-  --pmx-success: #22c55e;
-  --pmx-warning: #f59e0b;
-  --pmx-danger: #ef4444;
-  --pmx-info: #3b82f6;
+  /* Semantic status */
+  --pmx-success: #2e8b57;
+  --pmx-success-soft: #ecf8f2;
+  --pmx-warning: #d88716;
+  --pmx-warning-soft: #fff8e8;
+  --pmx-danger: #d63c4a;
+  --pmx-danger-soft: #fff0f1;
+  --pmx-info: #337ea9;
+  --pmx-info-soft: #edf6fb;
+
+  /* Neutral surfaces */
+  --pmx-bg: #f7f9fa;
+  --pmx-surface: #ffffff;
+  --pmx-surface-2: #f5f8fa;
+  --pmx-surface-3: #eef3f4;
+  --pmx-surface-raised: #ffffff;
+  --pmx-border: #dce7ef;
+  --pmx-border-strong: #bfd0da;
+  --pmx-text: #102943;
+  --pmx-muted: #657786;
+  --pmx-faint: #8796a2;
 
   /* Radius */
-  --pmx-radius-sm: 8px;
-  --pmx-radius-md: 12px;
-  --pmx-radius-lg: 16px;
-  --pmx-radius-xl: 20px;
+  --pmx-radius-xs: 6px;
+  --pmx-radius-sm: 10px;
+  --pmx-radius-md: 14px;
+  --pmx-radius-lg: 18px;
+  --pmx-radius-xl: 24px;
+  --pmx-radius-full: 9999px;
 
   /* Spacing */
   --pmx-space-1: 4px;
@@ -33,6 +54,17 @@
     BlinkMacSystemFont, "Segoe UI", sans-serif;
   --pmx-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular,
     Menlo, Monaco, Consolas, monospace;
+  --pmx-text-xs: 0.75rem;
+  --pmx-text-sm: 0.875rem;
+  --pmx-text-md: 1rem;
+  --pmx-text-lg: 1.125rem;
+  --pmx-text-xl: 1.5rem;
+  --pmx-text-2xl: clamp(1.9rem, 3vw, 2.5rem);
+
+  /* Elevation */
+  --pmx-shadow-card: 0 8px 24px rgba(18, 58, 96, 0.045);
+  --pmx-shadow-panel: 0 12px 35px rgba(18, 58, 96, 0.065);
+  --pmx-shadow-overlay: 0 24px 70px rgba(18, 58, 96, 0.18);
 
   /* Motion */
   --pmx-motion-fast: 120ms;
