@@ -8,6 +8,7 @@ import ThemeProvider from '@/theme/ThemeProvider'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
+import NotificationProvider from '@/components/ui/notifications/NotificationProvider'
 
 import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
@@ -249,7 +250,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
@@ -428,7 +430,8 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </NotificationProvider>
     </ThemeProvider>
   )
 }
