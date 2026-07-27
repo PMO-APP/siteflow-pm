@@ -38,7 +38,7 @@ export default function RiskTrendPage() {
 
   if (loading) {
     return (
-      <div className="card p-8 text-slate-400">
+      <div className="card p-8 text-[#65717c]">
         Loading risk trends…
       </div>
     )
@@ -46,7 +46,7 @@ export default function RiskTrendPage() {
 
   if (risks.length === 0) {
     return (
-      <div className="card p-8 text-slate-400">
+      <div className="card p-8 text-[#65717c]">
         No risk trend data available for this project yet.
       </div>
     )
@@ -74,26 +74,26 @@ export default function RiskTrendPage() {
     `${Math.round((count / maxSeverity) * 100)}%`
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card p-4">
           <div className="text-3xl text-red-400 font-bold">{open}</div>
-          <div className="text-sm text-slate-400">Open Risks</div>
+          <div className="text-sm text-[#65717c]">Open Risks</div>
         </div>
 
         <div className="card p-4">
           <div className="text-3xl text-red-500 font-bold">{critical}</div>
-          <div className="text-sm text-slate-400">Critical Risks</div>
+          <div className="text-sm text-[#65717c]">Critical Risks</div>
         </div>
 
         <div className="card p-4">
           <div className="text-3xl text-amber-400 font-bold">{auto}</div>
-          <div className="text-sm text-slate-400">Auto Risks</div>
+          <div className="text-sm text-[#65717c]">Auto Risks</div>
         </div>
 
         <div className="card p-4">
           <div className="text-3xl text-emerald-400 font-bold">{closed}</div>
-          <div className="text-sm text-slate-400">Closed Risks</div>
+          <div className="text-sm text-[#65717c]">Closed Risks</div>
         </div>
       </div>
 
@@ -107,7 +107,7 @@ export default function RiskTrendPage() {
             <div className="text-sm mb-1">
               High ({severityCount.High})
             </div>
-            <div className="h-3 bg-slate-800 rounded">
+            <div className="h-3 bg-[#e7ebee] rounded">
               <div
                 className="h-3 bg-red-500 rounded"
                 style={{ width: barWidth(severityCount.High) }}
@@ -119,7 +119,7 @@ export default function RiskTrendPage() {
             <div className="text-sm mb-1">
               Medium ({severityCount.Medium})
             </div>
-            <div className="h-3 bg-slate-800 rounded">
+            <div className="h-3 bg-[#e7ebee] rounded">
               <div
                 className="h-3 bg-amber-400 rounded"
                 style={{ width: barWidth(severityCount.Medium) }}
@@ -131,7 +131,7 @@ export default function RiskTrendPage() {
             <div className="text-sm mb-1">
               Low ({severityCount.Low})
             </div>
-            <div className="h-3 bg-slate-800 rounded">
+            <div className="h-3 bg-[#e7ebee] rounded">
               <div
                 className="h-3 bg-emerald-400 rounded"
                 style={{ width: barWidth(severityCount.Low) }}
