@@ -249,7 +249,7 @@ function DocModal({
 
           <button
             onClick={onClose}
-            className="text-[#6e7d8c] hover:text-[#ede8de]"
+            className="text-[#74818d] hover:text-[#102943]"
           >
             <X size={16} />
           </button>
@@ -465,14 +465,14 @@ function DocModal({
             </label>
 
             {form.file_size_kb > 0 && (
-              <div className="text-[10px] text-[#6e7d8c] mt-1">
+              <div className="text-[10px] text-[#74818d] mt-1">
                 {form.file_size_kb} KB · {form.file_type || 'file'}
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
+        <div className="flex gap-2 justify-end px-5 py-3 border-t border-[#dfe3e7]">
           <button className="btn-ghost btn-sm btn" onClick={onClose}>
             Cancel
           </button>
@@ -552,7 +552,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       {!canCreateDocument && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           Document Control View — you can view and download documents, but you
@@ -590,8 +590,8 @@ export default function DocumentsPage() {
                   key={type}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-colors ${
                     typeFilter === type
-                      ? 'bg-[#c49e48] text-[#0c1014] border-[#c49e48]'
-                      : 'bg-[#1c2a36] text-[#bfb9ae] border-white/[0.08] hover:border-[#c49e48]/30'
+                      ? 'bg-[#ff7657] text-[#0c1014] border-[#c49e48]'
+                      : 'bg-white text-[#536170] border-[#dfe3e7] hover:border-[#ffd1c5]'
                   }`}
                   onClick={() =>
                     setTypeFilter(typeFilter === type ? '' : type)
@@ -608,7 +608,7 @@ export default function DocumentsPage() {
             <div className="relative flex-1 min-w-[160px] max-w-xs">
               <Search
                 size={12}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6e7d8c]"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#74818d]"
               />
 
               <input
@@ -675,7 +675,7 @@ export default function DocumentsPage() {
                     <tr>
                       <td
                         colSpan={10}
-                        className="text-center py-6 text-[#6e7d8c]"
+                        className="text-center py-6 text-[#74818d]"
                       >
                         Loading…
                       </td>
@@ -684,7 +684,7 @@ export default function DocumentsPage() {
                     <tr>
                       <td
                         colSpan={10}
-                        className="text-center py-8 text-[#6e7d8c]"
+                        className="text-center py-8 text-[#74818d]"
                       >
                         {docs.length === 0
                           ? 'No documents registered yet.'
@@ -709,12 +709,12 @@ export default function DocumentsPage() {
                               : ''
                           }
                         >
-                          <td className="font-mono text-[10px] text-[#c49e48]">
+                          <td className="font-mono text-[10px] text-[#df5f41]">
                             {document.document_number || '—'}
                           </td>
 
                           <td
-                            className="font-medium text-[#ede8de] max-w-[200px] truncate"
+                            className="font-medium text-[#102943] max-w-[200px] truncate"
                             title={document.title}
                           >
                             {document.title}
@@ -724,7 +724,7 @@ export default function DocumentsPage() {
                             <span className="text-[9px]">
                               {typeIcon(document.type)}
                             </span>{' '}
-                            <span className="text-[10px] text-[#6e7d8c]">
+                            <span className="text-[10px] text-[#74818d]">
                               {document.type}
                             </span>
                           </td>
@@ -735,7 +735,7 @@ export default function DocumentsPage() {
                             </span>
                           </td>
 
-                          <td className="font-mono text-[11px] text-[#6e7d8c]">
+                          <td className="font-mono text-[11px] text-[#74818d]">
                             Rev {document.revision}
                           </td>
 
@@ -751,11 +751,11 @@ export default function DocumentsPage() {
                             </span>
                           </td>
 
-                          <td className="hide-mobile text-[11px] text-[#6e7d8c]">
+                          <td className="hide-mobile text-[11px] text-[#74818d]">
                             {document.issued_by || '—'}
                           </td>
 
-                          <td className="hide-mobile text-[10px] font-mono text-[#6e7d8c]">
+                          <td className="hide-mobile text-[10px] font-mono text-[#74818d]">
                             {document.file_size_kb
                               ? `${document.file_size_kb}KB`
                               : '—'}
@@ -795,7 +795,7 @@ export default function DocumentsPage() {
                                   Edit
                                 </button>
                               ) : (
-                                <span className="text-[#6e7d8c] text-[11px] px-2">
+                                <span className="text-[#74818d] text-[11px] px-2">
                                   View
                                 </span>
                               )}
