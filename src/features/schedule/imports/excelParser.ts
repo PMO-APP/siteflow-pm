@@ -9,10 +9,14 @@ export async function parseExcelScheduleFile({
   file,
   projectId,
   discipline,
+  deliveryPackageId,
+  scheduleVersionId,
 }: {
   file: File
   projectId: number | string
   discipline: ScheduleDiscipline
+  deliveryPackageId: string
+  scheduleVersionId?: string | null
 }): Promise<ImportedScheduleTask[]> {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(new Uint8Array(buffer), {
@@ -32,6 +36,8 @@ export async function parseExcelScheduleFile({
     .map((row, index) => ({
       project_id: projectId,
       discipline,
+      delivery_package_id: deliveryPackageId,
+      schedule_version_id: scheduleVersionId || null,
       schedule_source: 'Imported' as const,
       task_number: Number(row['Task Number'] || index + 1),
       name: String(row['Task Name'] || row.Name),
