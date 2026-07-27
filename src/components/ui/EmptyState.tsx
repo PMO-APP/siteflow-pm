@@ -1,10 +1,14 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { Inbox } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-interface Props {
+interface EmptyStateProps {
   icon?: ReactNode
   title: string
   message: string
   action?: ReactNode
+  compact?: boolean
+  className?: string
 }
 
 export default function EmptyState({
@@ -12,26 +16,24 @@ export default function EmptyState({
   title,
   message,
   action,
-}: Props) {
+  compact = false,
+  className,
+}: EmptyStateProps) {
   return (
-    <div className="card p-10 text-center">
-      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 text-[#c49e48]">
-        {icon || '◇'}
-      </div>
-
-      <div className="text-lg font-semibold text-[#ede8de]">
-        {title}
-      </div>
-
-      <div className="text-sm text-[#6e7d8c] mt-2 max-w-md mx-auto">
-        {message}
-      </div>
-
-      {action && (
-        <div className="mt-5">
-          {action}
-        </div>
+    <div
+      className={cn(
+        'ui-empty-state',
+        compact && 'ui-empty-state--compact',
+        className,
       )}
+      role="status"
+    >
+      <div className="ui-empty-state__icon" aria-hidden="true">
+        {icon || <Inbox size={22} />}
+      </div>
+      <h3 className="ui-empty-state__title">{title}</h3>
+      <p className="ui-empty-state__message">{message}</p>
+      {action && <div className="ui-empty-state__action">{action}</div>}
     </div>
   )
 }
