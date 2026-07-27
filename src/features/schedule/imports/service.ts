@@ -18,13 +18,15 @@ export async function insertImportedScheduleTasks(
 export async function uploadScheduleBackup({
   projectId,
   discipline,
+  deliveryPackageId,
   file,
 }: {
   projectId: number | string
   discipline: ScheduleDiscipline
+  deliveryPackageId: string
   file: File
 }) {
-  const fileName = `${projectId}/schedule-backups/${discipline}/${Date.now()}-${file.name}`
+  const fileName = `${projectId}/schedule-backups/${discipline}/${deliveryPackageId}/${Date.now()}-${file.name}`
 
   const { error } = await supabase.storage
     .from('project-files')
