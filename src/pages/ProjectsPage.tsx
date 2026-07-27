@@ -101,6 +101,7 @@ const INTERNAL_ROLE_LABELS: Record<string, string> = {
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
+  const [projectTasks, setProjectTasks] = useState<any[]>([])
   const [archivedProjects, setArchivedProjects] = useState<any[]>([])
   const [showArchivedProjects, setShowArchivedProjects] = useState(false)
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -192,11 +193,11 @@ export default function ProjectsPage() {
 
     const cleanEmail = currentUser.email.toLowerCase().trim()
     setCurrentUserEmail(cleanEmail)
-    setDisplayName(
+    const rawDisplayName =
       currentUser.user_metadata?.full_name ||
-        currentUser.user_metadata?.name ||
-        cleanEmail.split('@')[0].split(/[._-]/)[0]
-    )
+      currentUser.user_metadata?.name ||
+      cleanEmail.split('@')[0].split(/[._-]/)[0]
+    setDisplayName(String(rawDisplayName).trim().split(/\s+/)[0] || 'there')
 
     const { data: membershipRows, error: membershipError } = await supabase
       .from('memberships')
@@ -241,17 +242,21 @@ export default function ProjectsPage() {
       { data: orgs, error: orgError },
       { data: ports, error: portError },
       { data: projs, error: projectError },
+      { data: tasks, error: taskError },
     ] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at'),
       supabase.from('portfolios').select('*').order('created_at'),
       supabase.from('projects').select('*').order('id'),
+      supabase.from('tasks').select('project_id,status,finish_date,progress_pct'),
     ])
 
-    if (orgError || portError || projectError) {
-      showNotice({ variant: 'danger', title: 'Workspace could not be loaded', message: orgError?.message || portError?.message || projectError?.message || 'Unable to load workspace.', confirmLabel: 'Close' })
+    if (orgError || portError || projectError || taskError) {
+      showNotice({ variant: 'danger', title: 'Workspace could not be loaded', message: orgError?.message || portError?.message || projectError?.message || taskError?.message || 'Unable to load workspace.', confirmLabel: 'Close' })
       setLoading(false)
       return
     }
+
+    setProjectTasks(tasks || [])
 
     if (isInternalUser) {
       setOrganizations(orgs || [])
@@ -600,11 +605,41 @@ export default function ProjectsPage() {
   const userRoles = memberships.map(m => String(m.role || '').toLowerCase().trim())
   const workspaceName = organizations[0]?.name || 'Workspace'
   const activeProjects = projects.filter(project => project.status === 'Active').length
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
+  const projectAttentionMap = useMemo(() => {
+    const map = new Map<string, { needsAttention: boolean; overdueTasks: number }>()
+
+    projects.forEach(project => {
+      const overdueTasks = projectTasks.filter(task => {
+        if (String(task.project_id) !== String(project.id)) return false
+        if (String(task.status || '').toLowerCase() === 'completed') return false
+        if (Number(task.progress_pct || 0) >= 100) return false
+        if (!task.finish_date) return false
+
+        const finishDate = new Date(task.finish_date)
+        if (Number.isNaN(finishDate.getTime())) return false
+        finishDate.setHours(0, 0, 0, 0)
+        return finishDate < todayStart
+      }).length
+
+      const projectStatusNeedsAttention = ['Delayed', 'On Hold'].includes(project.status)
+      map.set(String(project.id), {
+        needsAttention: projectStatusNeedsAttention || overdueTasks > 0,
+        overdueTasks,
+      })
+    })
+
+    return map
+  }, [projects, projectTasks])
+
   const attentionProjects = projects.filter(project =>
-    ['Delayed', 'On Hold'].includes(project.status)
+    projectAttentionMap.get(String(project.id))?.needsAttention
   ).length
   const healthyProjects = projects.filter(project =>
-    ['Active', 'Completed'].includes(project.status)
+    !projectAttentionMap.get(String(project.id))?.needsAttention
   ).length
   const missingTargets = projects.filter(
     project => !project.handover_date && !['Completed', 'Cancelled'].includes(project.status)
@@ -739,7 +774,7 @@ export default function ProjectsPage() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {portfolios.map(portfolio => {
               const portfolioProjects = projects.filter(p => String(p.portfolio_id ?? '') === String(portfolio.id ?? ''))
-              const attention = portfolioProjects.filter(p => ['Delayed', 'On Hold'].includes(p.status)).length
+              const attention = portfolioProjects.filter(p => projectAttentionMap.get(String(p.id))?.needsAttention).length
               const active = portfolioProjects.filter(p => p.status === 'Active').length
               const health = portfolioProjects.length
                 ? Math.round(((portfolioProjects.length - attention) / portfolioProjects.length) * 100)
@@ -907,6 +942,7 @@ export default function ProjectsPage() {
                       <ProjectRow
                         key={project.id}
                         project={project}
+                        attentionInfo={projectAttentionMap.get(String(project.id))}
                         portfolioName={portfolio?.name || 'Unassigned'}
                         capacity={capacity}
                         canEdit={canEditProjects}
@@ -1087,10 +1123,11 @@ function PortfolioMetric({ label, value, attention = false }: any) {
   return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d86335]' : 'text-[#405b69]'}`}>{value}</div><div className="text-[11px] text-[#7c8d97]">{label}</div></div>
 }
 
-function ProjectRow({ project, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
+function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
   const status = project.status || 'Not set'
-  const isAttention = ['Delayed', 'On Hold'].includes(status)
-  const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : status === 'Completed' ? 'Complete' : 'Healthy'
+  const overdueTasks = Number(attentionInfo?.overdueTasks || 0)
+  const isAttention = Boolean(attentionInfo?.needsAttention)
+  const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : overdueTasks > 0 ? `${overdueTasks} overdue` : status === 'Completed' ? 'Complete' : 'Healthy'
 
   return (
     <tr className="border-t border-[#e2e9ed] bg-white transition hover:bg-[#f9fbfb]">
