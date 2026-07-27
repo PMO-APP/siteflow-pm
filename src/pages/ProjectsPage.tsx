@@ -108,8 +108,8 @@ export default function ProjectsPage() {
   const [newPortfolioName, setNewPortfolioName] = useState('')
   const [editPortfolioName, setEditPortfolioName] = useState('')
   const [editPortfolioDescription, setEditPortfolioDescription] = useState('')
-  const [selectedOrgId, setSelectedOrgId] = useState<number | ''>('')
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | ''>('')
+  const [selectedOrgId, setSelectedOrgId] = useState<string | number | ''>('')
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<string | number | ''>('')
 
   const [newOverallOwnerEmail, setNewOverallOwnerEmail] = useState('')
   const [newHousebuildOwnerEmail, setNewHousebuildOwnerEmail] = useState('')
@@ -121,7 +121,7 @@ export default function ProjectsPage() {
   const [editProjectPhase, setEditProjectPhase] = useState('Concept')
   const [editProjectLocation, setEditProjectLocation] = useState('')
   const [editProjectHandoverDate, setEditProjectHandoverDate] = useState('')
-  const [editProjectPortfolioId, setEditProjectPortfolioId] = useState<number | ''>('')
+  const [editProjectPortfolioId, setEditProjectPortfolioId] = useState<string | number | ''>('')
   const [editOverallOwnerEmail, setEditOverallOwnerEmail] = useState('')
   const [editHousebuildOwnerEmail, setEditHousebuildOwnerEmail] = useState('')
   const [editMepOwnerEmail, setEditMepOwnerEmail] = useState('')
@@ -437,7 +437,7 @@ ${project.project_name}`
   async function deletePortfolio(portfolio: any) {
     if (!canDeleteItems) return
 
-    const linkedProjects = projects.filter(project => project.portfolio_id === portfolio.id)
+    const linkedProjects = projects.filter(project => String(project.portfolio_id ?? '') === String(portfolio.id ?? ''))
     if (linkedProjects.length > 0) {
       alert(
         `This portfolio still contains ${linkedProjects.length} project${linkedProjects.length === 1 ? '' : 's'}. Move or delete those projects before deleting the portfolio.`
@@ -475,22 +475,38 @@ ${project.project_name}`
   }
 
   async function createPortfolio() {
-    if (!canCreateItems || !newPortfolioName.trim() || !selectedOrgId) return
+    const organizationId = selectedOrgId || organizations[0]?.id || null
 
-    const { error } = await supabase.from('portfolios').insert({
-      name: newPortfolioName.trim(),
-      organization_id: selectedOrgId,
-    })
+    if (!canCreateItems || !newPortfolioName.trim()) return
 
-    if (error) {
-      alert(error.message)
+    if (!organizationId) {
+      alert('No organization was found for this workspace. Run the included portfolio_recovery.sql file, then refresh the page.')
       return
     }
 
+    const { data: createdPortfolio, error } = await supabase
+      .from('portfolios')
+      .insert({
+        name: newPortfolioName.trim(),
+        organization_id: organizationId,
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      alert(`Unable to create portfolio: ${error.message}`)
+      return
+    }
+
+    if (createdPortfolio) {
+      setPortfolios(current => [...current, createdPortfolio])
+      setSelectedPortfolioId(createdPortfolio.id)
+    }
+
     setNewPortfolioName('')
-    setSelectedOrgId('')
+    setSelectedOrgId(organizationId)
     setShowPortfolioModal(false)
-    loadHub()
+    await loadHub()
   }
 
   async function createProject() {
@@ -598,20 +614,6 @@ ${project.project_name}`
               </>
             )}
 
-            {canCreateItems && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedOrgId(organizations[0]?.id || '')
-                  setShowProjectModal(true)
-                }}
-                className="ml-1 inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-[#ef8354] px-3.5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(239,131,84,0.24)] transition hover:bg-[#df7448] sm:px-4"
-              >
-                <Plus size={17} />
-                <span className="hidden xs:inline">New Project</span>
-                <span className="xs:hidden">New</span>
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -700,7 +702,7 @@ ${project.project_name}`
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {portfolios.map(portfolio => {
-              const portfolioProjects = projects.filter(p => p.portfolio_id === portfolio.id)
+              const portfolioProjects = projects.filter(p => String(p.portfolio_id ?? '') === String(portfolio.id ?? ''))
               const attention = portfolioProjects.filter(p => ['Delayed', 'On Hold'].includes(p.status)).length
               const active = portfolioProjects.filter(p => p.status === 'Active').length
               const health = portfolioProjects.length
@@ -748,20 +750,55 @@ ${project.project_name}`
               )
             })}
 
-            {canCreateItems && (
-              <button
-                onClick={() => {
-                  setSelectedOrgId(organizations[0]?.id || '')
-                  setShowPortfolioModal(true)
-                }}
-                className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cfdde2] bg-[#f9fbfb] p-5 text-center transition hover:border-[#ffad89] hover:bg-[#fff7f3]"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#ef8354] shadow-sm">
-                  <Plus size={21} />
+            {portfolios.length === 0 && (
+              <div className="rounded-[22px] border border-[#f0c4b2] bg-[#fff8f4] p-6 md:col-span-2 xl:col-span-3">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#d86335] shadow-sm">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-[#173f5f]">No portfolios are currently visible</h3>
+                    <p className="mt-1 text-sm leading-6 text-[#607580]">
+                      Your existing portfolios may be hidden by Supabase access policies, or they may need to be restored. Run the included portfolio_recovery.sql file once, then refresh this page.
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-4 font-bold text-[#405b69]">Create portfolio</div>
-                <div className="mt-1 text-sm text-[#71838d]">Add another delivery environment</div>
-              </button>
+              </div>
+            )}
+
+            {canCreateItems && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOrgId(organizations[0]?.id || '')
+                    setShowPortfolioModal(true)
+                  }}
+                  className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cfdde2] bg-[#f9fbfb] p-6 text-center transition hover:-translate-y-1 hover:border-[#ffad89] hover:bg-[#fff7f3]"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#ef8354] shadow-sm">
+                    <Briefcase size={22} />
+                  </div>
+                  <div className="mt-4 font-extrabold text-[#173f5f]">Create portfolio</div>
+                  <div className="mt-1 max-w-[220px] text-sm leading-5 text-[#71838d]">Add a separate delivery environment for a group of projects.</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOrgId(organizations[0]?.id || '')
+                    setSelectedPortfolioId('')
+                    setShowProjectModal(true)
+                  }}
+                  className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#c9dce8] bg-[#f7fafc] p-6 text-center transition hover:-translate-y-1 hover:border-[#74a5c3] hover:bg-[#f0f7fb]"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#2f6f91] shadow-sm">
+                    <FolderKanban size={22} />
+                  </div>
+                  <div className="mt-4 font-extrabold text-[#173f5f]">Create project</div>
+                  <div className="mt-1 max-w-[220px] text-sm leading-5 text-[#71838d]">Create a project and assign it to the appropriate portfolio.</div>
+                </button>
+              </>
             )}
           </div>
         </section>
@@ -876,7 +913,7 @@ ${project.project_name}`
                 </thead>
                 <tbody>
                   {archivedProjects.map(project => {
-                    const portfolio = portfolios.find(item => item.id === project.portfolio_id)
+                    const portfolio = portfolios.find(item => String(item.id ?? '') === String(project.portfolio_id ?? ''))
                     return (
                       <tr key={project.id} className="border-t border-[#eadfd9] bg-white">
                         <td className="px-6 py-4"><div className="font-bold text-[#173f5f]">{project.project_name}</div><div className="mt-1 text-xs text-[#7c8d97]">{project.location || 'No location set'}</div></td>
@@ -914,9 +951,9 @@ ${project.project_name}`
           <FieldLabel>Organization</FieldLabel>
           <div className="hub-readonly-field mb-4">{workspaceName}</div>
           <FieldLabel>Portfolio</FieldLabel>
-          <select className="hub-input mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(e.target.value ? Number(e.target.value) : '')}>
+          <select className="hub-input mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(e.target.value || '')}>
             <option value="">Select portfolio</option>
-            {portfolios.filter(p => !selectedOrgId || p.organization_id === selectedOrgId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {portfolios.filter(p => !selectedOrgId || !p.organization_id || String(p.organization_id) === String(selectedOrgId)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <FieldLabel>Project name</FieldLabel>
           <input className="hub-input mb-4" placeholder="Project name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
@@ -952,7 +989,7 @@ ${project.project_name}`
           <FieldLabel>Target handover date</FieldLabel>
           <input className="hub-input mb-4" type="date" value={editProjectHandoverDate} onChange={e => setEditProjectHandoverDate(e.target.value)} />
           <FieldLabel>Portfolio</FieldLabel>
-          <select className="hub-input mb-4" value={editProjectPortfolioId} onChange={e => setEditProjectPortfolioId(e.target.value ? Number(e.target.value) : '')}>
+          <select className="hub-input mb-4" value={editProjectPortfolioId} onChange={e => setEditProjectPortfolioId(e.target.value || '')}>
             <option value="">Unassigned</option>
             {portfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
