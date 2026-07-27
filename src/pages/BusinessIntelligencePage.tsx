@@ -1,103 +1,26 @@
-import { BarChart3, Brain, FileText, Archive, Gauge, LineChart } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowUpRight, BarChart3, Brain, FileText, Gauge, LineChart, ShieldCheck, Target, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-
-const BI_MODULES = [
-  {
-    title: 'Executive Dashboard',
-    description: 'Live portfolio KPIs, RAG status, progress, cost and risk indicators.',
-    icon: BarChart3,
-    status: 'Active',
-    path: '/app',
-  },
-  {
-    title: 'Portfolio Analytics',
-    description: 'Compare project performance, delays, budgets and risk exposure across the portfolio.',
-    icon: LineChart,
-    status: 'Coming Soon',
-    path: '',
-  },
-  {
-    title: 'Executive Reports',
-    description: 'Generate weekly, monthly and board-level reports from live PMOCorex records.',
-    icon: FileText,
-    status: 'Active',
-    path: '/app/pmo-weekly-report',
-  },
-  {
-    title: 'KPI Centre',
-    description: 'Track SPI, CPI, progress, quality, HSE, cost, procurement and consultant KPIs.',
-    icon: Gauge,
-    status: 'Coming Soon',
-    path: '',
-  },
-  {
-    title: 'Report Archive',
-    description: 'Search and retrieve previously generated executive reports.',
-    icon: Archive,
-    status: 'Coming Soon',
-    path: '',
-  },
-  {
-    title: 'AI Insights',
-    description: 'Executive recommendations, early warnings, delay insights and action prompts.',
-    icon: Brain,
-    status: 'Coming Soon',
-    path: '',
-  },
-]
+import { useTasks } from '@/hooks/useTasks'
+import { useProjectStore } from '@/store/project'
 
 export default function BusinessIntelligencePage() {
   const navigate = useNavigate()
-
-  return (
-    <div className="space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-          Business Intelligence
-        </div>
-
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Business Intelligence
-        </h1>
-
-        <p className="text-slate-400 mt-3 max-w-3xl">
-          Convert live project data into executive dashboards, portfolio analytics,
-          automated reports, KPI tracking and management insights.
-        </p>
-      </section>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {BI_MODULES.map(({ title, description, icon: Icon, status, path }) => (
-          <button
-            key={title}
-            type="button"
-            onClick={() => path && navigate(path)}
-            className="card p-5 text-left hover:border-[#c49e48]/30 hover:bg-[#c49e48]/5 transition-all"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="h-11 w-11 rounded-2xl border border-[#c49e48]/20 bg-[#c49e48]/10 flex items-center justify-center">
-                <Icon size={20} className="text-[#c49e48]" />
-              </div>
-
-              <span
-                className={`badge ${
-                  status === 'Active' ? 'badge-green' : 'badge-muted'
-                }`}
-              >
-                {status}
-              </span>
-            </div>
-
-            <h2 className="text-lg font-bold text-[#ede8de] mt-5">
-              {title}
-            </h2>
-
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-              {description}
-            </p>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+  const { projectId, projectName } = useProjectStore()
+  const { data: allTasks = [] } = useTasks()
+  const tasks = allTasks.filter((task:any) => task.project_id === projectId)
+  const completed = tasks.filter((task:any) => task.status === 'Completed').length
+  const delayed = tasks.filter((task:any) => task.status !== 'Completed' && task.finish_date && new Date(task.finish_date) < new Date()).length
+  const progress = tasks.length ? Math.round(tasks.reduce((s:number,t:any)=>s+(t.status==='Completed'?100:Number(t.progress_pct||0)),0)/tasks.length) : 0
+  const modules = [
+    {title:'Executive Dashboard',desc:'Live project health, schedule, risk and delivery indicators.',icon:BarChart3,path:'/app'},
+    {title:'Recovery Intelligence',desc:'Forecast completion and identify the activities driving delay.',icon:TrendingUp,path:'/app/recovery'},
+    {title:'Risk Intelligence',desc:'Review current exposure and changes in the project risk profile.',icon:ShieldCheck,path:'/app/risk-trends'},
+    {title:'Executive Reports',desc:'Generate management reports from live project records.',icon:FileText,path:'/app/pmo-weekly-report'},
+  ]
+  return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px] space-y-5">
+    <section className="overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white"><div className="grid lg:grid-cols-[1fr_380px]"><div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Executive intelligence</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Business Intelligence</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">Turn live data for {projectName || 'the selected project'} into clear decisions, early warnings and management reporting.</p></div><div className="bg-[#123a60] p-7 text-white"><div className="text-[11px] uppercase tracking-[.18em] text-white/60">Delivery pulse</div><div className="mt-3 flex items-end gap-3"><span className="text-5xl font-semibold">{progress}%</span><span className="pb-1 text-sm text-white/65">overall progress</span></div><div className="mt-5 h-2 rounded-full bg-white/15"><div className="h-full rounded-full bg-[#ff7657]" style={{width:`${progress}%`}}/></div></div></div></section>
+    <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[[tasks.length,'Activities',Activity],[completed,'Completed',Target],[delayed,'Delayed',AlertTriangle],[Math.max(0,tasks.length-completed),'Remaining',Gauge]].map(([v,l,I]:any)=><div key={l} className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><I size={17} className={l==='Delayed'&&v?'text-red-500':'text-[#6b7b88]'}/><div className="mt-4 text-3xl font-semibold text-[#102943]">{v}</div><div className="mt-1 text-xs text-[#7b8791]">{l}</div></div>)}</section>
+    <div className="grid gap-5 xl:grid-cols-[1fr_360px]"><section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#6f7d89]">Intelligence workspaces</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Choose an analysis centre</h2></div><Brain className="text-[#ff7657]"/></div><div className="mt-5 grid gap-3 md:grid-cols-2">{modules.map(({title,desc,icon:Icon,path})=><button key={title} onClick={()=>navigate(path)} className="group rounded-2xl border border-[#dfe3e7] p-5 text-left transition hover:border-[#8fb0c7] hover:shadow-sm"><div className="flex justify-between"><span className="rounded-xl bg-[#eaf1f7] p-2.5 text-[#1f668f]"><Icon size={19}/></span><ArrowUpRight size={16} className="text-[#94a0aa] group-hover:text-[#df5f41]"/></div><h3 className="mt-4 font-semibold text-[#102943]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#6f7d89]">{desc}</p></button>)}</div></section>
+    <aside className="space-y-5"><section className="rounded-[24px] bg-[#123a60] p-6 text-white"><div className="flex items-center gap-2 text-[11px] uppercase tracking-[.16em] text-white/60"><Brain size={15}/>Management interpretation</div><h2 className="mt-4 text-xl font-semibold">{delayed ? 'Delivery requires attention' : 'Delivery remains controlled'}</h2><p className="mt-3 text-sm leading-7 text-white/70">{delayed ? `${delayed} activities are past their planned finish dates. Open Recovery Intelligence to identify the immediate sequence constraint.` : 'No overdue activity is currently detected from the available programme data. Continue protecting upcoming approvals and milestones.'}</p><button onClick={()=>navigate('/app/recovery')} className="mt-5 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-[#123a60]">Open recovery view</button></section><section className="rounded-[24px] border border-[#dfe3e7] bg-white p-6"><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.16em] text-[#6f7d89]"><LineChart size={15}/>Next intelligence layer</div><p className="mt-4 text-sm leading-7 text-[#65717c]">Portfolio benchmarking, SPI/CPI and trend analytics can be activated as comparable project data becomes available.</p></section></aside></div>
+  </div></div>
 }
