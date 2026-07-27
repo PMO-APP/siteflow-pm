@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Building2, Plus, Trash2 } from 'lucide-react'
+import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
@@ -177,34 +178,16 @@ export default function ProjectPackagesPage() {
   }, 0)
 
   return (
-    <div className="pmx-command-page space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-          Project Setup
-        </div>
+    <div className="space-y-6">
+      <EnterprisePageHero
+        eyebrow="Delivery structure"
+        title="Delivery Package Control Centre"
+        description="Structure blocks, towers, zones and shared workstreams so progress, accountability and forecasting can be controlled accurately by package."
+        projectName={projectName || 'No project selected'}
+      >
+      </EnterprisePageHero>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Project Packages
-        </h1>
-
-        <p className="text-slate-400 mt-3 max-w-3xl">
-          Set up blocks, towers, zones, infrastructure sections, road packages
-          or work areas so progress can be reported accurately by package.
-        </p>
-
-        <div className="text-xs text-[#6e7d8c] mt-4">
-          Project:{' '}
-          <span className="text-[#c49e48]">
-            {projectName || 'No project selected'}
-          </span>
-        </div>
-      </section>
-
-      {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
-          {notice}
-        </div>
-      )}
+      {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <Metric title="Packages" value={packages.length} />
@@ -221,9 +204,9 @@ export default function ProjectPackagesPage() {
 
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
+          <Plus size={17} className="text-[#df5f41]" />
 
-          <h2 className="font-bold text-[#ede8de]">Add Project Package</h2>
+          <h2 className="font-bold text-[#102943]">Add Project Package</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -366,7 +349,7 @@ export default function ProjectPackagesPage() {
             <tbody>
               {packages.map(item => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {item.package_name || item.block_name}
                   </td>
 
@@ -376,7 +359,7 @@ export default function ProjectPackagesPage() {
 
                   <td>{Number(item.progress_weight || 0)}%</td>
 
-                  <td className="text-[#c49e48] font-semibold">
+                  <td className="text-[#df5f41] font-semibold">
                     {Number(item.progress_pct || 0)}%
                   </td>
 
@@ -407,7 +390,7 @@ export default function ProjectPackagesPage() {
 function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
-      <Building2 size={18} className="text-[#c49e48]" />
+      <Building2 size={18} className="text-[#df5f41]" />
 
       <div className="text-2xl font-black text-white mt-3">{value}</div>
 
