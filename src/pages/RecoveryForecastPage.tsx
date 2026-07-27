@@ -866,33 +866,33 @@ export default function RecoveryForecastPage() {
   const statusColour = statusTone(engine.recoveryStatus)
 
   if (loading) {
-    return <div className="p-8 text-[#ede8de]">Loading recovery intelligence...</div>
+    return <div className="p-8 text-[#102943]">Loading recovery intelligence...</div>
   }
 
   if (!projectId) {
-    return <div className="card p-8 text-[#6e7d8c]">No project selected.</div>
+    return <div className="card p-8 text-[#7b8791]">No project selected.</div>
   }
 
   if (!projectTasks.length) {
     return (
-      <div className="card p-8 text-[#6e7d8c]">
+      <div className="card p-8 text-[#7b8791]">
         No schedule tasks found for this project. Import or add tasks on the Schedule page first.
       </div>
     )
   }
 
   return (
-    <div className="pmx-command-page space-y-5 text-[#18212b]">
-      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+    <div className="-m-4 min-h-screen space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
+      <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.35em] text-[#6e7d8c]">
+            <div className="text-[10px] uppercase tracking-[0.35em] text-[#7b8791]">
               Project Recovery Intelligence
             </div>
             <h1 className="mt-2 text-2xl font-semibold">
               {projectName || context.project?.name || context.project?.project_name || 'Selected Project'}
             </h1>
-            <p className="mt-2 max-w-4xl text-sm text-[#9aa7b3]">
+            <p className="mt-2 max-w-4xl text-sm text-[#65717c]">
               A sequence-based recovery view that calculates delay by comparing today's planned schedule position with the actual site position.
             </p>
           </div>
@@ -900,7 +900,7 @@ export default function RecoveryForecastPage() {
           <button
             type="button"
             onClick={() => projectId && fetchProjectContext(projectId)}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] px-4 py-2 text-sm text-[#cbd5df] hover:bg-white/[0.04]"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#dfe3e7] px-4 py-2 text-sm text-[#536170] hover:bg-[#f2f5f7]"
           >
             <RefreshCw size={15} />
             Refresh
@@ -915,10 +915,10 @@ export default function RecoveryForecastPage() {
       </div>
 
       <div className="grid xl:grid-cols-[1.6fr_1fr] gap-5">
-        <div className="rounded-3xl border border-white/[0.08] bg-gradient-to-br from-[#17222d] to-[#0c1117] p-6 shadow-xl">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
           <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.35em] text-[#6e7d8c]">
+              <div className="text-[10px] uppercase tracking-[0.35em] text-[#7b8791]">
                 Forecast Completion
               </div>
 
@@ -941,15 +941,15 @@ export default function RecoveryForecastPage() {
                   {engine.daysBehind === 0 ? 'On Target' : `+${engine.daysBehind} Days Behind`}
                 </span>
 
-                <span className="rounded-full bg-white/[0.05] px-4 py-2 text-sm text-[#9aa7b3]">
+                <span className="rounded-full bg-[#eef3f6] px-4 py-2 text-sm text-[#65717c]">
                   Target: {formatDate(engine.targetDate)}
                 </span>
               </div>
 
-              <p className="mt-4 text-sm text-[#9aa7b3]">
+              <p className="mt-4 text-sm text-[#65717c]">
                 Delay basis: {engine.delayBasis}
               </p>
-              <p className="mt-1 text-xs text-[#6e7d8c]">
+              <p className="mt-1 text-xs text-[#7b8791]">
                 {engine.targetDateSource}
               </p>
             </div>
@@ -963,8 +963,8 @@ export default function RecoveryForecastPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
-          <label className="text-[10px] uppercase tracking-[0.3em] text-[#6e7d8c]">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
+          <label className="text-[10px] uppercase tracking-[0.3em] text-[#7b8791]">
             Contract Scope
           </label>
 
@@ -972,7 +972,7 @@ export default function RecoveryForecastPage() {
             <select
               value={selectedScope}
               onChange={event => setSelectedScope(event.target.value as ProjectScope)}
-              className="w-full rounded-xl border border-white/[0.08] bg-[#081018] px-3 py-2 text-sm text-[#ede8de] outline-none"
+              className="w-full rounded-xl border border-[#dfe3e7] bg-white px-3 py-2 text-sm text-[#102943] outline-none"
             >
               {PROJECT_SCOPES.map(scope => (
                 <option key={scope} value={scope}>
@@ -985,15 +985,15 @@ export default function RecoveryForecastPage() {
               type="button"
               onClick={saveProjectScope}
               disabled={savingScope}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#c49e48] px-4 py-2 text-sm font-semibold text-[#0c1014] disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#ff7657] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
               <Save size={15} />
               {savingScope ? 'Saving' : 'Save'}
             </button>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+          <div className="mt-5 rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
               Days Behind
             </div>
             <div
@@ -1009,7 +1009,7 @@ export default function RecoveryForecastPage() {
             >
               {engine.daysBehind}
             </div>
-            <div className="mt-1 text-sm text-[#6e7d8c]">
+            <div className="mt-1 text-sm text-[#7b8791]">
               {engine.daysBehind === 0
                 ? 'project is aligned with today’s schedule position'
                 : 'calendar day(s) behind current schedule position'}
@@ -1018,7 +1018,7 @@ export default function RecoveryForecastPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+      <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
         <div className="grid xl:grid-cols-[1fr_auto_1fr_auto_1fr] gap-4 items-stretch">
           <PositionPanel
             title="Should Be Today"
@@ -1027,7 +1027,7 @@ export default function RecoveryForecastPage() {
             tone="blue"
           />
 
-          <div className="hidden xl:flex items-center justify-center text-[#6e7d8c]">
+          <div className="hidden xl:flex items-center justify-center text-[#7b8791]">
             <ArrowRight size={24} />
           </div>
 
@@ -1038,28 +1038,28 @@ export default function RecoveryForecastPage() {
             tone="amber"
           />
 
-          <div className="hidden xl:flex items-center justify-center text-[#6e7d8c]">
+          <div className="hidden xl:flex items-center justify-center text-[#7b8791]">
             <ArrowRight size={24} />
           </div>
 
-          <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
-            <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+          <div className="rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+            <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
               Schedule Position Gap
             </div>
             <div className={`mt-2 text-3xl font-black ${engine.activityGap || engine.stageGap ? 'text-red-400' : 'text-emerald-400'}`}>
               {engine.activityGap} Steps
             </div>
-            <div className="mt-1 text-sm text-[#9aa7b3]">
+            <div className="mt-1 text-sm text-[#65717c]">
               {engine.stageGap} major stage gap(s)
             </div>
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-[#6e7d8c]">
+        <div className="mt-5 rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-[#7b8791]">
             Executive Interpretation
           </div>
-          <p className="mt-2 text-sm leading-6 text-[#cbd5df]">
+          <p className="mt-2 text-sm leading-6 text-[#536170]">
             {engine.executiveSummary}
           </p>
         </div>
@@ -1080,7 +1080,7 @@ export default function RecoveryForecastPage() {
       </div>
 
       <div className="grid xl:grid-cols-3 gap-5">
-        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 xl:col-span-2 shadow-sm">
           <SectionHeader
             title="Blockers to Next Workfront"
             subtitle="These are incomplete activities that should already be progressing before the planned position can be achieved."
@@ -1097,7 +1097,7 @@ export default function RecoveryForecastPage() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
           <SectionHeader
             title="Management Decisions"
             subtitle="Actions that need leadership approval or escalation."
@@ -1112,7 +1112,7 @@ export default function RecoveryForecastPage() {
       </div>
 
       <div className="grid xl:grid-cols-3 gap-5">
-        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 xl:col-span-2 shadow-xl">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 xl:col-span-2 shadow-sm">
           <SectionHeader
             title="Activities Between Actual and Planned Position"
             subtitle="This shows the schedule activities between where site is and where the programme says it should be."
@@ -1132,7 +1132,7 @@ export default function RecoveryForecastPage() {
           />
         </div>
 
-        <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+        <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
           <SectionHeader
             title="Recovery Actions"
             subtitle="Practical actions to protect or recover the forecast."
@@ -1146,7 +1146,7 @@ export default function RecoveryForecastPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
+      <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
         <SectionHeader
           title="Workfront Health"
           subtitle="Remaining work grouped by phase, with blocker pressure highlighted."
@@ -1154,7 +1154,7 @@ export default function RecoveryForecastPage() {
 
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-white/[0.08] text-[#6e7d8c]">
+            <thead className="border-b border-[#dfe3e7] text-[#7b8791]">
               <tr>
                 <th className="py-3 text-left">Phase</th>
                 <th className="text-left">Remaining</th>
@@ -1167,13 +1167,13 @@ export default function RecoveryForecastPage() {
             <tbody>
               {engine.phaseHealth.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-[#6e7d8c]">
+                  <td colSpan={5} className="py-6 text-center text-[#7b8791]">
                     No phase data available.
                   </td>
                 </tr>
               ) : (
                 engine.phaseHealth.map((phase: any) => (
-                  <tr key={phase.phase} className="border-b border-white/[0.04]">
+                  <tr key={phase.phase} className="border-b border-[#edf0f2]">
                     <td className="py-3 font-medium">{phase.phase}</td>
                     <td>{phase.remaining}</td>
                     <td className={phase.blockers > 0 ? 'text-red-400' : 'text-emerald-400'}>
@@ -1181,9 +1181,9 @@ export default function RecoveryForecastPage() {
                     </td>
                     <td>
                       <div className="flex items-center gap-3">
-                        <div className="h-2 w-28 rounded-full bg-white/[0.06]">
+                        <div className="h-2 w-28 rounded-full bg-[#e7ebee]">
                           <div
-                            className="h-2 rounded-full bg-[#c49e48]"
+                            className="h-2 rounded-full bg-[#ff7657]"
                             style={{ width: `${phase.progress}%` }}
                           />
                         </div>
@@ -1210,7 +1210,7 @@ export default function RecoveryForecastPage() {
       </div>
 
       {engine.dueButIncomplete.length > 0 && (
-        <div className="rounded-3xl border border-amber-500/20 bg-[#111a22] p-5 shadow-xl">
+        <div className="rounded-[24px] border border-amber-500/20 bg-white p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <FileWarning className="mt-1 text-amber-400" size={18} />
             <SectionHeader
@@ -1245,8 +1245,8 @@ function HeroMetric({
   tone: Tone
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
-      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+    <div className="rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
         {title}
       </div>
       <div className={`mt-2 text-xl font-black ${toneClass(tone)}`}>
@@ -1268,14 +1268,14 @@ function PositionPanel({
   tone: Tone
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#0c141d] p-4">
-      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+    <div className="rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
         {title}
       </div>
       <div className={`mt-2 text-2xl font-black ${toneClass(tone)}`}>
         {getTaskName(task)}
       </div>
-      <div className="mt-1 text-sm text-[#9aa7b3]">
+      <div className="mt-1 text-sm text-[#65717c]">
         Task #{task?.task_number || '—'} · {helper}
       </div>
     </div>
@@ -1296,16 +1296,16 @@ function MetricCard({
   tone: Tone
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#111a22] p-4 shadow-xl">
+    <div className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+          <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
             {title}
           </div>
           <div className={`mt-2 text-2xl font-black ${toneClass(tone)}`}>
             {value}
           </div>
-          <div className="mt-1 text-xs text-[#6e7d8c]">{helper}</div>
+          <div className="mt-1 text-xs text-[#7b8791]">{helper}</div>
         </div>
         <Icon size={18} className={toneClass(tone)} />
       </div>
@@ -1321,11 +1321,11 @@ function SmallCard({
   value: string | number
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-[#111a22] p-4 shadow-xl">
-      <div className="text-[10px] uppercase tracking-[0.25em] text-[#6e7d8c]">
+    <div className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm">
+      <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
         {title}
       </div>
-      <div className="mt-2 text-2xl font-black text-[#c49e48]">{value}</div>
+      <div className="mt-2 text-2xl font-black text-[#df5f41]">{value}</div>
     </div>
   )
 }
@@ -1339,8 +1339,8 @@ function SectionHeader({
 }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold text-[#ede8de]">{title}</h2>
-      <p className="mt-1 text-sm text-[#6e7d8c]">{subtitle}</p>
+      <h2 className="text-lg font-semibold text-[#102943]">{title}</h2>
+      <p className="mt-1 text-sm text-[#7b8791]">{subtitle}</p>
     </div>
   )
 }
@@ -1359,12 +1359,12 @@ function BlockerCard({ task }: { task: Task }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="font-semibold text-red-200">{getTaskName(task)}</div>
-          <div className="mt-1 text-sm text-[#cbd5df]">
+          <div className="mt-1 text-sm text-[#536170]">
             {getTaskProgress(task) > 0
               ? `${getTaskName(task)} is only ${getTaskProgress(task)}% complete.`
               : `${getTaskName(task)} has not started but should have progressed by now.`}
           </div>
-          <div className="mt-1 text-xs text-[#6e7d8c]">
+          <div className="mt-1 text-xs text-[#7b8791]">
             Planned: {formatDate(safeDate(getTaskStart(task)))} → {formatDate(safeDate(getTaskFinish(task)))}
           </div>
         </div>
@@ -1385,8 +1385,8 @@ function ActionItem({
   icon: React.ElementType
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-[#0c141d] p-3 text-sm text-[#cbd5df]">
-      <Icon size={16} className="mt-0.5 text-[#c49e48]" />
+    <div className="flex items-start gap-3 rounded-2xl border border-[#dfe3e7] bg-[#f8fafb] p-3 text-sm text-[#536170]">
+      <Icon size={16} className="mt-0.5 text-[#df5f41]" />
       <span>{text}</span>
     </div>
   )
@@ -1404,7 +1404,7 @@ function Table({
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="border-b border-white/[0.08] text-[#6e7d8c]">
+        <thead className="border-b border-[#dfe3e7] text-[#7b8791]">
           <tr>
             {columns.map(column => (
               <th key={column} className="py-3 text-left">
@@ -1417,13 +1417,13 @@ function Table({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="py-6 text-center text-[#6e7d8c]">
+              <td colSpan={columns.length} className="py-6 text-center text-[#7b8791]">
                 {emptyText}
               </td>
             </tr>
           ) : (
             rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-white/[0.04]">
+              <tr key={rowIndex} className="border-b border-[#edf0f2]">
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex} className="py-3">
                     {cell}
