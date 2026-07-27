@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
 import {
   canAccessAdminConsole,
   canCreateWorkspaceItems,
@@ -57,6 +58,25 @@ const PROJECT_PHASES = [
   'Defects Liability',
   'Closed Out',
 ]
+
+type DialogRequest = {
+  variant?: PMOCorexDialogVariant
+  eyebrow?: string
+  title: string
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+  showCancel?: boolean
+  inputLabel?: string
+  inputPlaceholder?: string
+  expectedValue?: string
+}
+
+type DialogState = DialogRequest & {
+  open: boolean
+  inputValue: string
+  busy: boolean
+}
 
 const INTERNAL_ROLE_LABELS: Record<string, string> = {
   workspace_admin: 'Workspace Admin',
@@ -132,6 +152,26 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [phaseFilter, setPhaseFilter] = useState('All')
 
+  const [dialog, setDialog] = useState<DialogState>({ open: false, title: '', message: '', inputValue: '', busy: false })
+  const dialogResolver = useRef<((value: boolean) => void) | null>(null)
+
+  function showNotice(request: DialogRequest) {
+    setDialog({ ...request, open: true, inputValue: '', busy: false, showCancel: false })
+  }
+
+  function requestDecision(request: DialogRequest) {
+    return new Promise<boolean>(resolve => {
+      dialogResolver.current = resolve
+      setDialog({ ...request, open: true, inputValue: '', busy: false, showCancel: true })
+    })
+  }
+
+  function closeDialog(result = false) {
+    dialogResolver.current?.(result)
+    dialogResolver.current = null
+    setDialog(current => ({ ...current, open: false, inputValue: '', busy: false }))
+  }
+
   const navigate = useNavigate()
   const { setProject } = useProjectStore()
 
@@ -164,7 +204,7 @@ export default function ProjectsPage() {
       .or(`user_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
 
     if (membershipError) {
-      alert(membershipError.message)
+      showNotice({ variant: 'danger', title: 'Unable to load access', message: membershipError.message, confirmLabel: 'Close' })
       setLoading(false)
       return
     }
@@ -208,12 +248,7 @@ export default function ProjectsPage() {
     ])
 
     if (orgError || portError || projectError) {
-      alert(
-        orgError?.message ||
-          portError?.message ||
-          projectError?.message ||
-          'Unable to load workspace.'
-      )
+      showNotice({ variant: 'danger', title: 'Workspace could not be loaded', message: orgError?.message || portError?.message || projectError?.message || 'Unable to load workspace.', confirmLabel: 'Close' })
       setLoading(false)
       return
     }
@@ -309,7 +344,7 @@ export default function ProjectsPage() {
       .eq('id', editingProject.id)
 
     if (error) {
-      alert(error.message)
+      showNotice({ variant: 'danger', title: 'Action could not be completed', message: error.message, confirmLabel: 'Close' })
       return
     }
 
@@ -339,7 +374,7 @@ export default function ProjectsPage() {
       .eq('id', editingPortfolio.id)
 
     if (error) {
-      alert(error.message)
+      showNotice({ variant: 'danger', title: 'Action could not be completed', message: error.message, confirmLabel: 'Close' })
       return
     }
 
@@ -350,12 +385,13 @@ export default function ProjectsPage() {
 
   async function archiveProject(project: any) {
     if (!canDeleteItems) return
-
-    const confirmed = window.confirm(
-      `Archive “${project.project_name}”?
-
-The project will disappear from active workspace views, but its tasks, approvals, documents and other records will remain safely stored. An Admin can restore it later.`
-    )
+    const confirmed = await requestDecision({
+      variant: 'archive',
+      title: `Archive ${project.project_name}?`,
+      message: 'The project will disappear from active workspace views, while its tasks, approvals, documents and other records remain safely stored. An Admin can restore it later.',
+      confirmLabel: 'Archive project',
+      cancelLabel: 'Keep active',
+    })
     if (!confirmed) return
 
     const { data: archivedRows, error } = await supabase
@@ -368,18 +404,18 @@ The project will disappear from active workspace views, but its tasks, approvals
       .select('*')
 
     if (error) {
-      alert(`Unable to archive project: ${error.message}`)
+      showNotice({ variant: 'danger', title: 'Project could not be archived', message: error.message, confirmLabel: 'Close' })
       return
     }
 
     if (!archivedRows || archivedRows.length === 0) {
-      alert('The project was not archived. Confirm that the included soft_delete_projects.sql migration has been run and that Admin UPDATE access is enabled.')
+      showNotice({ variant: 'warning', title: 'Archive was not completed', message: 'Confirm that the soft_delete_projects.sql migration has been run and that Admin UPDATE access is enabled.', confirmLabel: 'Understood' })
       return
     }
 
     setProjects(current => current.filter(item => item.id !== project.id))
     setArchivedProjects(current => [archivedRows[0], ...current])
-    alert(`“${project.project_name}” was moved to Archived Projects.`)
+    showNotice({ variant: 'success', title: 'Project archived', message: `“${project.project_name}” was moved to Archived Projects. Its linked records remain safely stored.`, confirmLabel: 'Done' })
   }
 
   async function restoreProject(project: any) {
@@ -392,46 +428,46 @@ The project will disappear from active workspace views, but its tasks, approvals
       .select('*')
 
     if (error) {
-      alert(`Unable to restore project: ${error.message}`)
+      showNotice({ variant: 'danger', title: 'Project could not be restored', message: error.message, confirmLabel: 'Close' })
       return
     }
 
     if (!restoredRows || restoredRows.length === 0) {
-      alert('The project was not restored. Check the project update policy in Supabase.')
+      showNotice({ variant: 'warning', title: 'Restore was not completed', message: 'Check the project update policy in Supabase, then try again.', confirmLabel: 'Understood' })
       return
     }
 
     setArchivedProjects(current => current.filter(item => item.id !== project.id))
     setProjects(current => [...current, restoredRows[0]].sort((a, b) => Number(a.id) - Number(b.id)))
-    alert(`“${project.project_name}” was restored successfully.`)
+    showNotice({ variant: 'success', title: 'Project restored', message: `“${project.project_name}” is active and visible in the workspace again.`, confirmLabel: 'Done' })
   }
 
   async function permanentlyDeleteProject(project: any) {
     if (!canDeleteItems) return
-
-    const typedName = window.prompt(
-      `Permanently delete “${project.project_name}” and every record attached to it?
-
-This cannot be undone. Type the project name exactly to continue:
-${project.project_name}`
-    )
-
-    if (typedName?.trim() !== String(project.project_name || '').trim()) {
-      if (typedName !== null) alert('Project name did not match. Nothing was deleted.')
-      return
-    }
+    const confirmed = await requestDecision({
+      variant: 'danger',
+      eyebrow: 'Permanent deletion',
+      title: `Delete ${project.project_name} permanently?`,
+      message: 'This will permanently remove the project and every linked record. This action cannot be undone.',
+      confirmLabel: 'Permanently delete',
+      cancelLabel: 'Cancel',
+      inputLabel: `Type “${project.project_name}” to confirm`,
+      inputPlaceholder: project.project_name,
+      expectedValue: String(project.project_name || ''),
+    })
+    if (!confirmed) return
 
     const { error } = await supabase.rpc('permanently_delete_project', {
       target_project_id: project.id,
     })
 
     if (error) {
-      alert(`Unable to permanently delete project: ${error.message}`)
+      showNotice({ variant: 'danger', title: 'Permanent deletion failed', message: error.message, confirmLabel: 'Close' })
       return
     }
 
     setArchivedProjects(current => current.filter(item => item.id !== project.id))
-    alert(`“${project.project_name}” and its linked records were permanently deleted.`)
+    showNotice({ variant: 'success', title: 'Project permanently deleted', message: `“${project.project_name}” and all linked records have been removed.`, confirmLabel: 'Done' })
   }
 
   async function deletePortfolio(portfolio: any) {
@@ -439,15 +475,17 @@ ${project.project_name}`
 
     const linkedProjects = projects.filter(project => String(project.portfolio_id ?? '') === String(portfolio.id ?? ''))
     if (linkedProjects.length > 0) {
-      alert(
-        `This portfolio still contains ${linkedProjects.length} project${linkedProjects.length === 1 ? '' : 's'}. Move or delete those projects before deleting the portfolio.`
-      )
+      showNotice({ variant: 'warning', title: 'Portfolio still contains projects', message: `This portfolio contains ${linkedProjects.length} project${linkedProjects.length === 1 ? '' : 's'}. Move or archive those projects before deleting the portfolio.`, confirmLabel: 'Understood' })
       return
     }
 
-    const confirmed = window.confirm(
-      `Delete the portfolio “${portfolio.name}”? This action cannot be undone.`
-    )
+    const confirmed = await requestDecision({
+      variant: 'danger',
+      title: `Delete ${portfolio.name}?`,
+      message: 'The empty portfolio will be permanently removed from the workspace. This action cannot be undone.',
+      confirmLabel: 'Delete portfolio',
+      cancelLabel: 'Cancel',
+    })
     if (!confirmed) return
 
     const { data: deletedRows, error } = await supabase
@@ -457,20 +495,18 @@ ${project.project_name}`
       .select('id')
 
     if (error) {
-      alert(`Unable to delete portfolio: ${error.message}`)
+      showNotice({ variant: 'danger', title: 'Portfolio could not be deleted', message: error.message, confirmLabel: 'Close' })
       return
     }
 
     if (!deletedRows || deletedRows.length === 0) {
-      alert(
-        'The portfolio was not deleted. Your database is still blocking DELETE operations through Row Level Security. Run the included admin_delete_policies.sql file in the Supabase SQL Editor, then try again.'
-      )
+      showNotice({ variant: 'warning', title: 'Portfolio deletion blocked', message: 'Row Level Security is still blocking DELETE operations. Run admin_delete_policies.sql in the Supabase SQL Editor, then try again.', confirmLabel: 'Understood' })
       return
     }
 
     setPortfolios(current => current.filter(item => item.id !== portfolio.id))
     if (portfolioFilter === String(portfolio.id)) setPortfolioFilter('All')
-    alert(`“${portfolio.name}” was deleted successfully.`)
+    showNotice({ variant: 'success', title: 'Portfolio deleted', message: `“${portfolio.name}” was deleted successfully.`, confirmLabel: 'Done' })
     await loadHub()
   }
 
@@ -480,7 +516,7 @@ ${project.project_name}`
     if (!canCreateItems || !newPortfolioName.trim()) return
 
     if (!organizationId) {
-      alert('No organization was found for this workspace. Run the included portfolio_recovery.sql file, then refresh the page.')
+      showNotice({ variant: 'warning', title: 'Workspace organization missing', message: 'Run portfolio_recovery.sql in the Supabase SQL Editor, then refresh this page.', confirmLabel: 'Understood' })
       return
     }
 
@@ -494,7 +530,7 @@ ${project.project_name}`
       .single()
 
     if (error) {
-      alert(`Unable to create portfolio: ${error.message}`)
+      showNotice({ variant: 'danger', title: 'Portfolio could not be created', message: error.message, confirmLabel: 'Close' })
       return
     }
 
@@ -526,7 +562,7 @@ ${project.project_name}`
     })
 
     if (error) {
-      alert(error.message)
+      showNotice({ variant: 'danger', title: 'Action could not be completed', message: error.message, confirmLabel: 'Close' })
       return
     }
 
@@ -997,6 +1033,25 @@ ${project.project_name}`
           <button className="hub-primary-button mt-5 w-full justify-center" onClick={updateProject}>Save Project Changes</button>
         </Modal>
       )}
+
+      <PMOCorexDialog
+        open={dialog.open}
+        variant={dialog.variant}
+        eyebrow={dialog.eyebrow}
+        title={dialog.title}
+        message={dialog.message}
+        confirmLabel={dialog.confirmLabel}
+        cancelLabel={dialog.cancelLabel}
+        showCancel={dialog.showCancel}
+        inputLabel={dialog.inputLabel}
+        inputPlaceholder={dialog.inputPlaceholder}
+        inputValue={dialog.inputValue}
+        expectedValue={dialog.expectedValue}
+        busy={dialog.busy}
+        onInputChange={value => setDialog(current => ({ ...current, inputValue: value }))}
+        onConfirm={() => closeDialog(true)}
+        onClose={() => closeDialog(false)}
+      />
     </div>
   )
 }
