@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 
+import { pmoConfirm } from '@/lib/notifications'
 const SECTIONS = [
   'Pre-Contract',
   'Tender',
@@ -786,7 +787,7 @@ export default function CostingPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this cost report item?')
+    const confirmed = await pmoConfirm('Delete this cost report item?')
     if (!confirmed) return
 
     const { error } = await supabase.from('cost_reports').delete().eq('id', id)
@@ -805,7 +806,7 @@ export default function CostingPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this contract?')
+    const confirmed = await pmoConfirm('Delete this contract?')
     if (!confirmed) return
 
     const { error } = await supabase.from('cost_contracts').delete().eq('id', id)
@@ -824,7 +825,7 @@ export default function CostingPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this payment record?')
+    const confirmed = await pmoConfirm('Delete this payment record?')
     if (!confirmed) return
 
     const { error } = await supabase.from('cost_payments').delete().eq('id', id)
@@ -843,7 +844,7 @@ export default function CostingPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this variation?')
+    const confirmed = await pmoConfirm('Delete this variation?')
     if (!confirmed) return
 
     const { error } = await supabase.from('cost_variations').delete().eq('id', id)
@@ -862,7 +863,7 @@ export default function CostingPage() {
       return
     }
 
-    const confirmed = window.confirm('Delete this procurement item?')
+    const confirmed = await pmoConfirm('Delete this procurement item?')
     if (!confirmed) return
 
     const { error } = await supabase
