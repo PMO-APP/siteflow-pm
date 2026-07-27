@@ -355,13 +355,28 @@ export default function ProjectsPage() {
       return
     }
 
-    const { error } = await supabase.from('projects').delete().eq('id', project.id)
+    const { data: deletedRows, error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', project.id)
+      .select('id')
 
     if (error) {
       alert(`Unable to delete project: ${error.message}`)
       return
     }
 
+    // Supabase can return no error when Row Level Security blocks a delete.
+    // Confirm that the database actually returned the deleted project row.
+    if (!deletedRows || deletedRows.length === 0) {
+      alert(
+        'The project was not deleted. Your database is still blocking DELETE operations through Row Level Security. Run the included admin_delete_policies.sql file in the Supabase SQL Editor, then try again.'
+      )
+      return
+    }
+
+    setProjects(current => current.filter(item => item.id !== project.id))
+    alert(`“${project.project_name}” was deleted successfully.`)
     await loadHub()
   }
 
@@ -381,14 +396,27 @@ export default function ProjectsPage() {
     )
     if (!confirmed) return
 
-    const { error } = await supabase.from('portfolios').delete().eq('id', portfolio.id)
+    const { data: deletedRows, error } = await supabase
+      .from('portfolios')
+      .delete()
+      .eq('id', portfolio.id)
+      .select('id')
 
     if (error) {
       alert(`Unable to delete portfolio: ${error.message}`)
       return
     }
 
+    if (!deletedRows || deletedRows.length === 0) {
+      alert(
+        'The portfolio was not deleted. Your database is still blocking DELETE operations through Row Level Security. Run the included admin_delete_policies.sql file in the Supabase SQL Editor, then try again.'
+      )
+      return
+    }
+
+    setPortfolios(current => current.filter(item => item.id !== portfolio.id))
     if (portfolioFilter === String(portfolio.id)) setPortfolioFilter('All')
+    alert(`“${portfolio.name}” was deleted successfully.`)
     await loadHub()
   }
 
@@ -488,7 +516,7 @@ export default function ProjectsPage() {
       <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
           <button type="button" onClick={() => navigate('/')} className="text-left">
-            <PMOCorexLogo size={40} tone="light" />
+            <PMOCorexLogo size={40} />
           </button>
 
           <div className="flex items-center gap-2">
