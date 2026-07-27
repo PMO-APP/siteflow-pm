@@ -338,11 +338,11 @@ function getScope(project: any): ProjectScope {
 }
 
 function toneClass(tone: Tone) {
-  if (tone === 'green') return 'text-emerald-400'
-  if (tone === 'amber') return 'text-amber-400'
-  if (tone === 'red') return 'text-red-400'
-  if (tone === 'blue') return 'text-sky-400'
-  return 'text-slate-300'
+  if (tone === 'green') return 'text-emerald-700'
+  if (tone === 'amber') return 'text-amber-700'
+  if (tone === 'red') return 'text-[#c84f36]'
+  if (tone === 'blue') return 'text-[#1f668f]'
+  return 'text-[#536170]'
 }
 
 function statusTone(status: RecoveryStatus): Tone {
@@ -922,7 +922,7 @@ export default function RecoveryForecastPage() {
                 Forecast Completion
               </div>
 
-              <div className={`mt-3 text-5xl xl:text-6xl font-black leading-none ${toneClass(statusColour)}`}>
+              <div className="mt-3 text-5xl font-black leading-none text-[#123a60] xl:text-6xl">
                 {formatDate(engine.forecastDate)}
               </div>
 
@@ -930,12 +930,12 @@ export default function RecoveryForecastPage() {
                 <span
                   className={`rounded-full px-4 py-2 text-sm font-bold ${
                     engine.daysBehind > 30
-                      ? 'bg-red-500/15 text-red-300'
+                      ? 'bg-[#fff0eb] text-[#c84f36]'
                       : engine.daysBehind > 7
-                      ? 'bg-amber-500/15 text-amber-300'
+                      ? 'bg-amber-50 text-amber-700'
                       : engine.daysBehind > 0
-                      ? 'bg-sky-500/15 text-sky-300'
-                      : 'bg-emerald-500/15 text-emerald-300'
+                      ? 'bg-[#eaf1f7] text-[#1f668f]'
+                      : 'bg-emerald-50 text-emerald-700'
                   }`}
                 >
                   {engine.daysBehind === 0 ? 'On Target' : `+${engine.daysBehind} Days Behind`}
@@ -999,12 +999,12 @@ export default function RecoveryForecastPage() {
             <div
               className={`mt-2 text-4xl font-black ${
                 engine.daysBehind > 30
-                  ? 'text-red-400'
+                  ? 'text-[#c84f36]'
                   : engine.daysBehind > 7
                   ? 'text-amber-400'
                   : engine.daysBehind > 0
                   ? 'text-sky-400'
-                  : 'text-emerald-400'
+                  : 'text-emerald-700'
               }`}
             >
               {engine.daysBehind}
@@ -1046,7 +1046,7 @@ export default function RecoveryForecastPage() {
             <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
               Schedule Position Gap
             </div>
-            <div className={`mt-2 text-3xl font-black ${engine.activityGap || engine.stageGap ? 'text-red-400' : 'text-emerald-400'}`}>
+            <div className={`mt-2 text-3xl font-black ${engine.activityGap || engine.stageGap ? 'text-[#c84f36]' : 'text-emerald-700'}`}>
               {engine.activityGap} Steps
             </div>
             <div className="mt-1 text-sm text-[#65717c]">
@@ -1176,7 +1176,7 @@ export default function RecoveryForecastPage() {
                   <tr key={phase.phase} className="border-b border-[#edf0f2]">
                     <td className="py-3 font-medium">{phase.phase}</td>
                     <td>{phase.remaining}</td>
-                    <td className={phase.blockers > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                    <td className={phase.blockers > 0 ? 'text-[#c84f36]' : 'text-emerald-700'}>
                       {phase.blockers}
                     </td>
                     <td>
@@ -1192,11 +1192,11 @@ export default function RecoveryForecastPage() {
                     </td>
                     <td>
                       {phase.blockers > 0 ? (
-                        <span className="rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-300">
+                        <span className="rounded-full bg-[#fff0eb] px-2 py-1 text-xs text-[#c84f36]">
                           Recovery Needed
                         </span>
                       ) : (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
                           Stable
                         </span>
                       )}
@@ -1325,7 +1325,7 @@ function SmallCard({
       <div className="text-[10px] uppercase tracking-[0.25em] text-[#7b8791]">
         {title}
       </div>
-      <div className="mt-2 text-2xl font-black text-[#df5f41]">{value}</div>
+      <div className="mt-2 text-2xl font-black text-[#123a60]">{value}</div>
     </div>
   )
 }
@@ -1347,7 +1347,7 @@ function SectionHeader({
 
 function EmptyGood({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
       {text}
     </div>
   )
@@ -1355,10 +1355,10 @@ function EmptyGood({ text }: { text: string }) {
 
 function BlockerCard({ task }: { task: Task }) {
   return (
-    <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
+    <div className="rounded-2xl border border-[#ffd1c5] bg-[#fff7f4] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-semibold text-red-200">{getTaskName(task)}</div>
+          <div className="font-semibold text-[#102943]">{getTaskName(task)}</div>
           <div className="mt-1 text-sm text-[#536170]">
             {getTaskProgress(task) > 0
               ? `${getTaskName(task)} is only ${getTaskProgress(task)}% complete.`
@@ -1369,7 +1369,7 @@ function BlockerCard({ task }: { task: Task }) {
           </div>
         </div>
 
-        <span className="rounded-full bg-red-500/20 px-3 py-1 text-xs text-red-200">
+        <span className="rounded-full bg-[#ffe4dc] px-3 py-1 text-xs text-[#c84f36]">
           {getTaskProgress(task)}%
         </span>
       </div>
