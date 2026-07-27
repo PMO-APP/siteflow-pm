@@ -46,6 +46,8 @@ export interface ScheduleImportBatch {
   project_id: number
 
   discipline: ScheduleDiscipline
+  delivery_package_id?: string
+  schedule_version_id?: string
 
   file_name?: string
 
@@ -67,6 +69,8 @@ export interface Task {
   name: string
   phase: string
   discipline: ScheduleDiscipline
+  delivery_package_id?: string
+  schedule_version_id?: string
 
 weight_pct?: number
 
