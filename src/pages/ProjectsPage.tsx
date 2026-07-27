@@ -573,24 +573,43 @@ ${project.project_name}`
             <PMOCorexLogo size={40} />
           </button>
 
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate('/profile')} className="hub-icon-button" title="My profile">
+          <div className="flex shrink-0 items-center rounded-2xl border border-[#d8e4ee] bg-[#f7fafb] p-1.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#173f5f] transition hover:bg-white hover:shadow-sm"
+              title="My profile"
+              aria-label="Open my profile"
+            >
               <UserCircle size={19} />
             </button>
+
             {canAccessAdmin && (
-              <button onClick={() => navigate('/admin')} className="hub-secondary-button hidden sm:inline-flex">
-                <Shield size={16} /> Admin Console
-              </button>
+              <>
+                <span className="mx-1 hidden h-6 w-px bg-[#d8e4ee] sm:block" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin')}
+                  className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
+                >
+                  <Shield size={16} />
+                  <span>Admin Console</span>
+                </button>
+              </>
             )}
+
             {canCreateItems && (
               <button
+                type="button"
                 onClick={() => {
                   setSelectedOrgId(organizations[0]?.id || '')
                   setShowProjectModal(true)
                 }}
-                className="hub-primary-button"
+                className="ml-1 inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-[#ef8354] px-3.5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(239,131,84,0.24)] transition hover:bg-[#df7448] sm:px-4"
               >
-                <Plus size={17} /> New Project
+                <Plus size={17} />
+                <span className="hidden xs:inline">New Project</span>
+                <span className="xs:hidden">New</span>
               </button>
             )}
           </div>
