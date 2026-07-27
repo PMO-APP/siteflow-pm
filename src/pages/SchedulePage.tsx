@@ -16,13 +16,17 @@ import {
   Building2,
   Layers3,
   X,
+  Pencil,
+  Archive,
+  RotateCcw,
+  Trash2,
 } from 'lucide-react'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useScheduleImport } from '@/features/schedule/imports'
-import { useCreateDeliveryPackage, useDeliveryPackages, type DeliveryPackage } from '@/features/schedule/deliveryPackages'
+import { useArchiveDeliveryPackage, useCreateDeliveryPackage, useDeleteDeliveryPackage, useDeliveryPackages, useUpdateDeliveryPackage, type DeliveryPackage } from '@/features/schedule/deliveryPackages'
 import { useQualityGates } from '@/hooks/useData'
 import { fdate, urgencyColor, computeRAG } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
@@ -30,6 +34,7 @@ import type { Task } from '@/types'
 import TaskModal from '@/components/modules/schedule/TaskModal'
 import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
+import { pmoConfirm, pmoPrompt, pmoToast } from '@/lib/notifications'
 
 type View = 'list' | 'gantt' | 'milestones'
 type DisciplineTab = 'Overall' | 'Housebuild' | 'MEP' | 'Infrastructure'
@@ -53,22 +58,31 @@ export default function SchedulePage() {
   const [modalTask, setModalTask] = useState<Task | null | 'new'>(null)
   const [selectedPackageId, setSelectedPackageId] = useState<string>('all')
   const [showPackageModal, setShowPackageModal] = useState(false)
+  const [editingPackage, setEditingPackage] = useState<DeliveryPackage | null>(null)
+  const [showArchivedPackages, setShowArchivedPackages] = useState(false)
   const [packageError, setPackageError] = useState('')
   const [packageForm, setPackageForm] = useState({ name: '', code: '', discipline: 'Housebuild' as ScheduleDiscipline, package_type: 'Block' as 'Block' | 'Shared' | 'Other', contractor_name: '', weight_pct: 0 })
 
   const { importExcel, importXml, uploadBackup } = useScheduleImport()
   const { data: allTasks = [], isLoading } = useTasks()
   const { data: qualityGates = [] } = useQualityGates()
-  const { data: deliveryPackages = [] } = useDeliveryPackages()
+  const { data: allDeliveryPackages = [] } = useDeliveryPackages(true)
+  const deliveryPackages = allDeliveryPackages.filter(pkg => !pkg.archived_at)
+  const archivedDeliveryPackages = allDeliveryPackages.filter(pkg => Boolean(pkg.archived_at))
   const createDeliveryPackage = useCreateDeliveryPackage()
+  const updateDeliveryPackage = useUpdateDeliveryPackage()
+  const archiveDeliveryPackage = useArchiveDeliveryPackage()
+  const deleteDeliveryPackage = useDeleteDeliveryPackage()
 
   const activeDiscipline = disciplineTab === 'Overall' ? undefined : (disciplineTab as ScheduleDiscipline)
   const canManageScheduleUpload =
     disciplineTab !== 'Overall' && selectedPackageId !== 'all' && ['workspace_admin', 'admin', 'pmo'].includes(role || '')
   const canConfigurePackages = ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+  const canAdministerPackages = ['workspace_admin', 'admin'].includes(role || '')
 
   const today = new Date()
-  const projectTasks: Task[] = allTasks.filter((task: Task) => task.project_id === projectId)
+  const activePackageIds = new Set(deliveryPackages.map(pkg => pkg.id))
+  const projectTasks: Task[] = allTasks.filter((task: Task) => task.project_id === projectId && (!task.delivery_package_id || activePackageIds.has(task.delivery_package_id)))
   const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => pkg.discipline === disciplineTab)
   const selectedPackage = deliveryPackages.find(pkg => pkg.id === selectedPackageId)
   const disciplineTasks = disciplineTab === 'Overall'
@@ -233,21 +247,69 @@ export default function SchedulePage() {
     return { ...pkg, total, progress, delayed, atRisk, health }
   }), [deliveryPackages, projectTasks])
 
+  const resetPackageForm = () => {
+    setEditingPackage(null)
+    setPackageError('')
+    setPackageForm({ name: '', code: '', discipline: 'Housebuild', package_type: 'Block', contractor_name: '', weight_pct: 0 })
+  }
+
+  const openCreatePackage = (discipline?: ScheduleDiscipline) => {
+    resetPackageForm()
+    if (discipline) setPackageForm(prev => ({ ...prev, discipline, package_type: discipline === 'Housebuild' ? 'Block' : 'Shared' }))
+    setShowPackageModal(true)
+  }
+
+  const openEditPackage = (pkg: DeliveryPackage) => {
+    setEditingPackage(pkg)
+    setPackageError('')
+    setPackageForm({ name: pkg.name, code: pkg.code || '', discipline: pkg.discipline, package_type: pkg.package_type, contractor_name: pkg.contractor_name || '', weight_pct: Number(pkg.weight_pct || 0) })
+    setShowPackageModal(true)
+  }
+
   const saveDeliveryPackage = async () => {
     setPackageError('')
     if (!packageForm.name.trim()) { setPackageError('Package or block name is required.'); return }
     try {
-      const created = await createDeliveryPackage.mutateAsync({
-        ...packageForm,
-        is_shared: packageForm.discipline !== 'Housebuild' || packageForm.package_type === 'Shared',
-      })
+      const payload = { ...packageForm, is_shared: packageForm.discipline !== 'Housebuild' || packageForm.package_type === 'Shared' }
+      const wasEditing = Boolean(editingPackage)
+      const saved = editingPackage
+        ? await updateDeliveryPackage.mutateAsync({ id: editingPackage.id, input: payload })
+        : await createDeliveryPackage.mutateAsync(payload)
       setShowPackageModal(false)
-      setPackageForm({ name: '', code: '', discipline: 'Housebuild', package_type: 'Block', contractor_name: '', weight_pct: 0 })
-      setDisciplineTab(created.discipline)
-      setSelectedPackageId(created.id)
-    } catch (error) {
-      setPackageError(error instanceof Error ? error.message : 'Unable to create delivery package.')
+      resetPackageForm()
+      setDisciplineTab(saved.discipline)
+      setSelectedPackageId(saved.id)
+      pmoToast({ title: wasEditing ? 'Delivery package updated' : 'Delivery package created', message: `${saved.name} is ready for schedule control.`, tone: 'success' })
+    } catch (error) { setPackageError(error instanceof Error ? error.message : 'Unable to save delivery package.') }
+  }
+
+  const archivePackage = async (pkg: DeliveryPackage) => {
+    const confirmed = await pmoConfirm({ title: `Archive ${pkg.name}?`, message: 'The package and its schedule will be removed from active project views, but all records will be preserved and can be restored by an administrator.', tone: 'warning', confirmLabel: 'Archive package', cancelLabel: 'Keep active' })
+    if (!confirmed) return
+    try {
+      await archiveDeliveryPackage.mutateAsync({ id: pkg.id })
+      if (selectedPackageId === pkg.id) setSelectedPackageId('all')
+      pmoToast({ title: 'Package archived', message: `${pkg.name} has been moved to the archive.`, tone: 'success' })
+    } catch (error) { pmoToast({ title: 'Archive failed', message: error instanceof Error ? error.message : 'Unable to archive package.', tone: 'error' }) }
+  }
+
+  const restorePackage = async (pkg: DeliveryPackage) => {
+    try {
+      await archiveDeliveryPackage.mutateAsync({ id: pkg.id, restore: true })
+      pmoToast({ title: 'Package restored', message: `${pkg.name} is active again.`, tone: 'success' })
+    } catch (error) { pmoToast({ title: 'Restore failed', message: error instanceof Error ? error.message : 'Unable to restore package.', tone: 'error' }) }
+  }
+
+  const permanentlyDeletePackage = async (pkg: DeliveryPackage) => {
+    const typed = await pmoPrompt({ title: `Permanently delete ${pkg.name}?`, message: 'This permanently removes the delivery package, every schedule revision and every task attached to it. This action cannot be undone.', tone: 'error', inputLabel: `Type “${pkg.name}” to confirm`, placeholder: pkg.name, required: true, confirmLabel: 'Permanently delete', cancelLabel: 'Cancel' })
+    if (typed !== pkg.name) {
+      if (typed !== null) pmoToast({ title: 'Name did not match', message: 'The delivery package was not deleted.', tone: 'warning' })
+      return
     }
+    try {
+      await deleteDeliveryPackage.mutateAsync(pkg.id)
+      pmoToast({ title: 'Package permanently deleted', message: `${pkg.name} and all attached schedule records have been removed.`, tone: 'success' })
+    } catch (error) { pmoToast({ title: 'Delete failed', message: error instanceof Error ? error.message : 'Unable to permanently delete package.', tone: 'error' }) }
   }
 
   return (
@@ -275,7 +337,7 @@ export default function SchedulePage() {
               {disciplineTab !== 'Overall' && <div className="mt-5 flex flex-wrap items-center gap-2">
                 <button onClick={() => setSelectedPackageId('all')} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === 'all' ? 'bg-[#eaf1f7] text-[#123a60]' : 'border border-[#dfe3e7] text-[#536170]'}`}>All {disciplineTab}</button>
                 {disciplinePackages.map(pkg => <button key={pkg.id} onClick={() => setSelectedPackageId(pkg.id)} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === pkg.id ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170]'}`}>{pkg.name}</button>)}
-                {canConfigurePackages && <button onClick={() => { setPackageForm(prev => ({ ...prev, discipline: disciplineTab, package_type: disciplineTab === 'Housebuild' ? 'Block' : 'Shared' })); setShowPackageModal(true) }} className="rounded-xl border border-dashed border-[#ff9b83] px-3.5 py-2 text-xs font-semibold text-[#df5f41]"><Plus size={13} className="mr-1 inline" />Add package</button>}
+                {canConfigurePackages && <button onClick={() => openCreatePackage(disciplineTab)} className="rounded-xl border border-dashed border-[#ff9b83] px-3.5 py-2 text-xs font-semibold text-[#df5f41]"><Plus size={13} className="mr-1 inline" />Add package</button>}
               </div>}
             </div>
             <div className="border-t border-[#e7eaed] bg-[#123a60] p-7 text-white lg:border-l lg:border-t-0">
@@ -298,12 +360,14 @@ export default function SchedulePage() {
         )}
 
         {disciplineTab === 'Overall' && <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Delivery packages</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Blocks and shared workstreams</h2><p className="mt-1 text-sm text-[#6f7d89]">Each contractor programme remains separate while progress rolls up to the project.</p></div>{canConfigurePackages && <button onClick={() => setShowPackageModal(true)} className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={14} className="mr-1.5 inline" />Create package</button>}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Delivery packages</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Blocks and shared workstreams</h2><p className="mt-1 text-sm text-[#6f7d89]">Each contractor programme remains separate while progress rolls up to the project.</p></div>{canConfigurePackages && <button onClick={() => openCreatePackage()} className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white"><Plus size={14} className="mr-1.5 inline" />Create package</button>}</div>
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {packageSummaries.map(pkg => <button key={pkg.id} onClick={() => { setDisciplineTab(pkg.discipline); setSelectedPackageId(pkg.id) }} className="rounded-2xl border border-[#dfe3e7] p-4 text-left transition hover:border-[#8fb0c7] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#eaf1f7] p-2 text-[#1f668f]">{pkg.package_type === 'Block' ? <Building2 size={18}/> : <Layers3 size={18}/>}</div><div><div className="font-semibold text-[#102943]">{pkg.name}</div><div className="mt-0.5 text-xs text-[#7a8792]">{pkg.contractor_name || pkg.discipline}</div></div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${pkg.health === 'Critical' ? 'bg-red-50 text-red-700' : pkg.health === 'Watch' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{pkg.health}</span></div><div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#edf0f2] pt-3 text-xs"><div><div className="font-semibold text-[#102943]">{pkg.progress}%</div><div className="text-[#8a96a0]">Progress</div></div><div><div className="font-semibold text-[#102943]">{pkg.total}</div><div className="text-[#8a96a0]">Activities</div></div><div><div className={pkg.delayed ? 'font-semibold text-red-600' : 'font-semibold text-[#102943]'}>{pkg.delayed}</div><div className="text-[#8a96a0]">Delayed</div></div></div></button>)}
+            {packageSummaries.map(pkg => <article key={pkg.id} onClick={() => { setDisciplineTab(pkg.discipline); setSelectedPackageId(pkg.id) }} className="group cursor-pointer rounded-2xl border border-[#dfe3e7] p-4 text-left transition hover:border-[#8fb0c7] hover:shadow-sm"><div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#eaf1f7] p-2 text-[#1f668f]">{pkg.package_type === 'Block' ? <Building2 size={18}/> : <Layers3 size={18}/>}</div><div><div className="font-semibold text-[#102943]">{pkg.name}</div><div className="mt-0.5 text-xs text-[#7a8792]">{pkg.contractor_name || pkg.discipline}</div></div></div><div className="flex items-center gap-1.5"><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${pkg.health === 'Critical' ? 'bg-red-50 text-red-700' : pkg.health === 'Watch' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{pkg.health}</span>{canAdministerPackages && <><button title="Edit package" onClick={event => { event.stopPropagation(); openEditPackage(pkg) }} className="rounded-lg p-2 text-[#31526d] hover:bg-[#eaf1f7]"><Pencil size={15}/></button><button title="Archive package" onClick={event => { event.stopPropagation(); void archivePackage(pkg) }} className="rounded-lg p-2 text-[#df5f41] hover:bg-[#fff2ec]"><Archive size={15}/></button></>}</div></div><div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#edf0f2] pt-3 text-xs"><div><div className="font-semibold text-[#102943]">{pkg.progress}%</div><div className="text-[#8a96a0]">Progress</div></div><div><div className="font-semibold text-[#102943]">{pkg.total}</div><div className="text-[#8a96a0]">Activities</div></div><div><div className={pkg.delayed ? 'font-semibold text-red-600' : 'font-semibold text-[#102943]'}>{pkg.delayed}</div><div className="text-[#8a96a0]">Delayed</div></div></div></article>)}
             {!packageSummaries.length && <div className="col-span-full rounded-2xl border border-dashed border-[#cfdbe3] p-8 text-center text-sm text-[#788591]">No delivery packages yet. Create blocks for Housebuild and shared packages for Infrastructure and External MEP.</div>}
           </div>
         </section>}
+
+        {canAdministerPackages && archivedDeliveryPackages.length > 0 && <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 sm:p-6"><button onClick={() => setShowArchivedPackages(value => !value)} className="flex w-full items-center justify-between text-left"><div><div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f7d89]">Admin archive</div><h2 className="mt-2 text-lg font-semibold text-[#102943]">Archived delivery packages ({archivedDeliveryPackages.length})</h2></div><Archive size={18} className="text-[#6f7d89]"/></button>{showArchivedPackages && <div className="mt-5 divide-y divide-[#edf0f2] rounded-2xl border border-[#e2e7eb]">{archivedDeliveryPackages.map(pkg => <div key={pkg.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><div className="font-semibold text-[#102943]">{pkg.name}</div><div className="mt-1 text-xs text-[#7a8792]">{pkg.discipline} · {pkg.contractor_name || 'No contractor recorded'} · archived {pkg.archived_at ? fdate(pkg.archived_at) : ''}</div></div><div className="flex gap-2"><button onClick={() => void restorePackage(pkg)} className="inline-flex items-center gap-2 rounded-xl border border-[#cfdbe3] px-3 py-2 text-xs font-semibold text-[#123a60] hover:bg-[#eef4f7]"><RotateCcw size={14}/>Restore</button><button onClick={() => void permanentlyDeletePackage(pkg)} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"><Trash2 size={14}/>Permanently delete</button></div></div>)}</div>}</section>}
 
         <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[#dfe3e7] bg-[#dfe3e7] sm:grid-cols-4 xl:grid-cols-7">
           {[
@@ -413,7 +477,7 @@ export default function SchedulePage() {
 
       {modalTask !== null && canManageScheduleUpload && <TaskModal task={modalTask === 'new' ? null : modalTask} onClose={() => setModalTask(null)} deliveryPackageId={selectedPackageId !== 'all' ? selectedPackageId : undefined} discipline={activeDiscipline} />}
 
-      {showPackageModal && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#102943]/45 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setShowPackageModal(false) }}><div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl"><div className="h-1.5 bg-[#ff7657]"/><div className="flex items-start justify-between border-b border-[#e5e8eb] p-6"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#df5f41]">Schedule structure</div><h2 className="mt-2 text-2xl font-semibold text-[#102943]">Create delivery package</h2><p className="mt-1 text-sm text-[#6f7d89]">Create a block or a shared Infrastructure / External MEP workstream.</p></div><button onClick={() => setShowPackageModal(false)} className="rounded-lg p-2 text-[#6f7d89] hover:bg-[#f2f5f7]"><X size={18}/></button></div><div className="grid gap-4 p-6 sm:grid-cols-2"><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Package or block name</span><input value={packageForm.name} onChange={e => setPackageForm({...packageForm,name:e.target.value})} placeholder="e.g. Block A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm outline-none focus:border-[#123a60]"/></label><label><span className="text-xs font-semibold text-[#536170]">Discipline</span><select value={packageForm.discipline} onChange={e => setPackageForm({...packageForm,discipline:e.target.value as ScheduleDiscipline,package_type:e.target.value === 'Housebuild' ? 'Block' : 'Shared'})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Housebuild</option><option>Infrastructure</option><option>MEP</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Package type</span><select value={packageForm.package_type} onChange={e => setPackageForm({...packageForm,package_type:e.target.value as any})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Block</option><option>Shared</option><option>Other</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Code</span><input value={packageForm.code} onChange={e => setPackageForm({...packageForm,code:e.target.value})} placeholder="PV-A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label><span className="text-xs font-semibold text-[#536170]">Contractor</span><input value={packageForm.contractor_name} onChange={e => setPackageForm({...packageForm,contractor_name:e.target.value})} placeholder="Contractor name" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Project weighting (%)</span><input type="number" min="0" max="100" value={packageForm.weight_pct} onChange={e => setPackageForm({...packageForm,weight_pct:Number(e.target.value)})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/><span className="mt-1 block text-xs text-[#8a96a0]">Used later for weighted project progress. It can be adjusted as the package structure is confirmed.</span></label>{packageError && <div className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{packageError}</div>}</div><div className="flex justify-end gap-3 border-t border-[#e5e8eb] p-5"><button onClick={() => setShowPackageModal(false)} className="rounded-xl border border-[#dfe3e7] px-4 py-2.5 text-sm font-semibold text-[#536170]">Cancel</button><button onClick={saveDeliveryPackage} disabled={createDeliveryPackage.isPending} className="rounded-xl bg-[#123a60] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{createDeliveryPackage.isPending ? 'Creating…' : 'Create package'}</button></div></div></div>}
+      {showPackageModal && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#102943]/45 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) { setShowPackageModal(false); resetPackageForm() } }}><div className="w-full max-w-xl overflow-hidden rounded-[24px] bg-white shadow-2xl"><div className="h-1.5 bg-[#ff7657]"/><div className="flex items-start justify-between border-b border-[#e5e8eb] p-6"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#df5f41]">Schedule structure</div><h2 className="mt-2 text-2xl font-semibold text-[#102943]">{editingPackage ? 'Edit delivery package' : 'Create delivery package'}</h2><p className="mt-1 text-sm text-[#6f7d89]">{editingPackage ? 'Correct the package details without losing its schedule history.' : 'Create a block or a shared Infrastructure / External MEP workstream.'}</p></div><button onClick={() => { setShowPackageModal(false); resetPackageForm() }} className="rounded-lg p-2 text-[#6f7d89] hover:bg-[#f2f5f7]"><X size={18}/></button></div><div className="grid gap-4 p-6 sm:grid-cols-2"><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Package or block name</span><input value={packageForm.name} onChange={e => setPackageForm({...packageForm,name:e.target.value})} placeholder="e.g. Block A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm outline-none focus:border-[#123a60]"/></label><label><span className="text-xs font-semibold text-[#536170]">Discipline</span><select value={packageForm.discipline} onChange={e => setPackageForm({...packageForm,discipline:e.target.value as ScheduleDiscipline,package_type:e.target.value === 'Housebuild' ? 'Block' : 'Shared'})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Housebuild</option><option>Infrastructure</option><option>MEP</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Package type</span><select value={packageForm.package_type} onChange={e => setPackageForm({...packageForm,package_type:e.target.value as any})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"><option>Block</option><option>Shared</option><option>Other</option></select></label><label><span className="text-xs font-semibold text-[#536170]">Code</span><input value={packageForm.code} onChange={e => setPackageForm({...packageForm,code:e.target.value})} placeholder="PV-A1" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label><span className="text-xs font-semibold text-[#536170]">Contractor</span><input value={packageForm.contractor_name} onChange={e => setPackageForm({...packageForm,contractor_name:e.target.value})} placeholder="Contractor name" className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/></label><label className="sm:col-span-2"><span className="text-xs font-semibold text-[#536170]">Project weighting (%)</span><input type="number" min="0" max="100" value={packageForm.weight_pct} onChange={e => setPackageForm({...packageForm,weight_pct:Number(e.target.value)})} className="mt-2 w-full rounded-xl border border-[#dfe3e7] px-4 py-3 text-sm"/><span className="mt-1 block text-xs text-[#8a96a0]">Used later for weighted project progress. It can be adjusted as the package structure is confirmed.</span></label>{packageError && <div className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{packageError}</div>}</div><div className="flex justify-end gap-3 border-t border-[#e5e8eb] p-5"><button onClick={() => { setShowPackageModal(false); resetPackageForm() }} className="rounded-xl border border-[#dfe3e7] px-4 py-2.5 text-sm font-semibold text-[#536170]">Cancel</button><button onClick={saveDeliveryPackage} disabled={createDeliveryPackage.isPending || updateDeliveryPackage.isPending} className="rounded-xl bg-[#123a60] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{createDeliveryPackage.isPending || updateDeliveryPackage.isPending ? 'Saving…' : editingPackage ? 'Save changes' : 'Create package'}</button></div></div></div>}
     </div>
   )
 }
