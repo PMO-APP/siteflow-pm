@@ -7,6 +7,7 @@ export type DependencyNode = {
   status: string | null
   isCritical: boolean
   isBlocked: boolean
+  deliveryPackageName: string | null
 }
 
 export type RootCauseResult = {
