@@ -85,18 +85,84 @@ export default function SchedulePage() {
   const projectTasks: Task[] = allTasks.filter((task: Task) => task.project_id === projectId && (!task.delivery_package_id || activePackageIds.has(task.delivery_package_id)))
   const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => pkg.discipline === disciplineTab)
   const selectedPackage = deliveryPackages.find(pkg => pkg.id === selectedPackageId)
-  const disciplineTasks = disciplineTab === 'Overall'
-    ? projectTasks
-    : projectTasks.filter(task => ((task as any).discipline || 'Housebuild') === disciplineTab)
-  const tasks: Task[] = selectedPackageId === 'all'
-    ? disciplineTasks
-    : disciplineTasks.filter(task => task.delivery_package_id === selectedPackageId)
 
   const getTaskProgress = (task: Task): number => {
     if (task.status === 'Completed') return 100
     if (task.status === 'Not Started') return 0
     return Number(task.progress_pct || 0)
   }
+
+  const overallTasks = useMemo(() => {
+    const normalise = (value?: string) => (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+
+    const packageWeight = new Map(deliveryPackages.map(pkg => [pkg.id, Number(pkg.weight_pct || 0)]))
+    const groups = new Map<string, Task[]>()
+
+    projectTasks.forEach(task => {
+      // Same construction activity in separate block programmes becomes one master activity.
+      // Phase is part of the key so an early drawing handover is not confused with final project handover.
+      const key = `${normalise(task.phase)}::${normalise(task.name)}`
+      const current = groups.get(key) || []
+      current.push(task)
+      groups.set(key, current)
+    })
+
+    const validDate = (value?: string) => value && !Number.isNaN(new Date(value).getTime())
+
+    return Array.from(groups.values()).map((records, index) => {
+      const weights = records.map(record => {
+        if (!record.delivery_package_id) return 1
+        return packageWeight.get(record.delivery_package_id) || 1
+      })
+      const totalWeight = weights.reduce((sum, value) => sum + value, 0) || records.length || 1
+      const progress = Math.round(records.reduce((sum, record, recordIndex) => sum + getTaskProgress(record) * weights[recordIndex], 0) / totalWeight)
+      const starts = records.map(record => record.start_date).filter(validDate) as string[]
+      const finishes = records.map(record => record.finish_date).filter(validDate) as string[]
+      const startDate = starts.length ? starts.sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0] : undefined
+      const finishDate = finishes.length ? finishes.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] : undefined
+      const completedCount = records.filter(record => getTaskProgress(record) >= 100).length
+      const status: Task['status'] = completedCount === records.length
+        ? 'Completed'
+        : progress <= 0
+          ? 'Not Started'
+          : 'In Progress'
+      const redCount = records.filter(record => getRag(record) === 'RED').length
+      const amberCount = records.filter(record => getRag(record) === 'AMBER').length
+      const packageIds = new Set(records.map(record => record.delivery_package_id).filter(Boolean))
+      const disciplines = Array.from(new Set(records.map(record => record.discipline || 'Housebuild')))
+
+      return {
+        ...records[0],
+        id: `overall-${index}-${normalise(records[0].phase)}-${normalise(records[0].name)}`,
+        task_number: Math.min(...records.map(record => Number(record.task_number || Number.MAX_SAFE_INTEGER))),
+        start_date: startDate,
+        finish_date: finishDate,
+        duration_days: startDate && finishDate ? Math.max(1, differenceInDays(new Date(finishDate), new Date(startDate)) + 1) : records[0].duration_days,
+        progress_pct: progress,
+        status,
+        rag: status === 'Completed' ? '' : redCount > 0 ? 'RED' : amberCount > 0 ? 'AMBER' : 'GREEN',
+        dependencies: records.length > 1 ? 'Consolidated from package schedules' : records[0].dependencies,
+        responsible: records.length > 1 ? 'Multiple delivery packages' : records[0].responsible,
+        delivery_package_id: undefined,
+        schedule_version_id: undefined,
+        is_milestone: records.some(record => record.is_milestone),
+        package_count: packageIds.size || records.length,
+        completed_package_count: completedCount,
+        discipline_summary: disciplines.join(', '),
+      } as Task & { package_count: number; completed_package_count: number; discipline_summary: string }
+    }).sort((a, b) => Number(a.task_number || 0) - Number(b.task_number || 0))
+  }, [projectTasks, deliveryPackages])
+
+  const disciplineTasks = disciplineTab === 'Overall'
+    ? overallTasks
+    : projectTasks.filter(task => ((task as any).discipline || 'Housebuild') === disciplineTab)
+  const tasks: Task[] = selectedPackageId === 'all'
+    ? disciplineTasks
+    : disciplineTasks.filter(task => task.delivery_package_id === selectedPackageId)
 
   const getRag = (task: Task): string => {
     if (task.status === 'Completed') return 'DONE'
@@ -435,7 +501,7 @@ export default function SchedulePage() {
               <colgroup>
                 <col className="w-[4%]" />
                 <col className={disciplineTab === 'Overall' ? 'w-[16%]' : 'w-[19%]'} />
-                {disciplineTab === 'Overall' && <><col className="w-[7%]" /><col className="w-[9%]" /></>}
+                {disciplineTab === 'Overall' && <col className="w-[9%]" />}
                 <col className="w-[6%]" />
                 <col className="w-[7%]" />
                 <col className="w-[7%]" />
@@ -448,10 +514,10 @@ export default function SchedulePage() {
                 <col className="w-[7%]" />
                 <col className="w-[5%]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <><th className="px-2 py-3">Discipline</th><th className="px-2 py-3">Package</th></>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
+              <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <th className="px-2 py-3">Coverage</th>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={14} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
-                  <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={14} className="px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#123a60]">{phase}</td></tr>
+                {isLoading ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
+                  <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#123a60]">{phase}</td></tr>
                   {phaseTasks.map(task => {
                     const rag = task.status === 'Completed' ? 'DONE' : getRag(task) || computeRAG(task)
                     const procDays = task.procurement_deadline ? differenceInDays(new Date(task.procurement_deadline), today) : null
@@ -460,7 +526,7 @@ export default function SchedulePage() {
                     return <tr key={task.id} className="border-b border-[#edf0f2] hover:bg-[#fafbfb]">
                       <td className="px-2 py-3 font-mono text-[9px] text-[#86919a]">{task.task_number}</td>
                       <td className="px-2 py-3"><div className="break-words font-medium leading-4 text-[#26384a]">{task.name}{task.is_milestone && <span className="ml-1.5 text-[#ff7657]">◆</span>}</div></td>
-                      {disciplineTab === 'Overall' && <><td className="px-2 py-3"><span className="rounded-full bg-[#edf3f7] px-2.5 py-1 text-[10px] font-semibold text-[#31526d]">{(task as any).discipline || 'Housebuild'}</span></td><td className="break-words px-2 py-3 text-[#536170]">{deliveryPackages.find(pkg => pkg.id === task.delivery_package_id)?.name || 'Legacy / unassigned'}</td></>}
+                      {disciplineTab === 'Overall' && <td className="px-2 py-3"><div className="font-semibold text-[#31526d]">{(task as any).package_count || 1} package{((task as any).package_count || 1) === 1 ? '' : 's'}</div><div className="mt-0.5 text-[9px] text-[#8a96a0]">{(task as any).completed_package_count || 0} complete</div></td>}
                       <td className="break-words px-2 py-3 font-mono text-[9px] leading-4 text-[#7d8993]">{task.dependencies || '—'}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.start_date)}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.finish_date)}</td><td className="px-2 py-3 text-center text-[#536170]">{task.duration_days || '—'}</td>
                       <td className="px-2 py-3">{task.procurement_deadline ? <span className={urgencyColor(procDays)}>{fdate(task.procurement_deadline)}</span> : '—'}</td><td className="px-2 py-3">{task.approval_deadline ? <span className={urgencyColor(apprDays)}>{fdate(task.approval_deadline)}</span> : '—'}</td>
                       <td className="px-2 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{rag}</span></td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.status || 'Not Started'}</td>
