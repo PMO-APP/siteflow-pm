@@ -152,6 +152,7 @@ export default function ProjectsPage() {
   const [portfolioFilter, setPortfolioFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [phaseFilter, setPhaseFilter] = useState('All')
+  const [attentionFilter, setAttentionFilter] = useState<'All' | 'Attention' | 'Healthy'>('All')
 
   const [dialog, setDialog] = useState<DialogState>({ open: false, title: '', message: '', inputValue: '', busy: false })
   const dialogResolver = useRef<((value: boolean) => void) | null>(null)
@@ -584,24 +585,6 @@ export default function ProjectsPage() {
     loadHub()
   }
 
-  const filteredProjects = useMemo(
-    () =>
-      projects.filter(project => {
-        const search = searchTerm.toLowerCase().trim()
-        return (
-          (!search ||
-            String(project.project_name || '').toLowerCase().includes(search) ||
-            String(project.location || '').toLowerCase().includes(search)) &&
-          (portfolioFilter === 'All' ||
-            String(project.portfolio_id || '') === portfolioFilter) &&
-          (statusFilter === 'All' ||
-            String(project.status || 'Not set') === statusFilter) &&
-          (phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter)
-        )
-      }),
-    [projects, searchTerm, portfolioFilter, statusFilter, phaseFilter]
-  )
-
   const userRoles = memberships.map(m => String(m.role || '').toLowerCase().trim())
   const workspaceName = organizations[0]?.name || 'Workspace'
   const activeProjects = projects.filter(project => project.status === 'Active').length
@@ -634,6 +617,37 @@ export default function ProjectsPage() {
 
     return map
   }, [projects, projectTasks])
+
+  const filteredProjects = useMemo(
+    () =>
+      projects.filter(project => {
+        const search = searchTerm.toLowerCase().trim()
+        const needsAttention = Boolean(projectAttentionMap.get(String(project.id))?.needsAttention)
+        return (
+          (!search ||
+            String(project.project_name || '').toLowerCase().includes(search) ||
+            String(project.location || '').toLowerCase().includes(search)) &&
+          (portfolioFilter === 'All' ||
+            String(project.portfolio_id || '') === portfolioFilter) &&
+          (statusFilter === 'All' ||
+            String(project.status || 'Not set') === statusFilter) &&
+          (phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter) &&
+          (attentionFilter === 'All' ||
+            (attentionFilter === 'Attention' && needsAttention) ||
+            (attentionFilter === 'Healthy' && !needsAttention))
+        )
+      }),
+    [projects, searchTerm, portfolioFilter, statusFilter, phaseFilter, attentionFilter, projectAttentionMap]
+  )
+
+  function showProjects(filter: { portfolioId?: string | number; status?: string; attention?: 'All' | 'Attention' | 'Healthy' }) {
+    setPortfolioFilter(filter.portfolioId !== undefined ? String(filter.portfolioId) : 'All')
+    setStatusFilter(filter.status || 'All')
+    setAttentionFilter(filter.attention || 'All')
+    requestAnimationFrame(() => {
+      document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   const attentionProjects = projects.filter(project =>
     projectAttentionMap.get(String(project.id))?.needsAttention
@@ -716,7 +730,7 @@ export default function ProjectsPage() {
                 <MiniMetric label="Portfolios" value={portfolios.length} />
                 <MiniMetric label="Projects" value={projects.length} />
                 <MiniMetric label="Healthy" value={healthyProjects} />
-                <MiniMetric label="Need attention" value={attentionProjects} accent />
+                <MiniMetric label="Need attention" value={attentionProjects} accent onClick={() => showProjects({ attention: 'Attention' })} />
               </div>
             </div>
           </div>
@@ -736,7 +750,7 @@ export default function ProjectsPage() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <FocusItem icon={FolderKanban} value={myAssignedProjects.length} label="Projects within your working scope" />
-              <FocusItem icon={AlertTriangle} value={attentionProjects} label="Projects requiring attention" urgent={attentionProjects > 0} />
+              <FocusItem icon={AlertTriangle} value={attentionProjects} label="Projects requiring attention" urgent={attentionProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
               <FocusItem icon={CalendarClock} value={missingTargets} label="Projects without a target date" urgent={missingTargets > 0} />
               <FocusItem icon={Activity} value={activeProjects} label="Projects currently active" />
             </div>
@@ -801,21 +815,21 @@ export default function ProjectsPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPortfolioFilter(String(portfolio.id))
-                      document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth' })
-                    }}
+                    onClick={() => showProjects({ portfolioId: portfolio.id })}
                     className="block w-full text-left"
                   >
                     <h3 className="mt-5 text-lg font-extrabold text-[#173f5f]">{portfolio.name}</h3>
                     <p className="mt-1 min-h-10 text-sm leading-5 text-[#6d7f8b]">
                       {portfolio.description || 'Project delivery portfolio'}
                     </p>
-                    <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
-                      <PortfolioMetric label="Projects" value={portfolioProjects.length} />
-                      <PortfolioMetric label="Active" value={active} />
-                      <PortfolioMetric label="Health" value={`${health}%`} attention={attention > 0} />
-                    </div>
+                  </button>
+                  <div className="mt-5 grid grid-cols-3 gap-2 border-t border-[#e6edf3] pt-4">
+                    <PortfolioMetric label="Projects" value={portfolioProjects.length} onClick={() => showProjects({ portfolioId: portfolio.id })} />
+                    <PortfolioMetric label="Active" value={active} onClick={() => showProjects({ portfolioId: portfolio.id, status: 'Active' })} />
+                    <PortfolioMetric label="Need attention" value={attention} attention={attention > 0} onClick={() => showProjects({ portfolioId: portfolio.id, attention: 'Attention' })} />
+                  </div>
+                  <button type="button" onClick={() => showProjects({ portfolioId: portfolio.id, attention: attention > 0 ? 'Attention' : 'Healthy' })} className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-[#2f6f91] hover:text-[#ef8354]">
+                    {health}% portfolio health <ArrowRight size={13} />
                   </button>
                 </div>
               )
@@ -884,6 +898,11 @@ export default function ProjectsPage() {
               </div>
 
               <div className="flex w-full flex-col gap-2 xl:w-auto xl:items-end">
+                {attentionFilter !== 'All' && (
+                  <button type="button" onClick={() => setAttentionFilter('All')} className="inline-flex self-start items-center gap-2 rounded-full border border-[#f0c4b2] bg-[#fff0e9] px-3 py-1.5 text-xs font-bold text-[#d86335] xl:self-end">
+                    Showing {attentionFilter === 'Attention' ? 'projects requiring attention' : 'healthy projects'} <X size={13} />
+                  </button>
+                )}
                 {canDeleteItems && archivedProjects.length > 0 && (
                   <button
                     type="button"
@@ -1092,21 +1111,23 @@ export default function ProjectsPage() {
   )
 }
 
-function MiniMetric({ label, value, accent = false }: any) {
+function MiniMetric({ label, value, accent = false, onClick }: any) {
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className={`rounded-2xl border p-4 ${accent ? 'border-[#f0c4b2] bg-[#fff0e9]' : 'border-[#d7e1e4] bg-white'}`}>
+    <Component type={onClick ? 'button' : undefined} onClick={onClick} className={`rounded-2xl border p-4 text-left transition ${accent ? 'border-[#f0c4b2] bg-[#fff0e9]' : 'border-[#d7e1e4] bg-white'} ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-sm' : ''}`}>
       <div className={`text-2xl font-black ${accent ? 'text-[#d86335]' : 'text-[#173f5f]'}`}>{value}</div>
       <div className="mt-1 text-xs font-medium text-[#71838d]">{label}</div>
-    </div>
+    </Component>
   )
 }
 
-function FocusItem({ icon: Icon, value, label, urgent = false }: any) {
+function FocusItem({ icon: Icon, value, label, urgent = false, onClick }: any) {
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className={`flex items-center gap-4 rounded-2xl border p-4 ${urgent ? 'border-[#f0c4b2] bg-[#fff7f3]' : 'border-[#dfe7e6] bg-[#f9fbfb]'}`}>
+    <Component type={onClick ? 'button' : undefined} onClick={onClick} className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${urgent ? 'border-[#f0c4b2] bg-[#fff7f3]' : 'border-[#dfe7e6] bg-[#f9fbfb]'} ${onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-sm' : ''}`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${urgent ? 'bg-[#fff0e9] text-[#d86335]' : 'bg-[#eaf1f4] text-[#2f6f91]'}`}><Icon size={19} /></div>
       <div><div className="text-xl font-black text-[#173f5f]">{value}</div><div className="text-xs leading-5 text-[#71838d]">{label}</div></div>
-    </div>
+    </Component>
   )
 }
 
@@ -1119,8 +1140,13 @@ function PermissionLine({ icon: Icon, title, text }: any) {
   )
 }
 
-function PortfolioMetric({ label, value, attention = false }: any) {
-  return <div><div className={`text-base font-extrabold ${attention ? 'text-[#d86335]' : 'text-[#405b69]'}`}>{value}</div><div className="text-[11px] text-[#7c8d97]">{label}</div></div>
+function PortfolioMetric({ label, value, attention = false, onClick }: any) {
+  return (
+    <button type="button" onClick={onClick} className="rounded-xl px-2 py-1.5 text-left transition hover:bg-[#f3f7f8]">
+      <div className={`text-base font-extrabold ${attention ? 'text-[#d86335]' : 'text-[#405b69]'}`}>{value}</div>
+      <div className="text-[11px] leading-4 text-[#7c8d97]">{label}</div>
+    </button>
+  )
 }
 
 function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
