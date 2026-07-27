@@ -11,9 +11,11 @@ import { fdate } from '@/lib/utils'
 interface Props {
   task: Task | null
   onClose: () => void
+  deliveryPackageId?: string
+  discipline?: 'Housebuild' | 'MEP' | 'Infrastructure'
 }
 
-export default function TaskModal({ task, onClose }: Props) {
+export default function TaskModal({ task, onClose, deliveryPackageId, discipline }: Props) {
   const { user } = useAuthStore()
   const { projectId } = useProjectStore()
 
@@ -92,6 +94,8 @@ export default function TaskModal({ task, onClose }: Props) {
   const cleanCreatePayload = () => {
     return {
       task_number: Number(form.task_number || 0),
+      delivery_package_id: deliveryPackageId || task?.delivery_package_id || null,
+      discipline: discipline || task?.discipline || 'Housebuild',
       name: form.name.trim(),
       phase: form.phase,
       start_date: cleanDate(form.start_date),
