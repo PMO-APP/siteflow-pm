@@ -5,8 +5,9 @@
   border-radius: var(--pmx-radius-lg);
 }
 
-.pmx-card {
-  padding: var(--pmx-space-5);
+.pmx-card,
+.pmx-section-panel {
+  padding: clamp(1rem, 1.4vw, 1.5rem);
 }
 
 .pmx-eyebrow {
