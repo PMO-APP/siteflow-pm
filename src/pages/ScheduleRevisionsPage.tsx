@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, FileSpreadsheet, Upload } from 'lucide-react'
+import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
@@ -230,34 +231,16 @@ export default function ScheduleRevisionsPage() {
   }
 
   return (
-    <div className="pmx-command-page space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-          Schedule Control
-        </div>
+    <div className="space-y-6">
+      <EnterprisePageHero
+        eyebrow="Schedule control"
+        title="Programme Revision Centre"
+        description="Manage approved baselines, revisions, recovery programmes and active schedule history for the project and its delivery packages."
+        projectName={projectName || 'No project selected'}
+      >
+      </EnterprisePageHero>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Schedule Revisions
-        </h1>
-
-        <p className="text-slate-400 mt-3 max-w-3xl">
-          Upload approved baseline, revised, recovery or catch-up programmes.
-          Only one schedule can be active per project/package.
-        </p>
-
-        <div className="text-xs text-[#6e7d8c] mt-4">
-          Project:{' '}
-          <span className="text-[#c49e48]">
-            {projectName || 'No project selected'}
-          </span>
-        </div>
-      </section>
-
-      {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
-          {notice}
-        </div>
-      )}
+      {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
       {!canManage && (
         <div className="card p-4 text-sm text-amber-400">
@@ -268,8 +251,8 @@ export default function ScheduleRevisionsPage() {
       {canManage && (
         <div className="card p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Upload size={17} className="text-[#c49e48]" />
-            <h2 className="font-bold text-[#ede8de]">
+            <Upload size={17} className="text-[#df5f41]" />
+            <h2 className="font-bold text-[#102943]">
               Upload Approved Programme
             </h2>
           </div>
@@ -433,7 +416,7 @@ export default function ScheduleRevisionsPage() {
             <tbody>
               {revisions.map(item => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {item.revision_name}
                     {item.revision_no ? (
                       <div className="text-[10px] text-[#6e7d8c]">
