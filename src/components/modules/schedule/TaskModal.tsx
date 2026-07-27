@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth'
 import type { Task } from '@/types'
 import { fdate } from '@/lib/utils'
 
+import { pmoConfirm } from '@/lib/notifications'
 interface Props {
   task: Task | null
   onClose: () => void
@@ -193,7 +194,7 @@ export default function TaskModal({ task, onClose, deliveryPackageId, discipline
   }
 
   const remove = async () => {
-    if (!task || !confirm('Delete this task?')) return
+    if (!task || !await pmoConfirm('Delete this task?')) return
 
     try {
       await del.mutateAsync(task.id)
