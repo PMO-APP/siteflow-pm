@@ -74,3 +74,72 @@
 .pmx-command-hero__content{max-width:850px}.pmx-command-hero h1{margin:.55rem 0 0;font-size:clamp(2rem,4vw,3rem);line-height:1.05}.pmx-command-hero p{margin:.8rem 0 0;color:var(--cmd-muted);line-height:1.7}.pmx-command-eyebrow{color:var(--cmd-coral);font-size:.7rem;font-weight:800;letter-spacing:.17em;text-transform:uppercase}.pmx-command-meta{margin-top:1rem;color:var(--cmd-muted);font-size:.8rem}.pmx-command-actions{display:flex;flex-wrap:wrap;gap:.65rem}
 .pmx-command-metric{background:#fff;border:1px solid var(--cmd-border);border-radius:18px;padding:1.15rem}.pmx-command-metric__top{display:flex;align-items:center;justify-content:space-between;color:var(--cmd-muted);font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.pmx-command-metric strong{display:block;margin-top:.75rem;color:var(--cmd-navy-deep);font-size:1.9rem;line-height:1}.pmx-command-metric small{display:block;margin-top:.55rem;color:var(--cmd-muted)}.pmx-command-metric--success{border-top:3px solid #2e8b57}.pmx-command-metric--warning{border-top:3px solid #f4a261}.pmx-command-metric--danger{border-top:3px solid #e63946}.pmx-command-metric--info{border-top:3px solid #337ea9}
 .pmx-command-section-header{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}.pmx-command-section-header h2{margin:.35rem 0 0;font-size:1.35rem}.pmx-command-section-header p{margin:.35rem 0 0;color:var(--cmd-muted);font-size:.875rem}.pmx-command-empty{text-align:center;padding:2.5rem 1.5rem;border:1px dashed #cfdbe3;border-radius:18px;background:#fbfcfc}.pmx-command-empty__icon{display:inline-flex;padding:.7rem;border-radius:14px;background:#eaf1f7;color:var(--cmd-navy)}.pmx-command-empty h3{margin:.8rem 0 .25rem}.pmx-command-empty p{margin:0 auto 1rem;max-width:480px;color:var(--cmd-muted)}
+
+
+/* Phase 2 operational command centres */
+.pmx-command-page .card {
+  overflow: hidden;
+  border: 1px solid #dfe3e7;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(16, 41, 67, 0.04);
+  color: #26384a;
+}
+.pmx-command-page .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e7eaed;
+  padding: 1rem 1.15rem;
+  background: #fbfcfc;
+}
+.pmx-command-page .card-title { color: #102943; font-size: .84rem; font-weight: 700; }
+.pmx-command-page .tbl { width: 100%; border-collapse: collapse; color: #536170; }
+.pmx-command-page .tbl th {
+  padding: .8rem .9rem;
+  border-bottom: 1px solid #dfe3e7;
+  background: #f7f8f8;
+  color: #74818d;
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pmx-command-page .tbl td { padding: .85rem .9rem; border-bottom: 1px solid #edf0f2; color: #536170; }
+.pmx-command-page .tbl tbody tr:hover { background: #fafbfb; }
+.pmx-command-page .text-\[\#ede8de\] { color: #26384a !important; }
+.pmx-command-page .text-\[\#6e7d8c\] { color: #74818d !important; }
+.pmx-command-page .text-\[\#c49e48\] { color: #df5f41 !important; }
+.pmx-command-page .bg-\[\#c49e48\] { background-color: #ff7657 !important; }
+.pmx-command-page .bg-white\/5 { background-color: #e7ebee !important; }
+.pmx-command-page .border-white\/5 { border-color: #e7eaed !important; }
+.pmx-command-page .btn-gold {
+  border: 1px solid #123a60;
+  background: #123a60;
+  color: white;
+}
+.pmx-command-page .btn-gold:hover { background: #0d2e4d; }
+.pmx-command-page .btn-ghost {
+  border: 1px solid #dfe3e7;
+  background: #fff;
+  color: #536170;
+}
+.pmx-command-page input,
+.pmx-command-page select,
+.pmx-command-page textarea {
+  border-color: #dfe3e7;
+  background: #fff;
+  color: #26384a;
+}
+.pmx-command-page .badge { border: 1px solid transparent; border-radius: 999px; }
+.pmx-command-page .badge-muted { background: #f0f2f4; color: #64717d; }
+.pmx-command-page .badge-blue { background: #eaf1f7; color: #1f668f; }
+.pmx-command-page .badge-green { background: #ecf8f1; color: #18794e; }
+.pmx-command-page .badge-amber { background: #fff7e6; color: #9a6700; }
+.pmx-command-page .badge-red { background: #fff0ee; color: #b42318; }
+.pmx-context-line {
+  margin-top: -0.5rem;
+  color: #74818d;
+  font-size: .75rem;
+}
