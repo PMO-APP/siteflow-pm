@@ -92,6 +92,17 @@ export default function SchedulePage() {
     return Number(task.progress_pct || 0)
   }
 
+  const getRag = (task: Task): string => {
+    if (task.status === 'Completed') return 'DONE'
+    if (!task.finish_date) return 'GREEN'
+    const finish = new Date(task.finish_date)
+    if (Number.isNaN(finish.getTime())) return 'GREEN'
+    const daysLeft = differenceInDays(finish, today)
+    if (today > finish && getTaskProgress(task) < 100) return 'RED'
+    if (daysLeft <= 3) return 'AMBER'
+    return 'GREEN'
+  }
+
   const overallTasks = useMemo(() => {
     const normalise = (value?: string) => (value || '')
       .trim()
@@ -138,7 +149,12 @@ export default function SchedulePage() {
       return {
         ...records[0],
         id: `overall-${index}-${normalise(records[0].phase)}-${normalise(records[0].name)}`,
-        task_number: Math.min(...records.map(record => Number(record.task_number || Number.MAX_SAFE_INTEGER))),
+        task_number: (() => {
+          const taskNumbers = records
+            .map(record => Number(record.task_number))
+            .filter(value => Number.isFinite(value))
+          return taskNumbers.length ? Math.min(...taskNumbers) : 0
+        })(),
         start_date: startDate,
         finish_date: finishDate,
         duration_days: startDate && finishDate ? Math.max(1, differenceInDays(new Date(finishDate), new Date(startDate)) + 1) : records[0].duration_days,
@@ -163,17 +179,6 @@ export default function SchedulePage() {
   const tasks: Task[] = selectedPackageId === 'all'
     ? disciplineTasks
     : disciplineTasks.filter(task => task.delivery_package_id === selectedPackageId)
-
-  const getRag = (task: Task): string => {
-    if (task.status === 'Completed') return 'DONE'
-    if (!task.finish_date) return 'GREEN'
-    const finish = new Date(task.finish_date)
-    if (Number.isNaN(finish.getTime())) return 'GREEN'
-    const daysLeft = differenceInDays(finish, today)
-    if (today > finish && getTaskProgress(task) < 100) return 'RED'
-    if (daysLeft <= 3) return 'AMBER'
-    return 'GREEN'
-  }
 
   const PHASES: string[] = useMemo(() => [
     'All',
@@ -282,24 +287,36 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { await uploadBackup(file, activeDiscipline, selectedPackageId); alert(`${activeDiscipline} schedule backup uploaded successfully.`) }
-    catch (error) { alert(error instanceof Error ? error.message : 'Unable to upload backup.') }
+    try {
+      await uploadBackup(file, activeDiscipline, selectedPackageId)
+      pmoToast({ title: 'Schedule backup uploaded', message: `${activeDiscipline} schedule backup uploaded successfully.`, tone: 'success' })
+    } catch (error) {
+      pmoToast({ title: 'Backup upload failed', message: error instanceof Error ? error.message : 'Unable to upload backup.', tone: 'error' })
+    }
     finally { event.target.value = '' }
   }
   const handleScheduleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { const count = await importExcel(file, activeDiscipline, selectedPackageId); alert(`${count} ${activeDiscipline} Excel tasks imported successfully.`) }
-    catch (error) { alert(error instanceof Error ? error.message : 'Unable to import Excel schedule.') }
+    try {
+      const count = await importExcel(file, activeDiscipline, selectedPackageId)
+      pmoToast({ title: 'Excel schedule imported', message: `${count} ${activeDiscipline} Excel tasks imported successfully.`, tone: 'success' })
+    } catch (error) {
+      pmoToast({ title: 'Excel import failed', message: error instanceof Error ? error.message : 'Unable to import Excel schedule.', tone: 'error' })
+    }
     finally { event.target.value = '' }
   }
   const handleXmlScheduleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    try { const count = await importXml(file, activeDiscipline, selectedPackageId); alert(`${count} ${activeDiscipline} MS Project XML tasks imported successfully.`) }
-    catch (error) { alert(error instanceof Error ? error.message : 'Unable to import MS Project XML.') }
+    try {
+      const count = await importXml(file, activeDiscipline, selectedPackageId)
+      pmoToast({ title: 'MS Project schedule imported', message: `${count} ${activeDiscipline} MS Project XML tasks imported successfully.`, tone: 'success' })
+    } catch (error) {
+      pmoToast({ title: 'XML import failed', message: error instanceof Error ? error.message : 'Unable to import MS Project XML.', tone: 'error' })
+    }
     finally { event.target.value = '' }
   }
 
