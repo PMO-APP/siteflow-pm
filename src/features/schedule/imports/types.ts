@@ -6,6 +6,8 @@ export type ScheduleDiscipline =
 export type ImportedScheduleTask = {
   project_id: number | string
   discipline: ScheduleDiscipline
+  delivery_package_id: string
+  schedule_version_id?: string | null
   schedule_source: 'Imported'
   task_number: number
   name: string
