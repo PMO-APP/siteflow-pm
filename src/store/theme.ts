@@ -8,7 +8,7 @@ interface ThemeStore {
 }
 
 export const useThemeStore = create<ThemeStore>(set => ({
-  theme: (localStorage.getItem('pmocorex-theme') as ThemeMode) || 'dark',
+  theme: (localStorage.getItem('pmocorex-theme') as ThemeMode) || 'light',
 
   setTheme: theme => {
     localStorage.setItem('pmocorex-theme', theme)
