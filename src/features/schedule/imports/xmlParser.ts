@@ -11,10 +11,14 @@ export async function parseMsProjectXmlFile({
   file,
   projectId,
   discipline,
+  deliveryPackageId,
+  scheduleVersionId,
 }: {
   file: File
   projectId: number | string
   discipline: ScheduleDiscipline
+  deliveryPackageId: string
+  scheduleVersionId?: string | null
 }): Promise<ImportedScheduleTask[]> {
   const text = await file.text()
   const parser = new DOMParser()
@@ -44,6 +48,8 @@ export async function parseMsProjectXmlFile({
       return {
         project_id: projectId,
         discipline,
+        delivery_package_id: deliveryPackageId,
+        schedule_version_id: scheduleVersionId || null,
         schedule_source: 'Imported',
         task_number: Number(id || uid || index + 1),
         name,
