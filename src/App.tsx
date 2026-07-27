@@ -8,7 +8,7 @@ import ThemeProvider from '@/theme/ThemeProvider'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
-import NotificationProvider from '@/components/ui/notifications/NotificationProvider'
+import NotificationProvider from './components/ui/notifications/NotificationProvider'
 
 import LandingPage from '@/pages/LandingPage'
 import LoginPage from '@/pages/LoginPage'
