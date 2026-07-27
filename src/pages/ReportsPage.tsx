@@ -830,7 +830,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       {notice && (
         <div
           className={`fixed top-5 right-5 z-[100] rounded-xl px-4 py-3 shadow-xl text-sm border ${
@@ -847,8 +847,8 @@ export default function ReportsPage() {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-xl font-semibold text-[#ede8de]">IPD Reports</div>
-          <div className="text-[11px] text-[#6e7d8c] mt-1">
+          <div className="text-xl font-semibold text-[#102943]">IPD Reports</div>
+          <div className="text-[11px] text-[#74818d] mt-1">
             Internal Project Delivery Weekly Reporting · {projectName}
           </div>
         </div>
@@ -874,7 +874,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Metric title="IPD Reports" value={reports.length} color="text-[#c49e48]" />
+        <Metric title="IPD Reports" value={reports.length} color="text-[#df5f41]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="Open Snags" value={openSnags} color={openSnags > 0 ? 'text-amber-400' : 'text-emerald-400'} />
@@ -883,21 +883,21 @@ export default function ReportsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
         <div className="card p-4 space-y-3">
-          <div className="flex items-center gap-2 text-[#ede8de] font-semibold">
-            <FileText size={16} className="text-[#c49e48]" />
+          <div className="flex items-center gap-2 text-[#102943] font-semibold">
+            <FileText size={16} className="text-[#df5f41]" />
             Report History
           </div>
 
           {isLoading ? (
-            <div className="text-sm text-[#6e7d8c]">Loading reports…</div>
+            <div className="text-sm text-[#74818d]">Loading reports…</div>
           ) : reports.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-[#6e7d8c]">
+            <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-[#74818d]">
               No IPD reports yet.
             </div>
           ) : (
             reportGroups.map(([date, dateReports]) => (
               <div key={date} className="space-y-2">
-                <div className="text-[10px] uppercase tracking-widest text-[#c49e48] pt-2">
+                <div className="text-[10px] uppercase tracking-widest text-[#df5f41] pt-2">
                   Week Ending {fdate(date)}
                 </div>
 
@@ -916,12 +916,12 @@ export default function ReportsPage() {
                       onClick={() => setSelectedReportId(report.id)}
                       className={`w-full text-left rounded-xl border p-3 transition ${
                         selectedReport?.id === report.id
-                          ? 'border-[#c49e48]/40 bg-[#c49e48]/10'
-                          : 'border-white/10 bg-white/[0.03] hover:border-[#c49e48]/30'
+                          ? 'border-[#c49e48]/40 bg-[#ff7657]/10'
+                          : 'border-white/10 bg-white hover:border-[#ffd1c5]'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-semibold text-[#ede8de]">
+                        <div className="text-sm font-semibold text-[#102943]">
                           {reportAny.department || reportAny.discipline || 'IPD'}
                         </div>
 
@@ -930,16 +930,16 @@ export default function ReportsPage() {
                         </span>
                       </div>
 
-                      <div className="text-[11px] text-[#c49e48] mt-1">
+                      <div className="text-[11px] text-[#df5f41] mt-1">
                         {packageName}
                       </div>
 
-                      <div className="text-[11px] text-[#6e7d8c] mt-1">
+                      <div className="text-[11px] text-[#74818d] mt-1">
                         Officer: {reportAny.reporting_officer || '—'}
                       </div>
 
                       {selectedReport?.id === report.id && reportPhotos.length > 0 && (
-                        <div className="text-[10px] text-[#6e7d8c] mt-1 flex items-center gap-1">
+                        <div className="text-[10px] text-[#74818d] mt-1 flex items-center gap-1">
                           <ImageIcon size={11} />
                           {reportPhotos.length} photo(s)
                         </div>
@@ -954,7 +954,7 @@ export default function ReportsPage() {
 
         <div className="space-y-3">
           {!selectedReport ? (
-            <div className="card p-8 text-center text-[#6e7d8c]">
+            <div className="card p-8 text-center text-[#74818d]">
               Select or create an IPD report.
             </div>
           ) : (
@@ -965,7 +965,7 @@ export default function ReportsPage() {
                     PMO Review Comment
                   </div>
 
-                  <div className="text-sm text-[#ede8de] whitespace-pre-wrap">
+                  <div className="text-sm text-[#102943] whitespace-pre-wrap">
                     {selectedReportAny.workflow_comment ||
                       selectedReportAny.return_comment ||
                       'No comment provided.'}
@@ -1167,7 +1167,7 @@ export default function ReportsPage() {
           }}
         >
           <div className="space-y-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-[#9aa6b2]">
+            <div className="rounded-xl border border-white/10 bg-white p-3 text-xs text-[#9aa6b2]">
               Report date is generated automatically on submission date and cannot be backdated.
             </div>
 
@@ -1296,9 +1296,9 @@ export default function ReportsPage() {
               />
             ))}
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#ede8de]">
-                <UploadCloud size={15} className="text-[#c49e48]" />
+            <div className="rounded-xl border border-white/10 bg-white p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#102943]">
+                <UploadCloud size={15} className="text-[#df5f41]" />
                 Upload Progress Photos
               </div>
 
@@ -1318,7 +1318,7 @@ export default function ReportsPage() {
                   key={photo.name}
                   className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2"
                 >
-                  <div className="text-xs text-[#ede8de]">{photo.name}</div>
+                  <div className="text-xs text-[#102943]">{photo.name}</div>
 
                   <input
                     className="form-control"
@@ -1360,26 +1360,26 @@ export default function ReportsPage() {
 function WorkflowTimeline({ history }: { history: any[] }) {
   return (
     <div className="card p-4 h-fit">
-      <div className="text-sm font-semibold text-[#ede8de] mb-4">
+      <div className="text-sm font-semibold text-[#102943] mb-4">
         Workflow History
       </div>
 
       {history.length === 0 ? (
-        <div className="text-xs text-[#6e7d8c]">No workflow history yet.</div>
+        <div className="text-xs text-[#74818d]">No workflow history yet.</div>
       ) : (
-        <div className="space-y-4">
+        <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
           {history.map(item => (
-            <div key={item.id} className="border-l border-[#c49e48]/30 pl-3">
-              <div className="text-xs font-semibold text-[#c49e48]">
+            <div key={item.id} className="border-l border-[#ffd1c5] pl-3">
+              <div className="text-xs font-semibold text-[#df5f41]">
                 {item.action}
               </div>
 
-              <div className="text-[11px] text-[#6e7d8c] mt-1">
+              <div className="text-[11px] text-[#74818d] mt-1">
                 {item.acted_by_name || 'User'} · {fdate(item.created_at)}
               </div>
 
               {item.comment && (
-                <div className="mt-2 rounded-lg bg-white/[0.04] border border-white/10 p-2 text-xs text-[#bfb9ae] whitespace-pre-wrap">
+                <div className="mt-2 rounded-lg bg-white/[0.04] border border-white/10 p-2 text-xs text-[#536170] whitespace-pre-wrap">
                   {item.comment}
                 </div>
               )}
@@ -1406,7 +1406,7 @@ function Metric({
         {value}
       </div>
 
-      <div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">
+      <div className="text-[9px] text-[#74818d] uppercase tracking-widest mt-1">
         {title}
       </div>
     </div>
@@ -1466,11 +1466,11 @@ function Modal({
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <div className="card w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-[#ede8de]">{title}</h2>
+          <h2 className="text-lg font-bold text-[#102943]">{title}</h2>
 
           <button
             onClick={onClose}
-            className="text-[#6e7d8c] hover:text-white"
+            className="text-[#74818d] hover:text-[#102943]"
           >
             ✕
           </button>
