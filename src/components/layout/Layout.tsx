@@ -39,11 +39,16 @@ import {
   UserCircle,
   Building2,
   MessageSquareText,
+  Search,
+  Plus,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import GlobalCommandPalette, { type CommandItem } from '@/components/ui/enterprise/GlobalCommandPalette'
+import QuickCreateMenu from '@/components/ui/enterprise/QuickCreateMenu'
 
 type NavItem = {
   to: string
@@ -114,6 +119,15 @@ const NAV: NavItem[] = [
   { to: '/app/team', icon: Users, label: 'Team' },
 ]
 
+
+const NAV_GROUPS = [
+  { label: 'Project Delivery', routes: ['/app', '/app/schedule', '/app/project-controls', '/app/schedule-revisions', '/app/recovery', '/app/planner', '/app/project-packages'] },
+  { label: 'Site Execution', routes: ['/app/procurement', '/app/approvals', '/app/site', '/app/quality', '/app/hse', '/app/snags', '/app/rfis', '/app/handover'] },
+  { label: 'Engineering & Commercial', routes: ['/app/documents', '/app/costing', '/app/design-reports'] },
+  { label: 'Governance & Intelligence', routes: ['/app/risk', '/app/risk-trends', '/app/reports', '/app/pmo-weekly-report', '/app/internal-assignments', '/app/business-intelligence'] },
+  { label: 'Workspace', routes: ['/app/administration', '/app/team'] },
+]
+
 const VIEWER_NAV = [
   '/app',
   '/app/recovery',
@@ -153,6 +167,9 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
@@ -194,6 +211,17 @@ export default function Layout() {
   })
 
   const unreadCount = unreadNotifications.length
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCommandOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     loadProject()
@@ -350,6 +378,21 @@ export default function Layout() {
 
   const pageTitle = currentPage?.label || 'Dashboard'
 
+  const groupedNav = NAV_GROUPS.map(group => ({
+    ...group,
+    items: allowedNav.filter(item => group.routes.includes(item.to)),
+  })).filter(group => group.items.length > 0)
+
+  const commandItems: CommandItem[] = groupedNav.flatMap(group =>
+    group.items.map(item => ({
+      label: item.label,
+      to: item.to,
+      group: group.label,
+      description: item.to === '/app' ? 'Project command centre and current delivery position' : `Open ${item.label.toLowerCase()}`,
+      keywords: [projectName || '', portfolioName || ''],
+    }))
+  )
+
   return (
     <div className="layout-shell flex h-screen overflow-hidden">
       {sidebarOpen && (
@@ -434,25 +477,20 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-          {allowedNav.map(({ to, icon: Icon, label, exact }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
-                  isActive
-                    ? 'nav-active'
-                    : 'nav-inactive'
-                }`
-              }
-            >
-              <Icon size={15} className="flex-shrink-0" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
+          {groupedNav.map(group => {
+            const collapsed = collapsedGroups[group.label]
+            return <div key={group.label} className="mb-3">
+              <button type="button" onClick={() => setCollapsedGroups(current => ({ ...current, [group.label]: !current[group.label] }))} className="flex w-full items-center justify-between px-3 py-2 text-[9px] font-semibold uppercase tracking-[0.17em] text-white/45 hover:text-white/70">
+                <span>{group.label}</span><ChevronDown size={13} className={`transition ${collapsed ? '-rotate-90' : ''}`}/>
+              </button>
+              {!collapsed && <div className="space-y-1">{group.items.map(({ to, icon: Icon, label, exact }) => (
+                <NavLink key={to} to={to} end={exact} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-all ${isActive ? 'nav-active' : 'nav-inactive'}`}>
+                  <Icon size={15} className="flex-shrink-0"/><span>{label}</span>
+                </NavLink>
+              ))}</div>}
+            </div>
+          })}
         </nav>
 
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
@@ -535,6 +573,10 @@ export default function Layout() {
             </div>
           </div>
 
+          <button type="button" onClick={() => setCommandOpen(true)} className="hidden min-w-[190px] items-center gap-2 rounded-xl border border-[#dfe3e7] bg-white px-3 py-2 text-left text-xs text-[#7a8792] shadow-sm hover:border-[#aebac3] xl:flex"><Search size={14}/><span className="flex-1">Search PMOCorex</span><span className="rounded-md bg-[#f2f5f7] px-1.5 py-0.5 text-[9px] font-semibold">⌘K</span></button>
+
+          <div className="relative"><button type="button" onClick={() => setQuickCreateOpen(value => !value)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#123a60] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0d2e4d]"><Plus size={14}/>New</button><QuickCreateMenu open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)}/></div>
+
           <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-[11px] text-emerald-400">Live</span>
@@ -573,6 +615,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      <GlobalCommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} items={commandItems}/>
     </div>
   )
 }
