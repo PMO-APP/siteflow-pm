@@ -17,6 +17,8 @@ import {
   Shield,
   SlidersHorizontal,
   UserCircle,
+  Archive,
+  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react'
@@ -79,6 +81,8 @@ const INTERNAL_ROLE_LABELS: Record<string, string> = {
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
+  const [archivedProjects, setArchivedProjects] = useState<any[]>([])
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false)
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
   const [memberships, setMemberships] = useState<any[]>([])
@@ -172,6 +176,7 @@ export default function ProjectsPage() {
       setOrganizations([])
       setPortfolios([])
       setProjects([])
+      setArchivedProjects([])
       setCanAccessAdmin(false)
       setCanCreateItems(false)
       setCanEditProjects(false)
@@ -216,7 +221,9 @@ export default function ProjectsPage() {
     if (isInternalUser) {
       setOrganizations(orgs || [])
       setPortfolios(ports || [])
-      setProjects(projs || [])
+      const allProjects = projs || []
+      setProjects(allProjects.filter(project => !project.archived_at))
+      setArchivedProjects(allProjects.filter(project => Boolean(project.archived_at)))
       setLoading(false)
       return
     }
@@ -228,7 +235,7 @@ export default function ProjectsPage() {
         .filter(Boolean)
 
       const visibleProjects = (projs || []).filter(project =>
-        allowedProjectIds.includes(project.id)
+        allowedProjectIds.includes(project.id) && !project.archived_at
       )
       const visiblePortfolioIds = [
         ...new Set(visibleProjects.map(project => project.portfolio_id).filter(Boolean)),
@@ -240,6 +247,7 @@ export default function ProjectsPage() {
       setOrganizations((orgs || []).filter(org => visibleOrgIds.includes(org.id)))
       setPortfolios((ports || []).filter(portfolio => visiblePortfolioIds.includes(portfolio.id)))
       setProjects(visibleProjects)
+      setArchivedProjects([])
       setLoading(false)
       return
     }
@@ -247,6 +255,7 @@ export default function ProjectsPage() {
     setOrganizations([])
     setPortfolios([])
     setProjects([])
+    setArchivedProjects([])
     setLoading(false)
   }
 
@@ -339,45 +348,90 @@ export default function ProjectsPage() {
     await loadHub()
   }
 
-  async function deleteProject(project: any) {
+  async function archiveProject(project: any) {
     if (!canDeleteItems) return
 
     const confirmed = window.confirm(
-      `Delete “${project.project_name}”?\n\nThis permanently removes the project and any records configured to cascade with it. This action cannot be undone.`
+      `Archive “${project.project_name}”?
+
+The project will disappear from active workspace views, but its tasks, approvals, documents and other records will remain safely stored. An Admin can restore it later.`
     )
     if (!confirmed) return
 
+    const { data: archivedRows, error } = await supabase
+      .from('projects')
+      .update({
+        archived_at: new Date().toISOString(),
+        archived_by: currentUserEmail || null,
+      })
+      .eq('id', project.id)
+      .select('*')
+
+    if (error) {
+      alert(`Unable to archive project: ${error.message}`)
+      return
+    }
+
+    if (!archivedRows || archivedRows.length === 0) {
+      alert('The project was not archived. Confirm that the included soft_delete_projects.sql migration has been run and that Admin UPDATE access is enabled.')
+      return
+    }
+
+    setProjects(current => current.filter(item => item.id !== project.id))
+    setArchivedProjects(current => [archivedRows[0], ...current])
+    alert(`“${project.project_name}” was moved to Archived Projects.`)
+  }
+
+  async function restoreProject(project: any) {
+    if (!canDeleteItems) return
+
+    const { data: restoredRows, error } = await supabase
+      .from('projects')
+      .update({ archived_at: null, archived_by: null })
+      .eq('id', project.id)
+      .select('*')
+
+    if (error) {
+      alert(`Unable to restore project: ${error.message}`)
+      return
+    }
+
+    if (!restoredRows || restoredRows.length === 0) {
+      alert('The project was not restored. Check the project update policy in Supabase.')
+      return
+    }
+
+    setArchivedProjects(current => current.filter(item => item.id !== project.id))
+    setProjects(current => [...current, restoredRows[0]].sort((a, b) => Number(a.id) - Number(b.id)))
+    alert(`“${project.project_name}” was restored successfully.`)
+  }
+
+  async function permanentlyDeleteProject(project: any) {
+    if (!canDeleteItems) return
+
     const typedName = window.prompt(
-      `Type the project name exactly to confirm deletion:\n${project.project_name}`
+      `Permanently delete “${project.project_name}” and every record attached to it?
+
+This cannot be undone. Type the project name exactly to continue:
+${project.project_name}`
     )
+
     if (typedName?.trim() !== String(project.project_name || '').trim()) {
       if (typedName !== null) alert('Project name did not match. Nothing was deleted.')
       return
     }
 
-    const { data: deletedRows, error } = await supabase
-      .from('projects')
-      .delete()
-      .eq('id', project.id)
-      .select('id')
+    const { error } = await supabase.rpc('permanently_delete_project', {
+      target_project_id: project.id,
+    })
 
     if (error) {
-      alert(`Unable to delete project: ${error.message}`)
+      alert(`Unable to permanently delete project: ${error.message}`)
       return
     }
 
-    // Supabase can return no error when Row Level Security blocks a delete.
-    // Confirm that the database actually returned the deleted project row.
-    if (!deletedRows || deletedRows.length === 0) {
-      alert(
-        'The project was not deleted. Your database is still blocking DELETE operations through Row Level Security. Run the included admin_delete_policies.sql file in the Supabase SQL Editor, then try again.'
-      )
-      return
-    }
-
-    setProjects(current => current.filter(item => item.id !== project.id))
-    alert(`“${project.project_name}” was deleted successfully.`)
-    await loadHub()
+    setArchivedProjects(current => current.filter(item => item.id !== project.id))
+    alert(`“${project.project_name}” and its linked records were permanently deleted.`)
   }
 
   async function deletePortfolio(portfolio: any) {
@@ -702,7 +756,18 @@ export default function ProjectsPage() {
                 <p className="mt-1 text-sm text-[#6d7f8b]">Your role is resolved project by project, not from one generic title.</p>
               </div>
 
-              <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+              <div className="flex w-full flex-col gap-2 xl:w-auto xl:items-end">
+                {canDeleteItems && archivedProjects.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchivedProjects(value => !value)}
+                    className="hub-secondary-button self-start xl:self-end"
+                  >
+                    <Archive size={16} />
+                    {showArchivedProjects ? 'Hide archived projects' : `Archived projects (${archivedProjects.length})`}
+                  </button>
+                )}
+                <div className="grid w-full gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="relative sm:col-span-2 xl:col-span-1 xl:w-72">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#82939c]" />
                   <input className="hub-input pl-9" placeholder="Search project or location" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
@@ -719,6 +784,7 @@ export default function ProjectsPage() {
                   <option value="All">All phases</option>
                   {PROJECT_PHASES.map(phase => <option key={phase} value={phase}>{phase}</option>)}
                 </select>
+                </div>
               </div>
             </div>
           </div>
@@ -755,7 +821,7 @@ export default function ProjectsPage() {
                         canDelete={canDeleteItems}
                         onOpen={() => openProject(project)}
                         onEdit={() => openEditProject(project)}
-                        onDelete={() => deleteProject(project)}
+                        onDelete={() => archiveProject(project)}
                       />
                     )
                   })}
@@ -767,6 +833,51 @@ export default function ProjectsPage() {
             </div>
           )}
         </section>
+
+        {canDeleteItems && showArchivedProjects && (
+          <section className="hub-panel overflow-hidden border-[#efc3af]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0ddd4] bg-[#fff8f4] p-5 sm:p-6">
+              <div>
+                <div className="hub-eyebrow">Admin archive</div>
+                <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Archived Projects</h2>
+                <p className="mt-1 text-sm text-[#6d7f8b]">Restore a project to active work or permanently remove it and all linked records.</p>
+              </div>
+              <span className="rounded-full border border-[#efc3af] bg-white px-3 py-1 text-xs font-bold text-[#b85d39]">{archivedProjects.length} archived</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[850px] border-collapse">
+                <thead>
+                  <tr className="bg-[#f8f4f1] text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#71838d]">
+                    <th className="px-6 py-4">Project</th>
+                    <th className="px-5 py-4">Portfolio</th>
+                    <th className="px-5 py-4">Archived</th>
+                    <th className="px-5 py-4">Archived by</th>
+                    <th className="px-5 py-4 text-right">Admin action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedProjects.map(project => {
+                    const portfolio = portfolios.find(item => item.id === project.portfolio_id)
+                    return (
+                      <tr key={project.id} className="border-t border-[#eadfd9] bg-white">
+                        <td className="px-6 py-4"><div className="font-bold text-[#173f5f]">{project.project_name}</div><div className="mt-1 text-xs text-[#7c8d97]">{project.location || 'No location set'}</div></td>
+                        <td className="px-5 py-4 text-sm text-[#536974]">{portfolio?.name || 'Unassigned'}</td>
+                        <td className="px-5 py-4 text-sm text-[#536974]">{project.archived_at ? new Date(project.archived_at).toLocaleString() : '—'}</td>
+                        <td className="px-5 py-4 text-sm text-[#536974]">{project.archived_by || 'Admin'}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => restoreProject(project)} className="hub-secondary-button py-2"><RotateCcw size={14} /> Restore</button>
+                            <button onClick={() => permanentlyDeleteProject(project)} className="inline-flex items-center gap-2 rounded-xl border border-[#efb8ad] bg-[#fff0ed] px-3 py-2 text-sm font-bold text-[#b74835] transition hover:bg-[#ffe5df]"><Trash2 size={14} /> Permanently delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </main>
 
       {showPortfolioModal && canCreateItems && (
@@ -886,7 +997,7 @@ function ProjectRow({ project, portfolioName, capacity, canEdit, canDelete, onOp
       <td className="px-5 py-4">
         <div className="flex items-center justify-end gap-2">
           {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
-          {canDelete && <button onClick={onDelete} className="hub-icon-button h-9 w-9 text-[#c94f3b] hover:border-[#efb8ad] hover:bg-[#fff0ed]" title="Delete project"><Trash2 size={15} /></button>}
+          {canDelete && <button onClick={onDelete} className="hub-icon-button h-9 w-9 text-[#c56b43] hover:border-[#efc3af] hover:bg-[#fff4ee]" title="Archive project"><Archive size={15} /></button>}
           <button onClick={onOpen} className="hub-secondary-button py-2">Open <ArrowRight size={14} /></button>
         </div>
       </td>
