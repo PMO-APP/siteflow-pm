@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import type { Meeting, ContractorScore } from '@/types'
 
+import { pmoConfirm } from '@/lib/notifications'
 const TEAM_ROLES = [
   'Client / Developer',
   'Architect',
@@ -588,7 +589,7 @@ export default function TeamPage() {
   )
 
   async function removeMember(member: any) {
-    if (!window.confirm(`Remove ${member.company_name} from this project team?`)) {
+    if (!await pmoConfirm(`Remove ${member.company_name} from this project team?`)) {
       return
     }
 
