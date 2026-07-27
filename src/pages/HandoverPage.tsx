@@ -10,6 +10,7 @@ import {
   UploadCloud,
   XCircle,
 } from 'lucide-react'
+import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
@@ -779,35 +780,16 @@ export default function HandoverPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-          Digital Handover Gate
-        </div>
+      <EnterprisePageHero
+        eyebrow="Digital handover"
+        title="Digital Handover Centre"
+        description="Control unit, block and project handover by closing checklist items, certificates, documents, utilities, keys and sign-offs before final release."
+        projectName={projectName || 'No project selected'}
+      >
+        <div className="mt-5 rounded-xl border border-[#dbe4ea] bg-[#f7f9fa] px-4 py-3 text-xs leading-5 text-[#65717c]">Evidence rule: users upload proof first, status becomes Uploaded, and only PMO, Admin or the Project Owner can approve or reject.</div>
+      </EnterprisePageHero>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Handover
-        </h1>
-
-        <p className="text-slate-400 mt-3 max-w-3xl">
-          Control unit, block and project handover by closing all checklist items,
-          certificates, documents, utilities, keys and sign-offs before final release.
-        </p>
-
-        <div className="text-xs text-[#6e7d8c] mt-4">
-          Project:{' '}
-          <span className="text-[#c49e48]">{projectName || 'No project selected'}</span>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.03] p-3 text-xs text-slate-400">
-          Evidence rule: users upload proof first → status becomes Uploaded → only PMO/Admin/Project Owner can approve or reject.
-        </div>
-      </section>
-
-      {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
-          {notice}
-        </div>
-      )}
+      {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
       <div className="card p-4 grid grid-cols-1 lg:grid-cols-6 gap-3 items-end">
         <div className="lg:col-span-2">
@@ -981,7 +963,7 @@ function DashboardTab({ selectedPackage, stats, canApprove, approvePackage }: an
       <div className="card p-6">
         <div className="flex flex-col lg:flex-row gap-5 lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-[#ede8de]">
+            <h2 className="text-xl font-bold text-[#102943]">
               {selectedPackage.package_name}
             </h2>
             <p className="text-sm text-[#6e7d8c] mt-1">
@@ -1603,7 +1585,7 @@ function GenericTable({ title, rows, columns, renderRow }: any) {
   return (
     <div className="card overflow-hidden">
       <div className="px-4 py-3 border-b border-white/[0.06]">
-        <div className="font-bold text-[#ede8de]">{title}</div>
+        <div className="font-bold text-[#102943]">{title}</div>
       </div>
 
       {rows.length === 0 ? (
@@ -1637,7 +1619,7 @@ function GenericTable({ title, rows, columns, renderRow }: any) {
 function Metric({ title, value }: { title: string; value: any }) {
   return (
     <div className="card p-4">
-      <PackageCheck size={18} className="text-[#c49e48]" />
+      <PackageCheck size={18} className="text-[#df5f41]" />
       <div className="text-2xl font-black text-white mt-3">{value}</div>
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
