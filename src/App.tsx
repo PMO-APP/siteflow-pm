@@ -50,6 +50,8 @@ import DocumentsPage from '@/pages/DocumentsPage'
 import RiskPage from '@/pages/RiskPage'
 import RiskTrendPage from '@/pages/RiskTrendPage'
 import TeamPage from '@/pages/TeamPage'
+import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
+import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
 import TeamAccessPage from '@/pages/TeamAccessPage'
 import ReportsPage from '@/pages/ReportsPage'
 import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
@@ -399,6 +401,8 @@ export default function App() {
             element={<ScheduleRevisionsPage />}
           />
           <Route path="handover" element={<HandoverPage />} />
+          <Route path="internal-assignments" element={<InternalAssignmentsPage />} />
+          <Route path="my-assignments" element={<MyAssignmentsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
           <Route path="reports" element={<ReportsPage />} />
