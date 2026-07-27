@@ -64,7 +64,7 @@ export default function RootCausePanel({
                         {item.name}
                       </div>
                       <div className="mt-1 text-xs text-[var(--pmx-muted)]">
-                        {item.progress}% complete
+                        {item.deliveryPackageName ? `${item.deliveryPackageName} · ` : ''}{item.progress}% complete
                         {item.isCritical
                           ? ' · Critical path'
                           : ''}
