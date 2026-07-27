@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useThemeStore } from '@/store/theme'
+import ThemeProvider from '@/theme/ThemeProvider'
 
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
@@ -70,12 +71,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#0c1014]">
-        <div className="text-center">
-          <div className="font-display text-3xl text-[#c49e48] mb-2">
-            PMOCorex
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f9fa]">
+        <div className="rounded-3xl border border-[#dbe5eb] bg-white px-10 py-8 text-center shadow-[0_24px_70px_rgba(23,63,95,.10)]">
+          <div className="mx-auto mb-4 h-11 w-11 rounded-2xl bg-[#173f5f] grid place-items-center text-white font-black relative overflow-hidden">
+            <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />P
           </div>
-          <div className="text-[#6e7d8c] text-sm">Loading…</div>
+          <div className="font-display text-2xl font-extrabold text-[#173f5f] mb-2">PMOCorex</div>
+          <div className="text-[#71838d] text-sm">Preparing your delivery workspace…</div>
         </div>
       </div>
     )
@@ -103,12 +105,13 @@ function ViewerRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { setUser, setLoading } = useAuthStore()
   const { setMembership, clearMembership } = useMembershipStore()
-  const { theme } = useThemeStore()
+  const { setTheme } = useThemeStore()
 
   useEffect(() => {
-    document.documentElement.classList.remove('dark', 'light')
-    document.documentElement.classList.add(theme)
-  }, [theme])
+    // PMOCorex now uses one unified light visual system across public and authenticated pages.
+    setTheme('light')
+    document.documentElement.dataset.productTheme = 'pmocorex'
+  }, [setTheme])
 
   async function loadMembership(userId: string) {
     const { data: sessionData } = await supabase.auth.getSession()
@@ -245,7 +248,8 @@ export default function App() {
   }, [setUser, setLoading, setMembership, clearMembership])
 
   return (
-    <BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
@@ -424,6 +428,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
