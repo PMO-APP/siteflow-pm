@@ -31,6 +31,22 @@ export type DeliveryStage = {
   applicable: boolean
 }
 
+export type DeliveryPackagePerformance = {
+  id: string
+  name: string
+  discipline: string | null
+  contractorName: string | null
+  weight: number
+  progress: number
+  plannedProgress: number
+  variance: number
+  overdueActivities: number
+  totalActivities: number
+  healthScore: number
+  healthLabel: 'Healthy' | 'Watch' | 'At Risk' | 'Critical'
+  primaryDelayActivity: string | null
+}
+
 export type DeliveryTwinResult = {
   scopeTemplate: string
   stages: DeliveryStage[]
@@ -39,5 +55,7 @@ export type DeliveryTwinResult = {
   completedStages: number
   totalApplicableStages: number
   overallProgress: number
+  packages: DeliveryPackagePerformance[]
+  isMultiPackage: boolean
   generatedAt: string
 }
