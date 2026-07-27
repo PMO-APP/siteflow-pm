@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { fdate } from '@/lib/utils'
 
+import { pmoConfirm } from '@/lib/notifications'
 const RECURRENCE_TYPES = ['Once', 'Daily', 'Weekly', 'Monthly']
 const WEEK_DAYS = [
   'Monday',
@@ -105,7 +106,7 @@ export default function PlannerPage() {
   }
 
   async function deleteReminder(id: string) {
-    const confirmed = window.confirm('Delete this reminder?')
+    const confirmed = await pmoConfirm('Delete this reminder?')
     if (!confirmed) return
 
     const { error } = await supabase
