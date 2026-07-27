@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { fdate } from '@/lib/utils'
+import { EnterpriseMetric, EnterpriseNotice, EnterprisePageHero } from '@/components/ui/enterprise/EnterprisePage'
 
 import { pmoConfirm, pmoToast } from '@/lib/notifications'
 const RECURRENCE_TYPES = ['Once', 'Daily', 'Weekly', 'Monthly']
@@ -181,34 +182,36 @@ export default function PlannerPage() {
   })
 
   return (
-    <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 p-4 sm:-m-6 sm:p-6 lg:p-8">
+    <div className="-m-4 min-h-screen bg-[var(--pmx-bg)] p-4 text-[var(--pmx-text)] sm:-m-6 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        <section className="overflow-hidden rounded-[24px] border border-[#dfe3e7] bg-white">
-          <div className="grid lg:grid-cols-[1fr_320px]">
-            <div className="border-l-[6px] border-[#ff7657] p-6 sm:p-8 lg:p-10">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#df5f41]">Personal productivity</div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-[#102943] sm:text-4xl">Weekly Planning Centre</h1>
-              <p className="mt-3 max-w-3xl text-[15px] leading-7 text-[#65717c]">Plan inspections, meetings, reports, schedule updates and follow-up actions for the current week.</p>
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#eef4f7] px-3 py-1.5 text-xs font-semibold text-[#31526d]">
-                <CalendarDays size={14} /> {projectName || 'No project selected'}
-              </div>
-            </div>
-            <div className="border-t border-[#e7eaed] bg-[#123a60] p-7 text-white lg:border-l lg:border-t-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">This week</div>
-              <div className="mt-3 text-5xl font-semibold tracking-[-0.05em]">{dueThisWeek.length}</div>
-              <div className="mt-1 text-sm text-white/70">open action{dueThisWeek.length === 1 ? '' : 's'} due</div>
-              <button onClick={() => setModal('new')} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#ff7657] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#ed6749]"><Plus size={14}/>Add action</button>
-            </div>
+        <EnterprisePageHero
+          eyebrow="Personal productivity"
+          title="Weekly Planning Centre"
+          description="Plan inspections, meetings, reports, schedule updates and follow-up actions for the current week."
+          projectName={projectName || 'No project selected'}
+          actions={
+            <button onClick={() => setModal('new')} className="btn btn-primary">
+              <Plus size={15} /> Add action
+            </button>
+          }
+        >
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className="pmx-status pmx-status-info">
+              <CalendarDays size={14} /> {dueThisWeek.length} open this week
+            </span>
+            <span className="pmx-status pmx-status-neutral">
+              {pending.length} total pending
+            </span>
           </div>
-        </section>
+        </EnterprisePageHero>
 
-        {notice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{notice}</div>}
+        {notice && <EnterpriseNotice tone="warning">{notice}</EnterpriseNotice>}
 
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <MetricCard icon={ListTodo} title="Today's priorities" value={dueToday.length} subtitle={dueToday.length ? `${dueToday.length} action${dueToday.length === 1 ? '' : 's'} need attention` : 'No actions due today'} />
-          <MetricCard icon={CalendarCheck} title="Due this week" value={dueThisWeek.length} subtitle={dueThisWeek.length ? 'Protect these commitments' : 'No weekly deadlines recorded'} />
-          <MetricCard icon={Clock} title="Overdue actions" value={overdue.length} subtitle={overdue.length ? 'Immediate follow-up required' : 'No overdue actions'} danger={overdue.length > 0} />
-          <MetricCard icon={CheckCircle} title="Completed" value={completed.length} subtitle={completed.length ? 'Actions closed successfully' : 'No completed actions yet'} good />
+          <EnterpriseMetric icon={ListTodo} label="Today's priorities" value={dueToday.length} helper={dueToday.length ? `${dueToday.length} action${dueToday.length === 1 ? '' : 's'} need attention` : 'No actions due today'} />
+          <EnterpriseMetric icon={CalendarCheck} label="Due this week" value={dueThisWeek.length} helper={dueThisWeek.length ? 'Protect these commitments' : 'No weekly deadlines recorded'} tone="coral" />
+          <EnterpriseMetric icon={Clock} label="Overdue actions" value={overdue.length} helper={overdue.length ? 'Immediate follow-up required' : 'No overdue actions'} tone={overdue.length ? 'red' : 'navy'} />
+          <EnterpriseMetric icon={CheckCircle} label="Completed" value={completed.length} helper={completed.length ? 'Actions closed successfully' : 'No completed actions yet'} tone="green" />
         </section>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
