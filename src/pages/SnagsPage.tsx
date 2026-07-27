@@ -11,6 +11,7 @@ import { Plus, X, Search } from 'lucide-react'
 import { useSnags, useUpsertSnag } from '@/hooks/useData'
 import { fdate } from '@/lib/utils'
 import type { Snag } from '@/types'
+import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 
 const SEVERITIES: Snag['severity'][] = ['Critical', 'Major', 'Minor']
 
@@ -392,7 +393,13 @@ export default function SnagsPage() {
   const rooms = [...new Set(snags.map(snag => snag.room).filter(Boolean))]
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page space-y-5">
+      <CommandHero
+        eyebrow="Quality completion"
+        title="Quality Completion Centre"
+        description="Drive defects from identification to verification and closure, organised by severity, room, contractor and status."
+      />
+
       {!canCreate && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           Snag List View — you can view snags, but you cannot create or edit
