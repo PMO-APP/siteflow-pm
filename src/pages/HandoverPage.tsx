@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 
+import { pmoConfirm, pmoPrompt } from '@/lib/notifications'
 const TABS = [
   ['dashboard', 'Dashboard'],
   ['checklist', 'Checklist'],
@@ -169,8 +170,8 @@ function hasEvidence(row: any) {
   return Boolean(row.file_url || row.evidence_url)
 }
 
-function requireComment(message = 'Please enter a comment/reason.') {
-  const comment = window.prompt(message)
+async function requireComment(message = 'Please enter a comment/reason.') {
+  const comment = await pmoPrompt({ title: 'Add required details', message, inputLabel: 'Comment or reason', required: true })
   return comment?.trim() || ''
 }
 
@@ -524,7 +525,7 @@ export default function HandoverPage() {
       return
     }
 
-    const confirmed = window.confirm(
+    const confirmed = await pmoConfirm(
       'Generate default handover requirements for this package? Existing records will not be deleted.'
     )
 
@@ -695,7 +696,7 @@ export default function HandoverPage() {
     let remarks = row.remarks || null
 
     if (status === 'Rejected') {
-      const comment = requireComment('Why is this being rejected?')
+      const comment = await requireComment('Why is this being rejected?')
       if (!comment) {
         setNotice('Rejection comment is required.')
         return
@@ -1163,8 +1164,8 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-gold"
                 disabled={!canEdit || !hasEvidence(item)}
-                onClick={() => {
-                  const comment = requireComment('Add inspection comment for passing this item.')
+                onClick={async () => {
+                  const comment = await requireComment('Add inspection comment for passing this item.')
                   if (!comment) return
                   updateRow(
                     'handover_checklist_items',
@@ -1184,8 +1185,8 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={!canEdit}
-                onClick={() => {
-                  const comment = requireComment('Why did this checklist item fail?')
+                onClick={async () => {
+                  const comment = await requireComment('Why did this checklist item fail?')
                   if (!comment) return
                   updateRow(
                     'handover_checklist_items',
@@ -1205,8 +1206,8 @@ function ChecklistTab({ checklist, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={!canEdit}
-                onClick={() => {
-                  const comment = requireComment('Why is this item not applicable?')
+                onClick={async () => {
+                  const comment = await requireComment('Why is this item not applicable?')
                   if (!comment) return
                   updateRow(
                     'handover_checklist_items',
@@ -1273,8 +1274,8 @@ function CertificatesTab({ certificates, uploadEvidence, reviewEvidence, canEdit
           <button
             className="btn btn-sm btn-ghost"
             disabled={!canEdit}
-            onClick={() => {
-              const comment = requireComment('Why is this certificate not applicable?')
+            onClick={async () => {
+              const comment = await requireComment('Why is this certificate not applicable?')
               if (!comment) return
               updateRow(
                 'handover_certificates',
@@ -1337,8 +1338,8 @@ function DocumentsTab({ documents, uploadEvidence, reviewEvidence, canEdit, canR
           <button
             className="btn btn-sm btn-ghost"
             disabled={!canEdit}
-            onClick={() => {
-              const comment = requireComment('Why is this document not applicable?')
+            onClick={async () => {
+              const comment = await requireComment('Why is this document not applicable?')
               if (!comment) return
               updateRow(
                 'handover_documents',
@@ -1396,8 +1397,8 @@ function UtilitiesTab({ utilities, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-gold"
                 disabled={!canEdit || !hasEvidence(item)}
-                onClick={() => {
-                  const comment = requireComment('Add commissioning/utility test comment.')
+                onClick={async () => {
+                  const comment = await requireComment('Add commissioning/utility test comment.')
                   if (!comment) return
                   updateRow(
                     'handover_utilities',
@@ -1417,8 +1418,8 @@ function UtilitiesTab({ utilities, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={!canEdit}
-                onClick={() => {
-                  const comment = requireComment('Why did this utility fail?')
+                onClick={async () => {
+                  const comment = await requireComment('Why did this utility fail?')
                   if (!comment) return
                   updateRow(
                     'handover_utilities',
@@ -1438,8 +1439,8 @@ function UtilitiesTab({ utilities, updateRow, uploadEvidence, canEdit, uploading
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={!canEdit}
-                onClick={() => {
-                  const comment = requireComment('Why is this utility not applicable?')
+                onClick={async () => {
+                  const comment = await requireComment('Why is this utility not applicable?')
                   if (!comment) return
                   updateRow(
                     'handover_utilities',
@@ -1479,9 +1480,9 @@ function KeysTab({ keys, updateRow, canEdit }: any) {
         <button
           className={`btn btn-sm ${item.issued ? 'btn-gold' : 'btn-ghost'}`}
           disabled={!canEdit}
-          onClick={() => {
+          onClick={async () => {
             if (!item.issued) {
-              const recipient = requireComment('Who received this key/item?')
+              const recipient = await requireComment('Who received this key/item?')
               if (!recipient) return
               updateRow(
                 'handover_keys',
@@ -1496,7 +1497,7 @@ function KeysTab({ keys, updateRow, canEdit }: any) {
               return
             }
 
-            const comment = requireComment('Why are you reversing this key issuance?')
+            const comment = await requireComment('Why are you reversing this key issuance?')
             if (!comment) return
             updateRow(
               'handover_keys',
@@ -1533,8 +1534,8 @@ function SignoffsTab({ signoffs, updateRow, canEdit, user }: any) {
           <button
             className="btn btn-sm btn-gold"
             disabled={!canEdit || item.status === 'Approved'}
-            onClick={() => {
-              const comment = requireComment('Add sign-off comment.')
+            onClick={async () => {
+              const comment = await requireComment('Add sign-off comment.')
               if (!comment) return
               updateRow(
                 'handover_signoffs',
@@ -1556,8 +1557,8 @@ function SignoffsTab({ signoffs, updateRow, canEdit, user }: any) {
           <button
             className="btn btn-sm btn-ghost"
             disabled={!canEdit}
-            onClick={() => {
-              const comment = requireComment('Why is this sign-off rejected?')
+            onClick={async () => {
+              const comment = await requireComment('Why is this sign-off rejected?')
               if (!comment) return
               updateRow(
                 'handover_signoffs',
