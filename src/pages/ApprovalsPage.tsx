@@ -6,6 +6,7 @@ import { useApprovals, useUpsertApproval } from '@/hooks/useData'
 import { fdate, urgencyColor } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { Approval } from '@/types'
+import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 
 const TYPES: Approval['type'][] = [
   'Material',
@@ -355,7 +356,13 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page space-y-5">
+      <CommandHero
+        eyebrow="Technical governance"
+        title="Approval Centre"
+        description="Track every submission from draft through review, decision and release, with overdue items brought immediately into focus."
+      />
+
       {!canEdit && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           View Only Mode — you can view approvals, but you cannot create,
