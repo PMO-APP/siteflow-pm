@@ -8,6 +8,7 @@ import {
   useSnags,
 } from '@/hooks/useData'
 import { normalizeProjectState } from '@/core/intelligence/normalizers/projectStateNormalizer'
+import { useDeliveryPackages } from '@/features/schedule'
 
 export function useProjectState({
   project,
@@ -32,12 +33,14 @@ export function useProjectState({
   const risks = useRisks()
   const snags = useSnags()
   const financial = useFinancial()
+  const deliveryPackages = useDeliveryPackages()
 
   const state = useMemo(
     () =>
       normalizeProjectState({
         project,
         tasks: tasks.data || [],
+        deliveryPackages: deliveryPackages.data || [],
         approvals: approvals.data || [],
         procurement: procurement.data || [],
         risks: risks.data || [],
@@ -53,6 +56,7 @@ export function useProjectState({
     [
       project,
       tasks.data,
+      deliveryPackages.data,
       approvals.data,
       procurement.data,
       risks.data,
@@ -75,13 +79,15 @@ export function useProjectState({
       procurement.isLoading ||
       risks.isLoading ||
       snags.isLoading ||
-      financial.isLoading,
+      financial.isLoading ||
+      deliveryPackages.isLoading,
     isError:
       tasks.isError ||
       approvals.isError ||
       procurement.isError ||
       risks.isError ||
       snags.isError ||
-      financial.isError,
+      financial.isError ||
+      deliveryPackages.isError,
   }
 }
