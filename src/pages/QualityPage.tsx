@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
-import { ClipboardCheck, Plus } from 'lucide-react'
+import { ClipboardCheck, Plus, ShieldCheck, AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import { EnterpriseMetric, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
@@ -473,23 +474,27 @@ export default function QualityPage() {
     gate.inspection_status !== 'Approved' &&
     gate.inspection_status !== 'Reapproved'
 
+  const approvedCount = qualityGates.filter(gate => gate.status === 'Approved' || gate.status === 'Reapproved').length
+  const rejectedCount = qualityGates.filter(gate => gate.status === 'Rejected').length
+  const reviewCount = qualityGates.filter(gate => gate.inspection_status === 'Under Review' || gate.inspection_status === 'Inspection Requested' || gate.inspection_status === 'Reinspection Requested').length
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 p-4 sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1600px] space-y-5">
       {customAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
-            <div className="text-lg font-semibold text-[#ede8de] mb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#102943]/45">
+          <div className="bg-white border border-[#dfe3e7] rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
+            <div className="text-lg font-semibold text-[#102943] mb-3">
               PMOCorex Notice
             </div>
 
-            <div className="text-sm text-[#9ca3af]">
+            <div className="text-sm text-[#65717c]">
               {customAlert}
             </div>
 
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setCustomAlert('')}
-                className="btn-gold btn"
+                className="inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white"
               >
                 Close
               </button>
@@ -499,9 +504,9 @@ export default function QualityPage() {
       )}
 
       {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
-            <div className="text-lg font-semibold text-[#ede8de] mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#102943]/45">
+          <div className="bg-white border border-[#dfe3e7] rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
+            <div className="text-lg font-semibold text-[#102943] mb-4">
               Reject Inspection
             </div>
 
@@ -535,9 +540,9 @@ export default function QualityPage() {
       )}
 
       {showApproveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-[#111827] border border-white/10 rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
-            <div className="text-lg font-semibold text-[#ede8de] mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#102943]/45">
+          <div className="bg-white border border-[#dfe3e7] rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
+            <div className="text-lg font-semibold text-[#102943] mb-4">
               Final Approval Signoff
             </div>
 
@@ -556,7 +561,7 @@ export default function QualityPage() {
                 onChange={e => setReviewerSignature(e.target.value)}
               />
 
-              <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/5 p-3 text-xs text-[#bfb9ae]">
+              <div className="rounded-xl border border-[#ffd0c3] bg-[#fff4ef] p-3 text-xs text-[#65717c]">
                 By approving, you confirm this inspection has been reviewed and
                 meets the required quality standards.
               </div>
@@ -586,28 +591,20 @@ export default function QualityPage() {
         </div>
       )}
 
-      <div>
-        <div className="flex items-center gap-2">
-          <ClipboardCheck className="text-[#c49e48]" size={22} />
+      <EnterprisePageHero eyebrow="Quality assurance" title="Quality Gate Control Centre" description="Control contractor inspection requests, consultant reviews, evidence and hold-point approvals before work proceeds." projectName={projectName}>
+        <div className="mt-4 inline-flex rounded-full border border-[#dbe4ea] bg-[#f5f8fa] px-3 py-1.5 text-xs font-semibold uppercase text-[#536170]">Project role: {projectRole}</div>
+      </EnterprisePageHero>
 
-          <h1 className="text-2xl font-bold text-[#ede8de]">
-            Quality Gates
-          </h1>
-        </div>
-
-        <p className="text-sm text-[#6e7d8c] mt-1">
-          Contractor inspection requests, consultant reviews, evidence, and hold-point approvals
-        </p>
-
-        <div className="mt-3">
-          <span className="badge badge-amber uppercase">
-            Project Role: {projectRole}
-          </span>
-        </div>
-      </div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <EnterpriseMetric label="Quality gates" value={qualityGates.length} helper="Total inspection controls" icon={ClipboardCheck}/>
+        <EnterpriseMetric label="Awaiting review" value={reviewCount} helper="Requires consultant action" icon={Clock3} tone="amber"/>
+        <EnterpriseMetric label="Approved" value={approvedCount} helper="Released to proceed" icon={CheckCircle2} tone="green"/>
+        <EnterpriseMetric label="Rejected" value={rejectedCount} helper="Requires corrective action" icon={AlertTriangle} tone={rejectedCount ? 'red' : 'navy'}/>
+      </section>
 
       {canCreateGate && (
-        <div className="card p-4 space-y-4">
+        <EnterpriseSection title="Request an inspection" description="Create a hold point from an approved template and attach readiness evidence.">
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <select
               className="form-control"
@@ -677,53 +674,55 @@ export default function QualityPage() {
 
           <button
             onClick={createGate}
-            className="btn-gold btn flex items-center gap-2"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white flex items-center gap-2"
           >
             <Plus size={14} />
             Request Inspection
           </button>
         </div>
+        </EnterpriseSection>
       )}
 
+      <EnterpriseSection title="Inspection register" description="Review current quality gates, evidence and sign-off status.">
       <div className="space-y-3">
         {loading ? (
-          <div className="text-[#6e7d8c]">Loading quality gates...</div>
+          <div className="text-[#74818d]">Loading quality gates...</div>
         ) : qualityGates.length === 0 ? (
-          <div className="card p-6 text-center text-[#6e7d8c]">
+          <div className="rounded-2xl border border-dashed border-[#cfdbe3] bg-white p-8 text-center text-[#74818d]">
             No quality gates created yet.
           </div>
         ) : (
           qualityGates.map(gate => (
             <div
               key={gate.id}
-              className="card p-4 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-5"
+              className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-[0_8px_24px_rgba(18,58,96,0.035)] grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-5"
             >
               <div>
-                <div className="text-lg font-semibold text-[#ede8de]">
+                <div className="text-lg font-semibold text-[#102943]">
                   {gate.gate_name}
                 </div>
 
-                <div className="text-[11px] text-[#c49e48] font-mono mt-1">
+                <div className="text-[11px] text-[#df5f41] font-mono mt-1">
                   Passport ID: {gate.passport_id || 'Not generated'}
                 </div>
 
-                <div className="text-sm text-[#6e7d8c]">
+                <div className="text-sm text-[#74818d]">
                   Responsible: {gate.gate_type || '—'}
                 </div>
 
-                <div className="text-sm text-[#6e7d8c]">
+                <div className="text-sm text-[#74818d]">
                   Auto-blocked Task: {gate.required_before_task || 'No task linked'}
                 </div>
 
-                <div className="text-sm text-[#6e7d8c]">
+                <div className="text-sm text-[#74818d]">
                   Raised by: {gate.inspector_name || '—'}
                 </div>
 
-                <div className="text-sm text-[#6e7d8c]">
+                <div className="text-sm text-[#74818d]">
                   Requested by: {gate.requested_by || 'Not requested'}
                 </div>
 
-                <div className="text-sm text-[#6e7d8c]">
+                <div className="text-sm text-[#74818d]">
                   Reviewed by: {gate.reviewed_by || 'Not reviewed'}
                 </div>
 
@@ -733,7 +732,7 @@ export default function QualityPage() {
                   </div>
                 )}
 
-                <div className="text-sm text-[#6e7d8c] mt-1">
+                <div className="text-sm text-[#74818d] mt-1">
                   {gate.inspection_comments || 'No comments'}
                 </div>
 
@@ -744,7 +743,7 @@ export default function QualityPage() {
                         key={photo}
                         src={photo}
                         alt="Evidence"
-                        className="w-28 h-28 object-cover rounded-lg border border-white/10"
+                        className="w-28 h-28 object-cover rounded-lg border border-[#dfe3e7]"
                       />
                     ))}
                   </div>
@@ -773,7 +772,7 @@ export default function QualityPage() {
                           Final Approval Record
                         </div>
 
-                        <div className="text-[11px] text-[#9ca3af] mt-1">
+                        <div className="text-[11px] text-[#65717c] mt-1">
                           Passport ID: {gate.passport_id}
                         </div>
                       </div>
@@ -783,37 +782,37 @@ export default function QualityPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                        <div className="text-[10px] uppercase tracking-wider text-[#74818d]">
                           Reviewed By
                         </div>
-                        <div className="text-sm text-[#ede8de]">
+                        <div className="text-sm text-[#102943]">
                           {gate.reviewed_by || '—'}
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                        <div className="text-[10px] uppercase tracking-wider text-[#74818d]">
                           Company
                         </div>
-                        <div className="text-sm text-[#ede8de]">
+                        <div className="text-sm text-[#102943]">
                           {gate.reviewer_company || '—'}
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                        <div className="text-[10px] uppercase tracking-wider text-[#74818d]">
                           Digital Signature
                         </div>
-                        <div className="text-sm text-[#c49e48] font-semibold">
+                        <div className="text-sm text-[#df5f41] font-semibold">
                           {gate.reviewer_signature || '—'}
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[#6e7d8c]">
+                        <div className="text-[10px] uppercase tracking-wider text-[#74818d]">
                           Approval Date
                         </div>
-                        <div className="text-sm text-[#ede8de]">
+                        <div className="text-sm text-[#102943]">
                           {gate.approved_at
                             ? new Date(gate.approved_at).toLocaleString('en-GB')
                             : '—'}
@@ -918,6 +917,8 @@ export default function QualityPage() {
             </div>
           ))
         )}
+      </div>
+      </EnterpriseSection>
       </div>
     </div>
   )
