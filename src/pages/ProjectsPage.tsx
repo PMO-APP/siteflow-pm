@@ -593,25 +593,63 @@ export default function ProjectsPage() {
   todayStart.setHours(0, 0, 0, 0)
 
   const projectAttentionMap = useMemo(() => {
-    const map = new Map<string, { needsAttention: boolean; overdueTasks: number }>()
+    const map = new Map<string, {
+      needsAttention: boolean
+      overdueTasks: number
+      totalTasks: number
+      healthScore: number
+      healthBand: 'Healthy' | 'Watch' | 'At Risk' | 'Critical'
+    }>()
 
     projects.forEach(project => {
-      const overdueTasks = projectTasks.filter(task => {
-        if (String(task.project_id) !== String(project.id)) return false
-        if (String(task.status || '').toLowerCase() === 'completed') return false
-        if (Number(task.progress_pct || 0) >= 100) return false
-        if (!task.finish_date) return false
+      const projectRows = projectTasks.filter(
+        task => String(task.project_id) === String(project.id)
+      )
+
+      let overdueTasks = 0
+      let weightedOverdueLoad = 0
+
+      projectRows.forEach(task => {
+        const status = String(task.status || '').toLowerCase()
+        const progress = Math.min(100, Math.max(0, Number(task.progress_pct || 0)))
+        if (status === 'completed' || progress >= 100 || !task.finish_date) return
 
         const finishDate = new Date(task.finish_date)
-        if (Number.isNaN(finishDate.getTime())) return false
+        if (Number.isNaN(finishDate.getTime())) return
         finishDate.setHours(0, 0, 0, 0)
-        return finishDate < todayStart
-      }).length
+        if (finishDate >= todayStart) return
 
-      const projectStatusNeedsAttention = ['Delayed', 'On Hold'].includes(project.status)
+        overdueTasks += 1
+
+        const daysOverdue = Math.max(
+          1,
+          Math.floor((todayStart.getTime() - finishDate.getTime()) / 86_400_000)
+        )
+        const remainingWork = Math.max(0.15, (100 - progress) / 100)
+        const delaySeverity = 1 + Math.min(daysOverdue, 90) / 90
+        weightedOverdueLoad += remainingWork * delaySeverity
+      })
+
+      const totalTasks = projectRows.length
+      const overdueRatio = totalTasks > 0 ? weightedOverdueLoad / totalTasks : 0
+      const schedulePenalty = Math.min(85, 65 * Math.sqrt(Math.max(0, overdueRatio)))
+      const projectStatus = String(project.status || '')
+      const statusPenalty = projectStatus === 'On Hold' ? 15 : projectStatus === 'Delayed' ? 10 : 0
+      const healthScore = Math.max(0, Math.min(100, Math.round(100 - schedulePenalty - statusPenalty)))
+      const healthBand = healthScore >= 85
+        ? 'Healthy'
+        : healthScore >= 70
+          ? 'Watch'
+          : healthScore >= 50
+            ? 'At Risk'
+            : 'Critical'
+
       map.set(String(project.id), {
-        needsAttention: projectStatusNeedsAttention || overdueTasks > 0,
+        needsAttention: healthScore < 85 || ['Delayed', 'On Hold'].includes(projectStatus),
         overdueTasks,
+        totalTasks,
+        healthScore,
+        healthBand,
       })
     })
 
@@ -790,8 +828,19 @@ export default function ProjectsPage() {
               const portfolioProjects = projects.filter(p => String(p.portfolio_id ?? '') === String(portfolio.id ?? ''))
               const attention = portfolioProjects.filter(p => projectAttentionMap.get(String(p.id))?.needsAttention).length
               const active = portfolioProjects.filter(p => p.status === 'Active').length
-              const health = portfolioProjects.length
-                ? Math.round(((portfolioProjects.length - attention) / portfolioProjects.length) * 100)
+              const portfolioHealthRows = portfolioProjects.map(project => ({
+                score: projectAttentionMap.get(String(project.id))?.healthScore ?? 100,
+                weight: Math.max(1, projectAttentionMap.get(String(project.id))?.totalTasks ?? 0),
+              }))
+              const simpleAverage = portfolioHealthRows.length
+                ? portfolioHealthRows.reduce((sum, row) => sum + row.score, 0) / portfolioHealthRows.length
+                : 0
+              const weightedAverage = portfolioHealthRows.length
+                ? portfolioHealthRows.reduce((sum, row) => sum + row.score * row.weight, 0) /
+                  portfolioHealthRows.reduce((sum, row) => sum + row.weight, 0)
+                : 0
+              const health = portfolioHealthRows.length
+                ? Math.round(simpleAverage * 0.7 + weightedAverage * 0.3)
                 : 0
 
               return (
@@ -1152,8 +1201,14 @@ function PortfolioMetric({ label, value, attention = false, onClick }: any) {
 function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
   const status = project.status || 'Not set'
   const overdueTasks = Number(attentionInfo?.overdueTasks || 0)
+  const healthScore = Number(attentionInfo?.healthScore ?? 100)
+  const healthBand = String(attentionInfo?.healthBand || 'Healthy')
   const isAttention = Boolean(attentionInfo?.needsAttention)
-  const healthLabel = status === 'Delayed' ? 'Critical' : status === 'On Hold' ? 'Attention' : overdueTasks > 0 ? `${overdueTasks} overdue` : status === 'Completed' ? 'Complete' : 'Healthy'
+  const healthLabel = status === 'Completed'
+    ? 'Complete'
+    : overdueTasks > 0
+      ? `${healthScore}% · ${overdueTasks} overdue`
+      : `${healthScore}% · ${healthBand}`
 
   return (
     <tr className="border-t border-[#e2e9ed] bg-white transition hover:bg-[#f9fbfb]">
@@ -1164,7 +1219,7 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
         </button>
       </td>
       <td className="px-5 py-4 text-sm text-[#536974]">{portfolioName}</td>
-      <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${isAttention ? 'border-[#f0c4b2] bg-[#fff0e9] text-[#d86335]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${isAttention ? 'bg-[#e56d47]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
+      <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${healthScore < 50 ? 'border-[#efb1ae] bg-[#fff0ef] text-[#b83f3b]' : healthScore < 70 ? 'border-[#f0c4b2] bg-[#fff0e9] text-[#d86335]' : healthScore < 85 ? 'border-[#ead08b] bg-[#fff8df] text-[#9a6a00]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${healthScore < 50 ? 'bg-[#d84a45]' : healthScore < 70 ? 'bg-[#e56d47]' : healthScore < 85 ? 'bg-[#d79b16]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
       <td className="px-5 py-4"><span className="rounded-full bg-[#eaf1f4] px-2.5 py-1 text-xs font-semibold text-[#2f6f91]">{capacity}</span></td>
       <td className="px-5 py-4 text-sm text-[#536974]">{project.phase || 'Not set'}</td>
       <td className="px-5 py-4 text-sm text-[#536974]">{formatDate(project.handover_date)}</td>
