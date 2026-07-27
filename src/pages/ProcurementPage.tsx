@@ -9,6 +9,7 @@ import {
 import { fdate, urgencyColor } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { ProcurementItem } from '@/types'
+import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 
 const CATS = [
   'Tiles',
@@ -520,7 +521,13 @@ export default function ProcurementPage() {
   const delivered = items.filter(item => item.status === 'Delivered').length
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page space-y-5">
+      <CommandHero
+        eyebrow="Procurement control"
+        title="Procurement Control Centre"
+        description="Control long-lead items, supplier commitments, order deadlines and site delivery readiness from one operational workspace."
+      />
+
       {!canEdit && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
           Procurement Register View Only — you can view procurement records,
