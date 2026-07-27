@@ -5,9 +5,11 @@ import {
   Mail,
   Building2,
   Send,
+  ShieldCheck,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { EnterpriseMetric, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
 const ROLES = [
   'admin',
@@ -155,52 +157,20 @@ const { error: emailError } = await supabase.functions.invoke(
   }
 
   return (
-    <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl border border-[#c49e48]/20 bg-gradient-to-r from-[#111820] via-[#162230] to-[#111820] p-6">
-        <div className="relative flex items-start justify-between gap-5">
-          <div>
-            <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-              Team Access
-            </div>
+    <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 p-4 sm:-m-6 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px] space-y-5">
+      <EnterprisePageHero eyebrow="Workspace access" title="Team Access" description="Invite workspace members, assign organization-level roles and monitor outstanding invitations." actions={<button onClick={() => setShowModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0d2e4d]"><Plus size={15}/>Invite member</button>} />
 
-            <h1 className="text-3xl font-black text-white">
-              Invite your project team.
-            </h1>
-
-            <p className="text-slate-400 mt-2 max-w-2xl">
-              Invite members by email and assign organization-level roles.
-            </p>
-          </div>
-
-          <button onClick={() => setShowModal(true)} className="btn-gold btn">
-            <Plus size={15} />
-            Invite Member
-          </button>
-        </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <EnterpriseMetric label="Organizations" value={organizations.length} helper="Available organizations" icon={Building2}/>
+        <EnterpriseMetric label="Members" value={members.length} helper="Workspace memberships" icon={Users} tone="green"/>
+        <EnterpriseMetric label="Pending invites" value={invites.filter(i => i.status === 'pending').length} helper="Awaiting acceptance" icon={Send} tone="coral"/>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <Metric title="Organizations" value={organizations.length} icon={Building2} />
-        <Metric title="Members" value={members.length} icon={Users} />
-        <Metric
-          title="Pending Invites"
-          value={invites.filter(i => i.status === 'pending').length}
-          icon={Send}
-        />
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="card-head">
-          <div>
-            <div className="card-title">Pending Invitations</div>
-            <div className="text-xs text-slate-500 mt-1">
-              Users invited to join PMOCorex.
-            </div>
-          </div>
-        </div>
+      <EnterpriseSection title="Pending invitations" description="Users invited to join PMOCorex and their current invitation status." action={<div className="rounded-xl bg-[#eaf1f7] p-2 text-[#123a60]"><ShieldCheck size={18}/></div>}>
 
         {loading ? (
-          <div className="p-6 text-slate-400">Loading invites…</div>
+          <div className="p-6 text-[#74818d]">Loading invites…</div>
         ) : invites.length === 0 ? (
           <div className="empty-state py-12">
             <p>No invitations sent yet.</p>
@@ -224,8 +194,8 @@ const { error: emailError } = await supabase.functions.invoke(
 
                   return (
                     <tr key={invite.id}>
-                      <td className="text-slate-300">{invite.email}</td>
-                      <td className="text-slate-400">{invite.full_name || '—'}</td>
+                      <td className="text-[#26384a]">{invite.email}</td>
+                      <td className="text-[#74818d]">{invite.full_name || '—'}</td>
 
                       <td>
                         <span className="badge badge-muted capitalize">
@@ -263,17 +233,9 @@ const { error: emailError } = await supabase.functions.invoke(
             </table>
           </div>
         )}
-      </div>
+      </EnterpriseSection>
 
-      <div className="card overflow-hidden">
-        <div className="card-head">
-          <div>
-            <div className="card-title">Members</div>
-            <div className="text-xs text-slate-500 mt-1">
-              Accepted members with access.
-            </div>
-          </div>
-        </div>
+      <EnterpriseSection title="Workspace members" description="Accepted members with active workspace access.">
 
         {members.length === 0 ? (
           <div className="empty-state py-12">
@@ -294,14 +256,14 @@ const { error: emailError } = await supabase.functions.invoke(
               <tbody>
                 {members.map(member => (
                   <tr key={member.id}>
-                    <td className="text-slate-300">{member.email || '—'}</td>
-                    <td className="text-slate-400">{member.full_name || '—'}</td>
+                    <td className="text-[#26384a]">{member.email || '—'}</td>
+                    <td className="text-[#74818d]">{member.full_name || '—'}</td>
                     <td>
                       <span className="badge badge-muted capitalize">
                         {member.role?.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="text-slate-500 text-xs">
+                    <td className="text-[#87929b] text-xs">
                       {member.access_scope || '—'}
                     </td>
                   </tr>
@@ -310,17 +272,18 @@ const { error: emailError } = await supabase.functions.invoke(
             </table>
           </div>
         )}
+      </EnterpriseSection>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-[#102943]/45 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="card w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-white">Invite Member</h2>
+              <h2 className="text-lg font-bold text-[#102943]">Invite Member</h2>
 
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-500 hover:text-white"
+                className="text-[#87929b] hover:text-[#102943]"
               >
                 ✕
               </button>
@@ -358,7 +321,7 @@ const { error: emailError } = await supabase.functions.invoke(
                 onChange={e => setEmail(e.target.value)}
               />
 
-              <Mail size={15} className="absolute left-3 top-3 text-slate-500" />
+              <Mail size={15} className="absolute left-3 top-3 text-[#87929b]" />
             </div>
 
             <label className="form-label">Role</label>
@@ -377,7 +340,7 @@ const { error: emailError } = await supabase.functions.invoke(
             <button
               onClick={sendInvite}
               disabled={sending}
-              className="btn-gold btn w-full justify-center"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white w-full justify-center"
             >
               {sending ? 'Sending Invite…' : 'Send Email Invite'}
             </button>
@@ -388,17 +351,3 @@ const { error: emailError } = await supabase.functions.invoke(
   )
 }
 
-function Metric({ title, value, icon: Icon }: any) {
-  return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-3xl font-black text-white">{value}</div>
-          <div className="text-sm text-slate-500 mt-1">{title}</div>
-        </div>
-
-        <Icon size={22} className="text-[#c49e48]" />
-      </div>
-    </div>
-  )
-}
