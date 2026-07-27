@@ -41,7 +41,7 @@ function RiskModal({ item, onClose }: { item: Risk | null; onClose: () => void }
         <div className="gold-bar" />
         <div className="modal-head">
           <div className="modal-title">{item ? `Edit Risk #${item.risk_number}` : 'New Risk'}</div>
-          <button onClick={onClose} className="text-[#6e7d8c] hover:text-[#ede8de]"><X size={16} /></button>
+          <button onClick={onClose} className="text-[#74818d] hover:text-[#102943]"><X size={16} /></button>
         </div>
         <div className="p-5 space-y-4">
           <div><label className="form-label">Risk Title *</label><input className="form-control" value={form.title} onChange={e => set('title', e.target.value)} /></div>
@@ -51,21 +51,21 @@ function RiskModal({ item, onClose }: { item: Risk | null; onClose: () => void }
           </div>
 
           {/* Risk scoring */}
-          <div className="bg-[#1c2a36] rounded-lg p-3">
+          <div className="bg-white rounded-lg p-3">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[10px] font-mono text-[#6e7d8c] uppercase tracking-widest">Risk Score</div>
+              <div className="text-[10px] font-mono text-[#74818d] uppercase tracking-widest">Risk Score</div>
               <div className={`text-2xl font-display font-bold px-3 py-1 rounded ${lvl.color}`}>{score} — {lvl.label}</div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="form-label">Likelihood (1–5): {form.likelihood}</label>
                 <input type="range" min={1} max={5} value={form.likelihood} onChange={e => set('likelihood', +e.target.value)} className="w-full accent-[#c49e48]" />
-                <div className="flex justify-between text-[9px] text-[#6e7d8c] mt-0.5"><span>Rare</span><span>Almost Certain</span></div>
+                <div className="flex justify-between text-[9px] text-[#74818d] mt-0.5"><span>Rare</span><span>Almost Certain</span></div>
               </div>
               <div>
                 <label className="form-label">Impact (1–5): {form.impact}</label>
                 <input type="range" min={1} max={5} value={form.impact} onChange={e => set('impact', +e.target.value)} className="w-full accent-[#c49e48]" />
-                <div className="flex justify-between text-[9px] text-[#6e7d8c] mt-0.5"><span>Negligible</span><span>Catastrophic</span></div>
+                <div className="flex justify-between text-[9px] text-[#74818d] mt-0.5"><span>Negligible</span><span>Catastrophic</span></div>
               </div>
             </div>
           </div>
@@ -78,7 +78,7 @@ function RiskModal({ item, onClose }: { item: Risk | null; onClose: () => void }
             <div><label className="form-label">Closed Date</label><input type="date" className="form-control" value={form.closed_date} onChange={e => set('closed_date', e.target.value)} /></div>
           </div>
         </div>
-        <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
+        <div className="flex gap-2 justify-end px-5 py-3 border-t border-[#dfe3e7]">
           <button className="btn-ghost btn-sm btn" onClick={onClose}>Cancel</button>
           <button className="btn-gold btn-sm btn" onClick={save} disabled={upsert.isPending}>{upsert.isPending ? 'Saving…' : item ? 'Save' : 'Add Risk'}</button>
         </div>
@@ -105,7 +105,7 @@ function RiskMatrix({ risks }: { risks: Risk[] }) {
         <div className="flex gap-2">
           {/* Y-axis label */}
           <div className="flex flex-col justify-center">
-            <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }} className="text-[9px] font-mono text-[#6e7d8c] uppercase tracking-widest">← Likelihood</div>
+            <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }} className="text-[9px] font-mono text-[#74818d] uppercase tracking-widest">← Likelihood</div>
           </div>
           <div className="flex-1">
             {/* Matrix */}
@@ -115,7 +115,7 @@ function RiskMatrix({ risks }: { risks: Risk[] }) {
                 return (
                   <div key={`${l}-${i}`} className={`border rounded flex flex-wrap items-center justify-center gap-0.5 p-0.5 ${cellColor(l, i)}`} title={`L${l}×I${i}=${l*i}`}>
                     {items.map(r => (
-                      <div key={r.id} className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[8px] font-mono text-white" title={r.title}>
+                      <div key={r.id} className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-[8px] font-mono text-[#102943]" title={r.title}>
                         {r.risk_number}
                       </div>
                     ))}
@@ -126,16 +126,16 @@ function RiskMatrix({ risks }: { risks: Risk[] }) {
             {/* X-axis */}
             <div className="flex mt-1 pl-0">
               {['','1','2','3','4','5'].map((v, i) => (
-                i === 0 ? null : <div key={v} className="flex-1 text-center text-[9px] text-[#6e7d8c]">{v}</div>
+                i === 0 ? null : <div key={v} className="flex-1 text-center text-[9px] text-[#74818d]">{v}</div>
               ))}
             </div>
-            <div className="text-center text-[9px] font-mono text-[#6e7d8c] uppercase tracking-widest mt-0.5">Impact →</div>
+            <div className="text-center text-[9px] font-mono text-[#74818d] uppercase tracking-widest mt-0.5">Impact →</div>
           </div>
         </div>
         {/* Legend */}
         <div className="flex gap-4 mt-3 justify-center">
           {[{ label: 'Low (1–4)', c: 'bg-emerald-500/30' }, { label: 'Medium (5–9)', c: 'bg-amber-500/30' }, { label: 'High (10–14)', c: 'bg-orange-500/30' }, { label: 'Critical (15–25)', c: 'bg-red-500/30' }].map(l => (
-            <div key={l.label} className="flex items-center gap-1.5"><div className={`w-3 h-3 rounded ${l.c}`} /><span className="text-[9px] text-[#6e7d8c]">{l.label}</span></div>
+            <div key={l.label} className="flex items-center gap-1.5"><div className={`w-3 h-3 rounded ${l.c}`} /><span className="text-[9px] text-[#74818d]">{l.label}</span></div>
           ))}
         </div>
       </div>
@@ -175,17 +175,17 @@ export default function RiskPage() {
   const statBadge = (s: string) => s === 'Open' ? 'badge-red' : s === 'Mitigated' ? 'badge-amber' : s === 'Closed' ? 'badge-green' : 'badge-muted'
 
   return (
-    <div className="space-y-4">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[{ label: 'Open Risks', value: open, c: open > 0 ? 'text-red-400' : 'text-emerald-400' }, { label: 'High / Critical', value: high, c: high > 0 ? 'text-red-400' : 'text-emerald-400' }, { label: 'Mitigated', value: mitigated, c: 'text-amber-400' }, { label: 'Closed', value: closed, c: 'text-emerald-400' }].map(s => (
-          <div key={s.label} className="card p-3"><div className={`font-display text-3xl font-bold ${s.c}`}>{s.value}</div><div className="text-[9px] text-[#6e7d8c] uppercase tracking-widest mt-1">{s.label}</div></div>
+          <div key={s.label} className="card p-3"><div className={`font-display text-3xl font-bold ${s.c}`}>{s.value}</div><div className="text-[9px] text-[#74818d] uppercase tracking-widest mt-1">{s.label}</div></div>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="flex rounded-md overflow-hidden border border-white/[0.08]">
+        <div className="flex rounded-md overflow-hidden border border-[#dfe3e7]">
           {(['list', 'matrix'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 text-[11px] font-medium capitalize transition-colors ${view === v ? 'bg-[#c49e48] text-[#0c1014]' : 'bg-[#1c2a36] text-[#6e7d8c] hover:text-[#bfb9ae]'}`}>
+            <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 text-[11px] font-medium capitalize transition-colors ${view === v ? 'bg-[#ff7657] text-[#0c1014]' : 'bg-white text-[#74818d] hover:text-[#536170]'}`}>
               {v === 'list' ? 'List' : 'Matrix'}
             </button>
           ))}
@@ -218,21 +218,21 @@ export default function RiskPage() {
                 <tr><th>#</th><th>Risk</th><th>Category</th><th>L</th><th>I</th><th>Score</th><th>Level</th><th>Status</th><th className="hide-mobile">Review</th><th></th></tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={10} className="text-center py-6 text-[#6e7d8c]">Loading…</td></tr>
+                {isLoading ? <tr><td colSpan={10} className="text-center py-6 text-[#74818d]">Loading…</td></tr>
                   : filtered.map(r => {
                   const score = r.risk_score || (r.likelihood * r.impact)
                   const lvl = riskLevel(score)
                   return (
                     <tr key={r.id} className={r.status === 'Closed' ? 'opacity-40' : ''}>
-                      <td className="font-mono text-[10px] text-[#6e7d8c]">R{r.risk_number}</td>
+                      <td className="font-mono text-[10px] text-[#74818d]">R{r.risk_number}</td>
                       <td className="max-w-[200px]">
-                        <div className="text-[12px] text-[#ede8de] font-medium truncate">{r.title}</div>
-                        {r.mitigation_action && <div className="text-[10px] text-[#6e7d8c] truncate">{r.mitigation_action.slice(0, 60)}</div>}
+                        <div className="text-[12px] text-[#102943] font-medium truncate">{r.title}</div>
+                        {r.mitigation_action && <div className="text-[10px] text-[#74818d] truncate">{r.mitigation_action.slice(0, 60)}</div>}
                       </td>
                       <td><span className={`badge ${catColor(r.category || '')}`}>{r.category}</span></td>
                       <td className="font-mono text-center">{r.likelihood}</td>
                       <td className="font-mono text-center">{r.impact}</td>
-                      <td className="font-mono font-bold text-center text-[14px] text-[#ede8de]">{score}</td>
+                      <td className="font-mono font-bold text-center text-[14px] text-[#102943]">{score}</td>
                       <td><span className={`badge ${lvl.color}`}>{lvl.label}</span></td>
                       <td><span className={`badge ${statBadge(r.status)}`}>{r.status}</span></td>
                       <td className="hide-mobile">{fdate(r.review_date)}</td>
@@ -245,7 +245,7 @@ export default function RiskPage() {
       Edit
     </button>
   ) : (
-    <span className="text-[10px] text-[#6e7d8c]">
+    <span className="text-[10px] text-[#74818d]">
       View only
     </span>
   )}
@@ -254,7 +254,7 @@ export default function RiskPage() {
                   )
                 })}
                 {!isLoading && filtered.length === 0 && (
-                  <tr><td colSpan={10} className="text-center py-8 text-[#6e7d8c]">{risks.length === 0 ? 'No risks logged yet.' : 'No risks match filters.'}</td></tr>
+                  <tr><td colSpan={10} className="text-center py-8 text-[#74818d]">{risks.length === 0 ? 'No risks logged yet.' : 'No risks match filters.'}</td></tr>
                 )}
               </tbody>
             </table>
