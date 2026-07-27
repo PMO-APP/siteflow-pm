@@ -1172,24 +1172,24 @@ export default function CostingPage() {
     (reportSourceForecastFinalCost - reportSourcePaidAmount)
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-6 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
+      <section className="pmx-command-hero">
+        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#ffd1c5] bg-[#ff7657]/10 text-[#df5f41] text-xs">
           Cost Control
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
+        <h1 className="text-3xl sm:text-4xl font-black text-[#102943]">
           Costing
         </h1>
 
-        <p className="text-slate-400 mt-3 max-w-2xl">
+        <p className="text-[#65717c] mt-3 max-w-2xl">
           Weekly cost reports, payments, contracts, variations and procurement
           updates for PMO executive reporting.
         </p>
 
-        <div className="text-xs text-[#6e7d8c] mt-4">
+        <div className="text-xs text-[#74818d] mt-4">
           Project:{' '}
-          <span className="text-[#c49e48]">
+          <span className="text-[#df5f41]">
             {projectName || 'No project selected'}
           </span>
         </div>
@@ -1202,7 +1202,7 @@ export default function CostingPage() {
       </section>
 
       {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           {notice}
         </div>
       )}
@@ -1261,7 +1261,7 @@ export default function CostingPage() {
       </div>
 
       {selectedSubmission && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           Viewing historical cost report for {fdate(selectedSubmission.report_week)}.
           This report is a saved snapshot and will not change when new costing records are added.
         </div>
@@ -1465,15 +1465,15 @@ function NoSubmittedCostReport({
 }) {
   return (
     <div className="card p-8 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48]">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#ffd1c5] bg-[#ff7657]/10 text-[#df5f41]">
         <Wallet size={22} />
       </div>
 
-      <h3 className="text-lg font-semibold text-[#ede8de]">
+      <h3 className="text-lg font-semibold text-[#102943]">
         No cost report submitted for {fdate(reportWeek)}
       </h3>
 
-      <p className="mx-auto mt-2 max-w-xl text-sm text-[#6e7d8c]">
+      <p className="mx-auto mt-2 max-w-xl text-sm text-[#74818d]">
         This tab only displays locked weekly report snapshots. Use the Weekly Updates,
         Contracts, Payments, Variations, Procurement and Financial Register tabs to update
         the live records, then submit the weekly report to generate the snapshot for this date.
@@ -1497,7 +1497,7 @@ function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
   const totals = calcFinancialTotals(financialItems)
 
   return (
-    <div className="space-y-5">
+    <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
       <MetricGrid
         values={[
           ['Contract Sum', formatCurrency(totals.contractSum)],
@@ -1508,15 +1508,15 @@ function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
       />
 
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-white/[0.06]">
-          <div className="font-bold text-[#ede8de]">Financial Register</div>
-          <div className="text-xs text-[#6e7d8c]">
+        <div className="px-4 py-3 border-b border-[#dfe3e7]">
+          <div className="font-bold text-[#102943]">Financial Register</div>
+          <div className="text-xs text-[#74818d]">
             Read-only source of truth imported from the former Financial module.
           </div>
         </div>
 
         {financialItems.length === 0 ? (
-          <div className="p-6 text-sm text-[#6e7d8c]">
+          <div className="p-6 text-sm text-[#74818d]">
             No financial register records found for this project.
           </div>
         ) : (
@@ -1541,7 +1541,7 @@ function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
               <tbody>
                 {financialItems.map(item => (
                   <tr key={item.id}>
-                    <td className="font-mono text-[#c49e48]">
+                    <td className="font-mono text-[#df5f41]">
                       {item.reference || '—'}
                     </td>
                     <td>
@@ -1549,11 +1549,11 @@ function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
                         {item.type || '—'}
                       </span>
                     </td>
-                    <td className="font-medium text-[#ede8de]">
+                    <td className="font-medium text-[#102943]">
                       {item.description || '—'}
                     </td>
                     <td>{item.direction || '—'}</td>
-                    <td className="text-[#c49e48] font-semibold">
+                    <td className="text-[#df5f41] font-semibold">
                       {formatCurrency(item.amount)}
                     </td>
                     <td>
@@ -1565,7 +1565,7 @@ function FinancialRegisterTab({ financialItems }: { financialItems: any[] }) {
                     <td>{fdate(item.approved_date)}</td>
                     <td>{fdate(item.certified_date)}</td>
                     <td>{fdate(item.payment_date)}</td>
-                    <td className="max-w-[280px] text-slate-400">
+                    <td className="max-w-[280px] text-[#65717c]">
                       {item.notes || '—'}
                     </td>
                   </tr>
@@ -1588,7 +1588,7 @@ function CostReportHistoryTab({
 }) {
   if (!submissions.length) {
     return (
-      <div className="card p-8 text-center text-[#6e7d8c]">
+      <div className="card p-8 text-center text-[#74818d]">
         No submitted cost reports yet. Submit a weekly report to save it into history.
       </div>
     )
@@ -1611,7 +1611,7 @@ function CostReportHistoryTab({
         <tbody>
           {submissions.map(submission => (
             <tr key={submission.id}>
-              <td className="font-medium text-[#ede8de]">
+              <td className="font-medium text-[#102943]">
                 {fdate(submission.report_week)}
               </td>
               <td>
@@ -2052,14 +2052,14 @@ function CostOverviewTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="card p-5">
-          <h2 className="font-bold text-[#ede8de] mb-4">
+          <h2 className="font-bold text-[#102943] mb-4">
             Costing Executive Summary
           </h2>
 
-          <div className="space-y-3 text-sm text-slate-400">
+          <div className="space-y-3 text-sm text-[#65717c]">
             <p>
               Total contract exposure is{' '}
-              <span className="text-[#c49e48] font-semibold">
+              <span className="text-[#df5f41] font-semibold">
                 ₦{totalContractValue.toLocaleString()}
               </span>.
             </p>
@@ -2088,7 +2088,7 @@ function CostOverviewTab({
         </div>
 
         <div className="card p-5">
-          <h2 className="font-bold text-[#ede8de] mb-4">Costing Workload</h2>
+          <h2 className="font-bold text-[#102943] mb-4">Costing Workload</h2>
 
           <div className="grid grid-cols-2 gap-3">
             <MiniMetric title="Active Contracts" value={activeContracts} />
@@ -2165,8 +2165,8 @@ function WeeklyReportTab({
 
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
-          <h2 className="font-bold text-[#ede8de]">Add Cost Report Item</h2>
+          <Plus size={17} className="text-[#df5f41]" />
+          <h2 className="font-bold text-[#102943]">Add Cost Report Item</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -2227,23 +2227,23 @@ function WeeklyReportTab({
       </div>
 
       {loading ? (
-        <div className="card p-6 text-slate-400">Loading cost report…</div>
+        <div className="card p-6 text-[#65717c]">Loading cost report…</div>
       ) : (
         <div className="space-y-5">
           {groupedItems.map((group: any) => (
             <div key={group.section} className="card overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-                <div className="font-bold text-[#ede8de]">
+              <div className="px-4 py-3 border-b border-[#dfe3e7] flex items-center justify-between">
+                <div className="font-bold text-[#102943]">
                   {group.section}
                 </div>
 
-                <div className="text-xs text-[#6e7d8c]">
+                <div className="text-xs text-[#74818d]">
                   {group.items.length} item(s)
                 </div>
               </div>
 
               {group.items.length === 0 ? (
-                <div className="p-5 text-sm text-[#6e7d8c]">
+                <div className="p-5 text-sm text-[#74818d]">
                   No entries for this section.
                 </div>
               ) : (
@@ -2282,15 +2282,15 @@ function ReportTable({
         <tbody>
           {items.map(item => (
             <tr key={item.id}>
-              <td className="font-medium text-[#ede8de]">
+              <td className="font-medium text-[#102943]">
                 {item.item_title}
               </td>
 
-              <td className="max-w-[360px] text-slate-400">
+              <td className="max-w-[360px] text-[#65717c]">
                 {item.description || '—'}
               </td>
 
-              <td className="text-[#c49e48] font-semibold">
+              <td className="text-[#df5f41] font-semibold">
                 ₦{Number(item.amount || 0).toLocaleString()}
               </td>
 
@@ -2309,7 +2309,7 @@ function ReportTable({
                     <Trash2 size={13} />
                   </button>
                 ) : (
-                  <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                  <span className="text-[10px] uppercase tracking-widest text-[#74818d]">
                     View Only
                   </span>
                 )}
@@ -2335,8 +2335,8 @@ function ContractsTab({
     <div className="space-y-5">
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
-          <h2 className="font-bold text-[#ede8de]">Add Contract</h2>
+          <Plus size={17} className="text-[#df5f41]" />
+          <h2 className="font-bold text-[#102943]">Add Contract</h2>
         </div>
 
         {!canEdit && (
@@ -2437,9 +2437,9 @@ function ContractsTab({
       </div>
 
       {loading ? (
-        <div className="card p-6 text-slate-400">Loading contracts…</div>
+        <div className="card p-6 text-[#65717c]">Loading contracts…</div>
       ) : contracts.length === 0 ? (
-        <div className="card p-6 text-slate-400">
+        <div className="card p-6 text-[#65717c]">
           No contracts recorded for this project.
         </div>
       ) : (
@@ -2460,12 +2460,12 @@ function ContractsTab({
             <tbody>
               {contracts.map((contract: any) => (
                 <tr key={contract.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {contract.contract_title}
                   </td>
                   <td>{contract.contractor_name || '—'}</td>
                   <td>{contract.contract_type || '—'}</td>
-                  <td className="text-[#c49e48] font-semibold">
+                  <td className="text-[#df5f41] font-semibold">
                     ₦{Number(contract.contract_value || 0).toLocaleString()}
                   </td>
                   <td>₦{Number(contract.amount_paid || 0).toLocaleString()}</td>
@@ -2483,7 +2483,7 @@ function ContractsTab({
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#74818d]">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -2509,8 +2509,8 @@ function PaymentsTab({
     <div className="space-y-5">
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Plus size={17} className="text-[#c49e48]" />
-          <h2 className="font-bold text-[#ede8de]">Add Payment</h2>
+          <Plus size={17} className="text-[#df5f41]" />
+          <h2 className="font-bold text-[#102943]">Add Payment</h2>
         </div>
 
         {!canEdit && (
@@ -2612,9 +2612,9 @@ function PaymentsTab({
       </div>
 
       {loading ? (
-        <div className="card p-6 text-slate-400">Loading payments…</div>
+        <div className="card p-6 text-[#65717c]">Loading payments…</div>
       ) : payments.length === 0 ? (
-        <div className="card p-6 text-slate-400">
+        <div className="card p-6 text-[#65717c]">
           No payments recorded for this project.
         </div>
       ) : (
@@ -2635,12 +2635,12 @@ function PaymentsTab({
             <tbody>
               {payments.map((payment: any) => (
                 <tr key={payment.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {payment.payment_title}
                   </td>
                   <td>{payment.vendor_name || '—'}</td>
                   <td>{payment.payment_category || '—'}</td>
-                  <td className="text-[#c49e48] font-semibold">
+                  <td className="text-[#df5f41] font-semibold">
                     ₦{Number(payment.amount || 0).toLocaleString()}
                   </td>
                   <td>
@@ -2658,7 +2658,7 @@ function PaymentsTab({
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#74818d]">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -2713,7 +2713,7 @@ function VariationsTab({
       />
 
       <div className="card p-5">
-        <h2 className="font-bold text-white mb-4">Add Variation</h2>
+        <h2 className="font-bold text-[#102943] mb-4">Add Variation</h2>
 
         {!canEdit && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
@@ -2833,12 +2833,12 @@ function VariationsTab({
             <tbody>
               {variations.map((variation: any) => (
                 <tr key={variation.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {variation.variation_title}
                   </td>
                   <td>{variation.variation_type}</td>
                   <td>{variation.contractor_name || '—'}</td>
-                  <td className="text-[#c49e48] font-semibold">
+                  <td className="text-[#df5f41] font-semibold">
                     ₦{Number(variation.amount || 0).toLocaleString()}
                   </td>
                   <td>
@@ -2855,7 +2855,7 @@ function VariationsTab({
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#74818d]">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -2900,7 +2900,7 @@ function ProcurementTab({
       />
 
       <div className="card p-5">
-        <h2 className="font-bold text-white mb-4">Add Procurement Item</h2>
+        <h2 className="font-bold text-[#102943] mb-4">Add Procurement Item</h2>
 
         {!canEdit && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
@@ -3029,12 +3029,12 @@ function ProcurementTab({
             <tbody>
               {procurements.map((item: any) => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {item.item_name}
                   </td>
                   <td>{item.vendor_name || '—'}</td>
                   <td>{item.procurement_category || '—'}</td>
-                  <td className="text-[#c49e48] font-semibold">
+                  <td className="text-[#df5f41] font-semibold">
                     ₦{Number(item.estimated_cost || 0).toLocaleString()}
                   </td>
                   <td>₦{Number(item.actual_cost || 0).toLocaleString()}</td>
@@ -3052,7 +3052,7 @@ function ProcurementTab({
                         <Trash2 size={13} />
                       </button>
                     ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">View Only</span>
+                      <span className="text-[10px] uppercase tracking-widest text-[#74818d]">View Only</span>
                     )}
                   </td>
                 </tr>
@@ -3078,9 +3078,9 @@ function MetricGrid({ values }: { values: [string, string | number][] }) {
 function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
-      <Wallet size={18} className="text-[#c49e48]" />
-      <div className="text-2xl font-black text-white mt-3">{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
+      <Wallet size={18} className="text-[#df5f41]" />
+      <div className="text-2xl font-black text-[#102943] mt-3">{value}</div>
+      <div className="text-[9px] uppercase tracking-widest text-[#74818d] mt-1">
         {title}
       </div>
     </div>
@@ -3089,9 +3089,9 @@ function Metric({ title, value }: { title: string; value: string | number }) {
 
 function MiniMetric({ title, value }: { title: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-      <div className="text-xl font-black text-white">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-[#6e7d8c] mt-1">
+    <div className="rounded-2xl border border-[#dfe3e7] bg-white p-4">
+      <div className="text-xl font-black text-[#102943]">{value}</div>
+      <div className="text-[10px] uppercase tracking-widest text-[#74818d] mt-1">
         {title}
       </div>
     </div>
@@ -3101,9 +3101,9 @@ function MiniMetric({ title, value }: { title: string; value: string | number })
 function EmptyCostingTab({ title }: { title: string }) {
   return (
     <div className="card p-10 text-center">
-      <Wallet size={36} className="mx-auto text-[#c49e48] mb-3" />
-      <div className="text-lg font-bold text-white">{title}</div>
-      <div className="text-sm text-slate-500 mt-1">
+      <Wallet size={36} className="mx-auto text-[#df5f41] mb-3" />
+      <div className="text-lg font-bold text-[#102943]">{title}</div>
+      <div className="text-sm text-[#74818d] mt-1">
         This section will be connected to the costing report workflow.
       </div>
     </div>
