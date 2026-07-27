@@ -882,7 +882,7 @@ export default function RecoveryForecastPage() {
   }
 
   return (
-    <div className="space-y-5 text-[#ede8de]">
+    <div className="pmx-command-page space-y-5 text-[#18212b]">
       <div className="rounded-3xl border border-white/[0.08] bg-[#111a22] p-5 shadow-xl">
         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
           <div>
