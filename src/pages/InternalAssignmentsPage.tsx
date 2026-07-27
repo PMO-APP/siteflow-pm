@@ -286,34 +286,34 @@ export default function InternalAssignmentsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
+    <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
+      <section className="overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white p-7 sm:p-9">
+        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#ffb7a6] bg-[#fff2ec] text-[#df5f41] text-xs">
           Internal Control
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-[-.04em] text-[#102943]">
           Internal Assignments
         </h1>
 
-        <p className="text-slate-400 mt-3 max-w-2xl">
+        <p className="text-[#65717c] mt-3 max-w-2xl">
           Team leads can assign tasks, track progress, and reduce follow-up
           emails through structured internal communication.
         </p>
       </section>
 
       {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+        <div className="rounded-xl border border-[#cfdbe3] bg-white p-4 text-sm text-[#31526d]">
           {notice}
         </div>
       )}
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {canAssign && (
-          <div className="card p-6 xl:col-span-1">
+          <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 xl:col-span-1">
             <div className="flex items-center gap-2 mb-5">
-              <Plus size={18} className="text-[#c49e48]" />
-              <h2 className="text-lg font-bold text-[#ede8de]">
+              <Plus size={18} className="text-[#df5f41]" />
+              <h2 className="text-lg font-semibold text-[#102943]">
                 Create Internal Task
               </h2>
             </div>
@@ -409,7 +409,7 @@ export default function InternalAssignmentsPage() {
               <button
                 onClick={createTask}
                 disabled={submitting}
-                className="btn btn-gold w-full justify-center"
+                className="rounded-xl bg-[#123a60] px-4 py-3 text-sm font-semibold text-white hover:bg-[#0d2e4d] w-full justify-center"
               >
                 {submitting ? 'Assigning…' : 'Assign Internal Task'}
               </button>
@@ -423,20 +423,20 @@ export default function InternalAssignmentsPage() {
           }
         >
           {loading ? (
-            <div className="card p-6 text-slate-400">
+            <div className="card p-6 text-[#65717c]">
               Loading internal assignments…
             </div>
           ) : tasks.length === 0 ? (
-            <div className="card p-10 text-center">
+            <div className="rounded-[24px] border border-dashed border-[#cfdbe3] bg-white p-10 text-center">
               <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-[#c49e48]/10 border border-[#c49e48]/20 flex items-center justify-center">
-                <ClipboardList size={24} className="text-[#c49e48]" />
+                <ClipboardList size={24} className="text-[#df5f41]" />
               </div>
 
-              <div className="text-xl font-bold text-white">
+              <div className="text-xl font-semibold text-[#102943]">
                 No internal tasks found
               </div>
 
-              <p className="text-sm text-slate-500 mt-2">
+              <p className="text-sm text-[#7b8791] mt-2">
                 {canAssign
                   ? 'Tasks assigned by team leads will appear here.'
                   : 'Tasks assigned to your role or email will appear here.'}
@@ -482,22 +482,22 @@ function TaskCard({
       : task.priority === 'High'
       ? 'text-orange-400'
       : task.priority === 'Low'
-      ? 'text-slate-400'
-      : 'text-[#c49e48]'
+      ? 'text-[#65717c]'
+      : 'text-[#df5f41]'
 
   return (
-    <div className="card p-5 space-y-4">
+    <div className="rounded-[22px] border border-[#dfe3e7] bg-white p-5 space-y-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-[#ede8de]">{task.title}</h2>
+          <h2 className="text-lg font-semibold text-[#102943]">{task.title}</h2>
 
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-[#7b8791] mt-1">
             {task.description || 'No description provided.'}
           </p>
 
           <div className="text-xs text-slate-500 mt-2">
             Assigned to:{' '}
-            <span className="text-[#c49e48]">
+            <span className="text-[#df5f41]">
               {task.assigned_person_name ||
                 task.assigned_person_email ||
                 task.assigned_email ||
@@ -507,14 +507,14 @@ function TaskCard({
 
           <div className="text-xs text-slate-500 mt-1">
             Department:{' '}
-            <span className="text-[#ede8de]">
+            <span className="text-[#102943]">
               {task.assigned_department || '—'}
             </span>
           </div>
 
           <div className="text-xs text-slate-500 mt-1">
             Visibility:{' '}
-            <span className="text-[#ede8de]">
+            <span className="text-[#102943]">
               {task.visibility || 'Private'}
             </span>
           </div>
@@ -540,11 +540,11 @@ function TaskCard({
           Priority: {task.priority || 'Medium'}
         </span>
 
-        <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-400">
+        <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[#65717c]">
           Due: {task.due_date || 'Not set'}
         </span>
 
-        <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-400">
+        <span className="text-xs rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[#65717c]">
           Progress: {task.progress || 0}%
         </span>
       </div>
