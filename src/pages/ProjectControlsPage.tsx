@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, Save } from 'lucide-react'
+import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
@@ -291,54 +292,20 @@ export default function ProjectControlsPage() {
   const activeSchedule = schedules.find(schedule => schedule.is_active)
 
   return (
-    <div className="pmx-command-page space-y-6">
-      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
-          Project Controls
+    <div className="space-y-6">
+      <EnterprisePageHero
+        eyebrow="Project governance"
+        title="Project Control Centre"
+        description="Control schedule performance, progress, delay ownership, recovery actions and delivery history from one operational workspace."
+        projectName={projectName || 'No project selected'}
+      >
+        {!canEdit && <div className="mt-5"><EnterpriseNotice tone="warning">View only. Only Project Owners, PMO and Administrators can update project controls.</EnterpriseNotice></div>}
+        <div className="mt-5 flex flex-wrap gap-2">
+          {DISCIPLINE_TABS.map(tab => <button key={tab} onClick={() => setDisciplineTab(tab)} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${disciplineTab === tab ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170] hover:border-[#9da9b3]'}`}>{tab === 'Overall' ? 'Master' : tab}</button>)}
         </div>
+      </EnterprisePageHero>
 
-        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
-          Project Controls
-        </h1>
-
-        <p className="text-slate-400 mt-3 max-w-3xl">
-          PMO/Admin controls schedule uploads. Project Owners update progress,
-          delay reason, recovery action and comments. Other roles are view only.
-        </p>
-
-        <div className="text-xs text-[#6e7d8c] mt-4">
-          Project:{' '}
-          <span className="text-[#c49e48]">
-            {projectName || 'No project selected'}
-          </span>
-        </div>
-
-        {!canEdit && (
-          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
-            View Only. Only Project Owners, PMO and Administrators can update project controls.
-          </div>
-        )}
-
-        <div className="flex gap-2 mt-4 flex-wrap">
-          {DISCIPLINE_TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setDisciplineTab(tab)}
-              className={`btn-sm btn ${
-                disciplineTab === tab ? 'btn-gold' : 'btn-ghost'
-              }`}
-            >
-              {tab === 'Overall' ? 'Master' : tab}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {notice && (
-        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
-          {notice}
-        </div>
-      )}
+      {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
@@ -467,7 +434,7 @@ function ExecutionTab({
 
               return (
                 <tr key={taskId}>
-                  <td className="font-medium text-[#ede8de] min-w-[220px]">
+                  <td className="font-medium text-[#102943] min-w-[220px]">
                     {getTaskName(task)}
                   </td>
 
@@ -648,7 +615,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
             <tbody>
               {schedules.map((item: any) => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#ede8de]">
+                  <td className="font-medium text-[#102943]">
                     {item.revision_name}
                   </td>
                   <td>{item.revision_type || '—'}</td>
@@ -711,7 +678,7 @@ function ProgressTab({ tasks, metrics }: any) {
           <tbody>
             {byDiscipline.map(item => (
               <tr key={item.discipline}>
-                <td className="font-medium text-[#ede8de]">
+                <td className="font-medium text-[#102943]">
                   {item.discipline}
                 </td>
                 <td>{item.count}</td>
@@ -760,7 +727,7 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
 
             return (
               <tr key={task.id}>
-                <td className="font-medium text-[#ede8de]">
+                <td className="font-medium text-[#102943]">
                   {getTaskName(task)}
                 </td>
                 <td>{task.package_name || 'Project Wide'}</td>
@@ -856,7 +823,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
             return (
               <tr key={log.id}>
                 <td>{fdate(log.created_at)}</td>
-                <td className="font-medium text-[#ede8de]">
+                <td className="font-medium text-[#102943]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
                 <td>{getLogActor(log)}</td>
@@ -879,7 +846,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
 function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
-      <Activity size={18} className="text-[#c49e48]" />
+      <Activity size={18} className="text-[#df5f41]" />
       <div className="text-2xl font-black text-white mt-3">{value}</div>
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
