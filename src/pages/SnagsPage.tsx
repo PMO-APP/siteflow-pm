@@ -12,6 +12,8 @@ import { useSnags, useUpsertSnag } from '@/hooks/useData'
 import { fdate } from '@/lib/utils'
 import type { Snag } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { snagIntelligence } from '@/lib/intelligence'
 
 const SEVERITIES: Snag['severity'][] = ['Critical', 'Major', 'Minor']
 
@@ -366,6 +368,7 @@ export default function SnagsPage() {
   ).length
 
   const closed = snags.filter(snag => snag.status === 'Closed').length
+  const intelligence = snagIntelligence(snags.length, open, critical, major, closed)
 
   const sevBadge = (severity: Snag['severity']) =>
     severity === 'Critical'
@@ -398,6 +401,17 @@ export default function SnagsPage() {
         eyebrow="Quality completion"
         title="Quality Completion Centre"
         description="Drive defects from identification to verification and closure, organised by severity, room, contractor and status."
+      />
+
+      <IntelligencePanel
+        title="Snag & Completion Intelligence"
+        {...intelligence}
+        metrics={[
+          { label: 'Open', value: open },
+          { label: 'Critical', value: critical },
+          { label: 'Major', value: major },
+          { label: 'Closed', value: closed },
+        ]}
       />
 
       {!canCreate && (
