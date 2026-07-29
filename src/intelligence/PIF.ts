@@ -27,6 +27,7 @@ import { buildTimelineStory } from './timeline/TimelineStory'
 import { buildDailyDecisionQueue } from './decision/DailyDecisionQueue'
 import { buildOrganizationalLearning } from './learning/OrganizationalLearning'
 import { buildProjectReviewBrief } from './meeting/MeetingIntelligence'
+import { buildActionIntelligence } from './action/ActionIntelligence'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -58,6 +59,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const decisionQueue = buildDailyDecisionQueue(decisions, warnings)
   const learning = buildOrganizationalLearning(input.events)
   const meeting = buildProjectReviewBrief(projectName, input.events, health, forecast, decisions, warnings, timeline, now)
+  const actionIntelligence = buildActionIntelligence(input.events, decisions, warnings, meeting.followUpActions, now)
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -94,6 +96,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     decisionQueue,
     learning,
     meeting,
+    actionIntelligence,
     confidence,
     rules,
     generatedAt: now.toISOString(),
