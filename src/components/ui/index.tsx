@@ -530,3 +530,5 @@ export { Skeleton, MetricSkeleton, TableSkeleton } from './Skeleton'
 export { StatCard } from './StatCard'
 export { Table } from './Table'
 export { Toolbar } from './Toolbar'
+
+export { Drawer } from './Drawer'
