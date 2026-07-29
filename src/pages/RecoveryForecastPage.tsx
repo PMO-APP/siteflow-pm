@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useTasks } from '@/hooks/useTasks'
 import type { Task } from '@/types'
+import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 
 type ProjectScope =
   | 'Carcass'
@@ -499,82 +500,40 @@ export default function RecoveryForecastPage() {
       ? `Last in-scope schedule activity: ${getTaskName(lastTask)}`
       : 'No target date found'
 
-    const plannedTodayActivities = workingTasks.filter(task => isActiveToday(task, today))
+    const sequence = analyseScheduleSequence(
+      workingTasks.map(task => ({
+        id: String(task.id),
+        name: getTaskName(task),
+        taskNumber: getTaskNumber(task),
+        plannedStart: safeDate(getTaskStart(task)),
+        plannedFinish: safeDate(getTaskFinish(task)),
+        progress: getTaskProgress(task),
+        phase: task.phase || null,
+        source: task,
+      })),
+      today
+    )
 
-    const plannedPosition =
-      plannedTodayActivities.length > 0
-        ? [...plannedTodayActivities].sort(sequenceSort).slice(-1)[0]
-        : [...workingTasks]
-            .filter(task => {
-              const finish = safeDate(getTaskFinish(task))
-              return !!finish && finish < today
-            })
-            .sort((a, b) => dateValue(getTaskFinish(b)) - dateValue(getTaskFinish(a)))[0] ||
-          firstTask
-
-    /*
-      Actual site position:
-      This uses the earliest incomplete activity that has genuinely started.
-      It prevents a later lightly-started activity from hiding the true site constraint.
-      Example: if external works has started but M&E first fix is still incomplete, M&E remains the constraint.
-    */
-    const activeIncomplete = workingTasks
-      .filter(task => isStarted(task) && !isComplete(task))
-      .sort(sequenceSort)
-
-    const actualPosition =
-      activeIncomplete[0] ||
-      [...workingTasks].filter(isComplete).sort(sequenceSort).slice(-1)[0] ||
-      workingTasks.find(task => !isComplete(task)) ||
-      firstTask
-
-    const plannedIndex = plannedPosition
-      ? workingTasks.findIndex(task => sameId(task.id, plannedPosition.id))
-      : -1
-
-    const actualIndex = actualPosition
-      ? workingTasks.findIndex(task => sameId(task.id, actualPosition.id))
-      : -1
-
-    const activityGap =
-      plannedIndex >= 0 && actualIndex >= 0
-        ? Math.max(0, plannedIndex - actualIndex)
-        : 0
+    const plannedPosition = sequence.plannedPosition?.source || null
+    const actualPosition = sequence.actualPosition?.source || null
+    const plannedIndex = sequence.plannedIndex
+    const actualIndex = sequence.actualIndex
+    const activityGap = sequence.activityGap
 
     const stageGap =
       getStageIndex(plannedPosition) >= 0 && getStageIndex(actualPosition) >= 0
         ? Math.max(0, getStageIndex(plannedPosition) - getStageIndex(actualPosition))
         : 0
 
+    const sequenceTasks = sequence.activities.map(activity => activity.source)
     const gapActivities =
       activityGap > 0 && actualIndex >= 0 && plannedIndex >= 0
-        ? workingTasks.slice(actualIndex + 1, plannedIndex + 1)
+        ? sequenceTasks.slice(actualIndex + 1, plannedIndex + 1)
         : []
 
-    /*
-      TRUE DELAY LOGIC:
-      Delay is not calculated from risk scores, procurement risks or arbitrary caps.
-      Delay = how far apart the actual site position and today's planned position are on the approved schedule.
-
-      Example:
-      - Today the programme says "Ceiling Installation" should be active.
-      - Actual site is still at "M&E First Fix".
-      - The delay is the calendar distance between those two schedule positions.
-    */
-    const plannedStart = plannedPosition ? safeDate(getTaskStart(plannedPosition)) : null
-    const plannedFinish = plannedPosition ? safeDate(getTaskFinish(plannedPosition)) : null
-    const actualStart = actualPosition ? safeDate(getTaskStart(actualPosition)) : null
-    const actualFinish = actualPosition ? safeDate(getTaskFinish(actualPosition)) : null
-
-    const actualReferenceDate = actualFinish || actualStart
-    const plannedReferenceDate = plannedStart || plannedFinish
-
-    const schedulePositionDelay =
-      actualReferenceDate && plannedReferenceDate
-        ? Math.max(0, daysBetween(plannedReferenceDate, actualReferenceDate))
-        : 0
-
-    const daysBehind = schedulePositionDelay
+    // Shared sequence truth: the Recovery Forecast, Dashboard and Digital Twin
+    // all use the same planned position, physical workfront and delay.
+    const daysBehind = sequence.delayDays
 
     const forecastDate =
       targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate
@@ -727,6 +686,13 @@ export default function RecoveryForecastPage() {
       0,
       100
     )
+
+    const plannedReferenceDate = plannedPosition
+      ? safeDate(getTaskStart(plannedPosition)) || safeDate(getTaskFinish(plannedPosition))
+      : null
+    const actualReferenceDate = actualPosition
+      ? safeDate(getTaskFinish(actualPosition)) || safeDate(getTaskStart(actualPosition))
+      : null
 
     const delayBasis =
       actualReferenceDate && plannedReferenceDate
