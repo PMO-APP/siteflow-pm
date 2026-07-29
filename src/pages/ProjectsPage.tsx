@@ -586,8 +586,9 @@ export default function ProjectsPage() {
   }
 
   const userRoles = memberships.map(m => String(m.role || '').toLowerCase().trim())
-  const workspaceName = organizations[0]?.name || 'Workspace'
+  const workspaceName = organizations[0]?.name || portfolios[0]?.organization_name || 'Workspace'
   const activeProjects = projects.filter(project => project.status === 'Active').length
+  const hasWorkspaceVisibility = memberships.length > 0 && (organizations.length > 0 || portfolios.length > 0 || projects.length > 0)
 
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
@@ -986,7 +987,7 @@ export default function ProjectsPage() {
 
           {loading ? (
             <div className="p-10 text-center text-[#75899a]">Loading workspace…</div>
-          ) : organizations.length === 0 ? (
+          ) : !hasWorkspaceVisibility ? (
             <EmptyHub title="No workspace access" message="You do not currently have access to an organization, portfolio, or project." action={() => navigate('/mixta-admin-login')} />
           ) : (
             <div className="overflow-x-auto">
@@ -1024,7 +1025,23 @@ export default function ProjectsPage() {
                 </tbody>
               </table>
               {filteredProjects.length === 0 && (
-                <div className="p-12 text-center text-sm text-[#71838d]">No projects match the selected filters.</div>
+                <div className="p-12 text-center">
+                  <div className="text-sm font-bold text-[#173f5f]">No projects match the selected filters.</div>
+                  <p className="mt-1 text-sm text-[#71838d]">Your workspace access is active, but the current search or filters exclude every visible project.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('')
+                      setPortfolioFilter('All')
+                      setStatusFilter('All')
+                      setPhaseFilter('All')
+                      setAttentionFilter('All')
+                    }}
+                    className="hub-secondary-button mt-4"
+                  >
+                    Clear filters
+                  </button>
+                </div>
               )}
             </div>
           )}
