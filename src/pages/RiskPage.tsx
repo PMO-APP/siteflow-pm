@@ -2,11 +2,12 @@ import { useProjectStore } from '@/store/project'
 import { getRole } from '@/lib/access'
 import { canEditRisk } from '@/lib/permissions'
 import { useState } from 'react'
-import { Plus, X, Shield } from 'lucide-react'
+import { Plus, Shield } from 'lucide-react'
 import { useRisks, useUpsertRisk } from '@/hooks/useData'
 import { useAuthStore } from '@/store/auth'
 import { fdate, riskLevel } from '@/lib/utils'
 import type { Risk } from '@/types'
+import { Drawer, TableSkeleton } from '@/components/ui'
 
 const CATEGORIES: Risk['category'][] = ['Procurement', 'Programme', 'Design', 'Financial', 'Safety', 'External', 'Contractor']
 const STATUSES: Risk['status'][] = ['Open', 'Mitigated', 'Closed', 'Transferred']
@@ -36,14 +37,18 @@ function RiskModal({ item, onClose }: { item: Risk | null; onClose: () => void }
   }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal max-w-xl" onClick={e => e.stopPropagation()}>
-        <div className="gold-bar" />
-        <div className="modal-head">
-          <div className="modal-title">{item ? `Edit Risk #${item.risk_number}` : 'New Risk'}</div>
-          <button onClick={onClose} className="text-[#74818d] hover:text-[#102943]"><X size={16} /></button>
-        </div>
-        <div className="p-5 space-y-4">
+    <Drawer
+      open
+      title={item ? `Edit Risk #${item.risk_number}` : 'New Risk'}
+      description="Review the exposure, response actions and ownership without leaving the register."
+      onClose={onClose}
+      width="lg"
+      footer={<>
+        <button className="pmx-btn-secondary" onClick={onClose}>Cancel</button>
+        <button className="pmx-btn-primary" onClick={save} disabled={upsert.isPending}>{upsert.isPending ? 'Saving…' : item ? 'Save Risk' : 'Add Risk'}</button>
+      </>}
+    >
+      <div className="space-y-4">
           <div><label className="form-label">Risk Title *</label><input className="form-control" value={form.title} onChange={e => set('title', e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="form-label">Category</label><select className="form-control" value={form.category} onChange={e => set('category', e.target.value)}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></div>
@@ -77,13 +82,9 @@ function RiskModal({ item, onClose }: { item: Risk | null; onClose: () => void }
             <div><label className="form-label">Review Date</label><input type="date" className="form-control" value={form.review_date} onChange={e => set('review_date', e.target.value)} /></div>
             <div><label className="form-label">Closed Date</label><input type="date" className="form-control" value={form.closed_date} onChange={e => set('closed_date', e.target.value)} /></div>
           </div>
-        </div>
-        <div className="flex gap-2 justify-end px-5 py-3 border-t border-[#dfe3e7]">
-          <button className="btn-ghost btn-sm btn" onClick={onClose}>Cancel</button>
-          <button className="btn-gold btn-sm btn" onClick={save} disabled={upsert.isPending}>{upsert.isPending ? 'Saving…' : item ? 'Save' : 'Add Risk'}</button>
-        </div>
+        
       </div>
-    </div>
+    </Drawer>
   )
 }
 
@@ -218,7 +219,7 @@ export default function RiskPage() {
                 <tr><th>#</th><th>Risk</th><th>Category</th><th>L</th><th>I</th><th>Score</th><th>Level</th><th>Status</th><th className="hide-mobile">Review</th><th></th></tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={10} className="text-center py-6 text-[#74818d]">Loading…</td></tr>
+                {isLoading ? <tr><td colSpan={10} className="p-0"><TableSkeleton rows={6} /></td></tr>
                   : filtered.map(r => {
                   const score = r.risk_score || (r.likelihood * r.impact)
                   const lvl = riskLevel(score)
