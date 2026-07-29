@@ -30,3 +30,5 @@ export * from './board/ExecutiveBrief'
 
 export * from './decision/DecisionCenter'
 export * from './governance/GovernanceEngine'
+
+export * from './decision/ImpactSimulator'
