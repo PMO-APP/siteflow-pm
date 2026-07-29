@@ -10,6 +10,8 @@ import { ClipboardCheck, Plus, ShieldCheck, AlertTriangle, CheckCircle2, Clock3,
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { EnterpriseMetric, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { qualityIntelligence } from '@/lib/intelligence'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
@@ -506,9 +508,20 @@ export default function QualityPage() {
   const approvedCount = qualityGates.filter(gate => gate.status === 'Approved' || gate.status === 'Reapproved').length
   const rejectedCount = qualityGates.filter(gate => gate.status === 'Rejected').length
   const reviewCount = qualityGates.filter(gate => gate.inspection_status === 'Under Review' || gate.inspection_status === 'Inspection Requested' || gate.inspection_status === 'Reinspection Requested').length
+  const intelligence = qualityIntelligence(qualityGates.length, approvedCount, rejectedCount, reviewCount)
 
   return (
     <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 p-4 sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1600px] space-y-5">
+      <IntelligencePanel
+        title="Quality Intelligence"
+        {...intelligence}
+        metrics={[
+          { label: 'Total gates', value: qualityGates.length },
+          { label: 'Approved', value: approvedCount },
+          { label: 'In review', value: reviewCount },
+          { label: 'Rejected', value: rejectedCount },
+        ]}
+      />
       {customAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#102943]/45">
           <div className="bg-white border border-[#dfe3e7] rounded-2xl p-6 w-[90%] max-w-md shadow-2xl">
