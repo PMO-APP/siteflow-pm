@@ -28,6 +28,7 @@ import { buildDailyDecisionQueue } from './decision/DailyDecisionQueue'
 import { buildOrganizationalLearning } from './learning/OrganizationalLearning'
 import { buildProjectReviewBrief } from './meeting/MeetingIntelligence'
 import { buildActionIntelligence } from './action/ActionIntelligence'
+import { buildExecutiveBoardPack } from './board/BoardPackEngine'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -60,6 +61,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const learning = buildOrganizationalLearning(input.events)
   const meeting = buildProjectReviewBrief(projectName, input.events, health, forecast, decisions, warnings, timeline, now)
   const actionIntelligence = buildActionIntelligence(input.events, decisions, warnings, meeting.followUpActions, now)
+  const boardPack = buildExecutiveBoardPack({ projectName, health, forecast, governance, warnings, actionIntelligence, meeting, pulse, now })
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -97,6 +99,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     learning,
     meeting,
     actionIntelligence,
+    boardPack,
     confidence,
     rules,
     generatedAt: now.toISOString(),
