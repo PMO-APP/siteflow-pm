@@ -9,6 +9,19 @@ export type ProductionRate = {
   efficiency: number
 }
 
+export type PackageDeliveryPosition = {
+  packageId: string
+  packageName: string
+  contractorName: string | null
+  discipline: string | null
+  progress: number
+  plannedPosition: ProjectState['schedule']['activities'][number] | null
+  actualPosition: ProjectState['schedule']['activities'][number] | null
+  activityGap: number
+  delayDays: number
+  status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
+}
+
 export type ForecastV2Result = {
   targetDate: Date | null
   forecastDate: Date | null
@@ -25,6 +38,8 @@ export type ForecastV2Result = {
 
   status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
   primaryConstraint: string | null
+  packagePositions: PackageDeliveryPosition[]
+  pressurePackage: PackageDeliveryPosition | null
 }
 
 type Activity = ProjectState['schedule']['activities'][number]
@@ -223,9 +238,82 @@ export function calculateForecastV2(
   )
 
   const activities = sequence.activities.map(activity => activity.source)
-  const plannedPosition = sequence.plannedPosition?.source || null
-  const actualPosition = sequence.actualPosition?.source || null
-  const activityGap = sequence.activityGap
+
+  const packageMetadata = new Map(
+    state.schedule.packages.map(pkg => [pkg.id, pkg])
+  )
+  const packageGroups = new Map<string, Activity[]>()
+
+  state.schedule.activities.forEach(activity => {
+    const packageId = activity.deliveryPackageId || '__unassigned__'
+    const group = packageGroups.get(packageId) || []
+    group.push(activity)
+    packageGroups.set(packageId, group)
+  })
+
+  const packagePositions: PackageDeliveryPosition[] = Array.from(packageGroups.entries())
+    .map(([packageId, packageActivities]) => {
+      const packageSequence = analyseScheduleSequence(
+        packageActivities.map(activity => ({
+          id: activity.id,
+          name: activity.name,
+          taskNumber: activity.taskNumber,
+          plannedStart: toDate(activity.plannedStart),
+          plannedFinish: toDate(activity.plannedFinish),
+          progress: activity.progress,
+          phase: activity.phase,
+          source: activity,
+        })),
+        today
+      )
+      const metadata = packageId === '__unassigned__' ? null : packageMetadata.get(packageId)
+      const packageProgress = packageActivities.length
+        ? Math.round(packageActivities.reduce((sum, item) => sum + item.progress, 0) / packageActivities.length)
+        : 0
+      const delayDays = packageSequence.delayDays
+      const status: PackageDeliveryPosition['status'] =
+        delayDays <= 0
+          ? 'on_track'
+          : delayDays <= 7
+            ? 'watch'
+            : delayDays <= 30
+              ? 'recovery_required'
+              : 'critical'
+
+      return {
+        packageId,
+        packageName:
+          metadata?.name ||
+          packageActivities[0]?.deliveryPackageName ||
+          'General project works',
+        contractorName: metadata?.contractorName || null,
+        discipline: metadata?.discipline || packageActivities[0]?.discipline || null,
+        progress: packageProgress,
+        plannedPosition: packageSequence.plannedPosition?.source || null,
+        actualPosition: packageSequence.actualPosition?.source || null,
+        activityGap: packageSequence.activityGap,
+        delayDays,
+        status,
+      }
+    })
+    .filter(item => item.plannedPosition || item.actualPosition)
+    .sort((a, b) =>
+      b.delayDays - a.delayDays ||
+      b.activityGap - a.activityGap ||
+      a.packageName.localeCompare(b.packageName)
+    )
+
+  const pressurePackage = packagePositions[0] || null
+  const isMultiPackage = packagePositions.length > 1
+  const plannedPosition = isMultiPackage
+    ? pressurePackage?.plannedPosition || null
+    : sequence.plannedPosition?.source || null
+  const actualPosition = isMultiPackage
+    ? pressurePackage?.actualPosition || null
+    : sequence.actualPosition?.source || null
+  const activityGap = isMultiPackage
+    ? pressurePackage?.activityGap || 0
+    : sequence.activityGap
 
   const elapsedDays = getElapsedDays(state, today)
   const remainingDays = getRemainingDays(state, today)
@@ -239,7 +327,9 @@ export function calculateForecastV2(
       ? clamp((actualPerDay / requiredPerDay) * 100)
       : 100
 
-  const delayDays = sequence.delayDays
+  const delayDays = isMultiPackage
+    ? pressurePackage?.delayDays || 0
+    : sequence.delayDays
 
   // The approved project target defines the relevant scope completion. The
   // imported programme finish is used only when no project target is available.
@@ -301,5 +391,7 @@ export function calculateForecastV2(
     },
     status,
     primaryConstraint,
+    packagePositions,
+    pressurePackage,
   }
 }
