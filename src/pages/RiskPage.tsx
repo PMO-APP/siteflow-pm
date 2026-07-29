@@ -8,6 +8,8 @@ import { useAuthStore } from '@/store/auth'
 import { fdate, riskLevel } from '@/lib/utils'
 import type { Risk } from '@/types'
 import { Drawer, TableSkeleton } from '@/components/ui'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { riskIntelligence } from '@/lib/intelligence'
 
 const CATEGORIES: Risk['category'][] = ['Procurement', 'Programme', 'Design', 'Financial', 'Safety', 'External', 'Contractor']
 const STATUSES: Risk['status'][] = ['Open', 'Mitigated', 'Closed', 'Transferred']
@@ -168,6 +170,7 @@ export default function RiskPage() {
   const high = risks.filter(r => r.status === 'Open' && (r.risk_score || 0) >= 12).length
   const mitigated = risks.filter(r => r.status === 'Mitigated').length
   const closed = risks.filter(r => r.status === 'Closed').length
+  const intelligence = riskIntelligence(risks.length, open, high, mitigated)
 
   const catColor = (c: string) => {
     const m: Record<string, string> = { Procurement: 'badge-amber', Programme: 'badge-blue', Design: 'badge-muted', Financial: 'badge-red', Safety: 'badge-red', External: 'badge-muted', Contractor: 'badge-amber' }
@@ -177,6 +180,17 @@ export default function RiskPage() {
 
   return (
     <div className="pmx-command-page min-h-screen -m-4 space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6">
+      <IntelligencePanel
+        title="Risk Intelligence"
+        {...intelligence}
+        metrics={[
+          { label: 'Open risks', value: open },
+          { label: 'High / critical', value: high },
+          { label: 'Mitigated', value: mitigated },
+          { label: 'Closed', value: closed },
+        ]}
+      />
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[{ label: 'Open Risks', value: open, c: open > 0 ? 'text-red-400' : 'text-emerald-400' }, { label: 'High / Critical', value: high, c: high > 0 ? 'text-red-400' : 'text-emerald-400' }, { label: 'Mitigated', value: mitigated, c: 'text-amber-400' }, { label: 'Closed', value: closed, c: 'text-emerald-400' }].map(s => (
           <div key={s.label} className="card p-3"><div className={`font-display text-3xl font-bold ${s.c}`}>{s.value}</div><div className="text-[9px] text-[#74818d] uppercase tracking-widest mt-1">{s.label}</div></div>
