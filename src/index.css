@@ -140,3 +140,9 @@
   }
   .ui-button:hover, .btn:hover { transform: none; }
 }
+
+@media print {
+  body * { visibility: hidden !important; }
+  .board-pack-print, .board-pack-print * { visibility: visible !important; }
+  .board-pack-print { position: absolute; inset: 0; width: 100%; padding: 18mm !important; }
+}
