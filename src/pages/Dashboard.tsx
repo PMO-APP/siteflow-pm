@@ -29,6 +29,7 @@ import { useProjectIntelligence } from '@/intelligence'
 import { ProjectPulsePanel } from '@/components/dashboard/ProjectPulsePanel'
 import { ProjectLearningPanel } from '@/components/dashboard/ProjectLearningPanel'
 import { ProjectCopilotPanel } from '@/components/copilot/ProjectCopilotPanel'
+import { ProjectReviewPanel } from '@/components/meeting/ProjectReviewPanel'
 
 const colorPool = [
   '#3b82f6',
@@ -975,6 +976,13 @@ export default function Dashboard() {
 
       {projectIntelligence && (
         <ProjectLearningPanel intelligence={projectIntelligence} />
+      )}
+
+      {projectIntelligence && (
+        <ProjectReviewPanel
+          intelligence={projectIntelligence}
+          onOpenSource={(source) => navigate(pifRouteBySource[source] || route('/schedule'))}
+        />
       )}
 
       {projectIntelligence && (
