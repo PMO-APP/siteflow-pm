@@ -6,6 +6,7 @@ import { supabase, uploadFile } from '@/lib/supabase'
 import { fdate } from '@/lib/utils'
 import type { SiteReport } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 
 const WEATHER = ['Sunny','Partly Cloudy','Overcast','Light Rain','Heavy Rain','Harmattan']
 
@@ -66,6 +67,8 @@ export default function SitePage() {
   }
 
   const latest = reports[0]
+  const hasIncident = Number(latest?.safety_incidents || 0) > 0
+  const hasConstraint = Boolean(latest?.issues_encountered?.trim())
 
   return (
     <div className="pmx-command-page space-y-5">
@@ -73,6 +76,22 @@ export default function SitePage() {
         eyebrow="Site execution"
         title="Site Command Centre"
         description="Capture daily production, labour, weather, safety, constraints and the next-day plan without losing the project delivery narrative."
+      />
+
+      <IntelligencePanel
+        title="Site Delivery Intelligence"
+        status={!latest ? 'neutral' : hasIncident ? 'critical' : hasConstraint ? 'watch' : 'healthy'}
+        statusLabel={!latest ? 'No report yet' : hasIncident ? 'Safety intervention required' : hasConstraint ? 'Constraints recorded' : 'Delivery controlled'}
+        trend={!latest ? 'stable' : hasIncident ? 'declining' : 'stable'}
+        summary={!latest ? 'No daily site report has been submitted, so current production, labour and safety conditions cannot be assessed.' : `The latest report records ${latest.total_labour || 0} personnel on site and ${latest.overall_progress_pct || 0}% overall progress under ${latest.weather || 'unrecorded'} weather conditions.`}
+        primaryConstraint={!latest ? 'Site intelligence depends on consistent daily reporting.' : hasIncident ? `${latest.safety_incidents} safety incident${latest.safety_incidents === 1 ? '' : 's'} recorded in the latest report.` : hasConstraint ? latest.issues_encountered : undefined}
+        recommendation={!latest ? 'Submit the first daily report with labour, progress, constraints, safety and the next-day plan.' : hasIncident ? 'Close immediate safety actions and verify controls before affected work continues.' : hasConstraint ? 'Assign owners and dates to recorded constraints before the next coordination review.' : 'Maintain daily reporting and compare labour deployment against achieved production.'}
+        metrics={[
+          { label: 'Reports', value: reports.length },
+          { label: 'Labour', value: latest?.total_labour || 0 },
+          { label: 'Progress', value: `${latest?.overall_progress_pct || 0}%` },
+          { label: 'Incidents', value: latest?.safety_incidents || 0 },
+        ]}
       />
 
       {/* Summary cards */}
