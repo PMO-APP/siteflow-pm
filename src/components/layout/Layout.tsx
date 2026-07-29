@@ -52,68 +52,88 @@ type NavItem = {
   label: string
   exact?: boolean
   roles?: string[]
+  group: NavGroupKey
 }
 
+type NavGroupKey = 'overview' | 'planning' | 'delivery' | 'commercial' | 'technical' | 'governance' | 'administration'
+
+const NAV_GROUPS: Array<{ key: NavGroupKey; label: string }> = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'planning', label: 'Planning' },
+  { key: 'delivery', label: 'Delivery' },
+  { key: 'commercial', label: 'Commercial' },
+  { key: 'technical', label: 'Technical' },
+  { key: 'governance', label: 'Governance' },
+  { key: 'administration', label: 'Administration' },
+]
+
 const NAV: NavItem[] = [
-  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/schedule', icon: CalendarDays, label: 'Schedule' },
+  { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true, group: 'overview' },
+  { to: '/app/schedule', icon: CalendarDays, label: 'Schedule', group: 'planning' },
   {
   to: '/app/project-controls',
   icon: Activity,
   label: 'Project Controls',
+  group: 'planning',
 },
    {
   to: '/app/schedule-revisions',
   icon: FileSpreadsheet,
   label: 'Schedule Revisions',
+  group: 'planning',
 },
-  { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast' },
-  { to: '/app/planner', icon: CalendarCheck, label: 'Planner', },
-  { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement' },
-  { to: '/app/approvals', icon: CheckSquare, label: 'Approvals' },
-  { to: '/app/site', icon: HardHat, label: 'Site Progress' },
-  { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates' },
-  { to: '/app/hse', icon: HardHat, label: 'HSE', },
-  { to: '/app/snags', icon: AlertTriangle, label: 'Snag List' },
-  { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs' },
-  { to: '/app/documents', icon: FolderOpen, label: 'Documents' },
-  { to: '/app/costing', icon: Wallet, label: 'Costing' },
-  { to: '/app/design-reports', icon: PenTool, label: 'Design Reports' },
-  { to: '/app/risk', icon: Shield, label: 'Risk Register' },
-  { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends' },
-  { to: '/app/reports', icon: FileText, label: 'IPD Reports' },
-  { to: '/app/handover', icon: PackageCheck, label: 'Handover' },
+  { to: '/app/recovery', icon: BarChart3, label: 'Recovery Forecast', group: 'planning' },
+  { to: '/app/planner', icon: CalendarCheck, label: 'Planner', group: 'planning' },
+  { to: '/app/procurement', icon: ShoppingCart, label: 'Procurement', group: 'commercial' },
+  { to: '/app/approvals', icon: CheckSquare, label: 'Approvals', group: 'commercial' },
+  { to: '/app/site', icon: HardHat, label: 'Site Progress', group: 'delivery' },
+  { to: '/app/quality', icon: ClipboardCheck, label: 'Quality Gates', group: 'delivery' },
+  { to: '/app/hse', icon: HardHat, label: 'HSE', group: 'delivery' },
+  { to: '/app/snags', icon: AlertTriangle, label: 'Snag List', group: 'delivery' },
+  { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs', group: 'technical' },
+  { to: '/app/documents', icon: FolderOpen, label: 'Documents', group: 'technical' },
+  { to: '/app/costing', icon: Wallet, label: 'Costing', group: 'commercial' },
+  { to: '/app/design-reports', icon: PenTool, label: 'Design Reports', group: 'technical' },
+  { to: '/app/risk', icon: Shield, label: 'Risk Register', group: 'governance' },
+  { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends', group: 'governance' },
+  { to: '/app/reports', icon: FileText, label: 'IPD Reports', group: 'governance' },
+  { to: '/app/handover', icon: PackageCheck, label: 'Handover', group: 'delivery' },
 
    {
   to: '/app/project-packages',
   icon: Building2,
   label: 'Project Packages',
+  group: 'administration',
 },
  
   {
   to: '/app/pmo-weekly-report',
   icon: FileText,
   label: 'Executive Reports',
+  group: 'overview',
 },
  
   {
     to: '/app/internal-assignments',
     icon: ClipboardList,
     label: 'Internal Assignments',
+    group: 'administration',
   },
-  { to: '/app/my-assignments', icon: ListChecks, label: 'My Assignments' },
+  { to: '/app/my-assignments', icon: ListChecks, label: 'My Assignments', group: 'overview' },
   {
   to: '/app/business-intelligence',
   icon: Brain,
   label: 'Business Intelligence',
+  group: 'overview',
 },
   {
     to: '/app/administration',
     icon: Shield,
     label: 'Administration',
     roles: ['workspace_admin', 'admin', 'pmo'],
+    group: 'administration',
   },
-  { to: '/app/team', icon: Users, label: 'Team' },
+  { to: '/app/team', icon: Users, label: 'Team', group: 'administration' },
 ]
 
 const VIEWER_NAV = [
@@ -452,25 +472,33 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1" aria-label="Project modules">
-          {allowedNav.map(({ to, icon: Icon, label, exact }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all border ${
-                  isActive
-                    ? 'nav-active'
-                    : 'nav-inactive'
-                }`
-              }
-            >
-              <Icon size={15} className="flex-shrink-0" />
-              <span>{label}</span>
-            </NavLink>
-          ))}
+        <nav className="layout-nav flex-1 overflow-y-auto px-3 py-3" aria-label="Project modules">
+          {NAV_GROUPS.map(group => {
+            const items = allowedNav.filter(item => item.group === group.key)
+            if (!items.length) return null
+
+            return (
+              <section key={group.key} className="layout-nav__group" aria-labelledby={`nav-${group.key}`}>
+                <div id={`nav-${group.key}`} className="layout-nav__label">{group.label}</div>
+                <div className="layout-nav__items">
+                  {items.map(({ to, icon: Icon, label, exact }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={exact}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `layout-nav__item ${isActive ? 'nav-active' : 'nav-inactive'}`
+                      }
+                    >
+                      <Icon size={15} className="flex-shrink-0" />
+                      <span>{label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </nav>
 
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
