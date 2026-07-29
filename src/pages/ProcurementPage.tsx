@@ -10,6 +10,8 @@ import { fdate, urgencyColor } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { ProcurementItem } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
+import { RecordContextDrawer } from '@/components/records/RecordContextDrawer'
+import type { RecordSummary } from '@/components/records/recordTypes'
 
 const CATS = [
   'Tiles',
@@ -449,6 +451,7 @@ export default function ProcurementPage() {
   const canEdit = canEditProcurement(role)
 
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
+  const [selectedRecord, setSelectedRecord] = useState<RecordSummary | null>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
@@ -747,12 +750,38 @@ export default function ProcurementPage() {
 
                       <td>
                         {canEdit ? (
-                          <button
-                            className="tbl-action"
-                            onClick={() => setModal(item)}
-                          >
-                            Edit
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="tbl-action"
+                              onClick={() => setSelectedRecord({
+                                id: item.id,
+                                kind: 'procurement',
+                                title: item.name,
+                                subtitle: item.specification,
+                                status: item.status,
+                                createdAt: item.created_at,
+                                updatedAt: item.updated_at,
+                                taskId: item.task_id,
+                                notes: item.notes,
+                                metadata: [
+                                  { label: 'Category', value: item.category },
+                                  { label: 'Vendor', value: item.vendor },
+                                  { label: 'Order by', value: item.order_by_date ? fdate(item.order_by_date) : '—' },
+                                  { label: 'Required on site', value: item.required_on_site ? fdate(item.required_on_site) : '—' },
+                                  { label: 'Lead time', value: item.lead_time_days ? `${item.lead_time_days} days` : '—' },
+                                  { label: 'PO number', value: item.po_number },
+                                ],
+                              })}
+                            >
+                              View
+                            </button>
+                            <button
+                              className="tbl-action"
+                              onClick={() => setModal(item)}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-[10px] text-[#6e7d8c]">
                             View only
@@ -777,6 +806,18 @@ export default function ProcurementPage() {
           </table>
         </div>
       </div>
+
+      <RecordContextDrawer
+        record={selectedRecord}
+        onClose={() => setSelectedRecord(null)}
+        onEdit={selectedRecord && canEdit ? () => {
+          const item = items.find(candidate => candidate.id === selectedRecord.id)
+          if (item) {
+            setSelectedRecord(null)
+            setModal(item)
+          }
+        } : undefined}
+      />
 
       {modal !== null && canEdit && (
         <ProcModal
