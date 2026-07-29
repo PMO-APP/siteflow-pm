@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
@@ -10,57 +10,123 @@ import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
 
-import LandingPage from '@/pages/LandingPage'
-import LoginPage from '@/pages/LoginPage'
-import ResetPasswordPage from '@/pages/ResetPasswordPage'
-import AcceptInvitePage from '@/pages/AcceptInvitePage'
-import ProjectsPage from '@/pages/ProjectsPage'
-import ProfilePage from '@/pages/ProfilePage'
-import WorkspaceAdminPage from '@/pages/WorkspaceAdminPage'
-import AuditPage from '@/pages/AuditPage'
-import PortfolioDashboardPage from '@/pages/PortfolioDashboardPage'
-import PlannerPage from '@/pages/PlannerPage'
-import CostingPage from '@/pages/CostingPage'
-import DesignReportsPage from '@/pages/DesignReportsPage'
-import PMOWeeklyReportPage from '@/pages/PMOWeeklyReportPage'
-import ProjectPackagesPage from '@/pages/ProjectPackagesPage'
-import HandoverPage from '@/pages/HandoverPage'
-import AdministrationPage from '@/pages/AdministrationPage'
-import CreateOrganizationPage from '@/features/organizations/pages/CreateOrganizationPage'
-import OrganizationDetailPage from '@/features/organizations/pages/OrganizationDetailPage'
+const LandingPage = lazy(() => import('@/pages/LandingPage'))
+const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
+const AcceptInvitePage = lazy(() => import('@/pages/AcceptInvitePage'))
+const ProjectsPage = lazy(() => import('@/pages/ProjectsPage'))
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
+const WorkspaceAdminPage = lazy(() => import('@/pages/WorkspaceAdminPage'))
+const AuditPage = lazy(() => import('@/pages/AuditPage'))
+const PortfolioDashboardPage = lazy(() => import('@/pages/PortfolioDashboardPage'))
+const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
+const CostingPage = lazy(() => import('@/pages/CostingPage'))
+const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
+const PMOWeeklyReportPage = lazy(() => import('@/pages/PMOWeeklyReportPage'))
+const ProjectPackagesPage = lazy(() => import('@/pages/ProjectPackagesPage'))
+const HandoverPage = lazy(() => import('@/pages/HandoverPage'))
+const AdministrationPage = lazy(() => import('@/pages/AdministrationPage'))
+const CreateOrganizationPage = lazy(() => import('@/features/organizations/pages/CreateOrganizationPage'))
+const OrganizationDetailPage = lazy(() => import('@/features/organizations/pages/OrganizationDetailPage'))
+const CommandCenterDashboard = lazy(() => import('@/pages/CommandCenterDashboard'))
+const BusinessIntelligencePage = lazy(() => import('@/pages/BusinessIntelligencePage'))
+const StudioLayout = lazy(() => import('@/studio/layout/StudioLayout'))
+const StudioHome = lazy(() => import('@/studio/pages/StudioHome'))
+const StudioIntelligencePage = lazy(() => import('@/studio/pages/StudioIntelligencePage'))
+const StudioProjectStatePage = lazy(() => import('@/studio/pages/StudioProjectStatePage'))
+const StudioPlaceholderPage = lazy(() => import('@/studio/pages/StudioPlaceholderPage'))
+const SchedulePage = lazy(() => import('@/pages/SchedulePage'))
+const QualityPage = lazy(() => import('@/pages/QualityPage'))
+const HSEPage = lazy(() => import('@/pages/HSEPage'))
+const ProcurementPage = lazy(() => import('@/pages/ProcurementPage'))
+const ApprovalsPage = lazy(() => import('@/pages/ApprovalsPage'))
+const SitePage = lazy(() => import('@/pages/SitePage'))
+const SnagsPage = lazy(() => import('@/pages/SnagsPage'))
+const DocumentsPage = lazy(() => import('@/pages/DocumentsPage'))
+const RiskPage = lazy(() => import('@/pages/RiskPage'))
+const RiskTrendPage = lazy(() => import('@/pages/RiskTrendPage'))
+const TeamPage = lazy(() => import('@/pages/TeamPage'))
+const InternalAssignmentsPage = lazy(() => import('@/pages/InternalAssignmentsPage'))
+const MyAssignmentsPage = lazy(() => import('@/pages/MyAssignmentsPage'))
+const TeamAccessPage = lazy(() => import('@/pages/TeamAccessPage'))
+const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
+const RecoveryForecastPage = lazy(() => import('@/pages/RecoveryForecastPage'))
+const ProjectControlsPage = lazy(() => import('@/pages/ProjectControlsPage'))
+const ScheduleRevisionsPage = lazy(() => import('@/pages/ScheduleRevisionsPage'))
+const OrganizationsPage = lazy(() => import('@/features/organizations/pages/OrganizationsPage'))
+const CreateRFIPage = lazy(() => import('@/features/rfi/pages/CreateRFIPage'))
+const RFIDetailPage = lazy(() => import('@/features/rfi/pages/RFIDetailPage'))
+const RFIRegisterPage = lazy(() => import('@/features/rfi/pages/RFIRegisterPage'))
 
 
-import CommandCenterDashboard from '@/pages/CommandCenterDashboard'
-import BusinessIntelligencePage from '@/pages/BusinessIntelligencePage'
-import StudioLayout from '@/studio/layout/StudioLayout'
-import StudioHome from '@/studio/pages/StudioHome'
-import StudioIntelligencePage from '@/studio/pages/StudioIntelligencePage'
-import StudioProjectStatePage from '@/studio/pages/StudioProjectStatePage'
-import StudioPlaceholderPage from '@/studio/pages/StudioPlaceholderPage'
 
 
-import SchedulePage from '@/pages/SchedulePage'
-import QualityPage from '@/pages/QualityPage'
-import HSEPage from '@/pages/HSEPage'
-import ProcurementPage from '@/pages/ProcurementPage'
-import ApprovalsPage from '@/pages/ApprovalsPage'
-import SitePage from '@/pages/SitePage'
-import SnagsPage from '@/pages/SnagsPage'
-import DocumentsPage from '@/pages/DocumentsPage'
-import RiskPage from '@/pages/RiskPage'
-import RiskTrendPage from '@/pages/RiskTrendPage'
-import TeamPage from '@/pages/TeamPage'
-import InternalAssignmentsPage from '@/pages/InternalAssignmentsPage'
-import MyAssignmentsPage from '@/pages/MyAssignmentsPage'
-import TeamAccessPage from '@/pages/TeamAccessPage'
-import ReportsPage from '@/pages/ReportsPage'
-import RecoveryForecastPage from '@/pages/RecoveryForecastPage'
-import ProjectControlsPage from '@/pages/ProjectControlsPage'
-import ScheduleRevisionsPage from '@/pages/ScheduleRevisionsPage'
-import OrganizationsPage from '@/features/organizations/pages/OrganizationsPage'
-import CreateRFIPage from '@/features/rfi/pages/CreateRFIPage'
-import RFIDetailPage from '@/features/rfi/pages/RFIDetailPage'
-import RFIRegisterPage from '@/features/rfi/pages/RFIRegisterPage'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function RouteFallback() {
+  return (
+    <div
+      className="route-loading"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading page"
+    >
+      <div className="route-loading__mark" aria-hidden="true">P</div>
+      <div>
+        <div className="route-loading__title">Loading workspace</div>
+        <div className="route-loading__copy">Preparing the latest project information…</div>
+      </div>
+    </div>
+  )
+}
 
 const VIEWER_ALLOWED_ROUTES = [
   '/app',
@@ -254,6 +320,7 @@ export default function App() {
     <ThemeProvider>
       <NotificationProvider>
         <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
@@ -434,6 +501,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+          </Suspense>
         </BrowserRouter>
       </NotificationProvider>
     </ThemeProvider>
