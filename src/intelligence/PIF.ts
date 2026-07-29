@@ -15,6 +15,7 @@ import { generateWeeklySummary } from './narrative/WeeklySummary'
 import { generateBoardSummary } from './narrative/BoardSummary'
 import { buildDecisionCenter } from './decision/DecisionCenter'
 import { assessGovernance } from './governance/GovernanceEngine'
+import { buildDefaultImpactScenarios } from './decision/ImpactSimulator'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -35,6 +36,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const board = generateBoardSummary(executive, forecast, recommendationExplorer)
   const decisions = buildDecisionCenter(input.events, recommendations, alerts, now)
   const governance = assessGovernance(input.events)
+  const impactScenarios = buildDefaultImpactScenarios(input.events, forecast)
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -60,6 +62,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     board,
     decisions,
     governance,
+    impactScenarios,
     confidence,
     rules,
     generatedAt: now.toISOString(),
