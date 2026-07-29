@@ -5,6 +5,7 @@ import { calculateProjectHealth } from './engine/HealthEngine'
 import { createExecutiveNarrative } from './engine/NarrativeEngine'
 import { generateRecommendations } from './engine/RecommendationEngine'
 import type { ProjectIntelligenceInput } from './models/IntelligenceEvent'
+import { evaluateIntelligenceRules } from './rules/RuleEngine'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -13,6 +14,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const forecast = calculateForecast(input.plannedFinish, input.events, now)
   const recommendations = generateRecommendations(input.events)
   const alerts = generateAlerts(input.events, now)
+  const rules = evaluateIntelligenceRules(input.events, now)
   const narrative = createExecutiveNarrative(
     input.projectName || `Project ${input.projectId}`,
     health,
@@ -28,6 +30,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     recommendations,
     alerts,
     narrative,
+    rules,
     generatedAt: now.toISOString(),
   }
 }
