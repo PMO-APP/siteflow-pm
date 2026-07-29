@@ -27,6 +27,7 @@ import { fdate, urgencyColor, formatCurrency } from '@/lib/utils'
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { useProjectIntelligence } from '@/intelligence'
 import { ProjectPulsePanel } from '@/components/dashboard/ProjectPulsePanel'
+import { ProjectLearningPanel } from '@/components/dashboard/ProjectLearningPanel'
 
 const colorPool = [
   '#3b82f6',
@@ -969,6 +970,10 @@ export default function Dashboard() {
           intelligence={projectIntelligence}
           onOpenSource={(source) => navigate(pifRouteBySource[source] || route('/schedule'))}
         />
+      )}
+
+      {projectIntelligence && (
+        <ProjectLearningPanel intelligence={projectIntelligence} />
       )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.75fr)]">
