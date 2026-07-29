@@ -27,3 +27,6 @@ export * from './narrative/ExecutiveSummary'
 export * from './narrative/WeeklySummary'
 export * from './narrative/BoardSummary'
 export * from './board/ExecutiveBrief'
+
+export * from './decision/DecisionCenter'
+export * from './governance/GovernanceEngine'
