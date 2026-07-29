@@ -25,6 +25,7 @@ import { generateEarlyWarnings } from './warning/EarlyWarningEngine'
 import { prioritizeWarnings } from './warning/WarningPrioritizer'
 import { buildTimelineStory } from './timeline/TimelineStory'
 import { buildDailyDecisionQueue } from './decision/DailyDecisionQueue'
+import { buildOrganizationalLearning } from './learning/OrganizationalLearning'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -54,6 +55,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const warnings = prioritizeWarnings(generateEarlyWarnings(input.events, escalation))
   const timeline = buildTimelineStory(input.events, now)
   const decisionQueue = buildDailyDecisionQueue(decisions, warnings)
+  const learning = buildOrganizationalLearning(input.events)
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -88,6 +90,7 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     warnings,
     timeline,
     decisionQueue,
+    learning,
     confidence,
     rules,
     generatedAt: now.toISOString(),
