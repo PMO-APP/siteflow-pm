@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
-import { ClipboardCheck, Plus, ShieldCheck, AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react'
+import { useMembershipStore } from '@/store/membership'
+import { isProjectAdmin } from '@/lib/permissions'
+import { ClipboardCheck, Plus, ShieldCheck, AlertTriangle, CheckCircle2, Clock3, ArrowRight, UserRoundCheck } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
-import { EnterpriseMetric, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
+import { EnterpriseMetric, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
   const { user } = useAuthStore()
+  const membershipRole = useMembershipStore(state => state.role)
   const { data: allTasks = [] } = useTasks()
 
   const tasks: Task[] = (allTasks as Task[]).filter(
@@ -21,7 +24,7 @@ export default function QualityPage() {
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [projectRole, setProjectRole] = useState('guest')
+  const [projectTeamRole, setProjectTeamRole] = useState<string | null>(null)
 
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [gateName, setGateName] = useState('')
@@ -51,14 +54,13 @@ export default function QualityPage() {
   }, [])
 
   useEffect(() => {
-    async function loadUserRole() {
+    async function loadProjectTeamRole() {
       if (!projectId || !user?.email) {
-        setProjectRole('guest')
+        setProjectTeamRole(null)
         return
       }
 
       const email = user.email.trim().toLowerCase()
-
       const { data, error } = await supabase
         .from('project_team_members')
         .select('role')
@@ -66,16 +68,17 @@ export default function QualityPage() {
         .ilike('email', email)
         .maybeSingle()
 
-      if (error || !data) {
-        setProjectRole('guest')
+      if (error) {
+        console.warn('Unable to resolve project-specific quality role:', error.message)
+        setProjectTeamRole(null)
         return
       }
 
-      setProjectRole(data.role.toLowerCase())
+      setProjectTeamRole(data?.role?.toLowerCase() || null)
     }
 
-    loadUserRole()
-  }, [projectId, user])
+    loadProjectTeamRole()
+  }, [projectId, user?.email])
 
   async function loadTemplates() {
     const { data, error } = await supabase
@@ -450,15 +453,41 @@ export default function QualityPage() {
     return 'badge-muted'
   }
 
+  const normalizedMembershipRole = membershipRole?.toLowerCase() || null
+  const effectiveRole: string = isProjectAdmin(normalizedMembershipRole)
+    ? (normalizedMembershipRole || 'guest')
+    : projectTeamRole || normalizedMembershipRole || 'guest'
+
+  const roleLabels: Record<string, string> = {
+    workspace_admin: 'Workspace Admin',
+    admin: 'Admin',
+    pmo: 'PMO',
+    portfolio_manager: 'Portfolio Manager',
+    overall_project_owner: 'Overall Project Owner',
+    project_owner: 'Project Owner',
+    housebuild_project_owner: 'Housebuild Project Owner',
+    mep_project_owner: 'MEP Project Owner',
+    infrastructure_project_owner: 'Infrastructure Project Owner',
+    contractor: 'Contractor',
+    consultant: 'Consultant',
+    design: 'Design',
+    housebuild: 'Housebuild',
+    infrastructure: 'Infrastructure',
+    mep: 'MEP',
+    costing: 'Costing',
+    viewer: 'Viewer',
+    guest: 'Guest',
+  }
+  const effectiveRoleLabel = roleLabels[effectiveRole] || effectiveRole.split('_').join(' ')
+
   const canCreateGate =
-    projectRole === 'admin' ||
-    projectRole === 'pmo' ||
-    projectRole === 'contractor'
+    isProjectAdmin(effectiveRole) ||
+    effectiveRole === 'contractor' ||
+    ['overall_project_owner', 'project_owner'].includes(effectiveRole)
 
   const canReview =
-    projectRole === 'admin' ||
-    projectRole === 'consultant' ||
-    projectRole === 'pmo'
+    isProjectAdmin(effectiveRole) ||
+    effectiveRole === 'consultant'
 
   const canStartReview = (gate: any) =>
     canReview &&
@@ -591,9 +620,52 @@ export default function QualityPage() {
         </div>
       )}
 
-      <EnterprisePageHero eyebrow="Quality assurance" title="Quality Gate Control Centre" description="Control contractor inspection requests, consultant reviews, evidence and hold-point approvals before work proceeds." projectName={projectName}>
-        <div className="mt-4 inline-flex rounded-full border border-[#dbe4ea] bg-[#f5f8fa] px-3 py-1.5 text-xs font-semibold uppercase text-[#536170]">Project role: {projectRole}</div>
-      </EnterprisePageHero>
+      <section className="overflow-hidden rounded-[28px] border border-[#dbe4ea] bg-white shadow-[0_18px_50px_rgba(16,41,67,0.06)]">
+        <div className="grid lg:grid-cols-[1fr_360px]">
+          <div className="relative px-6 py-7 sm:px-8 lg:px-10 lg:py-9">
+            <div className="absolute right-0 top-0 h-36 w-36 rounded-bl-full bg-[#fff1ec]" aria-hidden="true" />
+            <div className="relative max-w-3xl">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ffd2c5] bg-[#fff7f3] px-3 py-1.5 text-xs font-semibold text-[#c94f32]">
+                <ShieldCheck size={14} /> Quality control
+              </div>
+              <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#102943] sm:text-4xl">Quality Gate Control Centre</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[#65717c] sm:text-base">
+                Manage inspection requests, consultant reviews, evidence and hold-point release before work proceeds.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-full border border-[#dbe4ea] bg-[#f5f8fa] px-3 py-1.5 text-[#536170]">Project: <strong className="text-[#102943]">{projectName || 'Current project'}</strong></span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-[#cfe0eb] bg-[#edf5f9] px-3 py-1.5 font-semibold text-[#123a60]">
+                  <UserRoundCheck size={14} /> {effectiveRoleLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-[#dbe4ea] bg-[#eef5f7] px-6 py-7 lg:border-l lg:border-t-0 lg:px-8 lg:py-9">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6d7d88]">Your access</div>
+            <div className="mt-3 text-2xl font-semibold text-[#102943]">{effectiveRoleLabel}</div>
+            <p className="mt-2 text-sm leading-6 text-[#65717c]">
+              {isProjectAdmin(effectiveRole)
+                ? 'Full quality-control access for this project, including inspection creation, review, approval and rejection.'
+                : effectiveRole === 'consultant'
+                  ? 'Review and sign off contractor inspection requests assigned to this project.'
+                  : effectiveRole === 'contractor'
+                    ? 'Create inspection requests and upload supporting evidence.'
+                    : canCreateGate
+                      ? 'Create and manage inspection requests within your assigned project responsibility.'
+                      : 'View quality-control records for this project.'}
+            </p>
+            {canCreateGate && (
+              <button
+                type="button"
+                onClick={() => document.getElementById('quality-request-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0d2f50]"
+              >
+                New inspection request <ArrowRight size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <EnterpriseMetric label="Quality gates" value={qualityGates.length} helper="Total inspection controls" icon={ClipboardCheck}/>
@@ -603,9 +675,9 @@ export default function QualityPage() {
       </section>
 
       {canCreateGate && (
-        <EnterpriseSection title="Request an inspection" description="Create a hold point from an approved template and attach readiness evidence.">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <EnterpriseSection className="scroll-mt-24" title="Request an inspection" description="Create a hold point from an approved template and attach readiness evidence.">
+        <div id="quality-request-form" className="space-y-4 scroll-mt-24">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             <select
               className="form-control"
               value={selectedTemplate}
