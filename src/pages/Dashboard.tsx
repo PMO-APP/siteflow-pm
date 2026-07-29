@@ -25,6 +25,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { fdate, urgencyColor, formatCurrency } from '@/lib/utils'
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { useProjectIntelligence } from '@/intelligence'
 
 const colorPool = [
   '#3b82f6',
@@ -725,6 +726,13 @@ export default function Dashboard() {
 
   const handoverConfidence = calculateHandoverConfidence()
 
+  const { intelligence: projectIntelligence } = useProjectIntelligence({
+    projectId,
+    projectName: projectName || project?.name,
+    plannedFinish: targetDate?.toISOString(),
+    currentProgress: progressPct,
+  })
+
   const latestDesignReport = designSubmissions[0]
   const latestCostReport = costSubmissions[0]
 
@@ -822,7 +830,7 @@ export default function Dashboard() {
     },
   ]
 
-  const projectHealth = Math.max(
+  const projectHealth = projectIntelligence?.health.overallScore ?? Math.max(
     20,
     Math.min(
       96,
@@ -836,7 +844,17 @@ export default function Dashboard() {
   )
 
   const healthLabel =
-    projectHealth >= 80 ? 'Healthy' : projectHealth >= 60 ? 'Watch' : 'Critical'
+    projectIntelligence?.health.overallBand === 'green'
+      ? 'Healthy'
+      : projectIntelligence?.health.overallBand === 'red'
+      ? 'Critical'
+      : projectIntelligence?.health.overallBand === 'amber'
+      ? 'Watch'
+      : projectHealth >= 80
+      ? 'Healthy'
+      : projectHealth >= 60
+      ? 'Watch'
+      : 'Critical'
 
   const healthTone =
     projectHealth >= 80
@@ -845,16 +863,40 @@ export default function Dashboard() {
       ? 'text-amber-700 bg-amber-50 border-amber-200'
       : 'text-red-700 bg-red-50 border-red-200'
 
-  const executiveBrief =
-    overdue > 0 || procRisks > 0 || overdueApprovals > 0
-      ? `${projectName || project?.name || 'This project'} remains recoverable, but ${[
-          overdue > 0 ? `${overdue} overdue programme task${overdue === 1 ? '' : 's'}` : '',
-          procRisks > 0 ? `${procRisks} procurement exposure${procRisks === 1 ? '' : 's'}` : '',
-          overdueApprovals > 0 ? `${overdueApprovals} overdue approval${overdueApprovals === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' and ')} require attention. Current handover confidence is ${handoverConfidence ?? 'not yet available'}%.`
-      : `${projectName || project?.name || 'This project'} is progressing without a critical live exception. Current handover confidence is ${handoverConfidence ?? 'not yet available'}% and delivery remains ${varianceStatus.toLowerCase()}.`
+  const executiveBrief = projectIntelligence
+    ? `${projectIntelligence.narrative.overallStatus} ${projectIntelligence.narrative.executiveOutlook}`
+    : overdue > 0 || procRisks > 0 || overdueApprovals > 0
+    ? `${projectName || project?.name || 'This project'} remains recoverable, but ${[
+        overdue > 0 ? `${overdue} overdue programme task${overdue === 1 ? '' : 's'}` : '',
+        procRisks > 0 ? `${procRisks} procurement exposure${procRisks === 1 ? '' : 's'}` : '',
+        overdueApprovals > 0 ? `${overdueApprovals} overdue approval${overdueApprovals === 1 ? '' : 's'}` : '',
+      ].filter(Boolean).join(' and ')} require attention. Current handover confidence is ${handoverConfidence ?? 'not yet available'}%.`
+    : `${projectName || project?.name || 'This project'} is progressing without a critical live exception. Current handover confidence is ${handoverConfidence ?? 'not yet available'}% and delivery remains ${varianceStatus.toLowerCase()}.`
+
+  const pifRouteBySource: Record<string, string> = {
+    schedule: route('/schedule'),
+    approval: route('/approvals'),
+    procurement: route('/procurement'),
+    risk: route('/risk'),
+    quality: route('/snags'),
+    snag: route('/snags'),
+    finance: route('/costing'),
+    hse: route('/hse'),
+  }
+
+  const pifPriorities = projectIntelligence?.alerts.map(alert => {
+    const eventId = alert.relatedEventIds[0]
+    const source = eventId?.split(':')[0] || 'schedule'
+    return {
+      title: alert.title,
+      level: alert.severity === 'critical' ? ('red' as const) : ('amber' as const),
+      route: pifRouteBySource[source] || route('/schedule'),
+      meta: alert.recommendedAction,
+    }
+  }) || []
 
   const priorities = [
+    ...pifPriorities,
     ...alerts.map(alert => ({
       title: alert.msg,
       level: alert.level,
@@ -867,16 +909,26 @@ export default function Dashboard() {
       route: item.type === 'Approval' ? route('/approvals') : route('/schedule'),
       meta: `${item.type} · ${item.days === 0 ? 'Due today' : `${item.days} days`}`,
     })),
-  ].slice(0, 5)
+  ].filter((item, index, list) => list.findIndex(other => other.title === item.title) === index).slice(0, 5)
 
-  const healthAreas = [
-    { label: 'Schedule', score: variancePct === null ? 60 : clamp(82 + variancePct * 2), detail: varianceStatus },
-    { label: 'Procurement', score: clamp(92 - procRisks * 12), detail: procRisks ? `${procRisks} exposed` : 'Clear' },
-    { label: 'Approvals', score: clamp(94 - overdueApprovals * 16 - pendingApprovals * 2), detail: `${pendingApprovals} pending` },
-    { label: 'Quality', score: clamp(94 - criticalSnags * 18 - openSnags * 2), detail: `${openSnags} open snags` },
-    { label: 'Risk', score: clamp(92 - highRisks * 15 - openRisks * 2), detail: `${highRisks} high` },
-    { label: 'Commercial', score: clamp(90 - Math.max(0, costOverrunPct) * 3), detail: `${costOverrunPct >= 0 ? '+' : ''}${costOverrunPct.toFixed(1)}% forecast` },
-  ]
+  const dimensions = projectIntelligence?.health.dimensions
+  const healthAreas = dimensions
+    ? [
+        { label: 'Schedule', score: dimensions.schedule.score, detail: dimensions.schedule.explanation },
+        { label: 'Procurement', score: dimensions.procurement.score, detail: dimensions.procurement.explanation },
+        { label: 'Approvals', score: dimensions.approval.score, detail: dimensions.approval.explanation },
+        { label: 'Quality', score: dimensions.quality.score, detail: dimensions.quality.explanation },
+        { label: 'Safety', score: dimensions.safety.score, detail: dimensions.safety.explanation },
+        { label: 'Commercial', score: dimensions.commercial.score, detail: dimensions.commercial.explanation },
+      ]
+    : [
+        { label: 'Schedule', score: variancePct === null ? 60 : clamp(82 + variancePct * 2), detail: varianceStatus },
+        { label: 'Procurement', score: clamp(92 - procRisks * 12), detail: procRisks ? `${procRisks} exposed` : 'Clear' },
+        { label: 'Approvals', score: clamp(94 - overdueApprovals * 16 - pendingApprovals * 2), detail: `${pendingApprovals} pending` },
+        { label: 'Quality', score: clamp(94 - criticalSnags * 18 - openSnags * 2), detail: `${openSnags} open snags` },
+        { label: 'Risk', score: clamp(92 - highRisks * 15 - openRisks * 2), detail: `${highRisks} high` },
+        { label: 'Commercial', score: clamp(90 - Math.max(0, costOverrunPct) * 3), detail: `${costOverrunPct >= 0 ? '+' : ''}${costOverrunPct.toFixed(1)}% forecast` },
+      ]
 
   return (
     <div className="min-w-0 space-y-6 pb-10 text-slate-900">
@@ -900,7 +952,7 @@ export default function Dashboard() {
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${healthTone}`}>{healthLabel}</span>
             </div>
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-700" style={{ width: `${projectHealth}%` }}/></div>
-            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm"><div><div className="text-slate-500">Handover</div><div className="mt-1 font-semibold text-slate-900">{targetDate ? targetDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Not set'}</div></div><div><div className="text-slate-500">Confidence</div><div className="mt-1 font-semibold text-slate-900">{handoverConfidence ?? '—'}%</div></div></div>
+            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm"><div><div className="text-slate-500">Handover</div><div className="mt-1 font-semibold text-slate-900">{targetDate ? targetDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Not set'}</div></div><div><div className="text-slate-500">Confidence</div><div className="mt-1 font-semibold text-slate-900">{projectIntelligence?.forecast.confidence ?? handoverConfidence ?? '—'}%</div></div></div>
           </div>
         </div>
       </section>
@@ -921,8 +973,8 @@ export default function Dashboard() {
 
         <section className="rounded-2xl border border-blue-200 bg-blue-950 p-6 text-white">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">Project intelligence</div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.035em]">{handoverConfidence && handoverConfidence >= 75 ? 'Delivery remains achievable.' : 'Recovery action is required.'}</h2>
-          <p className="mt-4 text-sm leading-6 text-blue-100">{overdue > 0 ? `The primary schedule pressure is ${activeDelayedTask?.name || `${overdue} overdue activities`}.` : 'No overdue activity is currently driving the forecast.'} {procRisks > 0 ? `Resolve ${procRisks} procurement exposure${procRisks===1?'':'s'} to protect available float.` : 'Procurement is not currently reducing available float.'}</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.035em]">{projectIntelligence?.narrative.keyIssues || (handoverConfidence && handoverConfidence >= 75 ? 'Delivery remains achievable.' : 'Recovery action is required.')}</h2>
+          <p className="mt-4 text-sm leading-6 text-blue-100">{projectIntelligence?.narrative.immediateActions || `${overdue > 0 ? `The primary schedule pressure is ${activeDelayedTask?.name || `${overdue} overdue activities`}.` : 'No overdue activity is currently driving the forecast.'} ${procRisks > 0 ? `Resolve ${procRisks} procurement exposure${procRisks===1?'':'s'} to protect available float.` : 'Procurement is not currently reducing available float.'}`}</p>
           <div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-blue-200">Recovery confidence</div><div className="mt-1 text-3xl font-semibold">{handoverConfidence ?? '—'}%</div></div><div className="rounded-xl border border-white/10 bg-white/5 p-4"><div className="text-xs text-blue-200">Schedule position</div><div className="mt-1 text-xl font-semibold">{varianceStatus}</div></div></div>
         </section>
       </div>
