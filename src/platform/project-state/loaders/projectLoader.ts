@@ -17,7 +17,7 @@ export async function loadProject(projectId: string | number): Promise<ProjectSu
     status: data.status || null,
     scope: data.project_scope || data.scope || null,
     startDate: toISO(data.start_date),
-    targetDate: toISO(data.planned_finish),
+    targetDate: toISO(data.handover_date || data.finish_date || data.target_date || data.completion_date),
     handoverDate: toISO(data.handover_date),
     organizationId: data.organization_id ? toId(data.organization_id) : null,
     portfolioId: data.portfolio_id ? toId(data.portfolio_id) : null,
