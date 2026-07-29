@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, X, Star, Trash2 } from 'lucide-react'
+import { Plus, X, Star, Trash2, CalendarDays, MapPin, Users, ClipboardList, CheckSquare2, Pencil } from 'lucide-react'
 import {
   useMeetings,
   useUpsertMeeting,
@@ -14,6 +14,7 @@ import { fdate } from '@/lib/utils'
 import type { Meeting, ContractorScore } from '@/types'
 
 import { pmoConfirm } from '@/lib/notifications'
+import { Drawer } from '@/components/ui/Drawer'
 const TEAM_ROLES = [
   'Client / Developer',
   'Architect',
@@ -89,145 +90,91 @@ function MeetingModal({
   }
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={event => {
-        if (event.target === event.currentTarget) onClose()
-      }}
+    <Drawer
+      open
+      width="lg"
+      title={item ? 'Edit meeting record' : 'Record meeting'}
+      description="Capture the meeting context, discussion, decisions and accountable follow-up actions."
+      onClose={onClose}
+      footer={
+        <>
+          <button className="ui-button ui-button--secondary" onClick={onClose}>Cancel</button>
+          <button className="ui-button ui-button--primary" onClick={save} disabled={upsert.isPending || !form.title.trim()}>
+            <CheckSquare2 size={15} />
+            {upsert.isPending ? 'Saving…' : item ? 'Save changes' : 'Save meeting'}
+          </button>
+        </>
+      }
     >
-      <div className="modal max-w-2xl" onClick={event => event.stopPropagation()}>
-        <div className="gold-bar" />
-
-        <div className="modal-head">
-          <div className="modal-title">
-            {item ? 'Edit Meeting' : 'Record Meeting'}
+      <div className="space-y-6">
+        <section className="space-y-4">
+          <div>
+            <div className="ui-eyebrow">Meeting information</div>
+            <h3 className="mt-1 text-lg font-extrabold text-[#173f5f]">Session details</h3>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-[#6e7d8c] hover:text-[#ede8de]"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           <div>
-            <label className="form-label">Meeting Title *</label>
+            <label className="form-label">Meeting title *</label>
             <input
               className="form-control"
               value={form.title}
               onChange={event => set('title', event.target.value)}
+              placeholder="e.g. Site progress meeting"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="form-label">Date</label>
-              <input
-                type="date"
-                className="form-control"
-                value={form.meeting_date}
-                onChange={event => set('meeting_date', event.target.value)}
-              />
+              <input type="date" className="form-control" value={form.meeting_date} onChange={event => set('meeting_date', event.target.value)} />
             </div>
-
             <div>
               <label className="form-label">Type</label>
-              <select
-                className="form-control"
-                value={form.meeting_type}
-                onChange={event => set('meeting_type', event.target.value)}
-              >
-                {['Site', 'Design', 'Client', 'Contractor', 'Progress', 'Other'].map(
-                  type => (
-                    <option key={type}>{type}</option>
-                  )
-                )}
+              <select className="form-control" value={form.meeting_type} onChange={event => set('meeting_type', event.target.value)}>
+                {['Site', 'Design', 'Client', 'Contractor', 'Progress', 'Other'].map(type => <option key={type}>{type}</option>)}
               </select>
             </div>
-
             <div>
               <label className="form-label">Location</label>
-              <input
-                className="form-control"
-                value={form.location}
-                onChange={event => set('location', event.target.value)}
-                placeholder="Site / Teams / Office…"
-              />
+              <input className="form-control" value={form.location} onChange={event => set('location', event.target.value)} placeholder="Site / Teams / Office" />
             </div>
           </div>
+        </section>
 
+        <section className="space-y-4 rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
+          <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">
+            <Users size={14} className="text-[#ef8354]" /> Attendance and agenda
+          </div>
           <div>
             <label className="form-label">Attendees</label>
-            <textarea
-              className="form-control"
-              rows={2}
-              value={form.attendees}
-              onChange={event => set('attendees', event.target.value)}
-              placeholder="List attendees…"
-            />
+            <textarea className="form-control" rows={2} value={form.attendees} onChange={event => set('attendees', event.target.value)} placeholder="List attendees and organisations" />
           </div>
-
           <div>
             <label className="form-label">Agenda</label>
-            <textarea
-              className="form-control"
-              rows={3}
-              value={form.agenda}
-              onChange={event => set('agenda', event.target.value)}
-              placeholder="Meeting agenda items…"
-            />
+            <textarea className="form-control" rows={3} value={form.agenda} onChange={event => set('agenda', event.target.value)} placeholder="Meeting agenda items" />
           </div>
+        </section>
 
+        <section className="space-y-4">
           <div>
-            <label className="form-label">Minutes / Discussion</label>
-            <textarea
-              className="form-control"
-              rows={5}
-              value={form.minutes}
-              onChange={event => set('minutes', event.target.value)}
-              placeholder="Record of discussion…"
-            />
+            <div className="ui-eyebrow">Meeting record</div>
+            <h3 className="mt-1 text-lg font-extrabold text-[#173f5f]">Discussion and actions</h3>
           </div>
-
           <div>
-            <label className="form-label">Action Points</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={form.action_points}
-              onChange={event => set('action_points', event.target.value)}
-              placeholder="Action · Owner · Due Date"
-            />
+            <label className="form-label">Minutes / discussion</label>
+            <textarea className="form-control" rows={6} value={form.minutes} onChange={event => set('minutes', event.target.value)} placeholder="Record the key discussion, agreements and decisions" />
           </div>
-
           <div>
-            <label className="form-label">Next Meeting</label>
-            <input
-              type="date"
-              className="form-control"
-              value={form.next_meeting_date}
-              onChange={event => set('next_meeting_date', event.target.value)}
-            />
+            <label className="form-label">Action points</label>
+            <textarea className="form-control" rows={5} value={form.action_points} onChange={event => set('action_points', event.target.value)} placeholder="Action · Owner · Due date" />
           </div>
-        </div>
-
-        <div className="flex gap-2 justify-end px-5 py-3 border-t border-white/[0.06]">
-          <button className="btn-ghost btn-sm btn" onClick={onClose}>
-            Cancel
-          </button>
-
-          <button
-            className="btn-gold btn-sm btn"
-            onClick={save}
-            disabled={upsert.isPending}
-          >
-            {upsert.isPending ? 'Saving…' : 'Save'}
-          </button>
-        </div>
+          <div className="max-w-xs">
+            <label className="form-label">Next meeting</label>
+            <input type="date" className="form-control" value={form.next_meeting_date} onChange={event => set('next_meeting_date', event.target.value)} />
+          </div>
+        </section>
       </div>
-    </div>
+    </Drawer>
   )
 }
 
@@ -865,92 +812,98 @@ export default function TeamPage() {
       </div>
 
       {selectedMeeting && (
-        <div className="modal-overlay" onClick={() => setSelectedMeeting(null)}>
-          <div
-            className="modal max-w-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="gold-bar" />
-
-            <div className="modal-head">
-              <div className="modal-title">{selectedMeeting.title}</div>
-
+        <Drawer
+          open
+          width="lg"
+          title={selectedMeeting.title}
+          description="Meeting record, decisions and accountable follow-up actions."
+          onClose={() => setSelectedMeeting(null)}
+          footer={
+            <>
+              <button className="ui-button ui-button--secondary" onClick={() => setSelectedMeeting(null)}>Close</button>
               <button
-                onClick={() => setSelectedMeeting(null)}
-                className="text-[#6e7d8c] hover:text-[#ede8de]"
+                className="ui-button ui-button--primary"
+                onClick={() => {
+                  const meeting = selectedMeeting
+                  setSelectedMeeting(null)
+                  setMeetingModal(meeting)
+                }}
               >
-                <X size={16} />
+                <Pencil size={15} /> Edit meeting
               </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
-                <div className="bg-[#1c2a36] rounded p-2">
-                  <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase mb-1">
-                    Date
+            </>
+          }
+        >
+          <div className="space-y-6">
+            <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                { label: 'Date', value: fdate(selectedMeeting.meeting_date, 'dd MMMM yyyy'), icon: CalendarDays },
+                { label: 'Type', value: selectedMeeting.meeting_type || 'Not specified', icon: ClipboardList },
+                { label: 'Location', value: selectedMeeting.location || 'Not specified', icon: MapPin },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
+                  <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">
+                    <Icon size={14} className="text-[#ef8354]" /> {label}
                   </div>
-                  {fdate(selectedMeeting.meeting_date, 'dd MMMM yyyy')}
+                  <div className="mt-2 text-sm font-bold text-[#173f5f]">{value}</div>
                 </div>
+              ))}
+            </section>
 
-                <div className="bg-[#1c2a36] rounded p-2">
-                  <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase mb-1">
-                    Type
-                  </div>
-                  {selectedMeeting.meeting_type}
+            {selectedMeeting.attendees && (
+              <section>
+                <div className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">
+                  <Users size={14} className="text-[#ef8354]" /> Attendees
                 </div>
-
-                <div className="bg-[#1c2a36] rounded p-2">
-                  <div className="text-[8.5px] font-mono text-[#6e7d8c] uppercase mb-1">
-                    Location
-                  </div>
-                  {selectedMeeting.location || '—'}
+                <div className="whitespace-pre-wrap rounded-2xl border border-[#dce7ef] bg-white p-4 text-sm leading-6 text-[#40576a]">
+                  {selectedMeeting.attendees}
                 </div>
-              </div>
+              </section>
+            )}
 
-              {selectedMeeting.attendees && (
+            {selectedMeeting.agenda && (
+              <section>
+                <div className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">
+                  <ClipboardList size={14} className="text-[#ef8354]" /> Agenda
+                </div>
+                <div className="whitespace-pre-wrap rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4 text-sm leading-6 text-[#40576a]">
+                  {selectedMeeting.agenda}
+                </div>
+              </section>
+            )}
+
+            {selectedMeeting.minutes && (
+              <section>
+                <div className="ui-eyebrow">Meeting record</div>
+                <h3 className="mt-1 mb-3 text-lg font-extrabold text-[#173f5f]">Minutes and discussion</h3>
+                <div className="whitespace-pre-wrap rounded-2xl border border-[#dce7ef] bg-white p-5 text-sm leading-7 text-[#40576a]">
+                  {selectedMeeting.minutes}
+                </div>
+              </section>
+            )}
+
+            {selectedMeeting.action_points && (
+              <section className="rounded-2xl border border-[#ffd8ca] bg-[#fff8f5] p-5">
+                <div className="mb-3 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.14em] text-[#a84f2b]">
+                  <CheckSquare2 size={15} /> Action points
+                </div>
+                <div className="whitespace-pre-wrap text-sm leading-7 text-[#40576a]">
+                  {selectedMeeting.action_points}
+                </div>
+              </section>
+            )}
+
+            {selectedMeeting.next_meeting_date && (
+              <section className="flex items-center justify-between rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
                 <div>
-                  <div className="form-label">Attendees</div>
-                  <div className="text-[12px] text-[#bfb9ae] bg-[#1c2a36] rounded p-2.5 whitespace-pre-wrap">
-                    {selectedMeeting.attendees}
-                  </div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">Next meeting</div>
+                  <div className="mt-1 text-sm font-bold text-[#173f5f]">{fdate(selectedMeeting.next_meeting_date, 'dd MMMM yyyy')}</div>
                 </div>
-              )}
-
-              {selectedMeeting.agenda && (
-                <div>
-                  <div className="form-label">Agenda</div>
-                  <div className="text-[12px] text-[#bfb9ae] bg-[#1c2a36] rounded p-2.5 whitespace-pre-wrap">
-                    {selectedMeeting.agenda}
-                  </div>
-                </div>
-              )}
-
-              {selectedMeeting.minutes && (
-                <div>
-                  <div className="form-label">Minutes</div>
-                  <div className="text-[12px] text-[#bfb9ae] bg-[#1c2a36] rounded p-2.5 whitespace-pre-wrap">
-                    {selectedMeeting.minutes}
-                  </div>
-                </div>
-              )}
-
-              {selectedMeeting.action_points && (
-                <div>
-                  <div className="form-label">Action Points</div>
-                  <div className="text-[12px] text-[#bfb9ae] bg-[#1c2a36] rounded p-2.5 whitespace-pre-wrap font-mono">
-                    {selectedMeeting.action_points}
-                  </div>
-                </div>
-              )}
-
-              {selectedMeeting.next_meeting_date && (
-                <div className="text-[11px] text-[#6e7d8c]">
-                  Next meeting: {fdate(selectedMeeting.next_meeting_date)}
-                </div>
-              )}
-            </div>
+                <CalendarDays size={20} className="text-[#ef8354]" />
+              </section>
+            )}
           </div>
-        </div>
+        </Drawer>
       )}
 
       {meetingModal !== null && (
