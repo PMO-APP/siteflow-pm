@@ -258,7 +258,7 @@ export default function Layout() {
 
     const query = supabase
       .from('projects')
-      .select('id, handover_date, planned_finish, project_scope, scope_notes')
+      .select('id, handover_date, project_scope, scope_notes')
 
     const { data: projectData, error: projectError } = projectId
       ? await query.eq('id', projectId).maybeSingle()
@@ -269,17 +269,12 @@ export default function Layout() {
     }
 
     const explicitHandover = safeParseDate(projectData?.handover_date)
-    const plannedFinish = safeParseDate(projectData?.planned_finish)
 
     if (explicitHandover) {
       setHandoverDate(explicitHandover)
       return
     }
 
-    if (plannedFinish) {
-      setHandoverDate(plannedFinish)
-      return
-    }
 
     const resolvedProjectId = projectData?.id || projectId
 
