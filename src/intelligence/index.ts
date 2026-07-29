@@ -14,3 +14,7 @@ export * from './rules/ApprovalRules'
 export * from './rules/ProcurementRules'
 export * from './rules/RiskRules'
 export * from './rules/ScheduleRules'
+
+export * from './adapters/ProjectDataAdapter'
+export * from './hooks/useProjectIntelligence'
+export * from './rules/RuleEngine'
