@@ -212,12 +212,71 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <RoleAwareCommandSections project={project} />
         <section className="pmx-section-panel">
-          <SectionHeader eyebrow="Delivery position" title="Planned vs actual" description="Current workfront compared with the scheduled position for today." />
-          <div className="mt-5 space-y-4">
-            <div className="pmx-position-row"><div><div className="pmx-position-label">Should be today</div><div className="pmx-position-value">{forecast.plannedPosition?.name || 'No planned position found'}</div></div><CalendarDays size={18} className="text-[var(--pmx-muted)]" /></div>
-            <div className="pmx-position-row"><div><div className="pmx-position-label">Actual site position</div><div className="pmx-position-value">{forecast.actualPosition?.name || 'No active site position found'}</div></div><Clock3 size={18} className="text-[var(--pmx-muted)]" /></div>
-            <div className="pmx-position-gap"><div><div className="pmx-position-label">Activity gap</div><div className="pmx-position-gap-value">{forecast.activityGap}</div></div><div className="pmx-position-gap-copy">activity step{forecast.activityGap === 1 ? '' : 's'} behind</div></div>
-          </div>
+          <SectionHeader
+            eyebrow="Delivery position"
+            title={forecast.packagePositions.length > 1 ? 'Block and contractor positions' : 'Planned vs actual'}
+            description={forecast.packagePositions.length > 1
+              ? 'Each delivery package is assessed against its own approved programme. The highest-pressure package drives the project alert.'
+              : 'Current workfront compared with the scheduled position for today.'}
+          />
+
+          {forecast.packagePositions.length > 1 ? (
+            <div className="mt-5 space-y-4">
+              {forecast.pressurePackage ? (
+                <div className={`pmx-package-pressure is-${forecast.pressurePackage.status}`}>
+                  <AlertTriangle size={18} />
+                  <div>
+                    <div className="pmx-package-pressure-label">Main delivery pressure</div>
+                    <div className="pmx-package-pressure-title">{forecast.pressurePackage.packageName}</div>
+                    <div className="pmx-package-pressure-copy">
+                      {forecast.pressurePackage.contractorName ? `${forecast.pressurePackage.contractorName} · ` : ''}
+                      {forecast.pressurePackage.delayDays} day{forecast.pressurePackage.delayDays === 1 ? '' : 's'} behind, {forecast.pressurePackage.activityGap} activity step{forecast.pressurePackage.activityGap === 1 ? '' : 's'} behind.
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="pmx-package-position-list">
+                {forecast.packagePositions.map((item: any) => (
+                  <article key={item.packageId} className={`pmx-package-position-card is-${item.status}`}>
+                    <div className="pmx-package-position-head">
+                      <div>
+                        <div className="pmx-package-position-name">{item.packageName}</div>
+                        <div className="pmx-package-position-meta">
+                          {[item.contractorName, item.discipline, `${item.progress}% complete`].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <StatusPill
+                        label={item.delayDays > 0 ? `${item.delayDays}d behind` : 'On track'}
+                        tone={item.delayDays <= 0 ? 'success' : item.delayDays <= 7 ? 'warning' : 'danger'}
+                      />
+                    </div>
+                    <div className="pmx-package-position-grid">
+                      <div>
+                        <div className="pmx-position-label">Should be today</div>
+                        <div className="pmx-position-value">{item.plannedPosition?.name || 'No planned position found'}</div>
+                      </div>
+                      <div>
+                        <div className="pmx-position-label">Actual site position</div>
+                        <div className="pmx-position-value">{item.actualPosition?.name || 'No active site position found'}</div>
+                      </div>
+                      <div className="pmx-package-position-gap">
+                        <div className="pmx-position-label">Sequence gap</div>
+                        <strong>{item.activityGap}</strong>
+                        <span>step{item.activityGap === 1 ? '' : 's'}</span>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-4">
+              <div className="pmx-position-row"><div><div className="pmx-position-label">Should be today</div><div className="pmx-position-value">{forecast.plannedPosition?.name || 'No planned position found'}</div></div><CalendarDays size={18} className="text-[var(--pmx-muted)]" /></div>
+              <div className="pmx-position-row"><div><div className="pmx-position-label">Actual site position</div><div className="pmx-position-value">{forecast.actualPosition?.name || 'No active site position found'}</div></div><Clock3 size={18} className="text-[var(--pmx-muted)]" /></div>
+              <div className="pmx-position-gap"><div><div className="pmx-position-label">Activity gap</div><div className="pmx-position-gap-value">{forecast.activityGap}</div></div><div className="pmx-position-gap-copy">activity step{forecast.activityGap === 1 ? '' : 's'} behind</div></div>
+            </div>
+          )}
         </section>
       </div>
 
