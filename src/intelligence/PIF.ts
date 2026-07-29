@@ -16,6 +16,15 @@ import { generateBoardSummary } from './narrative/BoardSummary'
 import { buildDecisionCenter } from './decision/DecisionCenter'
 import { assessGovernance } from './governance/GovernanceEngine'
 import { buildDefaultImpactScenarios } from './decision/ImpactSimulator'
+import { analyseTrends } from './pulse/TrendEngine'
+import { calculateMomentum } from './pulse/MomentumCalculator'
+import { calculateAttentionIndex } from './pulse/AttentionIndex'
+import { calculateProjectPulse } from './pulse/PulseEngine'
+import { predictEscalation } from './warning/EscalationPredictor'
+import { generateEarlyWarnings } from './warning/EarlyWarningEngine'
+import { prioritizeWarnings } from './warning/WarningPrioritizer'
+import { buildTimelineStory } from './timeline/TimelineStory'
+import { buildDailyDecisionQueue } from './decision/DailyDecisionQueue'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -37,6 +46,14 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const decisions = buildDecisionCenter(input.events, recommendations, alerts, now)
   const governance = assessGovernance(input.events)
   const impactScenarios = buildDefaultImpactScenarios(input.events, forecast)
+  const trends = analyseTrends(input.events, now)
+  const momentum = calculateMomentum(health, trends)
+  const attention = calculateAttentionIndex(forecast, alerts, decisions, governance)
+  const pulse = calculateProjectPulse(health, forecast, governance, trends, momentum, attention)
+  const escalation = predictEscalation(health, forecast, trends, governance)
+  const warnings = prioritizeWarnings(generateEarlyWarnings(input.events, escalation))
+  const timeline = buildTimelineStory(input.events, now)
+  const decisionQueue = buildDailyDecisionQueue(decisions, warnings)
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -63,6 +80,14 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     decisions,
     governance,
     impactScenarios,
+    trends,
+    momentum,
+    attention,
+    pulse,
+    escalation,
+    warnings,
+    timeline,
+    decisionQueue,
     confidence,
     rules,
     generatedAt: now.toISOString(),
