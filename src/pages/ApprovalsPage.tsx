@@ -7,6 +7,8 @@ import { fdate, urgencyColor } from '@/lib/utils'
 import { differenceInDays } from 'date-fns'
 import type { Approval } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { approvalsIntelligence } from '@/lib/intelligence'
 
 const TYPES: Approval['type'][] = [
   'Material',
@@ -334,6 +336,7 @@ export default function ApprovalsPage() {
   const approved = approvals.filter(
     approval => approval.status === 'Approved'
   ).length
+  const intelligence = approvalsIntelligence(approvals.length, pending, overdue, approved)
 
   const statusIcon = (status: string) => {
     if (status === 'Approved') {
@@ -361,6 +364,17 @@ export default function ApprovalsPage() {
         eyebrow="Technical governance"
         title="Approval Centre"
         description="Track every submission from draft through review, decision and release, with overdue items brought immediately into focus."
+      />
+
+      <IntelligencePanel
+        title="Approval Intelligence"
+        {...intelligence}
+        metrics={[
+          { label: 'Total', value: approvals.length },
+          { label: 'Pending', value: pending },
+          { label: 'Overdue', value: overdue },
+          { label: 'Approved', value: approved },
+        ]}
       />
 
       {!canEdit && (
