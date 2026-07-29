@@ -358,3 +358,38 @@
 @media (max-width: 640px) {
   .ui-drawer-tabs { margin: -1.15rem -1rem 1.15rem -1.25rem; padding-inline: 1.25rem 1rem; }
 }
+
+/* Product Maturity Sprint 1B: connected record context */
+.record-context { display: flex; flex-direction: column; min-height: 100%; }
+.record-context__section { padding: 20px 2px 28px; display: grid; gap: 16px; }
+.record-context__summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.record-context__summary-card { border: 1px solid rgba(15, 39, 65, .10); border-radius: 12px; padding: 13px 14px; background: #f8fafc; display: grid; gap: 5px; }
+.record-context__summary-card span { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; font-weight: 700; }
+.record-context__summary-card strong { color: #10243b; font-size: 14px; }
+.record-context__panel { border: 1px solid rgba(15, 39, 65, .10); border-radius: 14px; padding: 16px; background: #fff; }
+.record-context__panel-title { display: flex; align-items: center; gap: 8px; color: #10243b; font-size: 13px; font-weight: 800; margin-bottom: 13px; }
+.record-context__panel p { margin: 0; color: #526273; line-height: 1.65; font-size: 13px; }
+.record-context__metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin: 0; }
+.record-context__metadata > div { padding: 11px 0; border-top: 1px solid rgba(15, 39, 65, .07); }
+.record-context__metadata > div:nth-child(-n+2) { border-top: 0; }
+.record-context__metadata dt { color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+.record-context__metadata dd { margin: 4px 0 0; color: #10243b; font-size: 13px; font-weight: 650; }
+.record-context__related { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; border: 1px solid rgba(15, 39, 65, .10); border-radius: 12px; padding: 12px; background: #fff; }
+.record-context__related-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; color: #184a72; background: #edf5fa; }
+.record-context__related strong { display: block; color: #10243b; font-size: 13px; }
+.record-context__related span { display: block; margin-top: 3px; color: #64748b; font-size: 11px; text-transform: capitalize; }
+.record-context__loading { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 38px 12px; color: #64748b; font-size: 13px; }
+.record-context__timeline { position: relative; display: grid; gap: 0; }
+.record-context__event { position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 12px; padding-bottom: 22px; }
+.record-context__event::before { content: ''; position: absolute; top: 15px; bottom: -1px; left: 5px; width: 1px; background: #dbe4ec; }
+.record-context__event:last-child::before { display: none; }
+.record-context__event-dot { position: relative; z-index: 1; width: 11px; height: 11px; margin-top: 4px; border-radius: 999px; background: #94a3b8; box-shadow: 0 0 0 4px #fff; }
+.record-context__event-dot.is-positive { background: #15803d; }
+.record-context__event-dot.is-warning { background: #d97706; }
+.record-context__event-dot.is-critical { background: #dc2626; }
+.record-context__event-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.record-context__event-head strong { color: #10243b; font-size: 13px; }
+.record-context__event-head time { color: #64748b; font-size: 10px; white-space: nowrap; }
+.record-context__event p { color: #526273; font-size: 12px; line-height: 1.55; margin: 5px 0 0; }
+.record-context__event span { color: #7b8794; font-size: 10px; display: block; margin-top: 5px; }
+@media (max-width: 760px) { .record-context__summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .record-context__metadata { grid-template-columns: 1fr; } .record-context__metadata > div:nth-child(2) { border-top: 1px solid rgba(15, 39, 65, .07); } }
