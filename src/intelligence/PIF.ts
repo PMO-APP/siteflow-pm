@@ -13,6 +13,8 @@ import { buildRecommendationExplorer } from './explainability/RecommendationExpl
 import { generateExecutiveSummary } from './narrative/ExecutiveSummary'
 import { generateWeeklySummary } from './narrative/WeeklySummary'
 import { generateBoardSummary } from './narrative/BoardSummary'
+import { buildDecisionCenter } from './decision/DecisionCenter'
+import { assessGovernance } from './governance/GovernanceEngine'
 
 export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const now = input.now || new Date()
@@ -31,6 +33,8 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
   const forecastBreakdown = buildForecastBreakdown(forecast)
   const weekly = generateWeeklySummary(input.events, health, recommendations)
   const board = generateBoardSummary(executive, forecast, recommendationExplorer)
+  const decisions = buildDecisionCenter(input.events, recommendations, alerts, now)
+  const governance = assessGovernance(input.events)
   const executiveBrief = {
     status: health.overallBand,
     healthScore: health.overallScore,
@@ -54,6 +58,8 @@ export function runProjectIntelligence(input: ProjectIntelligenceInput) {
     explainability: { health: healthBreakdown, forecast: forecastBreakdown, recommendations: recommendationExplorer },
     weekly,
     board,
+    decisions,
+    governance,
     confidence,
     rules,
     generatedAt: now.toISOString(),
