@@ -60,3 +60,5 @@ export * from './copilot/CopilotEngine'
 export * from './meeting/MeetingIntelligence'
 
 export * from './action/ActionIntelligence'
+
+export * from './board/BoardPackEngine'
