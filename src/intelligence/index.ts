@@ -56,3 +56,5 @@ export * from './copilot/QuestionRouter'
 export * from './copilot/ContextAssembler'
 export * from './copilot/ResponseFormatter'
 export * from './copilot/CopilotEngine'
+
+export * from './meeting/MeetingIntelligence'
