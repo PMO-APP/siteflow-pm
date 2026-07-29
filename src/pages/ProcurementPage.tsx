@@ -11,6 +11,8 @@ import { differenceInDays } from 'date-fns'
 import type { ProcurementItem } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { RecordContextDrawer } from '@/components/records/RecordContextDrawer'
+import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { procurementIntelligence } from '@/lib/intelligence'
 import type { RecordSummary } from '@/components/records/recordTypes'
 
 const CATS = [
@@ -522,6 +524,7 @@ export default function ProcurementPage() {
   }).length
 
   const delivered = items.filter(item => item.status === 'Delivered').length
+  const intelligence = procurementIntelligence(items.length, overdue, urgent, delivered)
 
   return (
     <div className="pmx-command-page space-y-5">
@@ -529,6 +532,17 @@ export default function ProcurementPage() {
         eyebrow="Procurement control"
         title="Procurement Control Centre"
         description="Control long-lead items, supplier commitments, order deadlines and site delivery readiness from one operational workspace."
+      />
+
+      <IntelligencePanel
+        title="Procurement Intelligence"
+        {...intelligence}
+        metrics={[
+          { label: 'Total items', value: items.length },
+          { label: 'Overdue', value: overdue },
+          { label: 'Urgent', value: urgent, helper: 'Within 7 days' },
+          { label: 'Delivered', value: delivered },
+        ]}
       />
 
       {!canEdit && (
