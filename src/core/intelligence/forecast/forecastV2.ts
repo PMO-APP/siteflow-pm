@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays } from 'date-fns'
+import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { toDate } from '@/core/intelligence/normalizers/dateUtils'
 
@@ -207,23 +208,24 @@ export function calculateForecastV2(
   state: ProjectState,
   today = new Date()
 ): ForecastV2Result {
-  const allActivities = sortActivities(state.schedule.activities)
-  const activities = getDetailedActivities(allActivities)
+  const sequence = analyseScheduleSequence(
+    state.schedule.activities.map(activity => ({
+      id: activity.id,
+      name: activity.name,
+      taskNumber: activity.taskNumber,
+      plannedStart: toDate(activity.plannedStart),
+      plannedFinish: toDate(activity.plannedFinish),
+      progress: activity.progress,
+      phase: activity.phase,
+      source: activity,
+    })),
+    today
+  )
 
-  const plannedPosition = getPlannedPosition(activities, today)
-  const actualPosition = getActualWorkfront(activities)
-
-  const plannedIndex = plannedPosition
-    ? activities.findIndex(activity => activity.id === plannedPosition.id)
-    : -1
-  const actualIndex = actualPosition
-    ? activities.findIndex(activity => activity.id === actualPosition.id)
-    : -1
-
-  const activityGap =
-    plannedIndex >= 0 && actualIndex >= 0
-      ? Math.max(0, plannedIndex - actualIndex)
-      : 0
+  const activities = sequence.activities.map(activity => activity.source)
+  const plannedPosition = sequence.plannedPosition?.source || null
+  const actualPosition = sequence.actualPosition?.source || null
+  const activityGap = sequence.activityGap
 
   const elapsedDays = getElapsedDays(state, today)
   const remainingDays = getRemainingDays(state, today)
@@ -237,7 +239,7 @@ export function calculateForecastV2(
       ? clamp((actualPerDay / requiredPerDay) * 100)
       : 100
 
-  const delayDays = getWorkfrontDelayDays(actualPosition, today)
+  const delayDays = sequence.delayDays
 
   // The approved project target defines the relevant scope completion. The
   // imported programme finish is used only when no project target is available.
