@@ -206,6 +206,22 @@ export default function Layout() {
   }, [organizationId, portfolioId])
 
   useEffect(() => {
+    setSidebarOpen(false)
+    setNotifsOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setSidebarOpen(false)
+      setNotifsOpen(false)
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [])
+
+  useEffect(() => {
     const channel = supabase
       .channel('layout-notifications')
       .on(
@@ -354,14 +370,18 @@ export default function Layout() {
 
   return (
     <div className="layout-shell flex h-screen overflow-hidden">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       <aside
+        id="primary-navigation"
+        aria-label="Primary navigation"
         className={`layout-sidebar fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
@@ -373,6 +393,7 @@ export default function Layout() {
             type="button"
             onClick={() => navigate('/')}
             className="text-left"
+            aria-label="Open PMOCorex home"
           >
             <PMOCorexLogo size={34} />
           </button>
@@ -436,7 +457,7 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1" aria-label="Project modules">
           {allowedNav.map(({ to, icon: Icon, label, exact }) => (
             <NavLink
               key={to}
@@ -488,6 +509,7 @@ export default function Layout() {
                 }}
                 className="sidebar-muted hover:text-red-500 transition-colors"
                 title="Sign out"
+                aria-label="Sign out"
               >
                 <LogOut size={14} />
               </button>
@@ -496,11 +518,14 @@ export default function Layout() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 flex flex-col h-full overflow-hidden">
+      <main className="min-w-0 flex-1 flex flex-col h-full overflow-hidden" aria-label="Application workspace">
         <header className="layout-header sticky top-0 z-20 border-b backdrop-blur-xl px-4 lg:px-6 py-3 flex items-center gap-3 flex-shrink-0">
           <button
             className="lg:hidden sidebar-muted hover:text-[#173f5f] transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={sidebarOpen}
+            aria-controls="primary-navigation"
           >
             <Menu size={18} />
           </button>
@@ -554,6 +579,8 @@ export default function Layout() {
           <button
             className="relative sidebar-muted hover:text-[#173f5f] transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
+            aria-label={unreadCount ? `Open notifications, ${unreadCount} unread` : 'Open notifications'}
+            aria-expanded={notifsOpen}
           >
             <Bell size={16} />
 
@@ -571,7 +598,7 @@ export default function Layout() {
           </div>
         )}
 
-        <div className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
+        <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
         </div>
       </main>
