@@ -30,6 +30,7 @@ import {
 import { fdate } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 import { useProjectHealth } from '@/hooks/useProjectHealth'
+import { ExecutiveHealthReportPanel, HealthHistoryChart } from '@/components/health'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
 const PMO_ROLES = ['workspace_admin', 'admin', 'pmo']
@@ -872,6 +873,9 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+
+      <ExecutiveHealthReportPanel projectId={projectId} health={projectHealth.health} />
+      <HealthHistoryChart projectId={projectId} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <Metric title="IPD Reports" value={reports.length} color="text-[#df5f41]" />
