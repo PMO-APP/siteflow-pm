@@ -32,6 +32,8 @@ import { ProjectCopilotPanel } from '@/components/copilot/ProjectCopilotPanel'
 import { ProjectReviewPanel } from '@/components/meeting/ProjectReviewPanel'
 import { ActionControlPanel } from '@/components/action/ActionControlPanel'
 import { ExecutiveBoardPackPanel } from '@/components/board/ExecutiveBoardPackPanel'
+import { useProjectHealth } from '@/hooks/useProjectHealth'
+import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
 
 const colorPool = [
   '#3b82f6',
@@ -115,6 +117,8 @@ function calcWeightedProgress(tasks: any[]) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { projectId, projectName } = useProjectStore()
+  const [healthDrawerOpen, setHealthDrawerOpen] = useState(false)
+  const sharedProjectHealth = useProjectHealth(projectId)
 
   const { data: taskData = [] } = useTasks()
   const { data: procData = [] } = useProcurement()
@@ -963,6 +967,30 @@ export default function Dashboard() {
         </div>
       </section>
 
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,.72fr)_minmax(0,1.28fr)]">
+        <ProjectHealthCard
+          health={sharedProjectHealth.health}
+          loading={sharedProjectHealth.isLoading}
+          fetching={sharedProjectHealth.isFetching}
+          onOpen={() => setHealthDrawerOpen(true)}
+          onRefresh={() => sharedProjectHealth.refetch()}
+        />
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Executive interpretation</div>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-slate-950">What is driving project health</h2>
+          <p className="mt-4 text-sm leading-6 text-slate-600">{sharedProjectHealth.healthSummary}</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {(sharedProjectHealth.contributors || []).filter(item => item.status === 'assessed').slice(0, 4).map(item => (
+              <button key={item.key} type="button" onClick={() => setHealthDrawerOpen(true)} className="rounded-xl border border-slate-200 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50/40">
+                <div className="flex items-center justify-between gap-3"><span className="font-semibold text-slate-900">{item.label}</span><span className="text-sm font-semibold text-slate-900">{item.score}%</span></div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-700" style={{ width: `${item.score || 0}%` }} /></div>
+                <div className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{item.explanations[0] || 'No exception recorded.'}</div>
+              </button>
+            ))}
+          </div>
+        </section>
+      </section>
+
       <section className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-4 xl:grid-cols-8">
         {[
           ['Progress', `${progressPct}%`], ['Variance', variancePct === null ? '—' : `${variancePct > 0 ? '+' : ''}${variancePct}%`], ['Days left', daysLeft ?? '—'], ['Overdue', overdue], ['Approvals', pendingApprovals], ['Procurement', procRisks], ['Risks', openRisks], ['Snags', openSnags],
@@ -1045,6 +1073,8 @@ export default function Dashboard() {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Now</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Current activities</h2></div><span className="text-sm text-slate-500">{inProg} active</span></div><div className="mt-5 divide-y divide-slate-100">{tasks.filter(t=>getTaskStatus(t)==='In Progress').slice(0,7).map(task=><div key={task.id} className="flex items-center gap-4 py-3.5"><div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{task.name}</div><div className="mt-1 text-sm text-slate-500">{task.phase || task.discipline || 'Unassigned phase'}</div></div><span className="font-semibold text-blue-700">{getTaskProgress(task)}%</span></div>)}{inProg===0&&<div className="py-5 text-sm text-slate-500">No activities are currently marked in progress.</div>}</div></section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Next</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Upcoming deadlines</h2></div><span className="text-sm text-slate-500">21-day view</span></div><div className="mt-5 divide-y divide-slate-100">{deadlines.slice(0,7).map(item=><div key={`${item.name}-${item.date}`} className="flex items-center gap-4 py-3.5"><div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{item.name}</div><div className="mt-1 text-sm text-slate-500">{item.type} · {fdate(item.date)}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.days<=3?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700'}`}>{item.days===0?'Today':`${item.days}d`}</span></div>)}{deadlines.length===0&&<div className="py-5 text-sm text-slate-500">No deadline is due within the next 21 days.</div>}</div></section>
       </div>
+
+      <HealthDetailsDrawer open={healthDrawerOpen} health={sharedProjectHealth.health} onClose={() => setHealthDrawerOpen(false)} />
     </div>
   )
 }
