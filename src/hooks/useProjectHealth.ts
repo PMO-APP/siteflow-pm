@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { differenceInDays } from 'date-fns'
 import { useTasks } from '@/hooks/useTasks'
 import { useProjects } from '@/hooks/useData'
 import { getProjectHealth } from '@/services/healthService'
+import { saveProjectHealthSnapshot, saveSnapshotIfDue } from '@/core/health/healthSnapshotService'
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
@@ -141,6 +142,33 @@ export function useProjectHealth(projectId?: string | number | null) {
     retry: 1,
   })
 
+  useEffect(() => {
+    if (!projectId || !query.data?.health) return
+    const project = legacy.project as any
+    saveSnapshotIfDue({
+      projectId,
+      organizationId: project?.organization_id ?? null,
+      portfolioId: project?.portfolio_id ?? null,
+      health: query.data.health,
+      source: 'automatic_daily',
+    }).catch(() => undefined)
+  }, [projectId, query.data?.health?.calculatedAt, legacy.project])
+
+  async function refreshAndSnapshot() {
+    const result = await query.refetch()
+    if (projectId && result.data?.health) {
+      const project = legacy.project as any
+      await saveProjectHealthSnapshot({
+        projectId,
+        organizationId: project?.organization_id ?? null,
+        portfolioId: project?.portfolio_id ?? null,
+        health: result.data.health,
+        source: 'manual_recalculation',
+      }).catch(() => undefined)
+    }
+    return result
+  }
+
   return {
     ...legacy,
     health: query.data?.health ?? null,
@@ -157,6 +185,6 @@ export function useProjectHealth(projectId?: string | number | null) {
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error,
-    refetch: query.refetch,
+    refetch: refreshAndSnapshot,
   }
 }
