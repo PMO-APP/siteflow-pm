@@ -32,6 +32,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import { PortfolioHealthComparison } from '@/components/health'
 
 type ProjectHealth =
   | 'Healthy'
@@ -582,6 +583,8 @@ export default function PortfolioDashboardPage() {
           <KpiStrip label="Open snags" value={summary.totalOpenSnags} />
           <KpiStrip label="Overdue tasks" value={summary.overdueTasks} alert={summary.overdueTasks > 0} />
         </section>
+
+        <PortfolioHealthComparison projects={projects} />
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1.45fr_.75fr]">
           <div className="rounded-2xl border border-[#dfe7e6] bg-white p-5 shadow-sm sm:p-6">
