@@ -40,11 +40,13 @@ import {
   UserCircle,
   Building2,
   MessageSquareText,
+  Search,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import { SearchModal } from '@/components/search'
 
 type NavItem = {
   to: string
@@ -175,6 +177,7 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
@@ -228,6 +231,7 @@ export default function Layout() {
   useEffect(() => {
     setSidebarOpen(false)
     setNotifsOpen(false)
+    setSearchOpen(false)
   }, [location.pathname])
 
   useEffect(() => {
@@ -585,6 +589,25 @@ export default function Layout() {
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="hidden sm:flex min-w-[190px] items-center gap-2 rounded-xl border border-[#d8e3e8] bg-white px-3 py-2 text-left text-xs font-medium text-[#6b7f8a] shadow-sm transition hover:border-[#bdccd4] hover:bg-[#f8fafb]"
+            aria-label="Search workspace"
+          >
+            <Search size={15} />
+            <span className="flex-1">Search workspace</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="sm:hidden rounded-lg p-1.5 sidebar-muted hover:bg-[#edf3f6] hover:text-[#173f5f]"
+            aria-label="Search workspace"
+          >
+            <Search size={17} />
+          </button>
+
           <div className="hidden md:flex items-center gap-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-[11px] text-emerald-400">Live</span>
@@ -620,6 +643,8 @@ export default function Layout() {
             <NotificationsPanel onClose={() => setNotifsOpen(false)} />
           </div>
         )}
+
+        <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
