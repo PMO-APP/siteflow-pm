@@ -3,8 +3,9 @@ import type { ProjectHealthResult } from '@/core/engine/types'
 import { HealthContributors } from './HealthContributors'
 import { HealthBreakdownChart } from './HealthBreakdownChart'
 import { HealthStatusBadge } from './HealthStatusBadge'
+import { HealthHistoryChart } from './HealthHistoryChart'
 
-export function HealthDetailsDrawer({ open, health, onClose }: { open: boolean; health: ProjectHealthResult | null; onClose: () => void }) {
+export function HealthDetailsDrawer({ open, health, onClose, projectId }: { open: boolean; health: ProjectHealthResult | null; onClose: () => void; projectId?: string | number | null }) {
   if (!health) return null
   return (
     <Drawer open={open} onClose={onClose} title="Project health breakdown" eyebrow="Unified Health Engine" description={`Calculated ${new Date(health.calculatedAt).toLocaleString('en-GB')}`} width="xl">
@@ -22,6 +23,8 @@ export function HealthDetailsDrawer({ open, health, onClose }: { open: boolean; 
           <p className="mt-1 text-sm text-slate-500">Only assessed modules contribute to the normalized health score.</p>
           <div className="mt-4"><HealthBreakdownChart contributors={health.contributors} /></div>
         </section>
+
+        <HealthHistoryChart projectId={projectId} />
 
         <section>
           <h3 className="text-lg font-semibold text-slate-950">Contributor explanations</h3>
