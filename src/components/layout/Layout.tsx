@@ -46,7 +46,8 @@ import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
 import NotificationsPanel from '@/components/modules/dashboard/NotificationsPanel'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
-import { SearchModal } from '@/components/search'
+import { CommandPalette } from '@/components/search'
+import { useCommandPalette } from '@/hooks/useCommandPalette'
 
 type NavItem = {
   to: string
@@ -177,7 +178,7 @@ export default function Layout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notifsOpen, setNotifsOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const commandPalette = useCommandPalette()
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
@@ -231,8 +232,8 @@ export default function Layout() {
   useEffect(() => {
     setSidebarOpen(false)
     setNotifsOpen(false)
-    setSearchOpen(false)
-  }, [location.pathname])
+    commandPalette.close()
+  }, [location.pathname, commandPalette.close])
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -591,17 +592,18 @@ export default function Layout() {
 
           <button
             type="button"
-            onClick={() => setSearchOpen(true)}
+            onClick={commandPalette.show}
             className="hidden sm:flex min-w-[190px] items-center gap-2 rounded-xl border border-[#d8e3e8] bg-white px-3 py-2 text-left text-xs font-medium text-[#6b7f8a] shadow-sm transition hover:border-[#bdccd4] hover:bg-[#f8fafb]"
             aria-label="Search workspace"
           >
             <Search size={15} />
-            <span className="flex-1">Search workspace</span>
+            <span className="flex-1">Search or jump to…</span>
+            <kbd className="rounded border border-[#d7e1e6] bg-[#f6f8f9] px-1.5 py-0.5 text-[9px] font-bold text-[#738690]">Ctrl K</kbd>
           </button>
 
           <button
             type="button"
-            onClick={() => setSearchOpen(true)}
+            onClick={commandPalette.show}
             className="sm:hidden rounded-lg p-1.5 sidebar-muted hover:bg-[#edf3f6] hover:text-[#173f5f]"
             aria-label="Search workspace"
           >
@@ -644,7 +646,7 @@ export default function Layout() {
           </div>
         )}
 
-        <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
 
         <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
