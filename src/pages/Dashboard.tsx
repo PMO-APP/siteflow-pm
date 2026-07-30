@@ -1074,7 +1074,7 @@ export default function Dashboard() {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><div className="flex items-center justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Next</div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em]">Upcoming deadlines</h2></div><span className="text-sm text-slate-500">21-day view</span></div><div className="mt-5 divide-y divide-slate-100">{deadlines.slice(0,7).map(item=><div key={`${item.name}-${item.date}`} className="flex items-center gap-4 py-3.5"><div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-900">{item.name}</div><div className="mt-1 text-sm text-slate-500">{item.type} · {fdate(item.date)}</div></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.days<=3?'bg-red-50 text-red-700':'bg-amber-50 text-amber-700'}`}>{item.days===0?'Today':`${item.days}d`}</span></div>)}{deadlines.length===0&&<div className="py-5 text-sm text-slate-500">No deadline is due within the next 21 days.</div>}</div></section>
       </div>
 
-      <HealthDetailsDrawer open={healthDrawerOpen} health={sharedProjectHealth.health} onClose={() => setHealthDrawerOpen(false)} />
+      <HealthDetailsDrawer open={healthDrawerOpen} health={sharedProjectHealth.health} projectId={projectId} onClose={() => setHealthDrawerOpen(false)} />
     </div>
   )
 }
