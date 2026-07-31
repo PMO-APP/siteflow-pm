@@ -348,6 +348,7 @@ export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
   const packages = calculatePackages(state, templates)
 
   return {
+    projectId: state.project.id,
     scopeTemplate,
     stages,
     activeStage,
