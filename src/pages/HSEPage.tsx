@@ -25,6 +25,7 @@ import {
   canEditOwnOrAdmin,
 } from '@/lib/permissions'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
+import { publishHSEMutationEvents } from '@/services/events/domainEventPublishers'
 
 type Tab =
   | 'observations'
@@ -818,12 +819,13 @@ function ObservationModal({
       ? supabase.from('hse_observations').update(payload).eq('id', item.id)
       : supabase.from('hse_observations').insert(payload)
 
-    const { error } = await query
+    const { data: saved, error } = await query.select().single()
 
     if (error) {
       alert(error.message)
       return
     }
+    await publishHSEMutationEvents({ projectId: projectId!, kind: 'observation', before: item as any, after: saved as any, source: 'ui' })
 
     await onSaved()
     onClose()
@@ -1005,12 +1007,13 @@ function IncidentModal({
       ? supabase.from('hse_incidents').update(payload).eq('id', item.id)
       : supabase.from('hse_incidents').insert(payload)
 
-    const { error } = await query
+    const { data: saved, error } = await query.select().single()
 
     if (error) {
       alert(error.message)
       return
     }
+    await publishHSEMutationEvents({ projectId: projectId!, kind: 'incident', before: item as any, after: saved as any, source: 'ui' })
 
     await onSaved()
     onClose()
