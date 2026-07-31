@@ -10,6 +10,7 @@ import type { Risk } from '@/types'
 import { Drawer, TableSkeleton } from '@/components/ui'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { riskIntelligence } from '@/lib/intelligence'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const CATEGORIES: Risk['category'][] = ['Procurement', 'Programme', 'Design', 'Financial', 'Safety', 'External', 'Contractor']
 const STATUSES: Risk['status'][] = ['Open', 'Mitigated', 'Closed', 'Transferred']
@@ -156,6 +157,8 @@ export default function RiskPage() {
 
   const canEdit = canEditRisk(role)
   const [modal, setModal] = useState<Risk | null | 'new'>(null)
+
+  useQuickActionRoute(() => setModal('new'), canEdit)
   const [catFilter, setCatFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
   const [view, setView] = useState<'list' | 'matrix'>('list')
