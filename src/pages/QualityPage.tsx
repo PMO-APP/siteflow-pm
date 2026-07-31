@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas'
 import { EnterpriseMetric, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { qualityIntelligence } from '@/lib/intelligence'
+import { publishQualityGateMutationEvents } from '@/services/events/domainEventPublishers'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
@@ -258,8 +259,7 @@ export default function QualityPage() {
         uploadedPhotoUrl = await uploadEvidencePhoto(selectedPhoto)
       }
 
-      const { error } = await supabase.from('quality_gates').insert([
-        {
+      const gatePayload = {
           project_id: projectId,
           passport_id: passportId,
           gate_name: gateName,
@@ -273,13 +273,15 @@ export default function QualityPage() {
           inspection_status: 'Inspection Requested',
           requested_by: user?.email || user?.full_name || 'Unknown user',
           requested_at: new Date().toISOString(),
-        },
-      ])
+      }
+      const { data: createdGate, error } = await supabase.from('quality_gates').insert([gatePayload]).select().single()
 
       if (error) {
         setCustomAlert(error.message)
         return
       }
+
+      if (createdGate) await publishQualityGateMutationEvents({ projectId, before: null, after: createdGate, source: 'ui' })
 
       setSelectedTemplate('')
       setGateName('')
@@ -315,6 +317,7 @@ export default function QualityPage() {
       setCustomAlert(error.message)
       return
     }
+    await publishQualityGateMutationEvents({ projectId: projectId!, before: gate, after: { ...gate, inspection_status: isResubmission ? 'Reinspection Requested' : 'Inspection Requested' }, source: 'ui' })
 
     await loadQualityGates()
   }
@@ -331,6 +334,7 @@ export default function QualityPage() {
       setCustomAlert(error.message)
       return
     }
+    await publishQualityGateMutationEvents({ projectId: projectId!, before: gate, after: { ...gate, inspection_status: 'Under Review' }, source: 'ui' })
 
     await loadQualityGates()
   }
@@ -374,6 +378,7 @@ export default function QualityPage() {
       setCustomAlert(error.message)
       return
     }
+    await publishQualityGateMutationEvents({ projectId: projectId!, before: gate, after: { ...gate, status: isReapproved ? 'Reapproved' : 'Approved', inspection_status: isReapproved ? 'Reapproved' : 'Approved' }, source: 'ui' })
 
     setShowApproveModal(false)
     setReviewerCompany('')
@@ -412,6 +417,7 @@ export default function QualityPage() {
       setCustomAlert(error.message)
       return
     }
+    await publishQualityGateMutationEvents({ projectId: projectId!, before: selectedGate, after: { ...selectedGate, status: 'Rejected', inspection_status: 'Rejected', rejection_reason: rejectReason }, source: 'ui' })
 
     setShowRejectModal(false)
     setRejectReason('')
