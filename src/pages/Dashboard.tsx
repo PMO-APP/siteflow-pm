@@ -34,6 +34,7 @@ import { ActionControlPanel } from '@/components/action/ActionControlPanel'
 import { ExecutiveBoardPackPanel } from '@/components/board/ExecutiveBoardPackPanel'
 import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
+import { ProjectTimelinePanel } from '@/components/intelligence/ProjectTimelinePanel'
 
 const colorPool = [
   '#3b82f6',
@@ -996,6 +997,8 @@ export default function Dashboard() {
           ['Progress', `${progressPct}%`], ['Variance', variancePct === null ? '—' : `${variancePct > 0 ? '+' : ''}${variancePct}%`], ['Days left', daysLeft ?? '—'], ['Overdue', overdue], ['Approvals', pendingApprovals], ['Procurement', procRisks], ['Risks', openRisks], ['Snags', openSnags],
         ].map(([label,value],index)=><button key={String(label)} onClick={()=>navigate(index<4?route('/schedule'):index===4?route('/approvals'):index===5?route('/procurement'):index===6?route('/risk'):route('/snags'))} className="min-w-0 border-b border-r border-slate-200 p-4 text-left transition hover:bg-slate-50 sm:p-5"><div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div><div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{value}</div></button>)}
       </section>
+
+      <ProjectTimelinePanel />
 
       {projectIntelligence && (
         <ProjectPulsePanel
