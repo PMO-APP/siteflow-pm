@@ -35,6 +35,7 @@ import { ExecutiveBoardPackPanel } from '@/components/board/ExecutiveBoardPackPa
 import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
 import { ProjectTimelinePanel } from '@/components/intelligence/ProjectTimelinePanel'
+import { AutonomousIntelligencePanel } from '@/components/intelligence/AutonomousIntelligencePanel'
 
 const colorPool = [
   '#3b82f6',
@@ -999,6 +1000,14 @@ export default function Dashboard() {
       </section>
 
       <ProjectTimelinePanel />
+
+      {projectIntelligence && (
+        <AutonomousIntelligencePanel
+          projectId={projectId || 'unknown'}
+          intelligence={projectIntelligence}
+          onOpenSource={(source) => navigate(pifRouteBySource[source] || route('/schedule'))}
+        />
+      )}
 
       {projectIntelligence && (
         <ProjectPulsePanel
