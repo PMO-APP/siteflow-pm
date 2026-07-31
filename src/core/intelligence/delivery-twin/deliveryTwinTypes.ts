@@ -31,6 +31,16 @@ export type DeliveryStage = {
   applicable: boolean
 }
 
+export type DeliveryPackageIssueSummary = {
+  delayedActivities: number
+  openApprovals: number
+  procurementBlockers: number
+  openRisks: number
+  openSnags: number
+  qualityFailures: number
+  hseIncidents: number
+}
+
 export type DeliveryPackagePerformance = {
   id: string
   name: string
@@ -45,6 +55,12 @@ export type DeliveryPackagePerformance = {
   healthScore: number
   healthLabel: 'Healthy' | 'Watch' | 'At Risk' | 'Critical'
   primaryDelayActivity: string | null
+  currentStageId: string | null
+  currentStageName: string | null
+  daysVariance: number
+  issueSummary: DeliveryPackageIssueSummary
+  recentActivityNames: string[]
+  upcomingMilestones: Array<{ id: string; name: string; plannedFinish: string | null }>
 }
 
 export type DeliveryTwinResult = {
