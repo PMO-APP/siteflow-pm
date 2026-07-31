@@ -9,6 +9,7 @@ import ThemeProvider from '@/theme/ThemeProvider'
 import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
+import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -319,6 +320,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <NotificationProvider>
+        <EventInfrastructureProvider>
         <BrowserRouter>
           <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -503,6 +505,7 @@ export default function App() {
       </Routes>
           </Suspense>
         </BrowserRouter>
+        </EventInfrastructureProvider>
       </NotificationProvider>
     </ThemeProvider>
   )
