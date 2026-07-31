@@ -14,6 +14,7 @@ import type { Snag } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { snagIntelligence } from '@/lib/intelligence'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const SEVERITIES: Snag['severity'][] = ['Critical', 'Major', 'Minor']
 
@@ -328,6 +329,8 @@ export default function SnagsPage() {
   const [view, setView] = useState<'list' | 'room'>('list')
 
   const canCreate = canCreateSnags(role)
+
+  useQuickActionRoute(() => setModal('new'), canCreate)
 
   const canEditSnag = (snag: Snag) => {
     return canEditOwnOrAdmin(
