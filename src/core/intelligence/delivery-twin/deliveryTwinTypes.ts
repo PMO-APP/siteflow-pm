@@ -64,6 +64,7 @@ export type DeliveryPackagePerformance = {
 }
 
 export type DeliveryTwinResult = {
+  projectId: string
   scopeTemplate: string
   stages: DeliveryStage[]
   activeStage: DeliveryStage | null
