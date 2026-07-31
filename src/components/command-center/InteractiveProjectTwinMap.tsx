@@ -17,6 +17,7 @@ import type {
 } from '@/core/intelligence/delivery-twin/deliveryTwinTypes'
 import { StatusPill } from '@/components/ui'
 import PackageStatusDrawer from './PackageStatusDrawer'
+import DependencyIntelligencePanel from './DependencyIntelligencePanel'
 
 function stageTone(status: DeliveryStage['status']) {
   if (status === 'completed') return 'success'
@@ -188,6 +189,8 @@ export default function InteractiveProjectTwinMap({
           </div>
         </div>
       ) : null}
+
+      <DependencyIntelligencePanel intelligence={twin.dependencyIntelligence} />
 
       <div className="rounded-2xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
