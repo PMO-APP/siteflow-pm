@@ -11,6 +11,8 @@ import type {
   DeliveryStageBlocker,
   DeliveryStageStatus,
   DeliveryTwinResult,
+  DeliveryDependencyIntelligence,
+  DependencyHealth,
 } from './deliveryTwinTypes'
 
 type ScheduleActivity = ProjectState['schedule']['activities'][number]
@@ -190,6 +192,103 @@ function calculatePackages(
   })
 }
 
+
+function dependencyHealth(activity: ScheduleActivity, now: Date): DependencyHealth {
+  if (activity.isBlocked) return 'blocked'
+  const finish = activity.plannedFinish ? new Date(activity.plannedFinish) : null
+  if (activity.progress < 100 && finish && !Number.isNaN(finish.getTime()) && finish < now) return 'at_risk'
+  return 'healthy'
+}
+
+function buildDependencyIntelligence(state: ProjectState): DeliveryDependencyIntelligence {
+  const activities = state.schedule.activities
+  const now = new Date()
+  const byId = new Map(activities.map(item => [item.id, item]))
+  const packageById = new Map(state.schedule.packages.map(item => [item.id, item.name]))
+  const successors = new Map<string, string[]>()
+
+  activities.forEach(activity => {
+    activity.predecessorIds.forEach(predecessorId => {
+      successors.set(predecessorId, [...(successors.get(predecessorId) || []), activity.id])
+    })
+  })
+
+  const nodes = activities.map(activity => ({
+    id: activity.id,
+    name: activity.name,
+    packageId: activity.deliveryPackageId,
+    packageName: activity.deliveryPackageName || (activity.deliveryPackageId ? packageById.get(activity.deliveryPackageId) || null : null),
+    progress: activity.progress,
+    isCritical: activity.isCritical,
+    isMilestone: Boolean((activity as ScheduleActivity & { isMilestone?: boolean }).isMilestone),
+    plannedFinish: activity.plannedFinish,
+    health: dependencyHealth(activity, now),
+    predecessorIds: activity.predecessorIds.filter(id => byId.has(id)),
+    successorIds: successors.get(activity.id) || [],
+  }))
+
+  const edges = nodes.flatMap(node => node.predecessorIds.map(predecessorId => {
+    const predecessor = byId.get(predecessorId)!
+    const predecessorHealth = dependencyHealth(predecessor, now)
+    const health: DependencyHealth = predecessor.progress < 100 && node.progress > 0
+      ? 'blocked'
+      : predecessorHealth === 'blocked'
+      ? 'blocked'
+      : predecessorHealth === 'at_risk' || (predecessor.isCritical && predecessor.progress < 100)
+      ? 'at_risk'
+      : 'healthy'
+    return {
+      id: `${predecessorId}-${node.id}`,
+      from: predecessorId,
+      to: node.id,
+      health,
+      reason: health === 'blocked'
+        ? `${predecessor.name} is preventing ${node.name} from progressing.`
+        : health === 'at_risk'
+        ? `${predecessor.name} may delay ${node.name}.`
+        : `${predecessor.name} is supporting ${node.name} as planned.`,
+    }
+  }))
+
+  const downstream = (startId: string) => {
+    const visited = new Set<string>()
+    const stack = [...(successors.get(startId) || [])]
+    while (stack.length) {
+      const id = stack.pop()!
+      if (visited.has(id)) continue
+      visited.add(id)
+      stack.push(...(successors.get(id) || []))
+    }
+    return [...visited]
+  }
+
+  const bottlenecks = nodes
+    .map(node => {
+      const affected = downstream(node.id)
+      const packageCount = new Set(affected.map(id => byId.get(id)?.deliveryPackageId).filter(Boolean)).size
+      return { activityId: node.id, activityName: node.name, downstreamCount: affected.length, packageCount, isCritical: node.isCritical, health: node.health }
+    })
+    .filter(item => item.downstreamCount > 0)
+    .sort((a, b) => (b.isCritical ? 10 : 0) + b.downstreamCount - ((a.isCritical ? 10 : 0) + a.downstreamCount))
+    .slice(0, 5)
+
+  const crossPackageLinks = edges.filter(edge => {
+    const from = byId.get(edge.from)
+    const to = byId.get(edge.to)
+    return Boolean(from?.deliveryPackageId && to?.deliveryPackageId && from.deliveryPackageId !== to.deliveryPackageId)
+  }).length
+
+  return {
+    nodes,
+    edges,
+    criticalPathIds: nodes.filter(node => node.isCritical).map(node => node.id),
+    bottlenecks,
+    crossPackageLinks,
+    blockedLinks: edges.filter(edge => edge.health === 'blocked').length,
+    atRiskLinks: edges.filter(edge => edge.health === 'at_risk').length,
+  }
+}
+
 export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
   const scopeTemplate = resolveProjectScopeTemplate(state.project.scope)
   const templates = getApplicableStageTemplates(state.project.scope)
@@ -259,5 +358,6 @@ export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
     packages,
     isMultiPackage: packages.length > 1,
     generatedAt: new Date().toISOString(),
+    dependencyIntelligence: buildDependencyIntelligence(state),
   }
 }
