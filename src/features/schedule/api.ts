@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types'
+import { publishTaskMutationEvents } from '@/services/events/domainEventPublishers'
 
 export async function fetchProjectTasks(projectId: number | string) {
   const { data, error } = await supabase
@@ -23,7 +24,9 @@ export async function createProjectTask(
     .single()
 
   if (error) throw error
-  return data as Task
+  const saved = data as Task
+  await publishTaskMutationEvents({ projectId, before: null, after: saved, source: 'ui' })
+  return saved
 }
 
 export async function fetchProjectTask(
@@ -46,6 +49,7 @@ export async function updateProjectTask(
   taskId: string,
   updates: Partial<Task>
 ) {
+  const before = await fetchProjectTask(projectId, taskId)
   const { data, error } = await supabase
     .from('tasks')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -55,7 +59,9 @@ export async function updateProjectTask(
     .single()
 
   if (error) throw error
-  return data as Task
+  const saved = data as Task
+  await publishTaskMutationEvents({ projectId, before, after: saved, source: 'ui' })
+  return saved
 }
 
 export async function deleteProjectTask(
