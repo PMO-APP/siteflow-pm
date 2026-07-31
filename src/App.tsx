@@ -10,6 +10,10 @@ import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
+import { OfflineProvider } from '@/platform/offline/OfflineProvider'
+import ConnectivityIndicator from '@/components/enterprise/ConnectivityIndicator'
+import SessionGuard from '@/platform/security/SessionGuard'
+import ObservabilityProvider from '@/platform/observability/ObservabilityProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -58,6 +62,7 @@ const OrganizationsPage = lazy(() => import('@/features/organizations/pages/Orga
 const CreateRFIPage = lazy(() => import('@/features/rfi/pages/CreateRFIPage'))
 const RFIDetailPage = lazy(() => import('@/features/rfi/pages/RFIDetailPage'))
 const RFIRegisterPage = lazy(() => import('@/features/rfi/pages/RFIRegisterPage'))
+const SystemHealthPage = lazy(() => import('@/pages/admin/SystemHealthPage'))
 
 
 
@@ -319,6 +324,10 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <ObservabilityProvider>
+      <OfflineProvider>
+      <SessionGuard />
+      <ConnectivityIndicator />
       <NotificationProvider>
         <EventInfrastructureProvider>
         <BrowserRouter>
@@ -441,6 +450,15 @@ export default function App() {
   }
 />
 
+<Route
+  path="administration/system-health"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <SystemHealthPage />
+    </RequireRole>
+  }
+/>
+
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
@@ -507,6 +525,8 @@ export default function App() {
         </BrowserRouter>
         </EventInfrastructureProvider>
       </NotificationProvider>
+      </OfflineProvider>
+      </ObservabilityProvider>
     </ThemeProvider>
   )
 }
