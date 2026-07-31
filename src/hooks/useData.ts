@@ -1,7 +1,7 @@
 import { useProjectStore } from '@/store/project'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { publishApprovalMutationEvents, publishProcurementMutationEvents } from '@/services/events/domainEventPublishers'
+import { publishApprovalMutationEvents, publishProcurementMutationEvents, publishRiskMutationEvents, publishSnagMutationEvents } from '@/services/events/domainEventPublishers'
 import type {
   ProcurementItem,
   Approval,
@@ -352,6 +352,11 @@ export const useUpsertSnag = () => {
         throw error
       }
 
+      await publishSnagMutationEvents({
+        projectId: pid,
+        before: id ? (item as unknown as Record<string, unknown>) : null,
+        after: data as unknown as Record<string, unknown>,
+      })
       return data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['snags', projectId] }),
@@ -511,6 +516,11 @@ export const useUpsertRisk = () => {
         throw error
       }
 
+      await publishRiskMutationEvents({
+        projectId: pid,
+        before: id ? (item as unknown as Record<string, unknown>) : null,
+        after: data as unknown as Record<string, unknown>,
+      })
       return data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['risks', projectId] }),
