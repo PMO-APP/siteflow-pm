@@ -16,6 +16,7 @@ import type {
   DeliveryTwinResult,
 } from '@/core/intelligence/delivery-twin/deliveryTwinTypes'
 import { StatusPill } from '@/components/ui'
+import PackageStatusDrawer from './PackageStatusDrawer'
 
 function stageTone(status: DeliveryStage['status']) {
   if (status === 'completed') return 'success'
@@ -45,6 +46,7 @@ export default function InteractiveProjectTwinMap({
   twin: DeliveryTwinResult
   onSelectStage: (stage: DeliveryStage) => void
 }) {
+  const [drawerPackageId, setDrawerPackageId] = useState<string | null>(null)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
     twin.packages[0]?.id || null,
   )
@@ -54,7 +56,10 @@ export default function InteractiveProjectTwinMap({
     [selectedPackageId, twin.packages],
   )
 
+  const drawerPackage = twin.packages.find(item => item.id === drawerPackageId) || null
+
   return (
+    <>
     <div className="space-y-4">
       <div className="rounded-2xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4">
         <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -127,6 +132,11 @@ export default function InteractiveProjectTwinMap({
                     <StatusPill label={pkg.healthLabel} tone={packageTone(pkg.healthLabel)} />
                   </div>
 
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[var(--pmx-muted)]">
+                    <span className="truncate">{pkg.currentStageName || 'Stage not detected'}</span>
+                    <span>{pkg.daysVariance > 0 ? '+' : ''}{pkg.daysVariance} days</span>
+                  </div>
+
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div className="text-xl font-semibold text-[var(--pmx-text)]">{pkg.progress}%</div>
                     <div className={pkg.variance < 0 ? 'text-xs font-semibold text-red-400' : 'text-xs font-semibold text-emerald-400'}>
@@ -136,6 +146,18 @@ export default function InteractiveProjectTwinMap({
 
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--pmx-surface-3)]">
                     <div className="h-full rounded-full bg-[var(--pmx-primary)]" style={{ width: `${pkg.progress}%` }} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-[var(--pmx-muted)]">{Object.values(pkg.issueSummary).reduce((sum, value) => sum + value, 0)} active signals</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={event => { event.stopPropagation(); setDrawerPackageId(pkg.id) }}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setDrawerPackageId(pkg.id) } }}
+                      className="text-[11px] font-semibold text-[var(--pmx-primary)]"
+                    >
+                      Open status
+                    </span>
                   </div>
                 </button>
               ))}
@@ -218,5 +240,7 @@ export default function InteractiveProjectTwinMap({
         </div>
       </div>
     </div>
+    <PackageStatusDrawer pkg={drawerPackage} onClose={() => setDrawerPackageId(null)} />
+    </>
   )
 }
