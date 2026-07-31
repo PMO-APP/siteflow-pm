@@ -1,8 +1,9 @@
 import { useEffect, type ReactNode } from 'react'
-import { flushProjectEventOutbox } from '@/services/events'
+import { flushProjectEventOutbox, registerConnectedIntelligenceHandlers } from '@/services/events'
 
 export default function EventInfrastructureProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
+    const unregisterHandlers = registerConnectedIntelligenceHandlers()
     const flush = () => {
       void flushProjectEventOutbox()
     }
@@ -14,6 +15,7 @@ export default function EventInfrastructureProvider({ children }: { children: Re
     return () => {
       window.removeEventListener('online', flush)
       window.clearInterval(timer)
+      unregisterHandlers()
     }
   }, [])
 
