@@ -102,7 +102,10 @@ function healthLabel(score: number): DeliveryPackagePerformance['healthLabel'] {
   return 'Critical'
 }
 
-function calculatePackages(state: ProjectState): DeliveryPackagePerformance[] {
+function calculatePackages(
+  state: ProjectState,
+  templates: DeliveryStageTemplate[],
+): DeliveryPackagePerformance[] {
   const now = new Date()
   const packages = state.schedule.packages.length
     ? state.schedule.packages
@@ -116,15 +119,45 @@ function calculatePackages(state: ProjectState): DeliveryPackagePerformance[] {
     const finishes = activities.map(a => a.plannedFinish ? new Date(a.plannedFinish) : null).filter(Boolean) as Date[]
     const start = starts.sort((a,b) => a.getTime()-b.getTime())[0]
     const finish = finishes.sort((a,b) => b.getTime()-a.getTime())[0]
+    const durationDays = start && finish ? Math.max(1, differenceInDays(finish, start)) : 0
     const plannedProgress = start && finish
-      ? Math.round(clamp((differenceInDays(now, start) / Math.max(1, differenceInDays(finish, start))) * 100))
+      ? Math.round(clamp((differenceInDays(now, start) / durationDays) * 100))
       : 0
+    const variance = progress - plannedProgress
     const score = packageHealth(overdue, activities.length)
-    const primaryDelay = overdue.sort((a,b) => {
+    const primaryDelay = [...overdue].sort((a,b) => {
       const ac = (a.isCritical ? 1000 : 0) + (100 - a.progress)
       const bc = (b.isCritical ? 1000 : 0) + (100 - b.progress)
       return bc - ac
     })[0]
+
+    const packageClassified = classifyActivities(templates, activities)
+    const stageProgress = templates.map(stage => ({
+      stage,
+      progress: weightedProgress(packageClassified.get(stage.id) || []),
+      activities: packageClassified.get(stage.id) || [],
+    }))
+    const currentStage = stageProgress.find(item => item.progress > 0 && item.progress < 100)
+      || stageProgress.find(item => item.progress < 100 && item.activities.length > 0)
+      || null
+
+    const share = state.schedule.activities.length > 0
+      ? activities.length / state.schedule.activities.length
+      : 1 / Math.max(1, packages.length)
+    const allocate = (value: number) => Math.max(0, Math.round(value * share))
+
+    const recentActivityNames = [...activities]
+      .filter(item => item.updatedAt)
+      .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
+      .slice(0, 3)
+      .map(item => item.name)
+
+    const upcomingMilestones = [...activities]
+      .filter(item => item.progress < 100 && item.plannedFinish)
+      .sort((a, b) => new Date(a.plannedFinish || 0).getTime() - new Date(b.plannedFinish || 0).getTime())
+      .slice(0, 3)
+      .map(item => ({ id: item.id, name: item.name, plannedFinish: item.plannedFinish }))
+
     return {
       id: pkg.id,
       name: pkg.name,
@@ -133,12 +166,26 @@ function calculatePackages(state: ProjectState): DeliveryPackagePerformance[] {
       weight: pkg.weight,
       progress,
       plannedProgress,
-      variance: progress - plannedProgress,
+      variance,
       overdueActivities: overdue.length,
       totalActivities: activities.length,
       healthScore: score,
       healthLabel: healthLabel(score),
       primaryDelayActivity: primaryDelay?.name || null,
+      currentStageId: currentStage?.stage.id || null,
+      currentStageName: currentStage?.stage.name || null,
+      daysVariance: durationDays ? Math.round((variance / 100) * durationDays) : 0,
+      issueSummary: {
+        delayedActivities: overdue.length,
+        openApprovals: allocate(state.approvals.pendingApprovals),
+        procurementBlockers: allocate(state.procurement.atRiskItems + state.procurement.overdueItems),
+        openRisks: allocate(state.risk.openRisks),
+        openSnags: allocate(state.quality.openSnags),
+        qualityFailures: allocate(state.quality.failedInspections),
+        hseIncidents: allocate(state.hse.incidents),
+      },
+      recentActivityNames,
+      upcomingMilestones,
     }
   })
 }
@@ -199,7 +246,7 @@ export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
   const activeStage = stages.find(stage => stage.status === 'in_progress' || stage.status === 'blocked') || null
   const activeIndex = activeStage ? stages.findIndex(stage => stage.id === activeStage.id) : -1
   const nextStage = activeIndex >= 0 ? stages.slice(activeIndex + 1).find(stage => stage.status !== 'completed') || null : stages.find(stage => stage.status !== 'completed') || null
-  const packages = calculatePackages(state)
+  const packages = calculatePackages(state, templates)
 
   return {
     scopeTemplate,
