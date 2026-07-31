@@ -1,6 +1,7 @@
 import { useProjectStore } from '@/store/project'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { publishApprovalMutationEvents, publishProcurementMutationEvents } from '@/services/events/domainEventPublishers'
 import type {
   ProcurementItem,
   Approval,
@@ -55,6 +56,18 @@ export const useUpsertProcurement = () => {
     mutationFn: async (item: Partial<ProcurementItem> & { id?: string }) => {
       const pid = requireProject(projectId)
       const { id, ...rest } = item
+      let before: ProcurementItem | null = null
+
+      if (id) {
+        const { data: existing, error: existingError } = await supabase
+          .from('procurement_items')
+          .select('*')
+          .eq('id', id)
+          .eq('project_id', pid)
+          .single()
+        if (existingError) throw existingError
+        before = existing as ProcurementItem
+      }
 
       const query = id
         ? supabase
@@ -74,7 +87,9 @@ export const useUpsertProcurement = () => {
         throw error
       }
 
-      return data
+      const saved = data as ProcurementItem
+      await publishProcurementMutationEvents({ projectId: pid, before, after: saved, source: 'ui' })
+      return saved
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['procurement', projectId] }),
   })
@@ -194,6 +209,18 @@ export const useUpsertApproval = () => {
     mutationFn: async (item: Partial<Approval> & { id?: string }) => {
       const pid = requireProject(projectId)
       const { id, ...rest } = item
+      let before: Approval | null = null
+
+      if (id) {
+        const { data: existing, error: existingError } = await supabase
+          .from('approvals')
+          .select('*')
+          .eq('id', id)
+          .eq('project_id', pid)
+          .single()
+        if (existingError) throw existingError
+        before = existing as Approval
+      }
 
       const query = id
         ? supabase
@@ -213,7 +240,9 @@ export const useUpsertApproval = () => {
         throw error
       }
 
-      return data
+      const saved = data as Approval
+      await publishApprovalMutationEvents({ projectId: pid, before, after: saved, source: 'ui' })
+      return saved
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals', projectId] }),
   })
