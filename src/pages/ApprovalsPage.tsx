@@ -9,6 +9,7 @@ import type { Approval } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { approvalsIntelligence } from '@/lib/intelligence'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const TYPES: Approval['type'][] = [
   'Material',
@@ -310,6 +311,8 @@ export default function ApprovalsPage() {
   const canEdit = canApprove(role)
 
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
+
+  useQuickActionRoute(() => setModal('new'), canEdit)
   const [typeFilter, setTypeFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
   const today = new Date()
