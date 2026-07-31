@@ -42,6 +42,8 @@ import type { SearchResult as SearchResultModel } from '@/services/search'
 import SearchInput from './SearchInput'
 import SearchCategory from './SearchCategory'
 import SearchResult from './SearchResult'
+import { useWorkspacePersonalization } from '@/hooks/useWorkspacePersonalization'
+import type { PersonalItem } from '@/services/personalization'
 
 const RECENT_SEARCH_KEY = 'pmocorex_recent_searches'
 const RECENT_PROJECT_KEY = 'pmocorex_recent_projects'
@@ -151,6 +153,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   const location = useLocation()
   const project = useProjectStore()
   const role = useMembershipStore(state => state.role)
+  const personalization = useWorkspacePersonalization()
   const mode = stripMode(query)
   const searchEnabled = mode.prefix !== '>' && mode.prefix !== '@'
   const search = useGlobalSearch(searchEnabled ? mode.query : '', { projectId: project.projectId, projectName: project.projectName })
@@ -247,6 +250,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   }
 
   function openProject(item: RecentProject) {
+    personalization.remember({ id: `project:${item.id}`, itemType: 'project', itemId: item.id, title: item.name, subtitle: 'Project dashboard', route: '/app', projectId: item.id, projectName: item.name, organizationId: item.organizationId, portfolioId: item.portfolioId })
     project.setProject(item.id, item.name, item.organizationId, item.portfolioId)
     rememberProject(item)
     onClose()
@@ -255,6 +259,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
 
   function selectResult(result: SearchResultModel) {
     rememberSearch(mode.query)
+    personalization.remember({ id: `${result.type}:${result.id}`, itemType: result.type as PersonalItem['itemType'], itemId: result.id, title: result.title, subtitle: result.subtitle, route: result.url, projectId: result.projectId, projectName: result.projectName, organizationId: Number(result.metadata?.organizationId) || null, portfolioId: Number(result.metadata?.portfolioId) || null, metadata: result.metadata })
     if (result.projectId && result.projectName) {
       const item = {
         id: result.projectId,
@@ -275,6 +280,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       return
     }
     rememberCommand(`action:${action.id}`)
+    personalization.remember({ id: `page:${action.url}`, itemType: 'page', itemId: action.url, title: action.title, subtitle: action.subtitle, route: action.url, projectId: project.projectId, projectName: project.projectName, organizationId: project.organizationId, portfolioId: project.portfolioId })
     onClose()
     navigate(action.url)
   }
@@ -283,6 +289,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     if (item.kind === 'action') return runAction(item.action)
     if (item.kind === 'command') {
       rememberCommand(item.key)
+      personalization.remember({ id: `page:${item.command.url}`, itemType: 'page', itemId: item.command.url, title: item.command.title, subtitle: item.command.subtitle, route: item.command.url, projectId: project.projectId, projectName: project.projectName, organizationId: project.organizationId, portfolioId: project.portfolioId })
       onClose()
       navigate(item.command.url)
       return
