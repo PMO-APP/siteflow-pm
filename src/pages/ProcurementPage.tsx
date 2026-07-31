@@ -14,6 +14,7 @@ import { RecordContextDrawer } from '@/components/records/RecordContextDrawer'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { procurementIntelligence } from '@/lib/intelligence'
 import type { RecordSummary } from '@/components/records/recordTypes'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const CATS = [
   'Tiles',
@@ -453,6 +454,8 @@ export default function ProcurementPage() {
   const canEdit = canEditProcurement(role)
 
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
+
+  useQuickActionRoute(() => setModal('new'), canEdit)
   const [selectedRecord, setSelectedRecord] = useState<RecordSummary | null>(null)
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
