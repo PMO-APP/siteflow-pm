@@ -7,6 +7,7 @@ import { fdate } from '@/lib/utils'
 import type { SiteReport } from '@/types'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const WEATHER = ['Sunny','Partly Cloudy','Overcast','Light Rain','Heavy Rain','Harmattan']
 
@@ -15,6 +16,8 @@ export default function SitePage() {
   const upsert = useUpsertSiteReport()
   const { user } = useAuthStore()
   const [modal, setModal] = useState(false)
+
+  useQuickActionRoute(() => setModal(true))
   const [selected, setSelected] = useState<SiteReport | null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
 
