@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   CheckCircle,
@@ -65,6 +66,7 @@ export default function InternalAssignmentsPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
   const { projectId, projectName } = useProjectStore()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const canAssign = TASK_ASSIGNER_ROLES.includes(role || '')
 
@@ -86,6 +88,19 @@ export default function InternalAssignmentsPage() {
   useEffect(() => {
     loadTasks()
   }, [projectId, user?.email, user?.id, role])
+
+  useEffect(() => {
+    if (!canAssign || searchParams.get('action') !== 'new') return
+
+    window.setTimeout(() => {
+      document.getElementById('internal-task-title')?.focus()
+      document.getElementById('create-internal-task')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 30)
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('action')
+    setSearchParams(next, { replace: true })
+  }, [canAssign, searchParams, setSearchParams])
 
   async function loadTasks() {
     if (!projectId) {
@@ -310,7 +325,7 @@ export default function InternalAssignmentsPage() {
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {canAssign && (
-          <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 xl:col-span-1">
+          <div id="create-internal-task" className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 xl:col-span-1">
             <div className="flex items-center gap-2 mb-5">
               <Plus size={18} className="text-[#df5f41]" />
               <h2 className="text-lg font-semibold text-[#102943]">
@@ -320,6 +335,7 @@ export default function InternalAssignmentsPage() {
 
             <div className="space-y-3">
               <input
+                id="internal-task-title"
                 className="form-control"
                 placeholder="Task title"
                 value={title}
