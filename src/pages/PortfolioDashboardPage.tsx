@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PortfolioHealthComparison } from '@/components/health'
+import { ExecutiveCommandCentre } from '@/components/portfolio/ExecutiveCommandCentre'
 
 type ProjectHealth =
   | 'Healthy'
@@ -583,6 +584,11 @@ export default function PortfolioDashboardPage() {
           <KpiStrip label="Open snags" value={summary.totalOpenSnags} />
           <KpiStrip label="Overdue tasks" value={summary.overdueTasks} alert={summary.overdueTasks > 0} />
         </section>
+
+        <ExecutiveCommandCentre
+          rows={projectRows}
+          onOpenProject={projectId => navigate(`/projects/${projectId}/dashboard`)}
+        />
 
         <PortfolioHealthComparison projects={projects} />
 
