@@ -18,6 +18,7 @@ import type {
 import { StatusPill } from '@/components/ui'
 import PackageStatusDrawer from './PackageStatusDrawer'
 import DependencyIntelligencePanel from './DependencyIntelligencePanel'
+import ProjectTwinTimeMachine from './ProjectTwinTimeMachine'
 
 function stageTone(status: DeliveryStage['status']) {
   if (status === 'completed') return 'success'
@@ -189,6 +190,8 @@ export default function InteractiveProjectTwinMap({
           </div>
         </div>
       ) : null}
+
+      <ProjectTwinTimeMachine twin={twin} />
 
       <DependencyIntelligencePanel intelligence={twin.dependencyIntelligence} />
 
