@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
 import type { Document } from '@/types'
 import DocumentRepository from '@/components/DocumentRepository'
+import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 
 const TYPES: Document['type'][] = [
   'Drawing',
@@ -502,6 +503,8 @@ export default function DocumentsPage() {
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
+
+  useQuickActionRoute(() => setModal('new'), canCreateDocument)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [discFilter, setDiscFilter] = useState('')
