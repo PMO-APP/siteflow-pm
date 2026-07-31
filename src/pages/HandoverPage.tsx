@@ -17,6 +17,7 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 
 import { pmoConfirm, pmoPrompt } from '@/lib/notifications'
+import { publishHandoverEvent } from '@/services/events/domainEventPublishers'
 const TABS = [
   ['dashboard', 'Dashboard'],
   ['checklist', 'Checklist'],
@@ -744,6 +745,7 @@ export default function HandoverPage() {
         .eq('id', selectedPackageId)
 
       await logHistory('HANDOVER BLOCKED', stats.blockers.join('; '))
+      await publishHandoverEvent({ projectId: projectId!, packageId: selectedPackageId, type: 'HANDOVER_BLOCKED', priority: 'high', payload: { readiness: stats.readiness, blockers: stats.blockers } })
       await loadPackages()
       setNotice(`Handover blocked: ${stats.blockers.join(', ')}`)
       return
@@ -764,6 +766,7 @@ export default function HandoverPage() {
     }
 
     await logHistory('HANDOVER APPROVED', 'Package marked as handed over.')
+    await publishHandoverEvent({ projectId: projectId!, packageId: selectedPackageId, type: 'HANDOVER_APPROVED', payload: { readiness: 100, actualHandoverDate: new Date().toISOString().slice(0, 10) } })
     await loadPackages()
     await loadPackageDetails(selectedPackageId)
     setNotice('Handover approved successfully.')
