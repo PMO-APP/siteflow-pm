@@ -253,3 +253,103 @@ export async function publishApprovalMutationEvents({
 export function classifyProjectEventType(value: string): ProjectEventType | null {
   return value as ProjectEventType
 }
+
+const recordStatus = (record: Record<string, unknown> | null | undefined) =>
+  String(record?.status ?? record?.inspection_status ?? '').trim().toLowerCase()
+
+export async function publishQualityGateMutationEvents({
+  projectId,
+  before,
+  after,
+  source = 'service',
+}: {
+  projectId: number | string
+  before: Record<string, unknown> | null
+  after: Record<string, unknown>
+  source?: 'ui' | 'service' | 'database' | 'system' | 'integration'
+}) {
+  const inputs: Parameters<typeof dispatchProjectEvent>[0][] = [{
+    type: before ? 'QUALITY_GATE_CREATED' : 'QUALITY_GATE_CREATED',
+    projectId,
+    entityType: 'quality_gate',
+    entityId: String(after.id ?? before?.id ?? ''),
+    source,
+    payload: { before, after, changedFields: changedFields(before, after), taskId: after.blocks_task_id ?? after.task_id ?? null },
+  }]
+  const wasPassed = ['approved', 'reapproved'].includes(recordStatus(before))
+  const isPassed = ['approved', 'reapproved'].includes(recordStatus(after))
+  const wasFailed = recordStatus(before) === 'rejected'
+  const isFailed = recordStatus(after) === 'rejected'
+  if (!wasPassed && isPassed) inputs.push({
+    type: 'QUALITY_GATE_PASSED', projectId, entityType: 'quality_gate', entityId: String(after.id ?? ''), source,
+    payload: { before, after, taskId: after.blocks_task_id ?? after.task_id ?? null },
+  })
+  if (!wasFailed && isFailed) inputs.push({
+    type: 'QUALITY_GATE_FAILED', projectId, entityType: 'quality_gate', entityId: String(after.id ?? ''), source, priority: 'critical',
+    payload: { before, after, taskId: after.blocks_task_id ?? after.task_id ?? null, reason: after.rejection_reason ?? null },
+  })
+  return dispatchMany(inputs)
+}
+
+export async function publishRiskMutationEvents({ projectId, before, after, source = 'service' }: {
+  projectId: number | string; before: Record<string, unknown> | null; after: Record<string, unknown>;
+  source?: 'ui' | 'service' | 'database' | 'system' | 'integration'
+}) {
+  const score = Number(after.risk_score ?? Number(after.likelihood ?? 0) * Number(after.impact ?? 0))
+  const previousScore = Number(before?.risk_score ?? Number(before?.likelihood ?? 0) * Number(before?.impact ?? 0))
+  const inputs: Parameters<typeof dispatchProjectEvent>[0][] = [{
+    type: before ? 'RISK_UPDATED' : 'RISK_CREATED', projectId, entityType: 'risk', entityId: String(after.id ?? ''), source,
+    priority: score >= 15 ? 'critical' : score >= 10 ? 'high' : 'normal',
+    payload: { before, after, changedFields: changedFields(before, after), score },
+  }]
+  if ((score >= 15 && previousScore < 15) || (score >= 10 && score > previousScore + 2)) inputs.push({
+    type: 'RISK_ESCALATED', projectId, entityType: 'risk', entityId: String(after.id ?? ''), source,
+    priority: score >= 15 ? 'critical' : 'high', payload: { before, after, previousScore, score },
+  })
+  if (recordStatus(before) !== 'closed' && recordStatus(after) === 'closed') inputs.push({
+    type: 'RISK_CLOSED', projectId, entityType: 'risk', entityId: String(after.id ?? ''), source,
+    payload: { before, after, score },
+  })
+  return dispatchMany(inputs)
+}
+
+export async function publishSnagMutationEvents({ projectId, before, after, source = 'service' }: {
+  projectId: number | string; before: Record<string, unknown> | null; after: Record<string, unknown>;
+  source?: 'ui' | 'service' | 'database' | 'system' | 'integration'
+}) {
+  const inputs: Parameters<typeof dispatchProjectEvent>[0][] = [{
+    type: before ? 'SNAG_UPDATED' : 'SNAG_CREATED', projectId, entityType: 'snag', entityId: String(after.id ?? ''), source,
+    priority: String(after.severity ?? '').toLowerCase() === 'critical' ? 'critical' : 'normal',
+    payload: { before, after, changedFields: changedFields(before, after), taskId: after.task_id ?? null },
+  }]
+  if (recordStatus(before) !== 'closed' && recordStatus(after) === 'closed') inputs.push({
+    type: 'SNAG_CLOSED', projectId, entityType: 'snag', entityId: String(after.id ?? ''), source,
+    payload: { before, after, taskId: after.task_id ?? null },
+  })
+  return dispatchMany(inputs)
+}
+
+export async function publishHSEMutationEvents({ projectId, kind, before, after, source = 'service' }: {
+  projectId: number | string; kind: 'observation' | 'incident'; before: Record<string, unknown> | null; after: Record<string, unknown>;
+  source?: 'ui' | 'service' | 'database' | 'system' | 'integration'
+}) {
+  const prefix = kind === 'incident' ? 'HSE_INCIDENT' : 'HSE_OBSERVATION'
+  const baseType = `${prefix}_${before ? 'UPDATED' : 'CREATED'}` as ProjectEventType
+  const inputs: Parameters<typeof dispatchProjectEvent>[0][] = [{
+    type: baseType, projectId, entityType: `hse_${kind}`, entityId: String(after.id ?? before?.id ?? ''), source,
+    priority: kind === 'incident' && recordStatus(after) !== 'closed' ? 'high' : 'normal',
+    payload: { before, after, changedFields: changedFields(before, after) },
+  }]
+  if (recordStatus(before) !== 'closed' && recordStatus(after) === 'closed') inputs.push({
+    type: `${prefix}_CLOSED` as ProjectEventType, projectId, entityType: `hse_${kind}`, entityId: String(after.id ?? before?.id ?? ''), source,
+    payload: { before, after },
+  })
+  return dispatchMany(inputs)
+}
+
+export async function publishHandoverEvent({ projectId, packageId, type, payload, priority = 'normal' }: {
+  projectId: number | string; packageId: number | string; type: 'HANDOVER_READINESS_UPDATED' | 'HANDOVER_BLOCKED' | 'HANDOVER_APPROVED';
+  payload: Record<string, unknown>; priority?: 'low' | 'normal' | 'high' | 'critical'
+}) {
+  return dispatchProjectEvent({ type, projectId, entityType: 'handover_package', entityId: packageId, source: 'ui', priority, payload })
+}
