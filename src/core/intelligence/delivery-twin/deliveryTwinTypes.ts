@@ -74,4 +74,48 @@ export type DeliveryTwinResult = {
   packages: DeliveryPackagePerformance[]
   isMultiPackage: boolean
   generatedAt: string
+  dependencyIntelligence: DeliveryDependencyIntelligence
+}
+
+export type DependencyHealth = 'healthy' | 'at_risk' | 'blocked'
+
+export type DependencyNode = {
+  id: string
+  name: string
+  packageId: string | null
+  packageName: string | null
+  progress: number
+  isCritical: boolean
+  isMilestone: boolean
+  plannedFinish: string | null
+  health: DependencyHealth
+  predecessorIds: string[]
+  successorIds: string[]
+}
+
+export type DependencyEdge = {
+  id: string
+  from: string
+  to: string
+  health: DependencyHealth
+  reason: string
+}
+
+export type DependencyBottleneck = {
+  activityId: string
+  activityName: string
+  downstreamCount: number
+  packageCount: number
+  isCritical: boolean
+  health: DependencyHealth
+}
+
+export type DeliveryDependencyIntelligence = {
+  nodes: DependencyNode[]
+  edges: DependencyEdge[]
+  criticalPathIds: string[]
+  bottlenecks: DependencyBottleneck[]
+  crossPackageLinks: number
+  blockedLinks: number
+  atRiskLinks: number
 }
