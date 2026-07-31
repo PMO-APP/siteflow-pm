@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase'
+import { publishTaskMutationEvents } from '@/services/events/domainEventPublishers'
+import type { Task } from '@/types'
 import type {
   ImportedScheduleTask,
   ScheduleDiscipline,
@@ -9,10 +11,22 @@ export async function insertImportedScheduleTasks(
 ) {
   if (!tasks.length) return 0
 
-  const { error } = await supabase.from('tasks').insert(tasks)
+  const { data, error } = await supabase.from('tasks').insert(tasks).select()
   if (error) throw error
 
-  return tasks.length
+  const inserted = (data || []) as Task[]
+  for (const task of inserted) {
+    if (!task.project_id) continue
+    await publishTaskMutationEvents({
+      projectId: task.project_id,
+      before: null,
+      after: task,
+      source: 'integration',
+      metadata: { import: true, batchSize: inserted.length },
+    })
+  }
+
+  return inserted.length
 }
 
 export async function uploadScheduleBackup({
