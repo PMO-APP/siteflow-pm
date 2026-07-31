@@ -27,6 +27,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
+import PersonalWorkspacePanel from '@/components/personalization/PersonalWorkspacePanel'
 import {
   canAccessAdminConsole,
   canCreateWorkspaceItems,
@@ -774,6 +775,8 @@ export default function ProjectsPage() {
             </div>
           </div>
         </section>
+
+        <PersonalWorkspacePanel />
 
         <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="hub-panel p-6 sm:p-7">
