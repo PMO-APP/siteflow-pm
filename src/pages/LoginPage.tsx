@@ -22,8 +22,23 @@ function LoginBrand() {
   )
 }
 
+type PublicBranding = {
+  workspace_name: string
+  product_name: string
+  product_tagline: string
+  logo_url: string | null
+  primary_color: string
+  secondary_color: string
+  favicon_url: string | null
+  login_background_url: string | null
+  login_headline: string | null
+  login_subheadline: string | null
+  hide_platform_brand: boolean
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [publicBranding, setPublicBranding] = useState<PublicBranding | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
@@ -32,6 +47,29 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('workspace')
+    if (!slug) return
+    supabase.rpc('get_public_workspace_branding', { workspace_slug: slug })
+      .then(({ data, error }) => {
+        if (error || !data?.[0]) return
+        const brand = data[0] as PublicBranding
+        setPublicBranding(brand)
+        document.documentElement.style.setProperty('--workspace-primary', brand.primary_color)
+        document.documentElement.style.setProperty('--workspace-secondary', brand.secondary_color)
+        document.title = `${brand.workspace_name} | ${brand.product_name}`
+        if (brand.favicon_url) {
+          let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null
+          if (!favicon) {
+            favicon = document.createElement('link')
+            favicon.rel = 'icon'
+            document.head.appendChild(favicon)
+          }
+          favicon.href = brand.favicon_url
+        }
+      })
+  }, [])
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail')
@@ -111,23 +149,36 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#f7f8f6] text-[#183044]">
       <div className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr]">
-        <section className="relative hidden overflow-hidden bg-[#173f5f] p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
+        <section
+          className="relative hidden overflow-hidden p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16"
+          style={{
+            backgroundColor: publicBranding?.primary_color || '#173f5f',
+            backgroundImage: publicBranding?.login_background_url
+              ? `linear-gradient(rgba(7,28,45,.72),rgba(7,28,45,.82)),url(${publicBranding.login_background_url})`
+              : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,.055)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.055)_1px,transparent_1px)] bg-[size:34px_34px]" />
           <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full border border-white/10" />
           <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#ef8354]/55" />
 
           <div className="relative flex items-center gap-3">
-            <div className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-[13px] bg-white">
-              <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />
-              <svg viewBox="0 0 40 40" className="h-7 w-7"><path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="#173f5f" /><path d="M27.8 25.4 32 29.6" stroke="#ef8354" strokeWidth="2.8" strokeLinecap="round" /></svg>
-            </div>
-            <div><div className="text-lg font-extrabold tracking-[-.04em]">PMOCorex</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[.2em] text-white/50">Project delivery control</div></div>
+            {publicBranding?.logo_url ? (
+              <img src={publicBranding.logo_url} alt={`${publicBranding.product_name} logo`} className="h-11 max-w-40 object-contain" />
+            ) : (
+              <div className="relative grid h-11 w-11 place-items-center overflow-hidden rounded-[13px] bg-white font-black" style={{color:publicBranding?.primary_color||'#173f5f'}}>
+                {(publicBranding?.product_name || 'PMOCorex').slice(0,1)}
+              </div>
+            )}
+            <div><div className="text-lg font-extrabold tracking-[-.04em]">{publicBranding?.product_name || 'PMOCorex'}</div><div className="mt-1 text-[9px] font-bold uppercase tracking-[.2em] text-white/50">{publicBranding?.product_tagline || 'Project delivery control'}</div></div>
           </div>
 
           <div className="relative max-w-xl">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.06] px-3 py-1.5 text-xs font-bold text-white/75"><LockKeyhole size={14} className="text-[#ffad89]" /> Authorised workspace access</div>
-            <h1 className="text-5xl font-extrabold leading-[1.05] tracking-[-.055em] xl:text-6xl">Return to the work that moves delivery forward.</h1>
-            <p className="mt-6 max-w-lg text-base leading-7 text-white/65">Review your portfolio position, respond to project risks and keep every control area connected.</p>
+            <h1 className="text-5xl font-extrabold leading-[1.05] tracking-[-.055em] xl:text-6xl">{publicBranding?.login_headline || 'Return to the work that moves delivery forward.'}</h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-white/65">{publicBranding?.login_subheadline || 'Review your portfolio position, respond to project risks and keep every control area connected.'}</p>
             <div className="mt-9 grid gap-3">
               {['One view across active projects', 'Role-based access for every delivery team', 'Live controls, decisions and reporting'].map(item => (
                 <div key={item} className="flex items-center gap-3 text-sm font-semibold text-white/78"><CheckCircle2 size={17} className="text-[#ffad89]" />{item}</div>
@@ -135,7 +186,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="relative text-xs text-white/40">PMOCorex · Built for disciplined project delivery</div>
+          <div className="relative text-xs text-white/40">{publicBranding?.hide_platform_brand ? publicBranding.workspace_name : `${publicBranding?.product_name || 'PMOCorex'} · Built for disciplined project delivery`}</div>
         </section>
 
         <section className="relative flex items-center justify-center px-5 py-10 sm:px-8 lg:px-12">
