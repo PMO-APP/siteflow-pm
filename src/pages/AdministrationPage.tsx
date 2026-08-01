@@ -1,6 +1,7 @@
 import { Building2, Users, MailPlus, KeyRound, Layers3, ClipboardList, Briefcase, Settings, ArrowUpRight, ShieldCheck, Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 const modules=[
+{title:'Customer Administration',description:'Manage company profile, departments, locations, members, licenses and security policies.',to:'/app/administration/customer',icon:ShieldCheck,ready:true},
 {title:'Organizations',description:'Manage consultants, contractors, vendors and project associations.',to:'/app/administration/organizations',icon:Building2,ready:true},
 {title:'Users',description:'Review workspace users and their access relationships.',to:'/app/team-access',icon:Users,ready:true},
 {title:'Invitations',description:'Issue and track invitations to the PMOCorex workspace.',to:'/app/team-access',icon:MailPlus,ready:true},
@@ -8,7 +9,7 @@ const modules=[
 {title:'Workspaces',description:'Configure internal and future external workspaces.',to:'/app/administration/workspaces',icon:Layers3,ready:true},
 {title:'Audit Log',description:'Review important administrative activity and changes.',to:'/app/administration/audit',icon:ClipboardList,ready:true},
 {title:'Portfolios',description:'Manage portfolio structures and project assignments.',to:'/projects',icon:Briefcase,ready:true},
-{title:'System Settings',description:'Configure platform-wide defaults and preferences.',to:'/app/administration/settings',icon:Settings,ready:false},]
+{title:'System Settings',description:'Configure workspace identity, regional defaults and branding.',to:'/app/administration/workspaces',icon:Settings,ready:true},]
 export default function AdministrationPage(){const navigate=useNavigate();return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px] space-y-5">
 <section className="overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white"><div className="grid lg:grid-cols-[1fr_360px]"><div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Workspace control</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Administration Centre</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">Manage organizations, users, permissions and the operating structure behind your project portfolio.</p></div><div className="bg-[#123a60] p-7 text-white"><ShieldCheck size={26} className="text-[#ff9b83]"/><div className="mt-5 text-[11px] uppercase tracking-[.18em] text-white/60">Administrative posture</div><div className="mt-2 text-2xl font-semibold">Workspace controlled</div><p className="mt-3 text-sm leading-6 text-white/65">Deletion and sensitive access controls remain restricted to authorized administrators.</p></div></div></section>
 <section className="grid grid-cols-2 gap-3 md:grid-cols-4">{[['Control areas',modules.length,Layers3],['Available now',modules.filter(x=>x.ready).length,Activity],['Access areas',3,KeyRound],['Governance',1,ShieldCheck]].map(([l,v,I]:any)=><div key={l} className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><I size={17} className="text-[#6b7b88]"/><div className="mt-4 text-3xl font-semibold text-[#102943]">{v}</div><div className="mt-1 text-xs text-[#7b8791]">{l}</div></div>)}</section>
