@@ -5,7 +5,7 @@ const modules=[
 {title:'Users',description:'Review workspace users and their access relationships.',to:'/app/team-access',icon:Users,ready:true},
 {title:'Invitations',description:'Issue and track invitations to the PMOCorex workspace.',to:'/app/team-access',icon:MailPlus,ready:true},
 {title:'Roles & Permissions',description:'Control workspace, portfolio and project editing rights.',to:'/app/administration/roles',icon:KeyRound,ready:false},
-{title:'Workspaces',description:'Configure internal and future external workspaces.',to:'/app/administration/workspaces',icon:Layers3,ready:false},
+{title:'Workspaces',description:'Configure internal and future external workspaces.',to:'/app/administration/workspaces',icon:Layers3,ready:true},
 {title:'Audit Log',description:'Review important administrative activity and changes.',to:'/app/administration/audit',icon:ClipboardList,ready:true},
 {title:'Portfolios',description:'Manage portfolio structures and project assignments.',to:'/projects',icon:Briefcase,ready:true},
 {title:'System Settings',description:'Configure platform-wide defaults and preferences.',to:'/app/administration/settings',icon:Settings,ready:false},]
