@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { EnterpriseMetric, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
 const ROLES = [
@@ -27,6 +28,7 @@ const ROLES = [
 
 export default function TeamAccessPage() {
   const { user } = useAuthStore()
+  const { activeWorkspace } = useWorkspace()
 
   const [organizations, setOrganizations] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
@@ -41,22 +43,29 @@ export default function TeamAccessPage() {
   const [role, setRole] = useState('viewer')
 
   useEffect(() => {
-    load()
-  }, [])
+    if (activeWorkspace?.id) load()
+  }, [activeWorkspace?.id])
 
   async function load() {
     setLoading(true)
 
+    if (!activeWorkspace?.id) {
+      setOrganizations([]); setMembers([]); setInvites([]); setLoading(false)
+      return
+    }
+
     const [{ data: orgs }, { data: mems }, { data: invs, error }] =
       await Promise.all([
-        supabase.from('organizations').select('*').order('created_at'),
+        supabase.from('organizations').select('*').eq('workspace_id', activeWorkspace.id).order('created_at'),
         supabase
           .from('memberships')
           .select('*')
+          .eq('workspace_id', activeWorkspace.id)
           .order('created_at', { ascending: false }),
         supabase
           .from('team_invitations')
           .select('*')
+          .eq('workspace_id', activeWorkspace.id)
           .order('created_at', { ascending: false }),
       ])
 
@@ -69,7 +78,7 @@ export default function TeamAccessPage() {
   }
 
   async function sendInvite() {
-    if (!organizationId || !email || !role) {
+    if (!activeWorkspace?.id || !organizationId || !email || !role) {
       alert('Please complete all required fields.')
       return
     }
@@ -80,6 +89,7 @@ export default function TeamAccessPage() {
     const { data: existingInvite } = await supabase
   .from('team_invitations')
   .select('id')
+  .eq('workspace_id', activeWorkspace.id)
   .eq('email', cleanEmail)
   .eq('status', 'pending')
   .maybeSingle()
@@ -94,6 +104,7 @@ if (existingInvite) {
     const { data, error } = await supabase
       .from('team_invitations')
       .insert({
+        workspace_id: activeWorkspace.id,
         organization_id: Number(organizationId),
         email: cleanEmail,
         full_name: fullName.trim() || null,
