@@ -10,10 +10,7 @@ import RequireRole from '@/components/auth/RequireRole'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
-import { OfflineProvider } from '@/platform/offline/OfflineProvider'
-import ConnectivityIndicator from '@/components/enterprise/ConnectivityIndicator'
-import SessionGuard from '@/platform/security/SessionGuard'
-import ObservabilityProvider from '@/platform/observability/ObservabilityProvider'
+import { WorkspaceProvider } from '@/workspace/WorkspaceProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -62,7 +59,7 @@ const OrganizationsPage = lazy(() => import('@/features/organizations/pages/Orga
 const CreateRFIPage = lazy(() => import('@/features/rfi/pages/CreateRFIPage'))
 const RFIDetailPage = lazy(() => import('@/features/rfi/pages/RFIDetailPage'))
 const RFIRegisterPage = lazy(() => import('@/features/rfi/pages/RFIRegisterPage'))
-const SystemHealthPage = lazy(() => import('@/pages/admin/SystemHealthPage'))
+const WorkspaceSettingsPage = lazy(() => import('@/pages/WorkspaceSettingsPage'))
 
 
 
@@ -324,11 +321,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <ObservabilityProvider>
-      <OfflineProvider>
-      <SessionGuard />
-      <ConnectivityIndicator />
       <NotificationProvider>
+        <WorkspaceProvider>
         <EventInfrastructureProvider>
         <BrowserRouter>
           <Suspense fallback={<RouteFallback />}>
@@ -451,10 +445,10 @@ export default function App() {
 />
 
 <Route
-  path="administration/system-health"
+  path="administration/workspaces"
   element={
     <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
-      <SystemHealthPage />
+      <WorkspaceSettingsPage />
     </RequireRole>
   }
 />
@@ -524,9 +518,8 @@ export default function App() {
           </Suspense>
         </BrowserRouter>
         </EventInfrastructureProvider>
+        </WorkspaceProvider>
       </NotificationProvider>
-      </OfflineProvider>
-      </ObservabilityProvider>
     </ThemeProvider>
   )
 }
