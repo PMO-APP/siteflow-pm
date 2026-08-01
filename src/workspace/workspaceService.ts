@@ -16,6 +16,14 @@ const DEFAULT_BRANDING: WorkspaceBranding = {
   loginBackgroundUrl: null,
   emailHeaderUrl: null,
   reportFooter: null,
+  productName: 'PMOCorex',
+  productTagline: 'Project delivery control',
+  faviconUrl: null,
+  loginHeadline: null,
+  loginSubheadline: null,
+  emailSenderName: null,
+  reportHeaderText: null,
+  hidePlatformBrand: false,
 }
 
 function mapWorkspace(row: any): Workspace {
@@ -39,6 +47,14 @@ function mapWorkspace(row: any): Workspace {
       loginBackgroundUrl: row.workspace_branding?.[0]?.login_background_url ?? null,
       emailHeaderUrl: row.workspace_branding?.[0]?.email_header_url ?? null,
       reportFooter: row.workspace_branding?.[0]?.report_footer ?? null,
+      productName: row.workspace_branding?.[0]?.product_name ?? 'PMOCorex',
+      productTagline: row.workspace_branding?.[0]?.product_tagline ?? 'Project delivery control',
+      faviconUrl: row.workspace_branding?.[0]?.favicon_url ?? null,
+      loginHeadline: row.workspace_branding?.[0]?.login_headline ?? null,
+      loginSubheadline: row.workspace_branding?.[0]?.login_subheadline ?? null,
+      emailSenderName: row.workspace_branding?.[0]?.email_sender_name ?? null,
+      reportHeaderText: row.workspace_branding?.[0]?.report_header_text ?? null,
+      hidePlatformBrand: Boolean(row.workspace_branding?.[0]?.hide_platform_brand),
     },
   }
 }
@@ -82,17 +98,45 @@ export async function updateWorkspaceProfile(
 
 export async function updateWorkspaceBranding(
   workspaceId: string,
-  branding: Pick<WorkspaceBranding, 'primaryColor' | 'secondaryColor' | 'reportFooter'>
+  branding: WorkspaceBranding
 ) {
   const { error } = await supabase.from('workspace_branding').upsert({
     workspace_id: workspaceId,
+    logo_url: branding.logoUrl,
     primary_color: branding.primaryColor,
     secondary_color: branding.secondaryColor,
+    login_background_url: branding.loginBackgroundUrl,
+    email_header_url: branding.emailHeaderUrl,
     report_footer: branding.reportFooter,
+    product_name: branding.productName,
+    product_tagline: branding.productTagline,
+    favicon_url: branding.faviconUrl,
+    login_headline: branding.loginHeadline,
+    login_subheadline: branding.loginSubheadline,
+    email_sender_name: branding.emailSenderName,
+    report_header_text: branding.reportHeaderText,
+    hide_platform_brand: branding.hidePlatformBrand,
+    updated_at: new Date().toISOString(),
   })
-
   if (error) throw error
 }
+
+export async function uploadWorkspaceBrandAsset(
+  workspaceId: string,
+  kind: 'logo' | 'favicon' | 'login-background' | 'email-header',
+  file: File
+) {
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  const path = `${workspaceId}/${kind}-${Date.now()}.${extension}`
+  const { error } = await supabase.storage.from('workspace-branding').upload(path, file, {
+    upsert: true,
+    cacheControl: '3600',
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from('workspace-branding').getPublicUrl(path)
+  return data.publicUrl
+}
+
 
 export function scopeWorkspace<T extends { eq: (column: string, value: string) => T }>(
   query: T,
