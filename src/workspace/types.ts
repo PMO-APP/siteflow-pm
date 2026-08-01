@@ -8,6 +8,14 @@ export type WorkspaceBranding = {
   loginBackgroundUrl: string | null
   emailHeaderUrl: string | null
   reportFooter: string | null
+  productName: string
+  productTagline: string
+  faviconUrl: string | null
+  loginHeadline: string | null
+  loginSubheadline: string | null
+  emailSenderName: string | null
+  reportHeaderText: string | null
+  hidePlatformBrand: boolean
 }
 
 export type WorkspaceSettings = {
