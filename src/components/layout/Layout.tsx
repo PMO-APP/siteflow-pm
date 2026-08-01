@@ -5,6 +5,7 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { PackageCheck } from 'lucide-react'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
 
 
 import {
@@ -185,6 +186,7 @@ export default function Layout() {
   const [portfolioName, setPortfolioName] = useState('')
 
   const { user, signOut } = useAuthStore()
+  const { activeWorkspace } = useWorkspace()
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
   const role = useMembershipStore(state => state.role)
@@ -194,7 +196,7 @@ export default function Layout() {
   const queryClient = useQueryClient()
 
   const { data: unreadNotifications = [] } = useQuery({
-    queryKey: ['layout-notifications', user?.id, role, projectId],
+    queryKey: ['layout-notifications', activeWorkspace?.id, user?.id, role, projectId],
     enabled: !!user,
     queryFn: async () => {
       if (!user) return []
@@ -205,11 +207,16 @@ export default function Layout() {
         filters.push(`project_id.eq.${projectId}`)
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('id')
         .eq('is_read', false)
-        .or(filters.join(','))
+
+      if (activeWorkspace?.id) {
+        query = query.eq('workspace_id', activeWorkspace.id)
+      }
+
+      const { data, error } = await query.or(filters.join(','))
 
       if (error) {
         console.error(error.message)
