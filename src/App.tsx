@@ -60,6 +60,7 @@ const CreateRFIPage = lazy(() => import('@/features/rfi/pages/CreateRFIPage'))
 const RFIDetailPage = lazy(() => import('@/features/rfi/pages/RFIDetailPage'))
 const RFIRegisterPage = lazy(() => import('@/features/rfi/pages/RFIRegisterPage'))
 const WorkspaceSettingsPage = lazy(() => import('@/pages/WorkspaceSettingsPage'))
+const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
 
 
 
@@ -440,6 +441,16 @@ export default function App() {
   element={
     <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
       <AuditPage />
+    </RequireRole>
+  }
+/>
+
+
+<Route
+  path="administration/customer"
+  element={
+    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+      <CustomerAdministrationPage />
     </RequireRole>
   }
 />
