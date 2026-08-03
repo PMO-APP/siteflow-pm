@@ -130,6 +130,13 @@ const NAV: NavItem[] = [
   label: 'Executive Narrative',
   group: 'overview',
 },
+  {
+  to: '/app/report-designer',
+  icon: FileText,
+  label: 'Report Designer',
+  roles: ['workspace_admin', 'admin', 'pmo'],
+  group: 'overview',
+},
  
   {
     to: '/app/internal-assignments',
