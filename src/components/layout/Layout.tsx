@@ -124,6 +124,12 @@ const NAV: NavItem[] = [
   label: 'Reporting Centre',
   group: 'overview',
 },
+  {
+  to: '/app/executive-narrative',
+  icon: Brain,
+  label: 'Executive Narrative',
+  group: 'overview',
+},
  
   {
     to: '/app/internal-assignments',
