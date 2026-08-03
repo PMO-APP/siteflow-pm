@@ -21,7 +21,7 @@ export default function ProductionPanel({
         description="Compares achieved production with the rate required to meet the target date."
       />
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      <div className="mt-5 grid min-w-0 gap-4 md:grid-cols-3">
         <MetricCard
           label="Actual Rate"
           value={`${forecast.production.actualPerDay}%`}
