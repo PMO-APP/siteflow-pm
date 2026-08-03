@@ -209,7 +209,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
       <DeliveryTwinPanel twin={intelligence.deliveryTwin} />
       {import.meta.env.DEV ? <V6IntelligenceComparison project={project} /> : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid min-w-0 gap-4">
         <RoleAwareCommandSections project={project} />
         <section className="pmx-section-panel">
           <SectionHeader
@@ -282,7 +282,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
 
       <section className="pmx-section-panel">
         <SectionHeader eyebrow="Delivery controls" title="Project pulse" description="Current performance across the main delivery dimensions." />
-        <div className="mt-5 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-5 grid min-w-0 gap-6">
           <TimelineBar showLegend={false} segments={deliveryPulseSegments as any} onSegmentClick={segment => {
             if (segment.id === 'schedule') navigate('/app/schedule')
             if (segment.id === 'commercial') navigate('/app/costing')
@@ -293,12 +293,12 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-2"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /></div>
-      <div className="grid gap-4 xl:grid-cols-2"><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div>
+      <div className="grid min-w-0 gap-4"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /></div>
+      <div className="grid min-w-0 gap-4"><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div>
 
       <section className="pmx-section-panel">
         <SectionHeader eyebrow="Operational metrics" title="Key controls" description="Supporting project indicators requiring regular monitoring." />
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2">
           <MetricCard label="Schedule Progress" value={`${intelligence.metrics.scheduleProgress}%`} helper={`Planned ${intelligence.metrics.plannedProgress}%`} icon={TrendingUp} tone={intelligence.metrics.scheduleProgress >= intelligence.metrics.plannedProgress ? 'success' : 'warning'} compact />
           <MetricCard label="Overdue Tasks" value={intelligence.metrics.overdueTasks} helper="Beyond planned finish" icon={AlertTriangle} tone={intelligence.metrics.overdueTasks > 0 ? 'danger' : 'success'} compact />
           <MetricCard label="Pending Approvals" value={intelligence.metrics.pendingApprovals} helper={`${intelligence.metrics.overdueApprovals} overdue`} icon={FileCheck} tone={intelligence.metrics.overdueApprovals > 0 ? 'danger' : intelligence.metrics.pendingApprovals > 0 ? 'warning' : 'success'} compact />
@@ -306,7 +306,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid min-w-0 gap-4">
         <section className="pmx-section-panel">
           <SectionHeader eyebrow="System activity" title="Live activity" description="Recent changes across PMOCorex modules." />
           <div className="mt-3">{activityLoading ? <div className="space-y-3">{[1,2,3].map(item => <div key={item} className="h-16 animate-pulse rounded-lg bg-[var(--pmx-surface-2)]" />)}</div> : <ActivityFeed items={activityItems as any} emptyText="No recent activity has been recorded." maxItems={8} onItemClick={item => { const source = (activity as any[]).find(row => String(row.id) === String(item.id)); if (source?.route) navigate(source.route) }} />}</div>
