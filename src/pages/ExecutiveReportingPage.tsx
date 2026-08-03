@@ -60,7 +60,7 @@ export default function ExecutiveReportingPage() {
       <section className="rounded-[26px] border border-[#dfe3e7] bg-white p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Executive reporting engine</div><h1 className="mt-2 text-3xl font-semibold text-[#102943]">Executive Reporting Centre</h1><p className="mt-2 max-w-3xl text-sm text-[#6f7d89]">Generate versioned, branded management reports from live workspace and project data.</p></div>
-          <div className="flex flex-wrap gap-2"><button onClick={()=>navigate('/app/report-designer')} className="btn btn-ghost">Report designer</button><button onClick={()=>navigate('/app/executive-narrative')} className="btn btn-ghost">Executive narrative</button><button onClick={()=>setShowCreate(true)} className="btn btn-gold"><Plus size={15}/>Generate report</button><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button></div>
+          <div className="flex flex-wrap gap-2"><button onClick={()=>navigate('/app/report-distribution')} className="btn btn-ghost">Report distribution</button><button onClick={()=>navigate('/app/report-designer')} className="btn btn-ghost">Report designer</button><button onClick={()=>navigate('/app/executive-narrative')} className="btn btn-ghost">Executive narrative</button><button onClick={()=>setShowCreate(true)} className="btn btn-gold"><Plus size={15}/>Generate report</button><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button></div>
         </div>
       </section>
 
