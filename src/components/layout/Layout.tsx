@@ -74,6 +74,7 @@ const NAV_GROUPS: Array<{ key: NavGroupKey; label: string }> = [
 
 const NAV: NavItem[] = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true, group: 'overview' },
+  { to: '/app/executive-dashboard', icon: BarChart3, label: 'Executive Dashboard', roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'], group: 'overview' },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule', group: 'planning' },
   {
   to: '/app/project-controls',
