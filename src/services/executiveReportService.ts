@@ -6,6 +6,7 @@ import type {
   ExecutiveReportType, GeneratedReport, ReportGenerationInput, ReportSnapshot, ReportTemplate
 } from './executiveReportTypes'
 import type { Workspace } from '@/workspace/types'
+import { calculateProjectProgress } from '@/core/metrics/progressMetrics'
 
 function mapTemplate(row: any): ReportTemplate {
   return {
@@ -113,9 +114,7 @@ export async function buildReportSnapshot(
     const finish = task.planned_finish || task.finish_date
     return task.status !== 'Completed' && finish && new Date(finish) < now
   })
-  const avgProgress = tasks.length
-    ? Math.round(tasks.reduce((sum: number, task: any) => sum + Number(task.status === 'Completed' ? 100 : task.progress_pct || 0), 0) / tasks.length)
-    : 0
+  const avgProgress = calculateProjectProgress(tasks)
   const highRisks = risks.filter((risk: any) => risk.status !== 'Closed' && Number(risk.risk_score || 0) >= 12)
   const overdueProcurement = procurement.filter((item: any) => {
     const due = item.expected_delivery_date || item.required_date
