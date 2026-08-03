@@ -43,6 +43,7 @@ import {
   Building2,
   MessageSquareText,
   Search,
+  Send,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -135,6 +136,13 @@ const NAV: NavItem[] = [
   icon: FileText,
   label: 'Report Designer',
   roles: ['workspace_admin', 'admin', 'pmo'],
+  group: 'overview',
+},
+  {
+  to: '/app/report-distribution',
+  icon: Send,
+  label: 'Report Distribution',
+  roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner'],
   group: 'overview',
 },
  
