@@ -35,7 +35,7 @@ type ProjectRow = {
   overdueTasks: number
   failedQualityGates: number
   openIncidents: number
-  resourceLabels: string[]
+  dependencyResources: Array<{ companyName: string; role: string }>
 }
 
 type Props = {
@@ -211,8 +211,8 @@ function PortfolioHeatMap({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenP
 
 function DependencyView({ dependencies }: { dependencies: ReturnType<typeof buildSharedDependencies> }) {
   return <div className="grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
-    <div className="rounded-2xl border border-[#dce5e8] bg-white p-5"><div className="flex items-center gap-2"><GitBranch size={17} className="text-[#2f6f91]" /><h3 className="font-semibold text-[#173f5f]">Cross-project exposure</h3></div><div className="mt-4 space-y-3">{dependencies.length ? dependencies.map(item => <div key={item.label} className="rounded-xl border border-[#e3eaec] p-4"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-[#173f5f]">{item.label}</div><div className="mt-1 text-xs text-[#7a8e98]">{item.projects.join(' • ')}</div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.projectCount >= 3 ? 'bg-[#fff0e9] text-[#c95b36]' : 'bg-[#eef3f4] text-[#2f6f91]'}`}>{item.projectCount} projects</span></div><div className="mt-3 text-sm text-[#5d727d]">{item.projectCount >= 3 ? 'Portfolio-wide single point of failure. Confirm capacity and escalation cover.' : 'Shared delivery dependency. Coordinate dates and ownership across projects.'}</div></div>) : <EmptyMessage text="No shared contractor, consultant or infrastructure dependency was found in the available project records." />}</div></div>
-    <div className="rounded-2xl border border-[#dce5e8] bg-white p-5"><div className="flex items-center gap-2"><UsersRound size={17} className="text-[#2f6f91]" /><h3 className="font-semibold text-[#173f5f]">Executive interpretation</h3></div><div className="mt-5 space-y-4"><Insight icon={ShieldAlert} title="Capacity concentration" text={`${dependencies.filter(d => d.projectCount >= 3).length} shared resources currently span three or more projects.`} /><Insight icon={Network} title="Coordination priority" text="Review shared resources before approving simultaneous recovery plans or accelerated programmes." /><Insight icon={CheckCircle2} title="Control safeguard" text="Dependencies are advisory and do not automatically alter project ownership, programme or contracts." /></div></div>
+    <div className="rounded-2xl border border-[#dce5e8] bg-white p-5"><div className="flex items-center gap-2"><GitBranch size={17} className="text-[#2f6f91]" /><h3 className="font-semibold text-[#173f5f]">Cross-project exposure</h3></div><div className="mt-4 space-y-3">{dependencies.length ? dependencies.map(item => <div key={item.label} className="rounded-xl border border-[#e3eaec] p-4"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-[#173f5f]">{item.label}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-[#8a9aa2]">{item.roles.join(' · ') || 'Delivery partner'}</div><div className="mt-1 text-xs text-[#7a8e98]">{item.projects.join(' • ')}</div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.projectCount >= 3 ? 'bg-[#fff0e9] text-[#c95b36]' : 'bg-[#eef3f4] text-[#2f6f91]'}`}>{item.projectCount} projects</span></div><div className="mt-3 text-sm text-[#5d727d]">{item.projectCount >= 3 ? 'Portfolio-wide single point of failure. Confirm capacity and escalation cover.' : 'Shared delivery dependency. Coordinate dates and ownership across projects.'}</div></div>) : <EmptyMessage text="No verified cross-project dependency is available yet. Add contractor, consultant, vendor or specialist company names on each project’s Team page. A company will appear here only when it is assigned to two or more projects." />}</div></div>
+    <div className="rounded-2xl border border-[#dce5e8] bg-white p-5"><div className="flex items-center gap-2"><UsersRound size={17} className="text-[#2f6f91]" /><h3 className="font-semibold text-[#173f5f]">Executive interpretation</h3></div><div className="mt-5 space-y-4"><Insight icon={ShieldAlert} title="Capacity concentration" text={`${dependencies.filter(d => d.projectCount >= 3).length} shared resources currently span three or more projects.`} /><Insight icon={Network} title="Coordination priority" text="Use this view to identify contractors, consultants or specialist firms carrying work across several projects before approving overlapping recovery plans." /><Insight icon={CheckCircle2} title="Control safeguard" text="Dependencies are advisory and do not automatically alter project ownership, programme or contracts." /></div></div>
   </div>
 }
 
@@ -240,24 +240,43 @@ function buildDecisions(row: ProjectRow) {
 }
 
 function buildSharedDependencies(rows: ProjectRow[]) {
-  const map = new Map<string, Set<string>>()
+  const map = new Map<string, {
+    label: string
+    roles: Set<string>
+    projects: Set<string>
+  }>()
+
   rows.forEach(row => {
-    const project = row.project
-    const values = [
-      ...(row.resourceLabels || []),
-      project.project_manager,
-      project.infrastructure_contractor,
-      project.mep_contractor,
-    ]
-    values.filter(Boolean).forEach(value => {
-      const label = String(value).trim()
+    ;(row.dependencyResources || []).forEach(resource => {
+      const label = String(resource.companyName || '').trim()
       if (!label) return
-      if (!map.has(label)) map.set(label, new Set())
-      map.get(label)!.add(nameOf(project))
+      const key = label.toLowerCase()
+
+      if (!map.has(key)) {
+        map.set(key, {
+          label,
+          roles: new Set<string>(),
+          projects: new Set<string>(),
+        })
+      }
+
+      const item = map.get(key)!
+      item.projects.add(nameOf(row.project))
+      if (resource.role) item.roles.add(resource.role)
     })
   })
-  return Array.from(map.entries()).map(([label, projects]) => ({ label, projects: Array.from(projects), projectCount: projects.size })).filter(item => item.projectCount > 1).sort((a,b) => b.projectCount-a.projectCount)
+
+  return Array.from(map.values())
+    .map(item => ({
+      label: item.label,
+      roles: Array.from(item.roles),
+      projects: Array.from(item.projects),
+      projectCount: item.projects.size,
+    }))
+    .filter(item => item.projectCount > 1)
+    .sort((a, b) => b.projectCount - a.projectCount || a.label.localeCompare(b.label))
 }
+
 
 function primaryBlocker(row: ProjectRow) {
   if (row.openIncidents) return `${row.openIncidents} open HSE incident${row.openIncidents === 1 ? '' : 's'}`
