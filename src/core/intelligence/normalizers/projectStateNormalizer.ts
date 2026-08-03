@@ -1,6 +1,7 @@
 import { differenceInDays } from 'date-fns'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { isPast, toDate, toISO } from './dateUtils'
+import { calculateProjectProgress, taskProgress } from '@/core/metrics/progressMetrics'
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
@@ -11,25 +12,7 @@ function id(value: unknown) {
 }
 
 function progress(task: any) {
-  if (task.status === 'Completed') return 100
-  if (task.status === 'Not Started') return 0
-  return clamp(Number(task.progress_pct || 0))
-}
-
-function weightedProgress(tasks: any[]) {
-  if (!tasks.length) return 0
-  const totalWeight = tasks.reduce((sum, task) => sum + Number(task.weight_pct || 0), 0)
-
-  if (totalWeight <= 0) {
-    return Math.round(tasks.reduce((sum, task) => sum + progress(task), 0) / tasks.length)
-  }
-
-  const earned = tasks.reduce(
-    (sum, task) => sum + Number(task.weight_pct || 0) * (progress(task) / 100),
-    0
-  )
-
-  return Math.round((earned / totalWeight) * 100)
+  return taskProgress(task)
 }
 
 function predecessors(value: unknown): string[] {
@@ -110,7 +93,7 @@ export function normalizeProjectState({
     activities.map(item => toDate(item.plannedFinish)).filter(Boolean).sort((a: any, b: any) => b.getTime() - a.getTime())[0] ||
     null
 
-  const actual = weightedProgress(tasks)
+  const actual = calculateProjectProgress(tasks)
   const planned =
     scheduleStart && scheduleFinish
       ? clamp(Math.round(
