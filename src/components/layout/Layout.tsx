@@ -117,6 +117,12 @@ const NAV: NavItem[] = [
   label: 'Executive Reports',
   group: 'overview',
 },
+  {
+  to: '/app/executive-reporting',
+  icon: FileSpreadsheet,
+  label: 'Reporting Centre',
+  group: 'overview',
+},
  
   {
     to: '/app/internal-assignments',
