@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, CalendarClock, Gauge, ShieldCheck, TrendingUp, Sparkles } from 'lucide-react'
 import type { DeliveryTwinResult } from '@/core/intelligence/delivery-twin/deliveryTwinTypes'
+import type { ForecastV2Result } from '@/core/intelligence/forecast/forecastV2'
 
 type ScenarioKey = 'baseline' | 'recovery' | 'procurement_delay' | 'additional_labour' | 'weekend_working'
 
@@ -36,26 +37,35 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
-export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult }) {
+export default function PredictiveTwinPanel({ twin, sharedForecast, currentHealth }: { twin: DeliveryTwinResult; sharedForecast: ForecastV2Result; currentHealth: number }) {
   const [scenarioKey, setScenarioKey] = useState<ScenarioKey>('baseline')
   const scenario = scenarios.find(item => item.key === scenarioKey) || scenarios[0]
 
   const forecast = useMemo(() => {
-    const packages = twin.packages.length || 1
-    const delayed = twin.packages.reduce((sum, item) => sum + item.overdueActivities, 0)
-    const activeSignals = twin.packages.reduce((sum, item) => sum + Object.values(item.issueSummary).reduce((a, b) => a + b, 0), 0)
-    const averageHealth = Math.round(twin.packages.reduce((sum, item) => sum + item.healthScore, 0) / packages)
-    const averageDaysVariance = Math.round(twin.packages.reduce((sum, item) => sum + Math.max(0, -item.daysVariance), 0) / packages)
-    const dependencyPressure = twin.dependencyIntelligence.blockedLinks * 3 + twin.dependencyIntelligence.atRiskLinks * 1.5
-    const baselineDelay = Math.max(0, Math.round(averageDaysVariance + delayed * 1.25 + dependencyPressure))
+    const activeSignals = twin.packages.reduce(
+      (sum, item) => sum + Object.values(item.issueSummary).reduce((a, b) => a + b, 0),
+      0
+    )
+    const baselineDate =
+      sharedForecast.forecastDate ||
+      sharedForecast.targetDate ||
+      new Date()
+    const baselineDelay = Math.max(0, sharedForecast.delayDays)
     const expectedDelay = Math.max(0, baselineDelay + scenario.dayDelta)
-    const bestDelay = Math.max(0, expectedDelay - Math.max(5, Math.round(expectedDelay * 0.3)))
-    const worstDelay = expectedDelay + Math.max(7, Math.round(activeSignals * 0.45))
-    const health = clamp(averageHealth + scenario.healthDelta)
-    const riskExposure = clamp(Math.round((100 - averageHealth) + activeSignals * 1.2 + scenario.riskDelta))
-    const confidence = clamp(92 - Math.min(35, activeSignals * 1.5) - Math.min(18, twin.dependencyIntelligence.crossPackageLinks * 2), 45, 92)
-    const onTimeProbability = clamp(Math.round(100 - expectedDelay * 2.2 - riskExposure * 0.25 + health * 0.25), 5, 95)
-    const today = new Date()
+    const expected = addDays(baselineDate, scenario.dayDelta)
+    const uncertainty = Math.max(2, Math.min(7, Math.round(2 + activeSignals * 0.2)))
+    const best = addDays(expected, -uncertainty)
+    const worst = addDays(expected, uncertainty)
+    const health = clamp(currentHealth + scenario.healthDelta)
+    const riskExposure = clamp(
+      Math.round((100 - currentHealth) + activeSignals * 1.2 + scenario.riskDelta)
+    )
+    const confidence = clamp(sharedForecast.recoveryConfidence, 5, 95)
+    const onTimeProbability = clamp(
+      Math.round(confidence - expectedDelay * 3 - riskExposure * 0.15),
+      5,
+      95
+    )
 
     const blockers = [
       ...twin.dependencyIntelligence.bottlenecks.slice(0, 3).map(item => ({
@@ -65,22 +75,25 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
       ...twin.packages
         .filter(item => item.primaryDelayActivity)
         .slice(0, 2)
-        .map(item => ({ title: item.primaryDelayActivity as string, detail: `${item.name} • ${item.overdueActivities} overdue activit${item.overdueActivities === 1 ? 'y' : 'ies'}` })),
+        .map(item => ({
+          title: item.primaryDelayActivity as string,
+          detail: `${item.name} • ${item.overdueActivities} overdue activit${item.overdueActivities === 1 ? 'y' : 'ies'}`,
+        })),
     ].slice(0, 3)
 
     return {
-      averageHealth,
+      averageHealth: currentHealth,
       health,
       riskExposure,
       confidence,
       onTimeProbability,
       expectedDelay,
-      expected: addDays(today, expectedDelay),
-      best: addDays(today, bestDelay),
-      worst: addDays(today, worstDelay),
+      expected,
+      best,
+      worst,
       blockers,
     }
-  }, [scenario, twin])
+  }, [scenario, twin, sharedForecast, currentHealth])
 
   return (
     <section className="rounded-2xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4">
@@ -89,12 +102,12 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--pmx-faint)]">
             <Sparkles size={14} /> Predictive twin
           </div>
-          <h3 className="mt-1 text-base font-semibold text-[var(--pmx-text)]">Future delivery outlook</h3>
+          <h3 className="mt-1 text-base font-semibold text-[var(--pmx-text)]">Delivery forecast</h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--pmx-muted)]">
-            Deterministic forecast using package variance, open signals, dependency pressure and current health. It supports management decisions and does not alter the programme automatically.
+            Scenario view anchored to the same approved target date, schedule delay and recovery confidence used across the Dashboard and Recovery Forecast.
           </p>
         </div>
-        <label className="w-full lg:max-w-[220px] text-xs font-medium text-[var(--pmx-muted)]">
+        <label className="min-w-[220px] text-xs font-medium text-[var(--pmx-muted)]">
           Scenario
           <select
             value={scenarioKey}
@@ -106,17 +119,17 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
         </label>
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={<CalendarClock size={15} />} label="Expected completion" value={formatDate(forecast.expected)} hint={`${forecast.expectedDelay} forecast delay days`} />
         <Metric icon={<Gauge size={15} />} label="On-time probability" value={`${forecast.onTimeProbability}%`} hint={`${forecast.confidence}% forecast confidence`} />
         <Metric icon={<TrendingUp size={15} />} label="Forecast health" value={`${forecast.health}%`} hint={`${forecast.health - forecast.averageHealth >= 0 ? '+' : ''}${forecast.health - forecast.averageHealth} vs current`} />
         <Metric icon={<ShieldCheck size={15} />} label="Risk exposure" value={`${forecast.riskExposure}%`} hint={`${scenario.cost} intervention cost`} />
       </div>
 
-      <div className="mt-4 grid min-w-0 gap-4">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface)] p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--pmx-faint)]">Completion range</div>
-          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3 text-center">
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             <DateCard label="Best case" date={forecast.best} />
             <DateCard label="Expected" date={forecast.expected} emphasized />
             <DateCard label="Worst case" date={forecast.worst} />
