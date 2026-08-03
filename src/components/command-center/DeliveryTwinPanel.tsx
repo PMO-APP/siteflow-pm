@@ -3,14 +3,19 @@ import type {
   DeliveryStage,
   DeliveryTwinResult,
 } from '@/core/intelligence/delivery-twin/deliveryTwinTypes'
+import type { ForecastV2Result } from '@/core/intelligence/forecast/forecastV2'
 import { SectionHeader } from '@/components/ui'
 import StageInspector from './StageInspector'
 import InteractiveProjectTwinMap from './InteractiveProjectTwinMap'
 
 export default function DeliveryTwinPanel({
   twin,
+  sharedForecast,
+  currentHealth,
 }: {
   twin: DeliveryTwinResult
+  sharedForecast: ForecastV2Result
+  currentHealth: number
 }) {
   const [selectedStage, setSelectedStage] =
     useState<DeliveryStage | null>(null)
@@ -38,6 +43,8 @@ export default function DeliveryTwinPanel({
             <InteractiveProjectTwinMap
               twin={twin}
               onSelectStage={setSelectedStage}
+              sharedForecast={sharedForecast}
+              currentHealth={currentHealth}
             />
           )}
         </div>
