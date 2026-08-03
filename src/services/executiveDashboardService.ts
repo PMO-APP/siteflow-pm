@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { calculateProjectPlannedProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
 import type {
   ExecutiveAttentionItem, ExecutiveDecision, ExecutivePortfolioSnapshot,
   ExecutiveProjectRow, ExecutiveTimelineItem
@@ -60,9 +61,11 @@ export async function loadExecutivePortfolioSnapshot(workspaceId: string): Promi
     const openSnags = projectSnags.filter((item: any) => !isClosed(item.status))
 
     const progress = projectTasks.length
-      ? Math.round(projectTasks.reduce((sum: number, task: any) => sum + (isClosed(task.status) ? 100 : number(task.progress_pct,task.progress,task.percent_complete)),0) / projectTasks.length)
+      ? calculateProjectProgress(projectTasks)
       : Math.round(number(project.progress_pct,project.progress_percent,project.progress))
-    const plannedProgress = Math.round(number(project.planned_progress,project.planned_progress_pct,progress))
+    const plannedProgress = projectTasks.length
+      ? calculateProjectPlannedProgress(projectTasks)
+      : Math.round(number(project.planned_progress,project.planned_progress_pct,progress))
     const scheduleVarianceDays = Math.max(
       number(project.delay_days,project.schedule_delay_days,project.days_behind),
       ...overdueTasks.map((task: any) => daysLate(dateValue(task.planned_finish,task.finish_date,task.due_date))),
