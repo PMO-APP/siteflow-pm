@@ -65,7 +65,7 @@ export default function InteractiveProjectTwinMap({
     <>
     <div className="space-y-4">
       <div className="rounded-2xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4">
-        <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
           <div className="rounded-xl border border-[var(--pmx-border-strong)] bg-[var(--pmx-surface)] p-4">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--pmx-primary-soft)] text-[var(--pmx-primary)]">
@@ -113,7 +113,7 @@ export default function InteractiveProjectTwinMap({
               <span className="text-[11px] text-[var(--pmx-muted)]">Select a package to inspect</span>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               {twin.packages.map(pkg => (
                 <button
                   key={pkg.id}
@@ -170,7 +170,7 @@ export default function InteractiveProjectTwinMap({
       </div>
 
       {selectedPackage ? (
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-3">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--pmx-faint)]">Package health</div>
             <div className="mt-1 text-lg font-semibold text-[var(--pmx-text)]">{selectedPackage.healthScore}%</div>
