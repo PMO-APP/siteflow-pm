@@ -35,6 +35,8 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PortfolioHealthComparison } from '@/components/health'
 import { ExecutiveCommandCentre } from '@/components/portfolio/ExecutiveCommandCentre'
 import { calculatePortfolioProgress, calculateProjectPlannedProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
+import { normalizeProjectState } from '@/core/intelligence/normalizers/projectStateNormalizer'
+import { buildProjectIntelligenceV4 } from '@/core/intelligence/projectIntelligenceV4'
 import { openProject } from '@/lib/openProject'
 
 type ProjectHealth =
@@ -312,6 +314,27 @@ export default function PortfolioDashboardPage() {
           )
         : null
 
+      const normalizedState = normalizeProjectState({
+        project,
+        tasks: projectScheduleTasks,
+        deliveryPackages: projectPackages,
+        financial: projectFinancial,
+        snags: projectSnags,
+        risks: projectRisks,
+        approvals: projectApprovals,
+        procurement: projectProcurement,
+        latestWeeklyReport: projectReports[0] || null,
+        documents: {},
+        hse: {
+          incidents: openIncidents.length,
+          openActions: openObservations.length,
+          overdueActions: criticalObservations.length,
+        },
+      })
+      const sharedIntelligence = buildProjectIntelligenceV4(normalizedState)
+      const delayDays = sharedIntelligence.forecastV2.delayDays
+      const projectRecoveryConfidence = sharedIntelligence.forecastV2.recoveryConfidence
+
       const failedQualityGates = projectQualityGates.filter(
         item => !['passed', 'approved', 'closed', 'completed'].includes(String(item.status || '').toLowerCase())
       )
@@ -342,6 +365,8 @@ export default function PortfolioDashboardPage() {
         progress,
         plannedProgress,
         scheduleVariance,
+        delayDays,
+        recoveryConfidence: projectRecoveryConfidence,
         resourceLabels,
         health,
         score,
@@ -384,6 +409,8 @@ export default function PortfolioDashboardPage() {
     hseObservations,
     hseIncidents,
     hseToolboxTalks,
+    scheduleTasks,
+    deliveryPackages,
   ])
 
   const summary = useMemo(() => {
@@ -624,6 +651,7 @@ export default function PortfolioDashboardPage() {
         <ExecutiveCommandCentre
           rows={projectRows}
           portfolioProgress={portfolioProgress}
+          portfolioConfidence={recoveryConfidence}
           onOpenProject={projectId => {
             const project = projects.find(item => String(item.id) === String(projectId))
             if (project) openPortfolioProject(project)
