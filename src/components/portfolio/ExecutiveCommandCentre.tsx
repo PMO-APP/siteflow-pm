@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase'
 type ProjectRow = {
   project: any
   progress: number
+  plannedProgress: number
   scheduleVariance: number
   score: number
   health: string
@@ -32,10 +33,12 @@ type ProjectRow = {
   overdueTasks: number
   failedQualityGates: number
   openIncidents: number
+  resourceLabels: string[]
 }
 
 type Props = {
   rows: ProjectRow[]
+  portfolioProgress: number
   onOpenProject: (projectId: string | number) => void
 }
 
@@ -59,29 +62,71 @@ const views: Array<{ id: View; label: string; icon: typeof Activity }> = [
   { id: 'replay', label: 'Replay', icon: History },
 ]
 
-export function ExecutiveCommandCentre({ rows, onOpenProject }: Props) {
+export function ExecutiveCommandCentre({ rows, portfolioProgress, onOpenProject }: Props) {
   const [view, setView] = useState<View>('twin')
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [replayIndex, setReplayIndex] = useState(0)
 
   useEffect(() => {
     let active = true
-    supabase
-      .from('project_activity_feed')
-      .select('id, project_id, event_type, title, summary, priority, created_at')
-      .order('created_at', { ascending: true })
-      .limit(500)
-      .then(({ data }) => {
-        if (!active) return
-        setEvents((data || []) as ActivityEvent[])
-        setReplayIndex(Math.max(0, (data || []).length - 1))
-      })
+    const projectIds = rows.map(row => row.project.id).filter(Boolean)
+    if (!projectIds.length) {
+      setEvents([])
+      return () => { active = false }
+    }
+
+    Promise.all([
+      supabase.from('project_activity_feed')
+        .select('id, project_id, event_type, title, summary, priority, created_at')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: true })
+        .limit(500),
+      supabase.from('audit_logs')
+        .select('id, project_id, action, module, description, severity, created_at')
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: true })
+        .limit(500),
+      supabase.from('project_health_snapshots')
+        .select('id, project_id, overall_score, health_label, summary, calculated_at')
+        .in('project_id', projectIds)
+        .order('calculated_at', { ascending: true })
+        .limit(500),
+    ]).then(([activityResult, auditResult, healthResult]) => {
+      if (!active) return
+      const activityEvents = (activityResult.data || []).map((item: any) => ({
+        id: `activity-${item.id}`, project_id: item.project_id,
+        event_type: item.event_type || 'project activity',
+        title: item.title, summary: item.summary, priority: item.priority,
+        created_at: item.created_at,
+      }))
+      const auditEvents = (auditResult.data || []).map((item: any) => ({
+        id: `audit-${item.id}`, project_id: item.project_id,
+        event_type: item.action || item.module || 'audit event',
+        title: `${item.action || 'Update'} · ${item.module || 'project'}`,
+        summary: item.description, priority: item.severity,
+        created_at: item.created_at,
+      }))
+      const healthEvents = (healthResult.data || []).map((item: any) => ({
+        id: `health-${item.id}`, project_id: item.project_id,
+        event_type: 'health snapshot',
+        title: `${item.health_label || 'Health'} · ${Math.round(Number(item.overall_score || 0))}%`,
+        summary: item.summary || 'Project health position recalculated.',
+        priority: Number(item.overall_score || 0) < 50 ? 'critical' : 'normal',
+        created_at: item.calculated_at,
+      }))
+      const combined = [...activityEvents, ...auditEvents, ...healthEvents]
+        .filter(item => item.created_at)
+        .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime())
+      setEvents(combined)
+      setReplayIndex(Math.max(0, combined.length - 1))
+    })
     return () => { active = false }
-  }, [])
+  }, [rows, portfolioProgress])
+
 
   const portfolio = useMemo(() => {
     const averageHealth = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0
-    const averageProgress = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.progress, 0) / rows.length) : 0
+    const averageProgress = portfolioProgress
     const atRisk = rows.filter(row => row.score < 65).length
     const deliveryConfidence = Math.max(0, Math.min(100, averageHealth - rows.reduce((sum, row) => sum + row.highRisks, 0)))
     return { averageHealth, averageProgress, atRisk, deliveryConfidence }
@@ -128,7 +173,7 @@ export function ExecutiveCommandCentre({ rows, onOpenProject }: Props) {
   )
 }
 
-function PortfolioTwin({ rows, onOpenProject }: Props) {
+function PortfolioTwin({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenProject'>) {
   return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
     {rows.slice().sort((a, b) => a.score - b.score).map(row => {
       const blocker = primaryBlocker(row)
@@ -144,9 +189,9 @@ function PortfolioTwin({ rows, onOpenProject }: Props) {
   </div>
 }
 
-function PortfolioHeatMap({ rows, onOpenProject }: Props) {
+function PortfolioHeatMap({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenProject'>) {
   const dimensions = [
-    { key: 'schedule', label: 'Schedule', value: (row: ProjectRow) => Math.min(100, Math.abs(Math.min(0, row.scheduleVariance)) * 3) },
+    { key: 'schedule', label: 'Schedule', value: (row: ProjectRow) => Math.min(100, Math.max(0, row.plannedProgress - row.progress) * 3) },
     { key: 'risk', label: 'Risk', value: (row: ProjectRow) => Math.min(100, row.highRisks * 22 + row.openRisks * 4) },
     { key: 'approvals', label: 'Approvals', value: (row: ProjectRow) => Math.min(100, row.pendingApprovals * 12) },
     { key: 'procurement', label: 'Procurement', value: (row: ProjectRow) => Math.min(100, row.delayedProcurement * 25 + row.pendingProcurement * 5) },
@@ -195,7 +240,12 @@ function buildSharedDependencies(rows: ProjectRow[]) {
   const map = new Map<string, Set<string>>()
   rows.forEach(row => {
     const project = row.project
-    const values = [project.contractor, project.contractor_name, project.consultant, project.consultant_name, project.project_manager, project.infrastructure_contractor, project.mep_contractor]
+    const values = [
+      ...(row.resourceLabels || []),
+      project.project_manager,
+      project.infrastructure_contractor,
+      project.mep_contractor,
+    ]
     values.filter(Boolean).forEach(value => {
       const label = String(value).trim()
       if (!label) return
