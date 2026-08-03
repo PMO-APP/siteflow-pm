@@ -34,6 +34,7 @@ import { formatCurrency } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PortfolioHealthComparison } from '@/components/health'
 import { ExecutiveCommandCentre } from '@/components/portfolio/ExecutiveCommandCentre'
+import { calculatePortfolioProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
 
 type ProjectHealth =
   | 'Healthy'
@@ -84,6 +85,7 @@ export default function PortfolioDashboardPage() {
   const [internalTasks, setInternalTasks] = useState<any[]>([])
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [siteReports, setSiteReports] = useState<any[]>([])
+  const [scheduleTasks, setScheduleTasks] = useState<any[]>([])
 
   const [hseObservations, setHseObservations] = useState<any[]>([])
   const [hseIncidents, setHseIncidents] = useState<any[]>([])
@@ -114,6 +116,7 @@ export default function PortfolioDashboardPage() {
       internalTasksRes,
       qualityGatesRes,
       siteReportsRes,
+      scheduleTasksRes,
       hseObservationsRes,
       hseIncidentsRes,
       hseToolboxTalksRes,
@@ -131,6 +134,7 @@ export default function PortfolioDashboardPage() {
       supabase.from('internal_tasks').select('*'),
       supabase.from('quality_gates').select('*'),
       supabase.from('site_reports').select('*'),
+      supabase.from('tasks').select('*'),
       supabase.from('hse_observations').select('*'),
       supabase.from('hse_incidents').select('*'),
       supabase.from('hse_toolbox_talks').select('*'),
@@ -149,6 +153,7 @@ export default function PortfolioDashboardPage() {
     setInternalTasks(internalTasksRes.data || [])
     setQualityGates(qualityGatesRes.data || [])
     setSiteReports(siteReportsRes.data || [])
+    setScheduleTasks(scheduleTasksRes.data || [])
     setHseObservations(hseObservationsRes.data || [])
     setHseIncidents(hseIncidentsRes.data || [])
     setHseToolboxTalks(hseToolboxTalksRes.data || [])
@@ -171,6 +176,7 @@ export default function PortfolioDashboardPage() {
       const projectInternalTasks = internalTasks.filter(item => item.project_id === projectId)
       const projectQualityGates = qualityGates.filter(item => item.project_id === projectId)
       const projectSiteReports = siteReports.filter(item => item.project_id === projectId)
+      const projectScheduleTasks = scheduleTasks.filter(item => String(item.project_id) === String(projectId))
 
       const projectObservations = hseObservations.filter(item => item.project_id === projectId)
       const projectIncidents = hseIncidents.filter(item => item.project_id === projectId)
@@ -231,9 +237,10 @@ export default function PortfolioDashboardPage() {
         ['completed', 'done', 'achieved'].includes(String(item.status || '').toLowerCase())
       )
 
-      const progress =
-        Number(project.progress || project.progress_percent || 0) ||
-        calculatePercentage(completedMilestones.length, projectMilestones.length)
+      const progress = projectScheduleTasks.length
+        ? calculateProjectProgress(projectScheduleTasks)
+        : Number(project.progress_pct || project.progress || project.progress_percent || 0) ||
+          calculatePercentage(completedMilestones.length, projectMilestones.length)
 
       const scheduleVariance =
         Number(project.schedule_variance || project.variance || 0) ||
@@ -485,9 +492,7 @@ export default function PortfolioDashboardPage() {
     ? Math.round(projectRows.reduce((sum, row) => sum + row.score, 0) / projectRows.length)
     : 0
 
-  const portfolioProgress = projectRows.length
-    ? Math.round(projectRows.reduce((sum, row) => sum + row.progress, 0) / projectRows.length)
-    : 0
+  const portfolioProgress = calculatePortfolioProgress(projects, scheduleTasks)
 
   const projectsRequiringAttention = projectRows.filter(row => row.score < 65).length
   const projectsOnTrack = projectRows.filter(row => row.score >= 65).length
