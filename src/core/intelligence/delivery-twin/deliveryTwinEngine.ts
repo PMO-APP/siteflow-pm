@@ -356,6 +356,7 @@ export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
     completedStages: stages.filter(stage => stage.status === 'completed').length,
     totalApplicableStages: stages.length,
     overallProgress: state.schedule.weightedProgress,
+    targetDate: state.project.handoverDate || state.project.targetDate || state.schedule.finishDate || null,
     packages,
     isMultiPackage: packages.length > 1,
     generatedAt: new Date().toISOString(),
