@@ -72,6 +72,7 @@ export type DeliveryTwinResult = {
   completedStages: number
   totalApplicableStages: number
   overallProgress: number
+  targetDate: string | null
   packages: DeliveryPackagePerformance[]
   isMultiPackage: boolean
   generatedAt: string
