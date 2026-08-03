@@ -94,6 +94,7 @@ export default function PortfolioDashboardPage() {
   const [siteReports, setSiteReports] = useState<any[]>([])
   const [scheduleTasks, setScheduleTasks] = useState<any[]>([])
   const [deliveryPackages, setDeliveryPackages] = useState<any[]>([])
+  const [projectTeam, setProjectTeam] = useState<any[]>([])
 
   const [hseObservations, setHseObservations] = useState<any[]>([])
   const [hseIncidents, setHseIncidents] = useState<any[]>([])
@@ -126,6 +127,7 @@ export default function PortfolioDashboardPage() {
       siteReportsRes,
       scheduleTasksRes,
       deliveryPackagesRes,
+      projectTeamRes,
       hseObservationsRes,
       hseIncidentsRes,
       hseToolboxTalksRes,
@@ -145,6 +147,7 @@ export default function PortfolioDashboardPage() {
       supabase.from('site_reports').select('*'),
       supabase.from('tasks').select('*'),
       supabase.from('delivery_packages').select('*'),
+      supabase.from('project_team').select('id, project_id, company_name, role'),
       supabase.from('hse_observations').select('*'),
       supabase.from('hse_incidents').select('*'),
       supabase.from('hse_toolbox_talks').select('*'),
@@ -165,6 +168,7 @@ export default function PortfolioDashboardPage() {
     setSiteReports(siteReportsRes.data || [])
     setScheduleTasks(scheduleTasksRes.data || [])
     setDeliveryPackages(deliveryPackagesRes.data || [])
+    setProjectTeam(projectTeamRes.data || [])
     setHseObservations(hseObservationsRes.data || [])
     setHseIncidents(hseIncidentsRes.data || [])
     setHseToolboxTalks(hseToolboxTalksRes.data || [])
@@ -264,18 +268,31 @@ export default function PortfolioDashboardPage() {
         : storedScheduleVariance || calculateScheduleVariance(projectMilestones)
 
       const projectPackages = deliveryPackages.filter(item => String(item.project_id) === String(projectId))
-      const resourceLabels = Array.from(new Set([
-        ...projectPackages.map(item => item.contractor_name),
-        ...projectProcurement.map(item => item.vendor_name || item.supplier_name || item.vendor || item.supplier),
-        project.overall_owner_email,
-        project.housebuild_owner_email,
-        project.mep_owner_email,
-        project.infrastructure_owner_email,
-        project.contractor,
-        project.contractor_name,
-        project.consultant,
-        project.consultant_name,
-      ].filter(Boolean).map(value => String(value).trim()).filter(Boolean)))
+      const dependencyRoles = [
+        'architect',
+        'structural engineer',
+        'm&e engineer',
+        'mep',
+        'main contractor',
+        'contractor',
+        'consultant',
+        'vendor',
+        'subcontractor',
+        'interior designer',
+        'landscaping contractor',
+        'specialist contractor',
+      ]
+      const dependencyResources = projectTeam
+        .filter(item => String(item.project_id) === String(projectId))
+        .filter(item => {
+          const role = String(item.role || '').trim().toLowerCase()
+          return dependencyRoles.some(allowed => role === allowed || role.includes(allowed))
+        })
+        .map(item => ({
+          companyName: String(item.company_name || '').trim(),
+          role: String(item.role || 'Delivery partner').trim(),
+        }))
+        .filter(item => item.companyName)
 
       const contractSum = sumByKeywords(projectFinancial, [
         'contract',
@@ -367,7 +384,7 @@ export default function PortfolioDashboardPage() {
         scheduleVariance,
         delayDays,
         recoveryConfidence: projectRecoveryConfidence,
-        resourceLabels,
+        dependencyResources,
         health,
         score,
         openRisks: openRisks.length,
@@ -411,6 +428,7 @@ export default function PortfolioDashboardPage() {
     hseToolboxTalks,
     scheduleTasks,
     deliveryPackages,
+    projectTeam,
   ])
 
   const summary = useMemo(() => {
