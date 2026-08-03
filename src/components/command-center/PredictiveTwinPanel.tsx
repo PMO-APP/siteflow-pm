@@ -55,8 +55,7 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
     const riskExposure = clamp(Math.round((100 - averageHealth) + activeSignals * 1.2 + scenario.riskDelta))
     const confidence = clamp(92 - Math.min(35, activeSignals * 1.5) - Math.min(18, twin.dependencyIntelligence.crossPackageLinks * 2), 45, 92)
     const onTimeProbability = clamp(Math.round(100 - expectedDelay * 2.2 - riskExposure * 0.25 + health * 0.25), 5, 95)
-    const targetDate = twin.targetDate ? new Date(twin.targetDate) : null
-    const validTargetDate = targetDate && !Number.isNaN(targetDate.getTime()) ? targetDate : null
+    const today = new Date()
 
     const blockers = [
       ...twin.dependencyIntelligence.bottlenecks.slice(0, 3).map(item => ({
@@ -76,10 +75,9 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
       confidence,
       onTimeProbability,
       expectedDelay,
-      targetDate: validTargetDate,
-      expected: validTargetDate ? addDays(validTargetDate, expectedDelay) : null,
-      best: validTargetDate ? addDays(validTargetDate, bestDelay) : null,
-      worst: validTargetDate ? addDays(validTargetDate, worstDelay) : null,
+      expected: addDays(today, expectedDelay),
+      best: addDays(today, bestDelay),
+      worst: addDays(today, worstDelay),
       blockers,
     }
   }, [scenario, twin])
@@ -91,12 +89,12 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--pmx-faint)]">
             <Sparkles size={14} /> Predictive twin
           </div>
-          <h3 className="mt-1 text-base font-semibold text-[var(--pmx-text)]">Delivery forecast</h3>
+          <h3 className="mt-1 text-base font-semibold text-[var(--pmx-text)]">Future delivery outlook</h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--pmx-muted)]">
-            Forecast anchored to the approved target completion date, then adjusted by current package variance, overdue activities and dependency pressure.
+            Deterministic forecast using package variance, open signals, dependency pressure and current health. It supports management decisions and does not alter the programme automatically.
           </p>
         </div>
-        <label className="min-w-[220px] text-xs font-medium text-[var(--pmx-muted)]">
+        <label className="w-full lg:max-w-[220px] text-xs font-medium text-[var(--pmx-muted)]">
           Scenario
           <select
             value={scenarioKey}
@@ -109,17 +107,16 @@ export default function PredictiveTwinPanel({ twin }: { twin: DeliveryTwinResult
       </div>
 
       <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-        <Metric icon={<CalendarClock size={15} />} label="Baseline completion" value={forecast.targetDate ? formatDate(forecast.targetDate) : 'Not set'} hint="Approved project target" />
-        <Metric icon={<CalendarClock size={15} />} label="Expected completion" value={forecast.expected ? formatDate(forecast.expected) : 'Not available'} hint={`${forecast.expectedDelay} forecast delay days`} />
+        <Metric icon={<CalendarClock size={15} />} label="Expected completion" value={formatDate(forecast.expected)} hint={`${forecast.expectedDelay} forecast delay days`} />
         <Metric icon={<Gauge size={15} />} label="On-time probability" value={`${forecast.onTimeProbability}%`} hint={`${forecast.confidence}% forecast confidence`} />
         <Metric icon={<TrendingUp size={15} />} label="Forecast health" value={`${forecast.health}%`} hint={`${forecast.health - forecast.averageHealth >= 0 ? '+' : ''}${forecast.health - forecast.averageHealth} vs current`} />
         <Metric icon={<ShieldCheck size={15} />} label="Risk exposure" value={`${forecast.riskExposure}%`} hint={`${scenario.cost} intervention cost`} />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="mt-4 grid min-w-0 gap-4">
         <div className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface)] p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--pmx-faint)]">Completion range</div>
-          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3 text-center">
             <DateCard label="Best case" date={forecast.best} />
             <DateCard label="Expected" date={forecast.expected} emphasized />
             <DateCard label="Worst case" date={forecast.worst} />
@@ -161,11 +158,11 @@ function Metric({ icon, label, value, hint }: { icon: React.ReactNode; label: st
   )
 }
 
-function DateCard({ label, date, emphasized = false }: { label: string; date: Date | null; emphasized?: boolean }) {
+function DateCard({ label, date, emphasized = false }: { label: string; date: Date; emphasized?: boolean }) {
   return (
     <div className={emphasized ? 'rounded-lg border border-[var(--pmx-primary)] bg-[var(--pmx-primary-soft)] p-3' : 'rounded-lg border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-3'}>
       <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--pmx-faint)]">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-[var(--pmx-text)]">{date ? formatDate(date) : 'Not available'}</div>
+      <div className="mt-1 text-sm font-semibold text-[var(--pmx-text)]">{formatDate(date)}</div>
     </div>
   )
 }
