@@ -34,7 +34,7 @@ import { formatCurrency } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PortfolioHealthComparison } from '@/components/health'
 import { ExecutiveCommandCentre } from '@/components/portfolio/ExecutiveCommandCentre'
-import { calculatePortfolioProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
+import { calculatePortfolioProgress, calculateProjectPlannedProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
 import { openProject } from '@/lib/openProject'
 
 type ProjectHealth =
@@ -91,6 +91,7 @@ export default function PortfolioDashboardPage() {
   const [qualityGates, setQualityGates] = useState<any[]>([])
   const [siteReports, setSiteReports] = useState<any[]>([])
   const [scheduleTasks, setScheduleTasks] = useState<any[]>([])
+  const [deliveryPackages, setDeliveryPackages] = useState<any[]>([])
 
   const [hseObservations, setHseObservations] = useState<any[]>([])
   const [hseIncidents, setHseIncidents] = useState<any[]>([])
@@ -122,6 +123,7 @@ export default function PortfolioDashboardPage() {
       qualityGatesRes,
       siteReportsRes,
       scheduleTasksRes,
+      deliveryPackagesRes,
       hseObservationsRes,
       hseIncidentsRes,
       hseToolboxTalksRes,
@@ -140,6 +142,7 @@ export default function PortfolioDashboardPage() {
       supabase.from('quality_gates').select('*'),
       supabase.from('site_reports').select('*'),
       supabase.from('tasks').select('*'),
+      supabase.from('delivery_packages').select('*'),
       supabase.from('hse_observations').select('*'),
       supabase.from('hse_incidents').select('*'),
       supabase.from('hse_toolbox_talks').select('*'),
@@ -159,6 +162,7 @@ export default function PortfolioDashboardPage() {
     setQualityGates(qualityGatesRes.data || [])
     setSiteReports(siteReportsRes.data || [])
     setScheduleTasks(scheduleTasksRes.data || [])
+    setDeliveryPackages(deliveryPackagesRes.data || [])
     setHseObservations(hseObservationsRes.data || [])
     setHseIncidents(hseIncidentsRes.data || [])
     setHseToolboxTalks(hseToolboxTalksRes.data || [])
@@ -247,9 +251,29 @@ export default function PortfolioDashboardPage() {
         : Number(project.progress_pct || project.progress || project.progress_percent || 0) ||
           calculatePercentage(completedMilestones.length, projectMilestones.length)
 
-      const scheduleVariance =
-        Number(project.schedule_variance || project.variance || 0) ||
-        calculateScheduleVariance(projectMilestones)
+      const plannedProgress = projectScheduleTasks.length
+        ? calculateProjectPlannedProgress(projectScheduleTasks)
+        : Math.max(progress, Number(project.planned_progress || 0))
+
+      const calculatedScheduleVariance = progress - plannedProgress
+      const storedScheduleVariance = Number(project.schedule_variance || project.variance || 0)
+      const scheduleVariance = projectScheduleTasks.length
+        ? calculatedScheduleVariance
+        : storedScheduleVariance || calculateScheduleVariance(projectMilestones)
+
+      const projectPackages = deliveryPackages.filter(item => String(item.project_id) === String(projectId))
+      const resourceLabels = Array.from(new Set([
+        ...projectPackages.map(item => item.contractor_name),
+        ...projectProcurement.map(item => item.vendor_name || item.supplier_name || item.vendor || item.supplier),
+        project.overall_owner_email,
+        project.housebuild_owner_email,
+        project.mep_owner_email,
+        project.infrastructure_owner_email,
+        project.contractor,
+        project.contractor_name,
+        project.consultant,
+        project.consultant_name,
+      ].filter(Boolean).map(value => String(value).trim()).filter(Boolean)))
 
       const contractSum = sumByKeywords(projectFinancial, [
         'contract',
@@ -316,7 +340,9 @@ export default function PortfolioDashboardPage() {
       return {
         project,
         progress,
+        plannedProgress,
         scheduleVariance,
+        resourceLabels,
         health,
         score,
         openRisks: openRisks.length,
@@ -597,6 +623,7 @@ export default function PortfolioDashboardPage() {
 
         <ExecutiveCommandCentre
           rows={projectRows}
+          portfolioProgress={portfolioProgress}
           onOpenProject={projectId => {
             const project = projects.find(item => String(item.id) === String(projectId))
             if (project) openPortfolioProject(project)
