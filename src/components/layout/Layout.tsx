@@ -693,7 +693,7 @@ export default function Layout() {
 
         <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
 
-        <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
+        <div id="main-content" tabIndex={-1} className="layout-content min-w-0 max-w-full flex-1 overflow-x-clip overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
         </div>
       </main>
