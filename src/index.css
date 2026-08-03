@@ -146,3 +146,32 @@
   .board-pack-print, .board-pack-print * { visibility: visible !important; }
   .board-pack-print { position: absolute; inset: 0; width: 100%; padding: 18mm !important; }
 }
+
+
+/* Dashboard viewport-fit correction: no command-centre section may force horizontal scrolling. */
+.layout-content {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip !important;
+}
+.layout-content > *,
+.layout-content section,
+.layout-content article,
+.layout-content .grid,
+.layout-content .flex {
+  min-width: 0;
+  max-width: 100%;
+}
+.layout-content img,
+.layout-content svg,
+.layout-content canvas {
+  max-width: 100%;
+}
+.pmx-section-panel,
+.pmx-card,
+.pmx-intelligence-panel,
+.pmx-package-position-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
