@@ -131,9 +131,9 @@ export function ExecutiveCommandCentre({ rows, portfolioProgress, portfolioConfi
     const averageHealth = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.score, 0) / rows.length) : 0
     const averageProgress = portfolioProgress
     const atRisk = rows.filter(row => row.score < 65).length
-    const deliveryConfidence = Math.max(0, Math.min(100, averageHealth - rows.reduce((sum, row) => sum + row.highRisks, 0)))
+    const deliveryConfidence = portfolioConfidence
     return { averageHealth, averageProgress, atRisk, deliveryConfidence }
-  }, [rows])
+  }, [rows, portfolioProgress, portfolioConfidence])
 
   const decisions = useMemo(() => rows.flatMap(row => buildDecisions(row)).sort((a, b) => b.weight - a.weight).slice(0, 8), [rows])
   const dependencies = useMemo(() => buildSharedDependencies(rows), [rows])
