@@ -18,7 +18,7 @@ export default function BusinessIntelligencePage() {
     { title: 'Executive Dashboard', desc: 'Live project health, schedule, risk and delivery indicators.', icon: BarChart3, path: '/app' },
     { title: 'Recovery Intelligence', desc: 'Forecast completion and identify the activities driving delay.', icon: TrendingUp, path: '/app/recovery' },
     { title: 'Risk Intelligence', desc: 'Review current exposure and changes in the project risk profile.', icon: ShieldCheck, path: '/app/risk-trends' },
-    { title: 'Executive Reports', desc: 'Generate management reports from live project records.', icon: FileText, path: '/app/pmo-weekly-report' },
+    { title: 'Executive Reports', desc: 'Generate management reports from live project records.', icon: FileText, path: '/app/executive-reporting' },
   ]
 
   return (
