@@ -14,6 +14,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useTasks } from '@/hooks/useTasks'
+import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 
@@ -373,6 +374,10 @@ export default function RecoveryForecastPage() {
   const [savingScope, setSavingScope] = useState(false)
   const [notice, setNotice] = useState('')
 
+  const sharedIntelligence = useProjectIntelligence({
+    project: context.project || undefined,
+  })
+
   const projectTasks = useMemo(() => {
     return (tasksFromHook as Task[]).filter(task =>
       !projectId || sameProject(task.project_id, projectId)
@@ -484,13 +489,17 @@ export default function RecoveryForecastPage() {
     const firstTask = workingTasks[0] || null
     const lastTask = workingTasks[workingTasks.length - 1] || null
 
-    const targetDate =
+    const localTargetDate =
       safeDate(project?.handover_date) ||
       safeDate(project?.planned_finish) ||
       safeDate(project?.finish_date) ||
       safeDate(project?.target_date) ||
       safeDate(project?.completion_date) ||
       (lastTask ? safeDate(getTaskFinish(lastTask)) : null)
+
+    const targetDate =
+      sharedIntelligence.forecastV2.targetDate ||
+      localTargetDate
 
     const targetDateSource = project?.handover_date
       ? 'Project handover date'
@@ -514,11 +523,19 @@ export default function RecoveryForecastPage() {
       today
     )
 
-    const plannedPosition = sequence.plannedPosition?.source || null
-    const actualPosition = sequence.actualPosition?.source || null
+    const plannedPosition = (
+      sharedIntelligence.forecastV2.plannedPosition ||
+      sequence.plannedPosition?.source ||
+      null
+    ) as Task | null
+    const actualPosition = (
+      sharedIntelligence.forecastV2.actualPosition ||
+      sequence.actualPosition?.source ||
+      null
+    ) as Task | null
     const plannedIndex = sequence.plannedIndex
     const actualIndex = sequence.actualIndex
-    const activityGap = sequence.activityGap
+    const activityGap = sharedIntelligence.forecastV2.activityGap
 
     const stageGap =
       getStageIndex(plannedPosition) >= 0 && getStageIndex(actualPosition) >= 0
@@ -533,10 +550,11 @@ export default function RecoveryForecastPage() {
 
     // Shared sequence truth: the Recovery Forecast, Dashboard and Digital Twin
     // all use the same planned position, physical workfront and delay.
-    const daysBehind = sequence.delayDays
+    const daysBehind = sharedIntelligence.forecastV2.delayDays
 
     const forecastDate =
-      targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate
+      sharedIntelligence.forecastV2.forecastDate ||
+      (targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate)
 
     const dueButIncomplete = workingTasks.filter(task => {
       const finish = safeDate(getTaskFinish(task))
@@ -582,10 +600,14 @@ export default function RecoveryForecastPage() {
       return sum + getTaskDuration(task) * (getTaskProgress(task) / 100)
     }, 0)
 
-    const actualProgress =
+    const localActualProgress =
       totalDuration > 0 ? Math.round((actualEarnedDuration / totalDuration) * 100) : 0
 
-    const progressVariance = actualProgress - plannedProgress
+    const authoritativePlannedProgress =
+      sharedIntelligence.metrics.plannedProgress ?? plannedProgress
+    const actualProgress =
+      sharedIntelligence.metrics.scheduleProgress ?? localActualProgress
+    const progressVariance = actualProgress - authoritativePlannedProgress
 
     const remainingTasks = workingTasks.filter(task => !isComplete(task)
     )
@@ -639,11 +661,11 @@ export default function RecoveryForecastPage() {
     const criticalSnags = openSnags.filter(item => normalise(item.severity) === 'critical')
 
     const recoveryStatus: RecoveryStatus =
-      daysBehind === 0 && blockers.length === 0
+      sharedIntelligence.forecastV2.status === 'on_track'
         ? 'On Track'
-        : daysBehind <= 7
+        : sharedIntelligence.forecastV2.status === 'watch'
         ? 'Watch'
-        : daysBehind <= 30
+        : sharedIntelligence.forecastV2.status === 'recovery_required'
         ? 'Recovery Required'
         : 'Critical'
 
@@ -659,18 +681,8 @@ export default function RecoveryForecastPage() {
     const additionalCrews =
       daysBehind === 0 ? 0 : daysBehind <= 10 ? 1 : daysBehind <= 30 ? 2 : 3
 
-    let confidence = 92
-    confidence -= activityGap * 2
-    confidence -= stageGap * 8
-    confidence -= daysBehind * 0.7
-    confidence -= blockers.length * 2
-    confidence -= overdueApprovals.length * 2
-    confidence -= procurementRisks.length * 1
-    confidence -= highRisks.length * 3
-    confidence -= criticalSnags.length * 3
-    if (pacePressure === 'Critical') confidence -= 8
-    if (pacePressure === 'Aggressive') confidence -= 5
-    confidence = clamp(Math.round(confidence), 5, 95)
+    const confidence =
+      sharedIntelligence.forecastV2.recoveryConfidence
 
     const recoveryIndex = clamp(
       Math.round(
@@ -809,7 +821,7 @@ export default function RecoveryForecastPage() {
       blockers,
       dueButIncomplete,
       actualProgress,
-      plannedProgress,
+      plannedProgress: authoritativePlannedProgress,
       progressVariance,
       remainingTasks,
       remainingDuration,
@@ -826,7 +838,7 @@ export default function RecoveryForecastPage() {
       phaseHealth,
       totalTasks: workingTasks.length,
     }
-  }, [projectTasks, context])
+  }, [projectTasks, context, sharedIntelligence])
 
   const loading = tasksLoading || contextLoading
   const statusColour = statusTone(engine.recoveryStatus)
