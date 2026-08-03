@@ -22,6 +22,8 @@ type ProjectRow = {
   progress: number
   plannedProgress: number
   scheduleVariance: number
+  delayDays: number
+  recoveryConfidence: number
   score: number
   health: string
   highRisks: number
@@ -39,6 +41,7 @@ type ProjectRow = {
 type Props = {
   rows: ProjectRow[]
   portfolioProgress: number
+  portfolioConfidence: number
   onOpenProject: (projectId: string | number) => void
 }
 
@@ -62,7 +65,7 @@ const views: Array<{ id: View; label: string; icon: typeof Activity }> = [
   { id: 'replay', label: 'Replay', icon: History },
 ]
 
-export function ExecutiveCommandCentre({ rows, portfolioProgress, onOpenProject }: Props) {
+export function ExecutiveCommandCentre({ rows, portfolioProgress, portfolioConfidence, onOpenProject }: Props) {
   const [view, setView] = useState<View>('twin')
   const [events, setEvents] = useState<ActivityEvent[]>([])
   const [replayIndex, setReplayIndex] = useState(0)
@@ -177,7 +180,7 @@ function PortfolioTwin({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenProj
   return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
     {rows.slice().sort((a, b) => a.score - b.score).map(row => {
       const blocker = primaryBlocker(row)
-      const forecastDays = Math.max(0, Math.round(Math.abs(Math.min(0, row.scheduleVariance)) * 0.7 + row.delayedProcurement * 3 + row.pendingApprovals))
+      const forecastDays = Math.max(0, row.delayDays)
       return <button key={row.project.id} onClick={() => onOpenProject(row.project.id)} className="group rounded-2xl border border-[#dce5e8] bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#a9c2cd] hover:shadow-md">
         <div className="flex items-start justify-between gap-3"><div><div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#8799a1]">{row.project.status || row.project.phase || 'Active project'}</div><h3 className="mt-1 text-lg font-semibold text-[#173f5f]">{nameOf(row.project)}</h3></div><HealthDot score={row.score} /></div>
         <div className="mt-5 grid grid-cols-3 gap-3"><SmallMetric label="Health" value={`${row.score}%`} /><SmallMetric label="Progress" value={`${row.progress}%`} /><SmallMetric label="Forecast" value={forecastDays ? `+${forecastDays}d` : 'On plan'} alert={forecastDays > 7} /></div>
@@ -191,7 +194,7 @@ function PortfolioTwin({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenProj
 
 function PortfolioHeatMap({ rows, onOpenProject }: Pick<Props, 'rows' | 'onOpenProject'>) {
   const dimensions = [
-    { key: 'schedule', label: 'Schedule', value: (row: ProjectRow) => Math.min(100, Math.max(0, row.plannedProgress - row.progress) * 3) },
+    { key: 'schedule', label: 'Schedule delay', value: (row: ProjectRow) => Math.max(0, row.delayDays) },
     { key: 'risk', label: 'Risk', value: (row: ProjectRow) => Math.min(100, row.highRisks * 22 + row.openRisks * 4) },
     { key: 'approvals', label: 'Approvals', value: (row: ProjectRow) => Math.min(100, row.pendingApprovals * 12) },
     { key: 'procurement', label: 'Procurement', value: (row: ProjectRow) => Math.min(100, row.delayedProcurement * 25 + row.pendingProcurement * 5) },
