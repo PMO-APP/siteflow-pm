@@ -65,7 +65,7 @@ export default function InteractiveProjectTwinMap({
     <>
     <div className="space-y-4">
       <div className="rounded-2xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4">
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
           <div className="rounded-xl border border-[var(--pmx-border-strong)] bg-[var(--pmx-surface)] p-4">
             <div className="flex items-center gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--pmx-primary-soft)] text-[var(--pmx-primary)]">
@@ -113,7 +113,7 @@ export default function InteractiveProjectTwinMap({
               <span className="text-[11px] text-[var(--pmx-muted)]">Select a package to inspect</span>
             </div>
 
-            <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {twin.packages.map(pkg => (
                 <button
                   key={pkg.id}
@@ -170,7 +170,7 @@ export default function InteractiveProjectTwinMap({
       </div>
 
       {selectedPackage ? (
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-3">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--pmx-faint)]">Package health</div>
             <div className="mt-1 text-lg font-semibold text-[var(--pmx-text)]">{selectedPackage.healthScore}%</div>
@@ -206,14 +206,13 @@ export default function InteractiveProjectTwinMap({
           <span className="text-[11px] text-[var(--pmx-muted)]">Click a stage for blockers and ownership</span>
         </div>
 
-        <div className="overflow-x-auto pb-2 pmx-scrollbar">
-          <div className="flex min-w-max items-stretch gap-2">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {twin.stages.map((stage, index) => (
-              <div key={stage.id} className="flex items-center gap-2">
+              <div key={stage.id} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => onSelectStage(stage)}
-                  className="group w-44 rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface)] p-3 text-left transition hover:border-[var(--pmx-border-strong)]"
+                  className="group h-full w-full min-w-0 rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface)] p-3 text-left transition hover:border-[var(--pmx-border-strong)]"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className={
@@ -242,10 +241,8 @@ export default function InteractiveProjectTwinMap({
                   </div>
                 </button>
 
-                {index < twin.stages.length - 1 ? <ChevronRight size={16} className="shrink-0 text-[var(--pmx-faint)]" /> : null}
               </div>
             ))}
-          </div>
         </div>
       </div>
     </div>
