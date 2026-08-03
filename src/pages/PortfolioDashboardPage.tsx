@@ -35,6 +35,7 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PortfolioHealthComparison } from '@/components/health'
 import { ExecutiveCommandCentre } from '@/components/portfolio/ExecutiveCommandCentre'
 import { calculatePortfolioProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
+import { openProject } from '@/lib/openProject'
 
 type ProjectHealth =
   | 'Healthy'
@@ -71,6 +72,10 @@ const CHART_COLORS = [
 
 export default function PortfolioDashboardPage() {
   const navigate = useNavigate()
+
+  function openPortfolioProject(project: any) {
+    openProject(navigate, project, '/app')
+  }
 
   const [organizations, setOrganizations] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
@@ -592,7 +597,10 @@ export default function PortfolioDashboardPage() {
 
         <ExecutiveCommandCentre
           rows={projectRows}
-          onOpenProject={projectId => navigate(`/projects/${projectId}/dashboard`)}
+          onOpenProject={projectId => {
+            const project = projects.find(item => String(item.id) === String(projectId))
+            if (project) openPortfolioProject(project)
+          }}
         />
 
         <PortfolioHealthComparison projects={projects} />
@@ -624,7 +632,7 @@ export default function PortfolioDashboardPage() {
                       <td className="px-3 py-4"><span className="font-semibold text-[#405b69]">{row.openRisks}</span>{row.highRisks > 0 && <span className="ml-2 text-xs font-semibold text-[#d86335]">{row.highRisks} high</span>}</td>
                       <td className="px-3 py-4 text-[#536974]">{row.pendingApprovals}</td>
                       <td className="px-3 py-4"><span className="text-sm font-semibold text-[#2f6f91]">{Math.max(0, Math.min(100, row.score - row.highRisks * 2))}%</span></td>
-                      <td className="px-3 py-4"><button onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="rounded-lg p-2 text-[#78909b] transition hover:bg-[#eaf1f4] hover:text-[#173f5f]"><ChevronRight size={17} /></button></td>
+                      <td className="px-3 py-4"><button onClick={() => openPortfolioProject(row.project)} className="rounded-lg p-2 text-[#78909b] transition hover:bg-[#eaf1f4] hover:text-[#173f5f]"><ChevronRight size={17} /></button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -648,7 +656,7 @@ export default function PortfolioDashboardPage() {
               <SectionHeading eyebrow="Executive watchlist" title="Attention required" />
               <div className="mt-4 space-y-3">
                 {executiveAlerts.length ? executiveAlerts.slice(0, 4).map(row => (
-                  <button key={row.project.id} onClick={() => navigate(`/projects/${row.project.id}/dashboard`)} className="w-full rounded-xl border border-[#e2e9ed] p-4 text-left transition hover:border-[#b8ccd5] hover:bg-[#f9fbfb]">
+                  <button key={row.project.id} onClick={() => openPortfolioProject(row.project)} className="w-full rounded-xl border border-[#e2e9ed] p-4 text-left transition hover:border-[#b8ccd5] hover:bg-[#f9fbfb]">
                     <div className="flex items-center justify-between gap-3"><span className="font-semibold text-[#173f5f]">{projectName(row.project)}</span><HealthBadge health={row.health} /></div>
                     <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-[#71838d]"><span>{row.highRisks} high risks</span><span>{row.pendingApprovals} approvals</span><span>{row.overdueTasks} overdue</span></div>
                   </button>
