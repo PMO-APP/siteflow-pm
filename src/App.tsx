@@ -62,6 +62,7 @@ const RFIRegisterPage = lazy(() => import('@/features/rfi/pages/RFIRegisterPage'
 const WorkspaceSettingsPage = lazy(() => import('@/pages/WorkspaceSettingsPage'))
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'))
 const ExecutiveReportingPage = lazy(() => import('@/pages/ExecutiveReportingPage'))
+const ExecutiveDashboardPage = lazy(() => import('@/pages/ExecutiveDashboardPage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
 
 
@@ -467,6 +468,7 @@ export default function App() {
 />
 
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="executive-dashboard" element={<ExecutiveDashboardPage />} />
           <Route path="executive-reporting" element={<ExecutiveReportingPage />} />
 
           <Route path="recovery" element={<RecoveryForecastPage />} />
