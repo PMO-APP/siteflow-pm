@@ -44,6 +44,7 @@ import {
   MessageSquareText,
   Search,
   Send,
+  Presentation,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -142,6 +143,13 @@ const NAV: NavItem[] = [
   to: '/app/report-distribution',
   icon: Send,
   label: 'Report Distribution',
+  roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner'],
+  group: 'overview',
+},
+  {
+  to: '/app/boardroom',
+  icon: Presentation,
+  label: 'Boardroom',
   roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner'],
   group: 'overview',
 },
