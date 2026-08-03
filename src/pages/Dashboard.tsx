@@ -36,6 +36,7 @@ import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
 import { ProjectTimelinePanel } from '@/components/intelligence/ProjectTimelinePanel'
 import { AutonomousIntelligencePanel } from '@/components/intelligence/AutonomousIntelligencePanel'
+import { calculateProjectProgress, taskProgress } from '@/core/metrics/progressMetrics'
 
 const colorPool = [
   '#3b82f6',
@@ -74,9 +75,7 @@ function getTaskFinish(task: any) {
 }
 
 function getTaskProgress(task: any): number {
-  if (task.status === 'Completed') return 100
-  if (task.status === 'Not Started') return 0
-  return clamp(Number(task.progress_pct || 0))
+  return taskProgress(task)
 }
 
 function getTaskStatus(task: any) {
@@ -93,27 +92,7 @@ function getTaskStatus(task: any) {
 }
 
 function calcWeightedProgress(tasks: any[]) {
-  if (!tasks.length) return 0
-
-  const totalWeight = tasks.reduce(
-    (sum, task) => sum + Number(task.weight_pct || 0),
-    0
-  )
-
-  if (totalWeight === 0) {
-    return Math.round(
-      tasks.reduce((sum, task) => sum + getTaskProgress(task), 0) /
-        tasks.length
-    )
-  }
-
-  const earnedWeight = tasks.reduce(
-    (sum, task) =>
-      sum + (Number(task.weight_pct || 0) * getTaskProgress(task)) / 100,
-    0
-  )
-
-  return Math.round((earnedWeight / totalWeight) * 100)
+  return calculateProjectProgress(tasks)
 }
 
 export default function Dashboard() {
