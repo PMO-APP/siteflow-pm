@@ -181,12 +181,9 @@ const NAV: NavItem[] = [
     group: 'administration',
   },
   { to: '/app/team', icon: Users, label: 'Team', group: 'administration' },
-  { to: '/app/feedback', icon: MessageSquarePlus, label: 'Feedback Centre', group: 'administration' },
-  { to: '/app/help', icon: HelpCircle, label: 'Help Centre', group: 'administration' },
-  { to: '/app/onboarding', icon: Rocket, label: 'Onboarding', group: 'administration' },
+  { to: '/app/product-centre', icon: HelpCircle, label: 'Product Centre', group: 'administration' },
   { to: '/app/demo-workspace', icon: Building2, label: 'Demo Workspace', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
   { to: '/app/system-health', icon: ActivitySquare, label: 'System Health', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
-  { to: '/app/updates', icon: Sparkles, label: "What's New", group: 'administration' },
 
 ]
 
@@ -681,6 +678,28 @@ export default function Layout() {
               year: 'numeric',
             })}
           </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/app/product-centre?tab=help')}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
+            aria-label="Open Help Centre"
+            title="Help"
+          >
+            <HelpCircle size={16} />
+            <span>Help</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/app/feedback?new=1')}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
+            aria-label="Report an issue or suggest an improvement"
+            title="Feedback"
+          >
+            <MessageSquarePlus size={16} />
+            <span>Feedback</span>
+          </button>
 
           <button
             className="relative sidebar-muted hover:text-[#173f5f] transition-colors p-1"
