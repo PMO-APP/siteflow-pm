@@ -21,6 +21,12 @@ import {
   RotateCcw,
   Trash2,
   X,
+  HelpCircle,
+  MessageSquarePlus,
+  Rocket,
+  Sparkles,
+  PlayCircle,
+  Keyboard,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -725,6 +731,25 @@ export default function ProjectsPage() {
               <UserCircle size={19} />
             </button>
 
+            <button
+              type="button"
+              onClick={() => navigate('/app/product-centre?tab=help')}
+              className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
+              title="Help Centre"
+            >
+              <HelpCircle size={16} />
+              <span>Help</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/app/feedback?new=1')}
+              className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
+              title="Feedback"
+            >
+              <MessageSquarePlus size={16} />
+              <span>Feedback</span>
+            </button>
+
             {canAccessAdmin && (
               <>
                 <span className="mx-1 hidden h-6 w-px bg-[#d8e4ee] sm:block" aria-hidden="true" />
@@ -777,6 +802,33 @@ export default function ProjectsPage() {
         </section>
 
         <PersonalWorkspacePanel />
+
+        <section className="hub-panel overflow-hidden">
+          <div className="grid gap-0 lg:grid-cols-[0.8fr_1.2fr]">
+            <div className="bg-[#173f5f] p-6 text-white sm:p-7">
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/50">Product Centre</div>
+              <h2 className="mt-2 text-2xl font-extrabold">Need help getting something done?</h2>
+              <p className="mt-3 text-sm leading-6 text-white/70">
+                Search guidance, complete onboarding, see what changed or send feedback without entering a project.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/app/product-centre')}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#173f5f]"
+              >
+                Open Product Centre <ArrowRight size={15} />
+              </button>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-7 xl:grid-cols-3">
+              <ProductCentreAction icon={HelpCircle} title="Search Help" text="Find guides and troubleshooting." onClick={() => navigate('/app/product-centre?tab=help')} />
+              <ProductCentreAction icon={MessageSquarePlus} title="Submit Feedback" text="Report a problem or suggest an improvement." onClick={() => navigate('/app/feedback?new=1')} />
+              <ProductCentreAction icon={Rocket} title="Onboarding" text="Complete workspace setup steps." onClick={() => navigate('/app/onboarding')} />
+              <ProductCentreAction icon={Sparkles} title="What's New" text="Review features and fixes." onClick={() => navigate('/app/product-centre?tab=updates')} />
+              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn SiteFlow PM workflows." onClick={() => navigate('/app/product-centre?tab=help')} />
+              <ProductCentreAction icon={Keyboard} title="Shortcuts" text="Use Ctrl + K and move faster." onClick={() => navigate('/app/product-centre?tab=shortcuts')} />
+            </div>
+          </div>
+        </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="hub-panel p-6 sm:p-7">
@@ -1330,6 +1382,31 @@ function getGreeting() {
 
 function capitalize(value: string) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value
+}
+
+
+function ProductCentreAction({
+  icon: Icon,
+  title,
+  text,
+  onClick,
+}: {
+  icon: any
+  title: string
+  text: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-[#dbe5ee] bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b9cedd] hover:shadow-md"
+    >
+      <Icon size={18} className="text-[#2f6f91]" />
+      <div className="mt-3 text-sm font-extrabold text-[#173f5f]">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-[#6d7f8b]">{text}</div>
+    </button>
+  )
 }
 
 function formatDate(value: string | null) {
