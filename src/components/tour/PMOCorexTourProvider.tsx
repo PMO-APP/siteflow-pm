@@ -21,9 +21,9 @@ const STEPS: TourStep[] = [
   { id:'projects', title:'Choose a project', body:'Open any project to enter its Project Control Centre. The tour will continue automatically.', target:'[data-tour="project-open"]', route:'/projects', interaction:true, placement:'top' },
   { id:'sidebar', title:'Project Control Centre', body:'The left navigation contains every module for the selected project. Your permissions determine what you can edit.', target:'[data-tour="project-sidebar"]', route:'/app', placement:'right' },
   { id:'schedule', title:'Schedule', body:'Open Schedule to see activities, dependencies, progress and critical delivery pressure.', target:'[data-tour="nav-schedule"]', route:'/app', interaction:true, placement:'right' },
-  { id:'dashboard', title:'Project dashboard', body:'Use the dashboard to review health, RAG status, progress, delays and forecasts.', target:'[data-tour="nav-dashboard"]', route:'/app/schedule', placement:'right' },
-  { id:'reports', title:'Reporting', body:'Reports turn live project data into management and executive information.', target:'[data-tour="nav-reports"]', route:'/app/schedule', placement:'right' },
-  { id:'support', title:'Help and Feedback', body:'Help and Feedback are global. They remain available from every page without tying you to one project.', target:'[data-tour="global-support"]', placement:'bottom' },
+  { id:'dashboard', title:'Project dashboard', body:'Use the dashboard to review health, RAG status, progress, delays and forecasts. Click the highlighted Dashboard link to open it.', target:'[data-tour="nav-dashboard"]', route:'/app/schedule', interaction:true, placement:'right' },
+  { id:'reports', title:'Reporting', body:'Reports turn live project data into management and executive information. Click the highlighted Reports link to open it.', target:'[data-tour="nav-reports"]', route:'/app', interaction:true, placement:'right' },
+  { id:'support', title:'Help and Feedback', body:'Help and Feedback are global. Click the highlighted support controls to see where assistance is always available.', target:'[data-tour="global-support"]', route:'/app/reports', interaction:true, placement:'bottom' },
   { id:'complete', title:'You are ready', body:'You now know the main PMOCorex navigation. Continue exploring on your own, or replay this tour later from the Product Centre.', placement:'center' },
 ]
 
@@ -105,7 +105,13 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
       <p className="mt-3 text-sm leading-6 text-[#607580]">{step.body}</p>
       {step.interaction&&<div className="mt-4 rounded-xl bg-[#fff3ed] px-3 py-2 text-xs font-semibold text-[#c85e35]">Click the highlighted item to continue.</div>}
       <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#e7edf0]"><div className="h-full bg-[#ef8354] transition-all" style={{width:`${((index+1)/STEPS.length)*100}%`}}/></div>
-      <div className="mt-5 flex items-center justify-between"><button onClick={previous} disabled={index===0} className="btn btn-ghost disabled:opacity-30"><ArrowLeft size={14}/>Back</button>{!step.interaction&&<button onClick={next} className="btn btn-gold">{index===STEPS.length-1?<><CheckCircle2 size={15}/>Start PMOCorex</>:<>Next<ArrowRight size={14}/></>}</button>}</div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+        <button onClick={previous} disabled={index===0} className="btn btn-ghost disabled:opacity-30"><ArrowLeft size={14}/>Back</button>
+        <div className="flex items-center gap-2">
+          <button onClick={skip} className="btn btn-ghost">Skip</button>
+          <button onClick={next} className="btn btn-gold">{index===STEPS.length-1?<><CheckCircle2 size={15}/>Start PMOCorex</>:<>Next<ArrowRight size={14}/></>}</button>
+        </div>
+      </div>
     </div>
   </>}</TourContext.Provider>
 }
