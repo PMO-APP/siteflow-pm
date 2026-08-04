@@ -1,14 +1,14 @@
 
 import { FormEvent,useEffect,useMemo,useState } from 'react'
-import { MessageSquarePlus,ThumbsUp,RefreshCw } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { ArrowLeft,MessageSquarePlus,ThumbsUp,RefreshCw } from 'lucide-react'
+import { useLocation,useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { listFeedback,submitFeedback,updateFeedback,voteFeedback } from '@/services/productExperienceService'
 import type { FeedbackItem,FeedbackCategory,FeedbackPriority } from '@/services/productExperienceTypes'
 
-export default function FeedbackPage(){
+export default function FeedbackPage(){const navigate=useNavigate();
   const {activeWorkspace}=useWorkspace();const {projectId,projectName}=useProjectStore();const role=useMembershipStore(s=>s.role);const location=useLocation();const workspaceScope=new URLSearchParams(location.search).get('scope')==='workspace';const effectiveProjectId=workspaceScope?null:projectId;const effectiveProjectName=workspaceScope?'Workspace-level':projectName
   const [items,setItems]=useState<FeedbackItem[]>([]);const [show,setShow]=useState(new URLSearchParams(location.search).get('new')==='1');const [message,setMessage]=useState('')
   const admin=['workspace_admin','admin','pmo'].includes(role||'')
@@ -17,6 +17,10 @@ export default function FeedbackPage(){
   const stats=useMemo(()=>({open:items.filter(i=>!['resolved','released','closed'].includes(i.status)).length,review:items.filter(i=>['acknowledged','under_review'].includes(i.status)).length,resolved:items.filter(i=>['resolved','released','closed'].includes(i.status)).length}),[items])
   if(!activeWorkspace)return null
   return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px] space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <button onClick={()=>navigate('/projects')} className="btn btn-ghost"><ArrowLeft size={15}/>Back to Workspace Hub</button>
+      <button onClick={()=>navigate('/product-centre')} className="text-xs font-semibold text-[#6f7d89] hover:text-[#173f5f]">Open Product Centre</button>
+    </div>
     <section className="rounded-[26px] border bg-white p-7"><div className="flex flex-wrap justify-between gap-4"><div><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Rapid feedback loop</div><h1 className="mt-2 text-3xl font-semibold text-[#102943]">Feedback Centre</h1><p className="mt-2 text-sm text-[#6f7d89]">Report issues, suggest improvements and follow progress in one place.</p></div><div className="flex gap-2"><button onClick={()=>setShow(true)} className="btn btn-gold"><MessageSquarePlus size={15}/>Submit feedback</button><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button></div></div></section>
     <section className="grid gap-3 md:grid-cols-4"><Metric label="Submitted" value={items.length}/><Metric label="Open" value={stats.open}/><Metric label="Under review" value={stats.review}/><Metric label="Resolved" value={stats.resolved}/></section>
     {message&&<div className="rounded-xl border bg-white p-4 text-sm">{message}</div>}
