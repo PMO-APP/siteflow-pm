@@ -733,7 +733,7 @@ export default function ProjectsPage() {
 
             <button
               type="button"
-              onClick={() => navigate('/app/product-centre?tab=help')}
+              onClick={() => navigate('/product-centre?tab=help')}
               className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
               title="Help Centre"
             >
@@ -742,7 +742,7 @@ export default function ProjectsPage() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/app/feedback?new=1')}
+              onClick={() => navigate('/feedback?new=1&scope=workspace')}
               className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
               title="Feedback"
             >
@@ -813,19 +813,19 @@ export default function ProjectsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => navigate('/app/product-centre')}
+                onClick={() => navigate('/product-centre')}
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#173f5f]"
               >
                 Open Product Centre <ArrowRight size={15} />
               </button>
             </div>
             <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-7 xl:grid-cols-3">
-              <ProductCentreAction icon={HelpCircle} title="Search Help" text="Find guides and troubleshooting." onClick={() => navigate('/app/product-centre?tab=help')} />
-              <ProductCentreAction icon={MessageSquarePlus} title="Submit Feedback" text="Report a problem or suggest an improvement." onClick={() => navigate('/app/feedback?new=1')} />
-              <ProductCentreAction icon={Rocket} title="Onboarding" text="Complete workspace setup steps." onClick={() => navigate('/app/onboarding')} />
-              <ProductCentreAction icon={Sparkles} title="What's New" text="Review features and fixes." onClick={() => navigate('/app/product-centre?tab=updates')} />
-              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn SiteFlow PM workflows." onClick={() => navigate('/app/product-centre?tab=help')} />
-              <ProductCentreAction icon={Keyboard} title="Shortcuts" text="Use Ctrl + K and move faster." onClick={() => navigate('/app/product-centre?tab=shortcuts')} />
+              <ProductCentreAction icon={HelpCircle} title="Search Help" text="Find guides and troubleshooting." onClick={() => navigate('/product-centre?tab=help')} />
+              <ProductCentreAction icon={MessageSquarePlus} title="Submit Feedback" text="Report a problem or suggest an improvement." onClick={() => navigate('/feedback?new=1&scope=workspace')} />
+              <ProductCentreAction icon={Rocket} title="Onboarding" text="Complete workspace setup steps." onClick={() => navigate('/onboarding')} />
+              <ProductCentreAction icon={Sparkles} title="What's New" text="Review features and fixes." onClick={() => navigate('/product-centre?tab=updates')} />
+              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn SiteFlow PM workflows." onClick={() => navigate('/product-centre?tab=help')} />
+              <ProductCentreAction icon={Keyboard} title="Shortcuts" text="Use Ctrl + K and move faster." onClick={() => navigate('/product-centre?tab=shortcuts')} />
             </div>
           </div>
         </section>
