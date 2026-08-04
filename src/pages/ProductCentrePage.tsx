@@ -5,6 +5,7 @@ import { useNavigate,useSearchParams } from 'react-router-dom'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { listHelpArticles,listReleaseNotes,recordHelpSearch } from '@/services/productExperienceService'
 import type { HelpArticle,ReleaseNote } from '@/services/productExperienceTypes'
+import ReplayTourButton from '@/components/tour/ReplayTourButton'
 
 type Tab='home'|'help'|'updates'|'onboarding'|'shortcuts'
 
@@ -35,7 +36,7 @@ export default function ProductCentrePage(){
     </div>
     <section className="rounded-[28px] border border-[#dfe3e7] bg-[#173f5f] p-8 text-white">
       <div className="text-xs uppercase tracking-[.2em] text-white/50">Product Centre</div>
-      <h1 className="mt-3 text-4xl font-semibold">Learn, get help and shape SiteFlow PM.</h1>
+      <h1 className="mt-3 text-4xl font-semibold">Learn, get help and shape PMOCorex.</h1>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70">Everything related to onboarding, documentation, product updates and support is available here.</p>
       <div className="relative mt-6 max-w-3xl"><Search className="absolute left-4 top-1/2 -translate-y-1/2" size={18}/><input className="w-full rounded-2xl bg-white px-12 py-4 text-[#173f5f]" placeholder="How do I upload a schedule?" value={q} onChange={e=>{setQ(e.target.value);openTab('help')}}/></div>
     </section>
@@ -47,9 +48,9 @@ export default function ProductCentrePage(){
     {tab==='home'&&<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Card icon={BookOpen} title="Help Centre" text="Search documentation and troubleshooting guides." action="Search Help" onClick={()=>openTab('help')}/>
       <Card icon={MessageSquarePlus} title="Feedback" text="Report an issue, ask a question or suggest an improvement." action="Submit Feedback" onClick={()=>navigate('/feedback?new=1&scope=workspace')}/>
-      <Card icon={Rocket} title="Complete Onboarding" text="Set up your workspace, portfolio, project, schedule and team." action="Continue Setup" onClick={()=>navigate('/onboarding')}/>
+      <div className="rounded-[22px] border bg-white p-6"><Rocket className="text-[#1f668f]"/><h3 className="mt-4 text-lg font-semibold text-[#102943]">Interactive Tour</h3><p className="mt-2 min-h-12 text-sm leading-6 text-[#6f7d89]">Walk through PMOCorex while the app highlights exactly what to click.</p><div className="mt-4"><ReplayTourButton/></div></div>
       <Card icon={Sparkles} title="What's New" text="See recent features, improvements and fixes." action="View Updates" onClick={()=>openTab('updates')}/>
-      <Card icon={PlayCircle} title="Training & Tutorials" text="Follow practical guides for SiteFlow PM workflows." action="Browse Guides" onClick={()=>openTab('help')}/>
+      <Card icon={PlayCircle} title="Training & Tutorials" text="Follow practical guides for PMOCorex workflows." action="Browse Guides" onClick={()=>openTab('help')}/>
       <Card icon={Keyboard} title="Keyboard Shortcuts" text="Use Ctrl/Cmd + K to search and move around faster." action="View Shortcuts" onClick={()=>openTab('shortcuts')}/>
     </section>}
 
@@ -57,7 +58,7 @@ export default function ProductCentrePage(){
 
     {tab==='updates'&&<div className="space-y-4">{updates.map(i=><article key={i.id} className="rounded-[24px] border bg-white p-6"><div className="text-xs uppercase tracking-wider text-[#df5f41]">Version {i.version}</div><h2 className="mt-2 text-2xl font-semibold">{i.title}</h2><p className="mt-2 text-sm text-[#6f7d89]">{i.summary}</p><div className="mt-4 space-y-2">{i.items.map(x=><div key={x} className="flex gap-2 text-sm"><span>✓</span><span>{x}</span></div>)}</div></article>)}</div>}
 
-    {tab==='onboarding'&&<section className="rounded-[24px] border bg-white p-7"><Rocket className="text-[#1f668f]"/><h2 className="mt-4 text-2xl font-semibold text-[#102943]">Complete your setup</h2><p className="mt-2 text-sm text-[#6f7d89]">Finish the guided workspace, portfolio, project, schedule and team setup.</p><button onClick={()=>navigate('/onboarding')} className="btn btn-gold mt-5">Open Onboarding</button></section>}
+    {tab==='onboarding'&&<section className="rounded-[24px] border bg-white p-7"><Rocket className="text-[#1f668f]"/><h2 className="mt-4 text-2xl font-semibold text-[#102943]">Complete your setup</h2><p className="mt-2 text-sm text-[#6f7d89]">Finish the guided workspace, portfolio, project, schedule and team setup.</p><div className="mt-5"><ReplayTourButton/></div></section>}
 
     {tab==='shortcuts'&&<section className="rounded-[24px] border bg-white p-7"><h2 className="text-2xl font-semibold text-[#102943]">Keyboard Shortcuts</h2><div className="mt-5 grid gap-3 md:grid-cols-2">{[['Ctrl/Cmd + K','Open command palette'],['Esc','Close dialogs and overlays'],['Arrow keys','Navigate Boardroom slides'],['Enter','Open selected command']].map(([key,text])=><div key={key} className="flex items-center justify-between rounded-xl border p-4"><kbd className="rounded-lg bg-[#eef3f4] px-3 py-2 text-xs font-bold">{key}</kbd><span className="text-sm text-[#536170]">{text}</span></div>)}</div></section>}
   </div></div>
