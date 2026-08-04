@@ -185,6 +185,12 @@ export default function ProjectsPage() {
   const { setProject } = useProjectStore()
 
   useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('pmocorex_onboarding_seen') === 'true'
+    if (!hasSeenOnboarding) {
+      localStorage.setItem('pmocorex_onboarding_seen', 'true')
+      navigate('/onboarding?welcome=1')
+      return
+    }
     loadHub()
   }, [])
 
@@ -824,7 +830,7 @@ export default function ProjectsPage() {
               <ProductCentreAction icon={MessageSquarePlus} title="Submit Feedback" text="Report a problem or suggest an improvement." onClick={() => navigate('/feedback?new=1&scope=workspace')} />
               <ProductCentreAction icon={Rocket} title="Onboarding" text="Complete workspace setup steps." onClick={() => navigate('/onboarding')} />
               <ProductCentreAction icon={Sparkles} title="What's New" text="Review features and fixes." onClick={() => navigate('/product-centre?tab=updates')} />
-              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn SiteFlow PM workflows." onClick={() => navigate('/product-centre?tab=help')} />
+              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn PMOCorex workflows." onClick={() => navigate('/product-centre?tab=help')} />
               <ProductCentreAction icon={Keyboard} title="Shortcuts" text="Use Ctrl + K and move faster." onClick={() => navigate('/product-centre?tab=shortcuts')} />
             </div>
           </div>
