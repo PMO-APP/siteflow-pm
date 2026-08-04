@@ -67,6 +67,12 @@ const ExecutiveNarrativePage = lazy(() => import('@/pages/ExecutiveNarrativePage
 const ReportDesignerPage = lazy(() => import('@/pages/ReportDesignerPage'))
 const ReportDistributionPage = lazy(() => import('@/pages/ReportDistributionPage'))
 const BoardroomPage = lazy(() => import('@/pages/BoardroomPage'))
+const FeedbackPage = lazy(() => import('@/pages/FeedbackPage'))
+const HelpPage = lazy(() => import('@/pages/HelpPage'))
+const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'))
+const DemoWorkspacePage = lazy(() => import('@/pages/DemoWorkspacePage'))
+const SystemHealthPage = lazy(() => import('@/pages/SystemHealthPage'))
+const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
 
 
@@ -477,6 +483,12 @@ export default function App() {
           <Route path="report-designer" element={<ReportDesignerPage />} />
           <Route path="report-distribution" element={<ReportDistributionPage />} />
           <Route path="boardroom" element={<BoardroomPage />} />
+          <Route path="feedback" element={<FeedbackPage />} />
+          <Route path="help" element={<HelpPage />} />
+          <Route path="onboarding" element={<OnboardingPage />} />
+          <Route path="demo-workspace" element={<RequireRole allowedRoles={['workspace_admin','admin','pmo']}><DemoWorkspacePage /></RequireRole>} />
+          <Route path="system-health" element={<RequireRole allowedRoles={['workspace_admin','admin','pmo']}><SystemHealthPage /></RequireRole>} />
+          <Route path="updates" element={<UpdatesPage />} />
 
 
 
