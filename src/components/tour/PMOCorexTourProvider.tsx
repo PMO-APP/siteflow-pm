@@ -1,0 +1,96 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+
+const TOUR_KEY = 'pmocorex-guided-tour-v1'
+
+type TourStep = {
+  id: string
+  title: string
+  body: string
+  target?: string
+  route?: string
+  interaction?: boolean
+  placement?: 'top' | 'bottom' | 'left' | 'right' | 'center'
+}
+
+const STEPS: TourStep[] = [
+  { id:'welcome', title:'Welcome to PMOCorex', body:'We will guide you through the platform while you use it. This takes about three minutes.', route:'/projects', placement:'center' },
+  { id:'workspace', title:'Your Workspace Hub', body:'This is your starting point. It gives you the delivery position across every project you can access.', target:'[data-tour="workspace-hub"]', route:'/projects', placement:'bottom' },
+  { id:'portfolios', title:'Portfolios organise delivery', body:'Projects are grouped into portfolios. Click any portfolio to filter the workspace and continue.', target:'[data-tour="portfolio-card"]', route:'/projects', interaction:true, placement:'bottom' },
+  { id:'projects', title:'Choose a project', body:'Open any project to enter its Project Control Centre. The tour will continue automatically.', target:'[data-tour="project-open"]', route:'/projects', interaction:true, placement:'top' },
+  { id:'sidebar', title:'Project Control Centre', body:'The left navigation contains every module for the selected project. Your permissions determine what you can edit.', target:'[data-tour="project-sidebar"]', route:'/app', placement:'right' },
+  { id:'schedule', title:'Schedule', body:'Open Schedule to see activities, dependencies, progress and critical delivery pressure.', target:'[data-tour="nav-schedule"]', route:'/app', interaction:true, placement:'right' },
+  { id:'dashboard', title:'Project dashboard', body:'Use the dashboard to review health, RAG status, progress, delays and forecasts.', target:'[data-tour="nav-dashboard"]', route:'/app/schedule', placement:'right' },
+  { id:'reports', title:'Reporting', body:'Reports turn live project data into management and executive information.', target:'[data-tour="nav-reports"]', route:'/app/schedule', placement:'right' },
+  { id:'support', title:'Help and Feedback', body:'Help and Feedback are global. They remain available from every page without tying you to one project.', target:'[data-tour="global-support"]', placement:'bottom' },
+  { id:'complete', title:'You are ready', body:'You now know the main PMOCorex navigation. Continue exploring on your own, or replay this tour later from the Product Centre.', placement:'center' },
+]
+
+type TourContextValue = { startTour: () => void; active: boolean }
+const TourContext = createContext<TourContextValue>({ startTour: () => undefined, active:false })
+export const usePMOCorexTour = () => useContext(TourContext)
+
+export default function PMOCorexTourProvider({children}:{children:React.ReactNode}){
+  const location=useLocation(); const navigate=useNavigate()
+  const [active,setActive]=useState(false); const [index,setIndex]=useState(0)
+  const [rect,setRect]=useState<DOMRect|null>(null); const step=STEPS[index]
+
+  const startTour=useCallback(()=>{setIndex(0);setActive(true);navigate('/projects')},[navigate])
+
+  useEffect(()=>{
+    if(location.pathname==='/projects' && !localStorage.getItem(TOUR_KEY)){
+      const timer=setTimeout(()=>setActive(true),700); return()=>clearTimeout(timer)
+    }
+  },[location.pathname])
+
+  useEffect(()=>{
+    if(!active||!step)return
+    if(step.route && location.pathname!==step.route){ navigate(step.route); return }
+    const update=()=>{
+      const el=step.target?document.querySelector(step.target):null
+      if(el){ el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'}); setTimeout(()=>setRect(el.getBoundingClientRect()),250) }
+      else setRect(null)
+    }
+    const timer=setTimeout(update,220)
+    const observer=new MutationObserver(update); observer.observe(document.body,{subtree:true,childList:true,attributes:true})
+    window.addEventListener('resize',update); window.addEventListener('scroll',update,true)
+    return()=>{clearTimeout(timer);observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)}
+  },[active,index,location.pathname,navigate,step])
+
+  useEffect(()=>{
+    if(!active||!step?.interaction||!step.target)return
+    const handler=(event:MouseEvent)=>{
+      const target=(event.target as HTMLElement)?.closest(step.target!)
+      if(target)setTimeout(()=>setIndex(i=>Math.min(i+1,STEPS.length-1)),350)
+    }
+    document.addEventListener('click',handler,true); return()=>document.removeEventListener('click',handler,true)
+  },[active,step])
+
+  const finish=()=>{localStorage.setItem(TOUR_KEY,'completed');setActive(false);setIndex(0);navigate('/projects')}
+  const skip=()=>{localStorage.setItem(TOUR_KEY,'skipped');setActive(false)}
+  const next=()=>{ if(index===STEPS.length-1)finish(); else setIndex(index+1) }
+  const previous=()=>setIndex(Math.max(0,index-1))
+
+  const cardStyle=useMemo(()=>{
+    if(!rect||step?.placement==='center')return {left:'50%',top:'50%',transform:'translate(-50%,-50%)'}
+    const width=360,gap=18; let left=Math.min(window.innerWidth-width-18,Math.max(18,rect.left)); let top=rect.bottom+gap
+    if(step.placement==='top')top=Math.max(18,rect.top-250)
+    if(step.placement==='right'){left=Math.min(window.innerWidth-width-18,rect.right+gap);top=Math.max(18,rect.top)}
+    if(step.placement==='left'){left=Math.max(18,rect.left-width-gap);top=Math.max(18,rect.top)}
+    if(top>window.innerHeight-280)top=Math.max(18,rect.top-250)
+    return {left,top}
+  },[rect,step])
+
+  return <TourContext.Provider value={{startTour,active}}>{children}{active&&step&&<>
+    <div className="fixed inset-0 z-[200] bg-[#071726]/70" />
+    {rect&&<div className="pointer-events-none fixed z-[201] rounded-2xl border-4 border-[#ef8354] shadow-[0_0_0_8px_rgba(239,131,84,.22),0_0_40px_rgba(239,131,84,.8)] transition-all duration-300" style={{left:rect.left-8,top:rect.top-8,width:rect.width+16,height:rect.height+16}}/>}
+    <div className="fixed z-[202] w-[min(360px,calc(100vw-32px))] rounded-[22px] border border-white/20 bg-white p-5 shadow-2xl" style={cardStyle as any}>
+      <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-[#df5f41]">PMOCorex tour · {index+1}/{STEPS.length}</div><h2 className="mt-2 text-xl font-extrabold text-[#173f5f]">{step.title}</h2></div><button onClick={skip} className="rounded-lg p-1 text-[#87929b] hover:bg-[#eef3f4]" aria-label="Skip tour"><X size={17}/></button></div>
+      <p className="mt-3 text-sm leading-6 text-[#607580]">{step.body}</p>
+      {step.interaction&&<div className="mt-4 rounded-xl bg-[#fff3ed] px-3 py-2 text-xs font-semibold text-[#c85e35]">Click the highlighted item to continue.</div>}
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#e7edf0]"><div className="h-full bg-[#ef8354] transition-all" style={{width:`${((index+1)/STEPS.length)*100}%`}}/></div>
+      <div className="mt-5 flex items-center justify-between"><button onClick={previous} disabled={index===0} className="btn btn-ghost disabled:opacity-30"><ArrowLeft size={14}/>Back</button>{!step.interaction&&<button onClick={next} className="btn btn-gold">{index===STEPS.length-1?<><CheckCircle2 size={15}/>Start PMOCorex</>:<>Next<ArrowRight size={14}/></>}</button>}</div>
+    </div>
+  </>}</TourContext.Provider>
+}
