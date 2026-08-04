@@ -1,0 +1,7 @@
+
+import { useEffect,useState } from 'react'
+import { Sparkles } from 'lucide-react'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { listReleaseNotes } from '@/services/productExperienceService'
+import type { ReleaseNote } from '@/services/productExperienceTypes'
+export default function UpdatesPage(){const {activeWorkspace}=useWorkspace();const [items,setItems]=useState<ReleaseNote[]>([]);useEffect(()=>{if(activeWorkspace)listReleaseNotes(activeWorkspace.id).then(setItems)},[activeWorkspace?.id]);return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-6"><div className="mx-auto max-w-4xl space-y-5"><section className="rounded-[26px] border bg-white p-7"><Sparkles className="text-[#df5f41]"/><h1 className="mt-3 text-3xl font-semibold text-[#102943]">What’s New</h1><p className="mt-2 text-[#6f7d89]">New features, improvements and fixes in SiteFlow PM.</p></section>{items.map(i=><article key={i.id} className="rounded-[24px] border bg-white p-6"><div className="text-xs uppercase tracking-wider text-[#df5f41]">Version {i.version}</div><h2 className="mt-2 text-2xl font-semibold">{i.title}</h2><p className="mt-2 text-sm text-[#6f7d89]">{i.summary}</p><div className="mt-4 space-y-2">{i.items.map(x=><div key={x} className="flex gap-2 text-sm"><span>✓</span><span>{x}</span></div>)}</div><div className="mt-4 text-xs text-[#929da5]">{new Date(i.releasedAt).toLocaleDateString()}</div></article>)}</div></div>}
