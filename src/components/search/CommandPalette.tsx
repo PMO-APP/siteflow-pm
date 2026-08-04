@@ -98,6 +98,12 @@ const NAVIGATION_COMMANDS: NavigationCommand[] = [
   { id: 'assignments', title: 'Open Internal Assignments', subtitle: 'Team actions and follow-ups', url: '/app/internal-assignments', icon: ClipboardList },
   { id: 'team', title: 'Open Team & Access', subtitle: 'People, roles and project access', url: '/app/team-access', icon: Users },
   { id: 'reports', title: 'Open Executive Reports', subtitle: 'IPD and management reporting', url: '/app/reports', icon: FileText },
+  { id: 'feedback', title: 'Open Feedback Centre', subtitle: 'Report issues and suggest improvements', url: '/app/feedback', icon: MessageSquarePlus },
+  { id: 'help', title: 'Open Help Centre', subtitle: 'Search guides and troubleshooting', url: '/app/help', icon: FileText },
+  { id: 'onboarding', title: 'Open Onboarding', subtitle: 'Complete workspace setup steps', url: '/app/onboarding', icon: PlusCircle },
+  { id: 'system-health', title: 'Open System Health', subtitle: 'Check platform services', url: '/app/system-health', icon: AlertCircle },
+  { id: 'updates', title: "Open What's New", subtitle: 'View release notes', url: '/app/updates', icon: Star },
+
 ]
 
 const TASK_ASSIGNER_ROLES = [
