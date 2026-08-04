@@ -1,6 +1,6 @@
 
 import { useEffect,useMemo,useState } from 'react'
-import { BookOpen,Search,MessageSquarePlus,Rocket,Sparkles,PlayCircle,Keyboard,LifeBuoy } from 'lucide-react'
+import { ArrowLeft,BookOpen,Search,MessageSquarePlus,Rocket,Sparkles,PlayCircle,Keyboard,LifeBuoy } from 'lucide-react'
 import { useNavigate,useSearchParams } from 'react-router-dom'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { listHelpArticles,listReleaseNotes,recordHelpSearch } from '@/services/productExperienceService'
@@ -29,6 +29,10 @@ export default function ProductCentrePage(){
   function openTab(next:Tab){setParams(next==='home'?{}:{tab:next})}
 
   return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 sm:-m-6 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px] space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <button onClick={()=>navigate('/projects')} className="btn btn-ghost"><ArrowLeft size={15}/>Back to Workspace Hub</button>
+      <button onClick={()=>navigate('/')} className="text-xs font-semibold text-[#6f7d89] hover:text-[#173f5f]">Go to Home</button>
+    </div>
     <section className="rounded-[28px] border border-[#dfe3e7] bg-[#173f5f] p-8 text-white">
       <div className="text-xs uppercase tracking-[.2em] text-white/50">Product Centre</div>
       <h1 className="mt-3 text-4xl font-semibold">Learn, get help and shape SiteFlow PM.</h1>
