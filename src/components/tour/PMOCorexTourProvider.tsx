@@ -83,7 +83,16 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
   },[rect,step])
 
   return <TourContext.Provider value={{startTour,active}}>{children}{active&&step&&<>
-    <div className="fixed inset-0 z-[200] bg-[#071726]/70" />
+    {!rect ? (
+      <div className="fixed inset-0 z-[200] bg-[#071726]/70" />
+    ) : (
+      <>
+        <div className="fixed left-0 right-0 top-0 z-[200] bg-[#071726]/70" style={{height:Math.max(0,rect.top-8)}} />
+        <div className="fixed bottom-0 left-0 right-0 z-[200] bg-[#071726]/70" style={{top:Math.min(window.innerHeight,rect.bottom+8)}} />
+        <div className="fixed left-0 z-[200] bg-[#071726]/70" style={{top:Math.max(0,rect.top-8),height:rect.height+16,width:Math.max(0,rect.left-8)}} />
+        <div className="fixed right-0 z-[200] bg-[#071726]/70" style={{top:Math.max(0,rect.top-8),height:rect.height+16,left:Math.min(window.innerWidth,rect.right+8)}} />
+      </>
+    )}
     {rect&&<div className="pointer-events-none fixed z-[201] rounded-2xl border-4 border-[#ef8354] shadow-[0_0_0_8px_rgba(239,131,84,.22),0_0_40px_rgba(239,131,84,.8)] transition-all duration-300" style={{left:rect.left-8,top:rect.top-8,width:rect.width+16,height:rect.height+16}}/>}
     <div className="fixed z-[202] w-[min(360px,calc(100vw-32px))] rounded-[22px] border border-white/20 bg-white p-5 shadow-2xl" style={cardStyle as any}>
       <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-[#df5f41]">PMOCorex tour · {index+1}/{STEPS.length}</div><h2 className="mt-2 text-xl font-extrabold text-[#173f5f]">{step.title}</h2></div><button onClick={skip} className="rounded-lg p-1 text-[#87929b] hover:bg-[#eef3f4]" aria-label="Skip tour"><X size={17}/></button></div>
