@@ -62,7 +62,9 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
     if(!active||!step?.interaction||!step.target)return
     const handler=(event:MouseEvent)=>{
       const target=(event.target as HTMLElement)?.closest(step.target!)
-      if(target)setTimeout(()=>setIndex(i=>Math.min(i+1,STEPS.length-1)),350)
+      if(target){
+        setIndex(i=>Math.min(i+1,STEPS.length-1))
+      }
     }
     document.addEventListener('click',handler,true); return()=>document.removeEventListener('click',handler,true)
   },[active,step])
@@ -74,11 +76,15 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
 
   const cardStyle=useMemo(()=>{
     if(!rect||step?.placement==='center')return {left:'50%',top:'50%',transform:'translate(-50%,-50%)'}
-    const width=360,gap=18; let left=Math.min(window.innerWidth-width-18,Math.max(18,rect.left)); let top=rect.bottom+gap
-    if(step.placement==='top')top=Math.max(18,rect.top-250)
+    const width=360,gap=18,estimatedCardHeight=330
+    let left=Math.min(window.innerWidth-width-18,Math.max(18,rect.left))
+    let top=rect.bottom+gap
+    if(step.placement==='top')top=Math.max(18,rect.top-estimatedCardHeight-gap)
     if(step.placement==='right'){left=Math.min(window.innerWidth-width-18,rect.right+gap);top=Math.max(18,rect.top)}
     if(step.placement==='left'){left=Math.max(18,rect.left-width-gap);top=Math.max(18,rect.top)}
-    if(top>window.innerHeight-280)top=Math.max(18,rect.top-250)
+    if(top>window.innerHeight-estimatedCardHeight-18){
+      top=Math.max(18,rect.top-estimatedCardHeight-gap)
+    }
     return {left,top}
   },[rect,step])
 
