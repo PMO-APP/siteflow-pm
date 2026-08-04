@@ -681,7 +681,7 @@ export default function Layout() {
 
           <button
             type="button"
-            onClick={() => navigate('/app/product-centre?tab=help')}
+            onClick={() => navigate('/product-centre?tab=help')}
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
             aria-label="Open Help Centre"
             title="Help"
@@ -692,7 +692,7 @@ export default function Layout() {
 
           <button
             type="button"
-            onClick={() => navigate('/app/feedback?new=1')}
+            onClick={() => navigate('/feedback?new=1')}
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
             aria-label="Report an issue or suggest an improvement"
             title="Feedback"
