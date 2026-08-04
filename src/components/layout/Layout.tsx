@@ -454,6 +454,7 @@ export default function Layout() {
       )}
 
       <aside
+        data-tour="project-sidebar"
         id="primary-navigation"
         aria-label="Primary navigation"
         className={`layout-sidebar fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
@@ -544,6 +545,7 @@ export default function Layout() {
                   {items.map(({ to, icon: Icon, label, exact }) => (
                     <NavLink
                       key={to}
+                      data-tour={to === '/app/schedule' ? 'nav-schedule' : to === '/app' ? 'nav-dashboard' : to === '/app/reports' ? 'nav-reports' : undefined}
                       to={to}
                       end={exact}
                       onClick={() => setSidebarOpen(false)}
@@ -679,6 +681,7 @@ export default function Layout() {
             })}
           </div>
 
+          <div data-tour="global-support" className="hidden sm:flex items-center gap-1">
           <button
             type="button"
             onClick={() => navigate('/product-centre?tab=help')}
@@ -700,6 +703,8 @@ export default function Layout() {
             <MessageSquarePlus size={16} />
             <span>Feedback</span>
           </button>
+
+          </div>
 
           <button
             className="relative sidebar-muted hover:text-[#173f5f] transition-colors p-1"
