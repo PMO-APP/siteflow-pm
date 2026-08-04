@@ -380,6 +380,40 @@ export default function App() {
           }
         />
 
+
+        <Route
+          path="/product-centre"
+          element={
+            <RequireAuth>
+              <ProductCentrePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/feedback"
+          element={
+            <RequireAuth>
+              <FeedbackPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <OnboardingPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/updates"
+          element={
+            <RequireAuth>
+              <UpdatesPage />
+            </RequireAuth>
+          }
+        />
+
         <Route
           path="/admin"
           element={
