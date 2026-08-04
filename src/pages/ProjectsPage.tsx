@@ -719,7 +719,7 @@ export default function ProjectsPage() {
   const greeting = getGreeting()
 
   return (
-    <div className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
+    <div data-tour="workspace-hub" className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
       <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
           <button type="button" onClick={() => navigate('/')} className="text-left">
@@ -908,7 +908,7 @@ export default function ProjectsPage() {
               return (
                 <div
                   key={portfolio.id}
-                  className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
+                  data-tour="portfolio-card" className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf1f4] text-[#2f6f91]">
@@ -1291,7 +1291,7 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
   return (
     <tr className="border-t border-[#e2e9ed] bg-white transition hover:bg-[#f9fbfb]">
       <td className="px-6 py-4">
-        <button onClick={onOpen} className="text-left">
+        <button data-tour="project-open" onClick={onOpen} className="text-left">
           <div className="font-bold text-[#173f5f] hover:text-[#e87545]">{project.project_name}</div>
           <div className="mt-1 text-xs text-[#7c8d97]">{project.location || 'No location set'}</div>
         </button>
