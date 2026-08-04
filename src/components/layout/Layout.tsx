@@ -45,6 +45,11 @@ import {
   Search,
   Send,
   Presentation,
+  HelpCircle,
+  MessageSquarePlus,
+  Sparkles,
+  ActivitySquare,
+  Rocket,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -52,6 +57,7 @@ import NotificationsPanel from '@/components/modules/dashboard/NotificationsPane
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { CommandPalette } from '@/components/search'
 import { useCommandPalette } from '@/hooks/useCommandPalette'
+import ProductSupportDock from '@/components/product/ProductSupportDock'
 
 type NavItem = {
   to: string
@@ -175,6 +181,13 @@ const NAV: NavItem[] = [
     group: 'administration',
   },
   { to: '/app/team', icon: Users, label: 'Team', group: 'administration' },
+  { to: '/app/feedback', icon: MessageSquarePlus, label: 'Feedback Centre', group: 'administration' },
+  { to: '/app/help', icon: HelpCircle, label: 'Help Centre', group: 'administration' },
+  { to: '/app/onboarding', icon: Rocket, label: 'Onboarding', group: 'administration' },
+  { to: '/app/demo-workspace', icon: Building2, label: 'Demo Workspace', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
+  { to: '/app/system-health', icon: ActivitySquare, label: 'System Health', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
+  { to: '/app/updates', icon: Sparkles, label: "What's New", group: 'administration' },
+
 ]
 
 const VIEWER_NAV = [
@@ -691,9 +704,10 @@ export default function Layout() {
           </div>
         )}
 
-        <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
+        <ProductSupportDock />
+      <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
 
-        <div id="main-content" tabIndex={-1} className="layout-content min-w-0 max-w-full flex-1 overflow-x-clip overflow-y-auto p-4 lg:p-6 animate-in">
+        <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
         </div>
       </main>
