@@ -11,8 +11,7 @@ import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
 import { WorkspaceProvider } from '@/workspace/WorkspaceProvider'
-import PMOCorexTourProvider from '@/components/tour/PMOCorexTourProvider'
-import ExperienceProvider from '@/experience/ExperienceProvider'
+import AccessSessionProvider from '@/access/AccessSessionProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -68,17 +67,7 @@ const ExecutiveDashboardPage = lazy(() => import('@/pages/ExecutiveDashboardPage
 const ExecutiveNarrativePage = lazy(() => import('@/pages/ExecutiveNarrativePage'))
 const ReportDesignerPage = lazy(() => import('@/pages/ReportDesignerPage'))
 const ReportDistributionPage = lazy(() => import('@/pages/ReportDistributionPage'))
-const BoardroomPage = lazy(() => import('@/pages/BoardroomPage'))
-const FeedbackPage = lazy(() => import('@/pages/FeedbackPage'))
-const HelpPage = lazy(() => import('@/pages/HelpPage'))
-const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'))
-const DemoWorkspacePage = lazy(() => import('@/pages/DemoWorkspacePage'))
-const SystemHealthPage = lazy(() => import('@/pages/SystemHealthPage'))
-const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'))
-const ProductCentrePage = lazy(() => import('@/pages/ProductCentrePage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
-const ExperienceCentrePage = lazy(() => import('@/pages/ExperienceCentrePage'))
-const WorkspaceSetupWizardPage = lazy(() => import('@/pages/WorkspaceSetupWizardPage'))
 
 
 
@@ -195,7 +184,7 @@ function ViewerRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { setUser, setLoading } = useAuthStore()
-  const { setMembership, clearMembership } = useMembershipStore()
+  const { clearMembership } = useMembershipStore()
   const { setTheme } = useThemeStore()
 
   useEffect(() => {
@@ -204,68 +193,6 @@ export default function App() {
     document.documentElement.dataset.productTheme = 'pmocorex'
   }, [setTheme])
 
-  async function loadMembership(userId: string) {
-    const { data: sessionData } = await supabase.auth.getSession()
-    const email = sessionData.session?.user?.email?.toLowerCase().trim()
-
-    let query = supabase
-      .from('memberships')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (email) {
-      query = supabase
-        .from('memberships')
-        .select('*')
-        .or(`user_id.eq.${userId},email.eq.${email}`)
-    }
-
-    const { data: memberships, error } = await query
-
-    if (error) {
-      console.error('Membership loading failed:', error)
-      clearMembership()
-      return
-    }
-
-    if (!memberships || memberships.length === 0) {
-      clearMembership()
-      return
-    }
-
-    const selectedMembership =
-      memberships.find(
-        membership => membership.access_scope === 'workspace'
-      ) ??
-      memberships.find(
-        membership => membership.access_scope === 'portfolio'
-      ) ??
-      memberships.find(
-        membership => membership.access_scope === 'project'
-      ) ??
-      memberships[0]
-
-    const projectIds = Array.from(
-      new Set(
-        memberships
-          .filter(
-            membership =>
-              membership.access_scope === 'project' &&
-              membership.project_id !== null &&
-              membership.project_id !== undefined
-          )
-          .map(membership => membership.project_id)
-      )
-    )
-
-    setMembership({
-      role: selectedMembership.role,
-      accessScope: selectedMembership.access_scope,
-      portfolioId: selectedMembership.portfolio_id ?? null,
-      projectId: selectedMembership.project_id ?? null,
-      projectIds,
-    })
-  }
 
   useEffect(() => {
     let mounted = true
@@ -295,7 +222,6 @@ export default function App() {
           role: user.user_metadata?.role || null,
         } as any)
 
-        await loadMembership(user.id)
       } catch (error) {
         console.error('Auth loading failed:', error)
         clearMembership()
@@ -327,7 +253,6 @@ export default function App() {
       } as any)
 
       setTimeout(async () => {
-        await loadMembership(user.id)
         setLoading(false)
       }, 0)
     })
@@ -336,16 +261,15 @@ export default function App() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [setUser, setLoading, setMembership, clearMembership])
+  }, [setUser, setLoading, clearMembership])
 
   return (
     <ThemeProvider>
       <NotificationProvider>
         <WorkspaceProvider>
+        <AccessSessionProvider>
         <EventInfrastructureProvider>
         <BrowserRouter>
-          <ExperienceProvider>
-          <PMOCorexTourProvider>
           <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -382,58 +306,6 @@ export default function App() {
           element={
             <RequireAuth>
               <ProjectsPage />
-            </RequireAuth>
-          }
-        />
-
-
-        <Route
-          path="/product-centre"
-          element={
-            <RequireAuth>
-              <ProductCentrePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/feedback"
-          element={
-            <RequireAuth>
-              <FeedbackPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <RequireAuth>
-              <OnboardingPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/updates"
-          element={
-            <RequireAuth>
-              <UpdatesPage />
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/workspace-setup"
-          element={
-            <RequireAuth>
-              <WorkspaceSetupWizardPage />
-            </RequireAuth>
-          }
-        />
-
-        <Route
-          path="/experience-centre"
-          element={
-            <RequireAuth>
-              <ExperienceCentrePage />
             </RequireAuth>
           }
         />
@@ -541,15 +413,6 @@ export default function App() {
           <Route path="executive-narrative" element={<ExecutiveNarrativePage />} />
           <Route path="report-designer" element={<ReportDesignerPage />} />
           <Route path="report-distribution" element={<ReportDistributionPage />} />
-          <Route path="boardroom" element={<BoardroomPage />} />
-          <Route path="feedback" element={<FeedbackPage />} />
-          <Route path="help" element={<HelpPage />} />
-          <Route path="onboarding" element={<OnboardingPage />} />
-          <Route path="demo-workspace" element={<RequireRole allowedRoles={['workspace_admin','admin','pmo']}><DemoWorkspacePage /></RequireRole>} />
-          <Route path="system-health" element={<RequireRole allowedRoles={['workspace_admin','admin','pmo']}><SystemHealthPage /></RequireRole>} />
-          <Route path="updates" element={<UpdatesPage />} />
-          <Route path="product-centre" element={<ProductCentrePage />} />
-
 
 
 
@@ -618,10 +481,9 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
           </Suspense>
-          </PMOCorexTourProvider>
-          </ExperienceProvider>
         </BrowserRouter>
         </EventInfrastructureProvider>
+        </AccessSessionProvider>
         </WorkspaceProvider>
       </NotificationProvider>
     </ThemeProvider>
