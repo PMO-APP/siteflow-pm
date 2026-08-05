@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { uploadWorkspaceBrandAsset } from '@/workspace/workspaceService'
 
 export type WorkspaceSetupInput={
-  organizationId:string
+  organizationId:number
   name:string
   code:string
   description:string
@@ -34,8 +34,16 @@ export type BrandingSetupInput={
 }
 
 export async function saveSetupWorkspace(input:WorkspaceSetupInput){
-  const {data,error}=await supabase.rpc('save_workspace_setup_workspace',{
-    p_organization_id:input.organizationId,
+ const organizationId = Number(input.organizationId)
+
+if (!Number.isSafeInteger(organizationId) || organizationId <= 0) {
+  throw new Error('A valid organization ID is required.')
+}
+
+const { data, error } = await supabase.rpc(
+  'save_workspace_setup_workspace',
+  {
+    p_organization_id: organizationId,
     p_name:input.name.trim(),
     p_code:input.code.trim().toUpperCase(),
     p_description:input.description.trim()||null,
@@ -51,7 +59,13 @@ export async function saveSetupWorkspace(input:WorkspaceSetupInput){
     p_financial_year_start:Number(input.financialYearStart)
   })
   if(error)throw error
-  return data as {workspaceId:string;created:boolean;slug:string}
+  return data as {
+  workspaceId:string
+  organizationId:number
+  created:boolean
+  slug:string
+  code:string
+}
 }
 
 export async function loadSetupWorkspace(workspaceId:string){
