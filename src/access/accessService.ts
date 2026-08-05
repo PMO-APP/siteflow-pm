@@ -3,105 +3,189 @@ import { supabase } from '@/lib/supabase'
 import type {
   AccessLevel,
   AccessScopeType,
-  CanonicalWorkspaceMember,
-  MemberAccessAssignment,
+  CanonicalAccessAssignment,
+  CanonicalAccessSession,
+  PermissionAction,
 } from './accessTypes'
 
-function mapAssignment(row:any):MemberAccessAssignment{
+const ACCESS_RANK:Record<AccessLevel,number>={
+  view:1,
+  contribute:2,
+  edit:3,
+  manage:4,
+}
+
+const PROFILE_ACTIONS:Record<string,PermissionAction[]>={
+  workspace_admin:[
+    'workspace.view','workspace.manage',
+    'portfolio.view','portfolio.edit',
+    'project.view','project.contribute','project.edit','project.manage',
+    'schedule.view','schedule.edit','documents.upload',
+    'hse.create','hse.close','team.invite','team.manage','project.delete',
+  ],
+  pmo:[
+    'workspace.view','workspace.manage',
+    'portfolio.view','portfolio.edit',
+    'project.view','project.contribute','project.edit','project.manage',
+    'schedule.view','schedule.edit','documents.upload',
+    'hse.create','hse.close','team.invite','team.manage',
+  ],
+  project_owner:[
+    'workspace.view','portfolio.view',
+    'project.view','project.contribute','project.edit','project.manage',
+    'schedule.view','schedule.edit','documents.upload','hse.create',
+  ],
+  discipline_project_owner:[
+    'workspace.view','portfolio.view',
+    'project.view','project.contribute','project.edit',
+    'schedule.view','schedule.edit','documents.upload','hse.create',
+  ],
+  hse_manager:[
+    'workspace.view','portfolio.view','project.view',
+    'hse.create','hse.close',
+  ],
+  hse_officer:[
+    'workspace.view','portfolio.view','project.view','hse.create',
+  ],
+  discipline_member:[
+    'workspace.view','portfolio.view','project.view','project.contribute',
+    'schedule.view','documents.upload',
+  ],
+  consultant:[
+    'workspace.view','portfolio.view','project.view','project.contribute',
+    'schedule.view','documents.upload',
+  ],
+  contractor:[
+    'workspace.view','portfolio.view','project.view','project.contribute',
+    'schedule.view','documents.upload','hse.create',
+  ],
+  vendor:[
+    'workspace.view','portfolio.view','project.view',
+  ],
+  viewer:[
+    'workspace.view','portfolio.view','project.view','schedule.view',
+  ],
+  workspace_member:[
+    'workspace.view','portfolio.view','project.view','schedule.view',
+  ],
+}
+
+function mapAssignment(row:any):CanonicalAccessAssignment{
   return {
     id:String(row.id),
     workspaceId:String(row.workspace_id),
     userId:String(row.user_id),
     scopeType:row.scope_type,
-    scopeId:row.scope_id,
-    discipline:row.discipline,
+    scopeId:row.scope_id===null?null:String(row.scope_id),
+    discipline:row.discipline||null,
     accessLevel:row.access_level,
-    assignmentRole:row.assignment_role,
-    source:row.source,
-    startsAt:row.starts_at,
-    endsAt:row.ends_at,
+    assignmentRole:row.assignment_role||null,
+    source:row.source||'native',
   }
 }
 
-export async function loadCanonicalWorkspaceMember(
-  workspaceId:string,
-  userId:string
-):Promise<CanonicalWorkspaceMember|null>{
-  const [{data:member,error:memberError},{data:assignments,error:assignmentError}]=await Promise.all([
-    supabase.from('workspace_members').select('*')
-      .eq('workspace_id',workspaceId).eq('user_id',userId).maybeSingle(),
-    supabase.from('member_access_assignments').select('*')
-      .eq('workspace_id',workspaceId).eq('user_id',userId)
-  ])
-  if(memberError)throw memberError
-  if(assignmentError)throw assignmentError
-  if(!member)return null
-  return {
-    workspaceId:String(member.workspace_id),
-    userId:String(member.user_id),
-    role:member.role,
-    status:member.status||'active',
-    isDefault:Boolean(member.is_default),
-    discipline:member.discipline||null,
-    permissionProfileKey:member.permission_profile_key||null,
-    source:member.source||'native',
-    assignments:(assignments||[]).map(mapAssignment),
-  }
-}
-
-export async function listWorkspaceMemberDirectory(workspaceId:string){
-  const {data,error}=await supabase.from('workspace_member_access_summary')
-    .select('*').eq('workspace_id',workspaceId)
-  if(error)throw error
-  return data||[]
-}
-
-export async function assignMemberAccess(input:{
+export async function loadCanonicalAccessSession(input:{
   workspaceId:string
   userId:string
-  scopeType:AccessScopeType
-  scopeId?:string|null
-  discipline?:string|null
-  accessLevel:AccessLevel
-  assignmentRole?:string|null
-}){
-  const {data,error}=await supabase.from('member_access_assignments').upsert({
-    workspace_id:input.workspaceId,
-    user_id:input.userId,
-    scope_type:input.scopeType,
-    scope_id:input.scopeId||null,
-    discipline:input.discipline||null,
-    access_level:input.accessLevel,
-    assignment_role:input.assignmentRole||null,
-    source:'native',
-    updated_at:new Date().toISOString(),
-  },{
-    onConflict:'workspace_id,user_id,scope_type,scope_id,discipline,access_level'
-  }).select('*').single()
-  if(error)throw error
-  return mapAssignment(data)
+}):Promise<CanonicalAccessSession>{
+  const [{data:member,error:memberError},{data:assignmentRows,error:assignmentError}]=await Promise.all([
+    supabase.from('workspace_members').select(`
+      workspace_id,
+      user_id,
+      role,
+      status,
+      is_default,
+      discipline,
+      permission_profile_key,
+      portal_role,
+      workspace_type
+    `).eq('workspace_id',input.workspaceId).eq('user_id',input.userId).maybeSingle(),
+    supabase.from('member_access_assignments').select('*')
+      .eq('workspace_id',input.workspaceId)
+      .eq('user_id',input.userId),
+  ])
+
+  if(memberError)throw memberError
+  if(assignmentError)throw assignmentError
+
+  if(!member){
+    return {
+      loading:false,error:null,workspaceId:input.workspaceId,userId:input.userId,
+      role:null,permissionProfileKey:null,discipline:null,status:null,isDefault:false,
+      portalRole:null,workspaceType:null,assignments:[],
+    }
+  }
+
+  return {
+    loading:false,
+    error:null,
+    workspaceId:String(member.workspace_id),
+    userId:String(member.user_id),
+    role:member.role||null,
+    permissionProfileKey:member.permission_profile_key||null,
+    discipline:member.discipline||null,
+    status:member.status||'active',
+    isDefault:Boolean(member.is_default),
+    portalRole:member.portal_role||null,
+    workspaceType:member.workspace_type||null,
+    assignments:(assignmentRows||[]).map(mapAssignment),
+  }
 }
 
-export async function removeMemberAccess(assignmentId:string){
-  const {error}=await supabase.from('member_access_assignments')
-    .delete().eq('id',assignmentId)
-  if(error)throw error
-}
-
-export function hasLocalScope(
-  member:CanonicalWorkspaceMember|null,
+export function hasScopeAccess(
+  session:CanonicalAccessSession,
   scopeType:AccessScopeType,
-  scopeId?:string|null,
+  scopeId:string|null|undefined,
   minimum:AccessLevel='view',
   discipline?:string|null
 ){
-  if(!member||member.status!=='active')return false
-  if(['workspace_admin','admin','pmo'].includes(String(member.role)))return true
-  const rank:Record<AccessLevel,number>={view:1,contribute:2,edit:3,manage:4}
-  return member.assignments.some(item=>
+  if(session.status!=='active')return false
+
+  if(['workspace_admin','pmo'].includes(session.permissionProfileKey||'')){
+    return true
+  }
+
+  return session.assignments.some(item=>
     item.scopeType===scopeType
-    &&(!scopeId||item.scopeId===scopeId)
+    &&(scopeType==='workspace'||!scopeId||item.scopeId===String(scopeId))
     &&(!discipline||item.discipline===discipline)
-    &&rank[item.accessLevel]>=rank[minimum]
+    &&ACCESS_RANK[item.accessLevel]>=ACCESS_RANK[minimum]
   )
+}
+
+export function canPerform(
+  session:CanonicalAccessSession,
+  action:PermissionAction,
+  context?:{
+    scopeType?:AccessScopeType
+    scopeId?:string|number|null
+    discipline?:string|null
+  }
+){
+  if(session.status!=='active')return false
+  const profile=session.permissionProfileKey||'workspace_member'
+  const allowed=PROFILE_ACTIONS[profile]||PROFILE_ACTIONS.workspace_member
+  if(!allowed.includes(action))return false
+
+  if(!context?.scopeType)return true
+
+  const minimum:AccessLevel=
+    action.endsWith('.manage')||action==='project.delete'||action==='team.manage'?'manage':
+    action.endsWith('.edit')||action==='schedule.edit'||action==='documents.upload'?'edit':
+    action.endsWith('.contribute')||action==='hse.create'?'contribute':'view'
+
+  return hasScopeAccess(
+    session,
+    context.scopeType,
+    context.scopeId===null||context.scopeId===undefined?null:String(context.scopeId),
+    minimum,
+    context.discipline||null
+  )
+}
+
+export function projectIdsFromAssignments(assignments:CanonicalAccessAssignment[]){
+  return assignments
+    .filter(item=>item.scopeType==='project'&&item.scopeId!==null)
+    .map(item=>Number(item.scopeId))
+    .filter(Number.isFinite)
 }
