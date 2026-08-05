@@ -3,6 +3,8 @@ import { ArrowLeft,ArrowRight,Check,Clock,Save,SkipForward } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import WorkspaceSetupProvider,{useWorkspaceSetup} from '@/experience/WorkspaceSetupProvider'
 import OrganizationSetupStep from '@/experience/OrganizationSetupStep'
+import WorkspaceCreationStep from '@/experience/WorkspaceCreationStep'
+import BrandingSetupStep from '@/experience/BrandingSetupStep'
 
 export default function WorkspaceSetupWizardPage(){
   return <WorkspaceSetupProvider><WorkspaceSetupWizard/></WorkspaceSetupProvider>
@@ -50,8 +52,23 @@ function WorkspaceSetupWizard(){
           <p className="mt-3 text-sm leading-6 text-[#6f7d89]">{currentStep.description}</p>
 
           <div className="mt-7">
-            {isLast?<FinishPanel/>:currentStep.key==='organization'
-              ?<OrganizationSetupStep data={stepData} onChange={updateStepData} onCreated={async organizationId=>{await updateStepData({organizationId})}}/>
+            {isLast?<FinishPanel/>
+              :currentStep.key==='organization'
+                ?<OrganizationSetupStep data={stepData} onChange={updateStepData} onCreated={async organizationId=>{await updateStepData({organizationId})}}/>
+              :currentStep.key==='workspace'
+                ?<WorkspaceCreationStep
+                    data={stepData}
+                    organizationId={String((draft.data.organization as any)?.organizationId||'')}
+                    onChange={updateStepData}
+                    onCreated={async workspaceId=>{await updateStepData({workspaceId})}}
+                  />
+              :currentStep.key==='branding'
+                ?<BrandingSetupStep
+                    data={stepData}
+                    workspaceId={String((draft.data.workspace as any)?.workspaceId||draft.workspaceId||'')}
+                    onChange={updateStepData}
+                    onSaved={async()=>{await updateStepData({brandingSaved:true})}}
+                  />
               :<FrameworkStep stepKey={currentStep.key} data={stepData} onChange={updateStepData}/>}
           </div>
 
@@ -61,9 +78,15 @@ function WorkspaceSetupWizard(){
             <button disabled={currentIndex===0||saving} onClick={()=>void previous()} className="btn btn-ghost"><ArrowLeft size={15}/>Back</button>
             <div className="flex flex-wrap gap-2">
               {currentStep.optional&&!isLast&&<button disabled={saving} onClick={()=>void skip()} className="btn btn-ghost"><SkipForward size={15}/>Skip for now</button>}
-              {!isLast?<button disabled={saving} onClick={()=>void next(currentStep.key==='organization'
-                ?{valid:Boolean(stepData.organizationId),message:'Create or update the organization before continuing.'}
-                :{valid:true})} className="btn btn-gold">{saving?<><Save size={15}/>Saving…</>:<>Save and continue<ArrowRight size={15}/></>}</button>:<button disabled={saving} onClick={async()=>{await finish();window.dispatchEvent(new CustomEvent('pmocorex:start-tour'));navigate('/projects')}} className="btn btn-gold">Continue to Product Tour<ArrowRight size={15}/></button>}
+              {!isLast?<button disabled={saving} onClick={()=>void next(
+                currentStep.key==='organization'
+                  ?{valid:Boolean(stepData.organizationId),message:'Create or update the organization before continuing.'}
+                :currentStep.key==='workspace'
+                  ?{valid:Boolean(stepData.workspaceId),message:'Create or update the workspace before continuing.'}
+                :currentStep.key==='branding'
+                  ?{valid:Boolean(stepData.brandingSaved),message:'Save the workspace branding before continuing, or use Skip for now.'}
+                  :{valid:true}
+              )} className="btn btn-gold">{saving?<><Save size={15}/>Saving…</>:<>Save and continue<ArrowRight size={15}/></>}</button>:<button disabled={saving} onClick={async()=>{await finish();window.dispatchEvent(new CustomEvent('pmocorex:start-tour'));navigate('/projects')}} className="btn btn-gold">Continue to Product Tour<ArrowRight size={15}/></button>}
             </div>
           </div>
         </main>
