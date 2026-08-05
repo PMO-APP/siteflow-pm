@@ -12,6 +12,7 @@ import NotificationProvider from './components/ui/notifications/NotificationProv
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
 import { WorkspaceProvider } from '@/workspace/WorkspaceProvider'
 import PMOCorexTourProvider from '@/components/tour/PMOCorexTourProvider'
+import ExperienceProvider from '@/experience/ExperienceProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -76,6 +77,7 @@ const SystemHealthPage = lazy(() => import('@/pages/SystemHealthPage'))
 const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'))
 const ProductCentrePage = lazy(() => import('@/pages/ProductCentrePage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
+const ExperienceCentrePage = lazy(() => import('@/pages/ExperienceCentrePage'))
 
 
 
@@ -341,6 +343,7 @@ export default function App() {
         <WorkspaceProvider>
         <EventInfrastructureProvider>
         <BrowserRouter>
+          <ExperienceProvider>
           <PMOCorexTourProvider>
           <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -412,6 +415,15 @@ export default function App() {
           element={
             <RequireAuth>
               <UpdatesPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/experience-centre"
+          element={
+            <RequireAuth>
+              <ExperienceCentrePage />
             </RequireAuth>
           }
         />
@@ -597,6 +609,7 @@ export default function App() {
       </Routes>
           </Suspense>
           </PMOCorexTourProvider>
+          </ExperienceProvider>
         </BrowserRouter>
         </EventInfrastructureProvider>
         </WorkspaceProvider>
