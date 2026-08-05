@@ -78,6 +78,7 @@ const UpdatesPage = lazy(() => import('@/pages/UpdatesPage'))
 const ProductCentrePage = lazy(() => import('@/pages/ProductCentrePage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
 const ExperienceCentrePage = lazy(() => import('@/pages/ExperienceCentrePage'))
+const WorkspaceSetupWizardPage = lazy(() => import('@/pages/WorkspaceSetupWizardPage'))
 
 
 
@@ -415,6 +416,15 @@ export default function App() {
           element={
             <RequireAuth>
               <UpdatesPage />
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/workspace-setup"
+          element={
+            <RequireAuth>
+              <WorkspaceSetupWizardPage />
             </RequireAuth>
           }
         />
