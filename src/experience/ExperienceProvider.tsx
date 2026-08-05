@@ -51,7 +51,7 @@ export default function ExperienceProvider({children}:{children:React.ReactNode}
   function launch(kind=state.recommendedExperience){
     if(!user?.id)return
     void recordExperienceEvent({workspaceId:state.workspaceId,userId:user.id,experienceKey:kind,eventName:'launched',route:location.pathname})
-    if(kind==='workspace_setup')navigate('/product-centre?tab=experience')
+    if(kind==='workspace_setup')navigate('/workspace-setup')
     else if(kind==='product_tour')window.dispatchEvent(new CustomEvent('pmocorex:start-tour'))
     else navigate('/product-centre?tab=experience')
     void markFirstLoginComplete(user.id)
