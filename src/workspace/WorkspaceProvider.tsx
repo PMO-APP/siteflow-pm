@@ -66,7 +66,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     if (!activeWorkspace) return
     document.documentElement.style.setProperty('--workspace-primary', activeWorkspace.branding.primaryColor)
     document.documentElement.style.setProperty('--workspace-secondary', activeWorkspace.branding.secondaryColor)
-    document.title = `${activeWorkspace.name} | SiteFlow PM`
+    document.title = `${activeWorkspace.name} | PMOCorex`
   }, [activeWorkspace])
 
   const value = useMemo(() => ({
