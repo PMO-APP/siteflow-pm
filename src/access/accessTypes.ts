@@ -1,18 +1,14 @@
 
-export type WorkspaceMemberRole =
-  | 'workspace_admin' | 'admin' | 'pmo' | 'portfolio_manager'
-  | 'project_manager' | 'project_owner'
-  | 'design' | 'costing' | 'housebuild' | 'infrastructure'
-  | 'mep' | 'hse' | 'hse_lead' | 'hse_manager'
-  | 'consultant' | 'contractor' | 'vendor' | 'subcontractor'
-  | 'viewer' | 'guest' | string
-
 export type AccessScopeType =
-  | 'workspace' | 'portfolio' | 'project' | 'package' | 'discipline'
+  | 'workspace'
+  | 'portfolio'
+  | 'project'
+  | 'package'
+  | 'discipline'
 
 export type AccessLevel = 'view' | 'contribute' | 'edit' | 'manage'
 
-export type MemberAccessAssignment = {
+export type CanonicalAccessAssignment = {
   id: string
   workspaceId: string
   userId: string
@@ -22,18 +18,37 @@ export type MemberAccessAssignment = {
   accessLevel: AccessLevel
   assignmentRole: string | null
   source: string
-  startsAt: string | null
-  endsAt: string | null
 }
 
-export type CanonicalWorkspaceMember = {
-  workspaceId: string
-  userId: string
-  role: WorkspaceMemberRole
-  status: string
-  isDefault: boolean
-  discipline: string | null
+export type CanonicalAccessSession = {
+  loading: boolean
+  error: string | null
+  workspaceId: string | null
+  userId: string | null
+  role: string | null
   permissionProfileKey: string | null
-  source: string
-  assignments: MemberAccessAssignment[]
+  discipline: string | null
+  status: string | null
+  isDefault: boolean
+  portalRole: string | null
+  workspaceType: string | null
+  assignments: CanonicalAccessAssignment[]
 }
+
+export type PermissionAction =
+  | 'workspace.view'
+  | 'workspace.manage'
+  | 'portfolio.view'
+  | 'portfolio.edit'
+  | 'project.view'
+  | 'project.contribute'
+  | 'project.edit'
+  | 'project.manage'
+  | 'schedule.view'
+  | 'schedule.edit'
+  | 'documents.upload'
+  | 'hse.create'
+  | 'hse.close'
+  | 'team.invite'
+  | 'team.manage'
+  | 'project.delete'
