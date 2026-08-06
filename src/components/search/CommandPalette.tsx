@@ -29,15 +29,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
 import { useProjectStore } from '@/store/project'
-import { useMembershipStore } from '@/store/membership'
-import {
-  canApprove,
-  canCreateInternalContribution,
-  canCreateSnags,
-  canEditProcurement,
-  canEditRisk,
-  canUploadDocuments,
-} from '@/lib/permissions'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import type { SearchResult as SearchResultModel } from '@/services/search'
 import SearchInput from './SearchInput'
 import SearchCategory from './SearchCategory'
@@ -65,7 +57,7 @@ type QuickAction = {
   subtitle: string
   url: string
   icon: typeof Search
-  permitted: (role: string | null) => boolean
+  permission: string
   requiresProject?: boolean
 }
 
@@ -106,22 +98,16 @@ const NAVIGATION_COMMANDS: NavigationCommand[] = [
 
 ]
 
-const TASK_ASSIGNER_ROLES = [
-  'workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner',
-  'overall_project_owner', 'housebuild_project_owner', 'mep_project_owner',
-  'infrastructure_project_owner', 'hse_manager', 'hse_lead', 'design',
-  'housebuild', 'infrastructure', 'mep', 'costing',
-]
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'create-rfi', title: 'Create RFI', subtitle: 'Open a technical clarification for the selected project', url: '/app/rfis/new', icon: MessageSquarePlus, permitted: canCreateInternalContribution, requiresProject: true },
-  { id: 'create-risk', title: 'Add Risk', subtitle: 'Record a new project risk and mitigation', url: '/app/risk?action=new', icon: AlertTriangle, permitted: role => canEditRisk(role), requiresProject: true },
-  { id: 'create-snag', title: 'Create Snag', subtitle: 'Record a defect or completion issue', url: '/app/snags?action=new', icon: PlusCircle, permitted: canCreateSnags, requiresProject: true },
-  { id: 'create-procurement', title: 'Add Procurement Item', subtitle: 'Create a material, vendor or delivery requirement', url: '/app/procurement?action=new', icon: ShoppingCart, permitted: role => canEditProcurement(role), requiresProject: true },
-  { id: 'create-approval', title: 'Submit Approval', subtitle: 'Create a technical or material approval request', url: '/app/approvals?action=new', icon: FilePlus2, permitted: role => canApprove(role), requiresProject: true },
-  { id: 'create-site-report', title: 'Add Site Progress', subtitle: 'Create today’s site progress report', url: '/app/site?action=new', icon: HardHat, permitted: canCreateInternalContribution, requiresProject: true },
-  { id: 'upload-document', title: 'Upload Document', subtitle: 'Add a drawing, report or controlled document', url: '/app/documents?action=new', icon: Upload, permitted: canUploadDocuments, requiresProject: true },
-  { id: 'create-assignment', title: 'Create Internal Assignment', subtitle: 'Assign a tracked action to an internal team member', url: '/app/internal-assignments?action=new', icon: UserRoundPlus, permitted: role => TASK_ASSIGNER_ROLES.includes(role || ''), requiresProject: true },
+  { id: 'create-rfi', title: 'Create RFI', subtitle: 'Open a technical clarification for the selected project', url: '/app/rfis/new', icon: MessageSquarePlus, permission: 'project.contribute', requiresProject: true },
+  { id: 'create-risk', title: 'Add Risk', subtitle: 'Record a new project risk and mitigation', url: '/app/risk?action=new', icon: AlertTriangle, permission: 'risk.edit', requiresProject: true },
+  { id: 'create-snag', title: 'Create Snag', subtitle: 'Record a defect or completion issue', url: '/app/snags?action=new', icon: PlusCircle, permission: 'snags.edit', requiresProject: true },
+  { id: 'create-procurement', title: 'Add Procurement Item', subtitle: 'Create a material, vendor or delivery requirement', url: '/app/procurement?action=new', icon: ShoppingCart, permission: 'procurement.edit', requiresProject: true },
+  { id: 'create-approval', title: 'Submit Approval', subtitle: 'Create a technical or material approval request', url: '/app/approvals?action=new', icon: FilePlus2, permission: 'approvals.edit', requiresProject: true },
+  { id: 'create-site-report', title: 'Add Site Progress', subtitle: 'Create today’s site progress report', url: '/app/site?action=new', icon: HardHat, permission: 'reports.edit', requiresProject: true },
+  { id: 'upload-document', title: 'Upload Document', subtitle: 'Add a drawing, report or controlled document', url: '/app/documents?action=new', icon: Upload, permission: 'documents.upload', requiresProject: true },
+  { id: 'create-assignment', title: 'Create Internal Assignment', subtitle: 'Assign a tracked action to an internal team member', url: '/app/internal-assignments?action=new', icon: UserRoundPlus, permission: 'team.manage', requiresProject: true },
 ]
 
 function readJson<T>(key: string, fallback: T): T {
@@ -158,7 +144,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   const navigate = useNavigate()
   const location = useLocation()
   const project = useProjectStore()
-  const role = useMembershipStore(state => state.role)
+  const { can } = useAccessSession()
   const personalization = useWorkspacePersonalization()
   const mode = stripMode(query)
   const searchEnabled = mode.prefix !== '>' && mode.prefix !== '@'
@@ -167,7 +153,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   const groups = search.data?.groups || {}
   const normalizedQuery = mode.query.trim()
 
-  const permittedActions = useMemo(() => QUICK_ACTIONS.filter(action => action.permitted(role)), [role])
+  const permittedActions = useMemo(() => QUICK_ACTIONS.filter(action => can(action.permission as any)), [can])
 
   const matchingActions = useMemo(() => {
     if (mode.prefix === '#' || mode.prefix === '@') return []
