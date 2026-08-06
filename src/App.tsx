@@ -6,7 +6,6 @@ import { useMembershipStore } from '@/store/membership'
 import { useThemeStore } from '@/store/theme'
 import ThemeProvider from '@/theme/ThemeProvider'
 
-import RequireRole from '@/components/auth/RequireRole'
 import RequirePermission from '@/components/auth/RequirePermission'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
