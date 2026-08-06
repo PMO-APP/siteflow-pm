@@ -122,21 +122,23 @@ export default function ProjectAccessMatrix() {
   const rows = useMemo<AccessRow[]>(() => {
     return memberships.map((membership:any) => {
       const assignments = Array.isArray(membership.assignments) ? membership.assignments : []
+      const scopeTypeOf = (item:any) => item?.scopeType ?? item?.scope_type
+      const scopeIdOf = (item:any) => item?.scopeId ?? item?.scope_id
       const projectIds = assignments
-        .filter((item:any) => item.scopeType === 'project' && item.scopeId != null)
-        .map((item:any) => Number(item.scopeId))
+        .filter((item:any) => scopeTypeOf(item) === 'project' && scopeIdOf(item) != null)
+        .map((item:any) => Number(scopeIdOf(item)))
         .filter(Number.isFinite)
-      const hasWorkspaceAccess = assignments.some((item:any) => item.scopeType === 'workspace')
-      const email = String(membership.email || '').toLowerCase()
-      const role = String(membership.role || '').toLowerCase()
+      const hasWorkspaceAccess = assignments.some((item:any) => scopeTypeOf(item) === 'workspace')
+      const email = String(membership.email || '').trim().toLowerCase()
+      const role = String(membership.role || '').trim().toLowerCase()
       return {
         key: `${membership.user_id}-${role}`,
         email,
-        fullName: membership.full_name || '',
+        fullName: String(membership.full_name || membership.email || '').trim(),
         userId: membership.user_id || null,
         organizationId: membership.legacy_organization_id || null,
         role,
-        accessScope: hasWorkspaceAccess ? 'workspace' : 'project',
+        accessScope: hasWorkspaceAccess ? 'workspace' : projectIds.length ? 'project' : 'none',
         membershipIds: [],
         projectIds: Array.from(new Set(projectIds)),
         hasAllProjectAccess: hasWorkspaceAccess || WORKSPACE_WIDE_ROLES.has(role),
