@@ -58,10 +58,10 @@ export default function TeamAccessPage() {
       await Promise.all([
         supabase.from('organizations').select('*').eq('workspace_id', activeWorkspace.id).order('created_at'),
         supabase
-          .from('memberships')
+          .from('workspace_member_access_summary')
           .select('*')
           .eq('workspace_id', activeWorkspace.id)
-          .order('created_at', { ascending: false }),
+          .order('user_id'),
         supabase
           .from('team_invitations')
           .select('*')
