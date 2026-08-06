@@ -1,5 +1,4 @@
 import { useMembershipStore } from '@/store/membership'
-import { canApprove } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useApprovals, useUpsertApproval } from '@/hooks/useData'
@@ -10,6 +9,7 @@ import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { approvalsIntelligence } from '@/lib/intelligence'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const TYPES: Approval['type'][] = [
   'Material',
@@ -308,7 +308,8 @@ function ApprovalModal({
 export default function ApprovalsPage() {
   const { data: approvals = [], isLoading } = useApprovals()
   const role = useMembershipStore(state => state.role)
-  const canEdit = canApprove(role)
+  const { can } = useAccessSession()
+  const canEdit = can('approvals.edit')
 
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
 
