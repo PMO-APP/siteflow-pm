@@ -1,9 +1,5 @@
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
-import {
-  canCreateSnags,
-  canEditOwnOrAdmin,
-} from '@/lib/permissions'
 import { logAudit } from '@/lib/audit'
 import { useAuthStore } from '@/store/auth'
 import { useState } from 'react'
@@ -15,6 +11,7 @@ import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { snagIntelligence } from '@/lib/intelligence'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const SEVERITIES: Snag['severity'][] = ['Critical', 'Major', 'Minor']
 
@@ -53,16 +50,10 @@ function SnagModal({
 }) {
   const upsert = useUpsertSnag()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
   const { projectId } = useProjectStore()
 
-  const canEdit =
-    !item ||
-    canEditOwnOrAdmin(
-      role,
-      item.created_by,
-      user?.id
-    )
+  const { can } = useAccessSession()
+  const canEdit = !item || item.created_by === user?.id || can('project.manage')
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -319,7 +310,6 @@ export default function SnagsPage() {
   const { data: snags = [], isLoading } = useSnags()
   const { projectId } = useProjectStore()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
 
   const [modal, setModal] = useState<Snag | null | 'new'>(null)
   const [search, setSearch] = useState('')
@@ -328,17 +318,13 @@ export default function SnagsPage() {
   const [statFilter, setStatFilter] = useState('')
   const [view, setView] = useState<'list' | 'room'>('list')
 
-  const canCreate = canCreateSnags(role)
+  const { can } = useAccessSession()
+  const canCreate = can('snags.edit')
 
   useQuickActionRoute(() => setModal('new'), canCreate)
 
-  const canEditSnag = (snag: Snag) => {
-    return canEditOwnOrAdmin(
-      role,
-      snag.created_by,
-      user?.id
-    )
-  }
+  const canEditSnag = (snag: Snag) =>
+    can('snags.edit') && (snag.created_by === user?.id || can('project.manage'))
 
   const filtered = snags.filter(snag => {
     if (
