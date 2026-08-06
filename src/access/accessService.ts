@@ -17,56 +17,68 @@ const ACCESS_RANK:Record<AccessLevel,number>={
 
 const PROFILE_ACTIONS:Record<string,PermissionAction[]>={
   workspace_admin:[
-    'workspace.view','workspace.manage',
-    'portfolio.view','portfolio.edit',
-    'project.view','project.contribute','project.edit','project.manage',
-    'schedule.view','schedule.edit','documents.upload',
-    'hse.create','hse.close','team.invite','team.manage','project.delete',
+    'workspace.view','workspace.manage','portfolio.view','portfolio.edit',
+    'project.view','project.contribute','project.edit','project.manage','project.delete',
+    'schedule.view','schedule.edit','schedule.import',
+    'documents.view','documents.upload','documents.delete',
+    'procurement.view','procurement.edit','approvals.view','approvals.edit',
+    'quality.view','quality.edit','snags.view','snags.edit','risk.view','risk.edit',
+    'reports.view','reports.edit','reports.review','reports.export',
+    'costing.view','costing.edit','hse.create','hse.close',
+    'team.invite','team.manage','notifications.announce','audit.view',
   ],
   pmo:[
-    'workspace.view','workspace.manage',
-    'portfolio.view','portfolio.edit',
+    'workspace.view','workspace.manage','portfolio.view','portfolio.edit',
     'project.view','project.contribute','project.edit','project.manage',
-    'schedule.view','schedule.edit','documents.upload',
-    'hse.create','hse.close','team.invite','team.manage',
+    'schedule.view','schedule.edit','schedule.import',
+    'documents.view','documents.upload','documents.delete',
+    'procurement.view','procurement.edit','approvals.view','approvals.edit',
+    'quality.view','quality.edit','snags.view','snags.edit','risk.view','risk.edit',
+    'reports.view','reports.edit','reports.review','reports.export',
+    'costing.view','hse.create','hse.close','team.invite','team.manage',
+    'notifications.announce','audit.view',
   ],
   project_owner:[
-    'workspace.view','portfolio.view',
-    'project.view','project.contribute','project.edit','project.manage',
-    'schedule.view','schedule.edit','documents.upload','hse.create',
+    'workspace.view','portfolio.view','project.view','project.contribute','project.edit','project.manage',
+    'schedule.view','schedule.edit','documents.view','documents.upload',
+    'procurement.view','procurement.edit','approvals.view','approvals.edit',
+    'quality.view','quality.edit','snags.view','snags.edit','risk.view','risk.edit',
+    'reports.view','reports.edit','reports.export','costing.view','hse.create',
   ],
   discipline_project_owner:[
-    'workspace.view','portfolio.view',
-    'project.view','project.contribute','project.edit',
-    'schedule.view','schedule.edit','documents.upload','hse.create',
+    'workspace.view','portfolio.view','project.view','project.contribute','project.edit',
+    'schedule.view','schedule.edit','documents.view','documents.upload',
+    'procurement.view','procurement.edit','approvals.view','quality.view','quality.edit',
+    'snags.view','snags.edit','risk.view','risk.edit','reports.view','reports.edit',
+    'reports.export','costing.view','hse.create',
   ],
-  hse_manager:[
-    'workspace.view','portfolio.view','project.view',
-    'hse.create','hse.close',
-  ],
-  hse_officer:[
-    'workspace.view','portfolio.view','project.view','hse.create',
-  ],
+  hse_manager:['workspace.view','portfolio.view','project.view','hse.create','hse.close','reports.view'],
+  hse_officer:['workspace.view','portfolio.view','project.view','hse.create','reports.view'],
   discipline_member:[
-    'workspace.view','portfolio.view','project.view','project.contribute',
-    'schedule.view','documents.upload',
+    'workspace.view','portfolio.view','project.view','project.contribute','schedule.view',
+    'documents.view','documents.upload','procurement.view','approvals.view','quality.view',
+    'snags.view','risk.view','reports.view','reports.edit','costing.view',
   ],
   consultant:[
-    'workspace.view','portfolio.view','project.view','project.contribute',
-    'schedule.view','documents.upload',
+    'workspace.view','portfolio.view','project.view','project.contribute','schedule.view',
+    'documents.view','documents.upload','procurement.view','approvals.view','quality.view',
+    'snags.view','risk.view','reports.view',
   ],
   contractor:[
-    'workspace.view','portfolio.view','project.view','project.contribute',
-    'schedule.view','documents.upload','hse.create',
+    'workspace.view','portfolio.view','project.view','project.contribute','schedule.view',
+    'documents.view','documents.upload','procurement.view','approvals.view','quality.view',
+    'snags.view','risk.view','reports.view','hse.create',
   ],
-  vendor:[
-    'workspace.view','portfolio.view','project.view',
-  ],
+  vendor:['workspace.view','portfolio.view','project.view','documents.view','procurement.view'],
   viewer:[
-    'workspace.view','portfolio.view','project.view','schedule.view',
+    'workspace.view','portfolio.view','project.view','schedule.view','documents.view',
+    'procurement.view','approvals.view','quality.view','snags.view','risk.view',
+    'reports.view','costing.view',
   ],
   workspace_member:[
-    'workspace.view','portfolio.view','project.view','schedule.view',
+    'workspace.view','portfolio.view','project.view','schedule.view','documents.view',
+    'procurement.view','approvals.view','quality.view','snags.view','risk.view',
+    'reports.view','costing.view',
   ],
 }
 
@@ -170,8 +182,8 @@ export function canPerform(
   if(!context?.scopeType)return true
 
   const minimum:AccessLevel=
-    action.endsWith('.manage')||action==='project.delete'||action==='team.manage'?'manage':
-    action.endsWith('.edit')||action==='schedule.edit'||action==='documents.upload'?'edit':
+    action.endsWith('.manage')||action==='project.delete'||action==='team.manage'||action==='documents.delete'?'manage':
+    action.endsWith('.edit')||action==='schedule.edit'||action==='schedule.import'||action==='documents.upload'||action==='reports.review'?'edit':
     action.endsWith('.contribute')||action==='hse.create'?'contribute':'view'
 
   return hasScopeAccess(
