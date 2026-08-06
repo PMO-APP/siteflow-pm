@@ -1,5 +1,5 @@
 import { useProjectStore } from '@/store/project'
-import { getRole } from '@/lib/access'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import { logAudit } from '@/lib/audit'
 import { useState } from 'react'
 import { CalendarDays, CheckCircle2, Flag, Trash2 } from 'lucide-react'
@@ -20,7 +20,8 @@ interface Props {
 export default function TaskModal({ task, onClose, deliveryPackageId, discipline }: Props) {
   const { user } = useAuthStore()
   const { projectId } = useProjectStore()
-  const role = getRole(user?.email)
+  const {can}=useAccessSession()
+  const canDeleteTask=can('project.delete',{scopeType:'project',scopeId:projectId})
   const create = useCreateTask()
   const update = useUpdateTask()
   const del = useDeleteTask()
@@ -154,7 +155,7 @@ export default function TaskModal({ task, onClose, deliveryPackageId, discipline
       onClose={onClose}
       footer={
         <>
-          {task && role === 'admin' && (
+          {task && canDeleteTask && (
             <button className="ui-button ui-button--danger mr-auto" onClick={remove} disabled={del.isPending}>
               <Trash2 size={15} /> Delete task
             </button>
