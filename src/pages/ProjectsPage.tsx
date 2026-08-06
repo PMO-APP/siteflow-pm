@@ -28,14 +28,8 @@ import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
 import PersonalWorkspacePanel from '@/components/personalization/PersonalWorkspacePanel'
-import {
-  canAccessAdminConsole,
-  canCreateWorkspaceItems,
-  canEditProjectInfo,
-  canManageWorkspace,
-  canViewInternalPages,
-  isExternalRole,
-} from '@/lib/permissions'
+import { canViewInternalPages, isExternalRole } from '@/lib/permissions'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const PROJECT_STATUSES = [
   'Planning',
@@ -101,6 +95,7 @@ const INTERNAL_ROLE_LABELS: Record<string, string> = {
 }
 
 export default function ProjectsPage() {
+  const { session: accessSession, can } = useAccessSession()
   const [projects, setProjects] = useState<any[]>([])
   const [projectTasks, setProjectTasks] = useState<any[]>([])
   const [archivedProjects, setArchivedProjects] = useState<any[]>([])
@@ -179,8 +174,8 @@ export default function ProjectsPage() {
   const { setProject } = useProjectStore()
 
   useEffect(() => {
-    loadHub()
-  }, [])
+    if (!accessSession.loading) void loadHub()
+  }, [accessSession.loading, accessSession.workspaceId, accessSession.permissionProfileKey])
 
   async function loadHub() {
     setLoading(true)
@@ -250,10 +245,13 @@ export default function ProjectsPage() {
     const isInternalUser = userRoles.some(role => canViewInternalPages(role))
     const isExternalUser = userRoles.some(role => isExternalRole(role))
 
-    setCanAccessAdmin(userRoles.some(role => canAccessAdminConsole(role)))
-    setCanCreateItems(userRoles.some(role => canCreateWorkspaceItems(role)))
-    setCanEditProjects(userRoles.some(role => canEditProjectInfo(role)))
-    setCanDeleteItems(userRoles.some(role => canManageWorkspace(role)))
+    setCanAccessAdmin(can('workspace.manage', { scopeType: 'workspace' }))
+    setCanCreateItems(
+      can('portfolio.edit', { scopeType: 'workspace' }) ||
+      can('project.manage', { scopeType: 'workspace' })
+    )
+    setCanEditProjects(can('project.edit'))
+    setCanDeleteItems(can('project.delete', { scopeType: 'workspace' }))
 
     const [
       { data: orgs, error: orgError },
@@ -331,6 +329,15 @@ export default function ProjectsPage() {
   }
 
   function openEditProject(project: any) {
+    if (!can('project.edit', { scopeType: 'project', scopeId: project.id })) {
+      showNotice({
+        variant: 'danger',
+        title: 'Project access required',
+        message: 'You do not have permission to edit this project.',
+        confirmLabel: 'Close',
+      })
+      return
+    }
     setEditingProject(project)
     setEditProjectName(project.project_name || '')
     setEditProjectStatus(project.status || 'Planning')
@@ -346,7 +353,11 @@ export default function ProjectsPage() {
   }
 
   async function updateProject() {
-    if (!canEditProjects || !editingProject || !editProjectName.trim()) return
+    if (
+      !editingProject ||
+      !editProjectName.trim() ||
+      !can('project.edit', { scopeType: 'project', scopeId: editingProject.id })
+    ) return
 
     const { error } = await supabase
       .from('projects')
