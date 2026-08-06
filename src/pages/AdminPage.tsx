@@ -149,7 +149,7 @@ export default function WorkspaceAdminPage() {
       supabase.from('organizations').select('*').order('created_at'),
       supabase.from('portfolios').select('*').order('created_at'),
       supabase.from('projects').select('*').order('id'),
-      supabase.from('memberships').select('*').order('created_at'),
+      supabase.from('workspace_member_access_summary').select('*').order('user_id'),
       supabase
         .from('team_invitations')
         .select('*')
