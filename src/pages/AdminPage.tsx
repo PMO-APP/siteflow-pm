@@ -18,6 +18,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMembershipStore } from '@/store/membership'
 import { canManageUsers, canManageWorkspace } from '@/lib/permissions'
 import ProjectAccessMatrix from '@/pages/admin/ProjectAccessMatrix'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
 
 const baseAdminTabs = [
   'Overview',
@@ -88,6 +89,7 @@ export default function WorkspaceAdminPage() {
   const { user, signOut } = useAuthStore()
   const role = useMembershipStore(state => state.role)
   const navigate = useNavigate()
+  const { activeWorkspace } = useWorkspace()
 
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
@@ -134,7 +136,7 @@ export default function WorkspaceAdminPage() {
 
   useEffect(() => {
     loadAdminData()
-  }, [])
+  }, [activeWorkspace?.id])
 
   async function loadAdminData() {
     setLoading(true)
@@ -149,7 +151,9 @@ export default function WorkspaceAdminPage() {
       supabase.from('organizations').select('*').order('created_at'),
       supabase.from('portfolios').select('*').order('created_at'),
       supabase.from('projects').select('*').order('id'),
-      supabase.from('workspace_member_access_summary').select('*').order('user_id'),
+      activeWorkspace?.id
+        ? supabase.from('workspace_member_access_summary').select('*').eq('workspace_id', activeWorkspace.id).order('full_name')
+        : Promise.resolve({ data: [], error: null }),
       supabase
         .from('team_invitations')
         .select('*')
