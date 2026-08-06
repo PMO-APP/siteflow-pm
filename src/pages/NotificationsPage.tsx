@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import {
   createAnnouncement, getNotificationPreference, listAnnouncements, listNotifications,
   markNotificationRead, markNotificationsRead, saveNotificationPreference
@@ -18,6 +19,7 @@ export default function NotificationsPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
+  const {can}=useAccessSession()
   const { projectId } = useProjectStore()
   const { activeWorkspace } = useWorkspace()
   const [tab,setTab]=useState<Tab>('inbox')
@@ -28,7 +30,7 @@ export default function NotificationsPage() {
   const [message,setMessage]=useState('')
   const [showAnnouncement,setShowAnnouncement]=useState(false)
 
-  const isAdmin=['workspace_admin','admin','pmo'].includes(role||'')
+  const canAnnounce=can('notifications.announce')
 
   async function load(){
     if(!activeWorkspace||!user)return
@@ -59,7 +61,7 @@ export default function NotificationsPage() {
       <section className="rounded-[26px] border border-[#dfe3e7] bg-white p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#df5f41]">Communication centre</div><h1 className="mt-2 text-3xl font-semibold text-[#102943]">Notifications & Announcements</h1><p className="mt-2 max-w-3xl text-sm text-[#6f7d89]">Review project alerts, management announcements and the communication preferences that control how updates reach you.</p></div>
-          <div className="flex gap-2">{isAdmin&&<button onClick={()=>setShowAnnouncement(true)} className="btn btn-ghost"><Plus size={15}/>New announcement</button>}<button onClick={()=>void load()} className="btn btn-gold"><RefreshCw size={15}/>Refresh</button></div>
+          <div className="flex gap-2">{canAnnounce&&<button onClick={()=>setShowAnnouncement(true)} className="btn btn-ghost"><Plus size={15}/>New announcement</button>}<button onClick={()=>void load()} className="btn btn-gold"><RefreshCw size={15}/>Refresh</button></div>
         </div>
       </section>
 
