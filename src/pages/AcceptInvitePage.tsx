@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { completeCanonicalInvitation } from '@/auth/canonicalInvitationService'
+import { completeCanonicalInvitation, loadCanonicalInvitation } from '@/auth/canonicalInvitationService'
 import {
   CheckCircle,
   AlertTriangle,
@@ -177,9 +177,7 @@ const projectIds = getProjectIds()
       }
 
       await completeCanonicalInvitation({
-        invite,
-        userId,
-        email,
+        token,
         fullName:fullName.trim(),
       })
 
