@@ -43,17 +43,6 @@ export default function SignUpPage() {
         throw new Error('Password must be at least 8 characters.')
       }
 
-      const { data: existingOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('slug', orgSlug)
-        .maybeSingle()
-
-      if (existingOrg) {
-        throw new Error(
-          'This organization already exists. Please ask your workspace administrator to invite you.'
-        )
-      }
 
       const { data: signUpData, error: signUpError } =
         await supabase.auth.signUp({
@@ -88,19 +77,7 @@ export default function SignUpPage() {
 
       if (profileError) throw profileError
 
-      const { data: organization, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: cleanOrgName,
-          slug: orgSlug,
-          created_by: userId,
-        })
-        .select()
-        .single()
-
-      if (orgError) throw orgError
-
-      // Tenant and workspace membership are created by the PXE setup wizard after sign-in.
+      // Tenant account, workspace and canonical membership are created by PXE after verified sign-in.
 
 
       setName('')
@@ -109,7 +86,7 @@ export default function SignUpPage() {
       setPassword('')
 
       setSuccess(
-        `Workspace created successfully. Your workspace URL will be pmocorex.com/${orgSlug}. Please check your email to verify your account before signing in.`
+        `Account created successfully. Please verify your email, sign in, and complete the PMOCorex workspace setup for ${cleanOrgName}.`
       )
     } catch (err: any) {
       const msg = err.message?.toLowerCase() || ''
