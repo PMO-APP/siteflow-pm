@@ -21,12 +21,6 @@ import {
   RotateCcw,
   Trash2,
   X,
-  HelpCircle,
-  MessageSquarePlus,
-  Rocket,
-  Sparkles,
-  PlayCircle,
-  Keyboard,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -185,12 +179,6 @@ export default function ProjectsPage() {
   const { setProject } = useProjectStore()
 
   useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem('pmocorex_onboarding_seen') === 'true'
-    if (!hasSeenOnboarding) {
-      localStorage.setItem('pmocorex_onboarding_seen', 'true')
-      navigate('/onboarding?welcome=1')
-      return
-    }
     loadHub()
   }, [])
 
@@ -214,9 +202,9 @@ export default function ProjectsPage() {
     setDisplayName(String(rawDisplayName).trim().split(/\s+/)[0] || 'there')
 
     const { data: membershipRows, error: membershipError } = await supabase
-      .from('memberships')
+      .from('workspace_member_access_summary')
       .select('*')
-      .or(`user_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
+      .eq('user_id', currentUser.id)
 
     if (membershipError) {
       showNotice({ variant: 'danger', title: 'Unable to load access', message: membershipError.message, confirmLabel: 'Close' })
@@ -224,7 +212,22 @@ export default function ProjectsPage() {
       return
     }
 
-    const memberRows = membershipRows || []
+    const memberRows = (membershipRows || []).map((row:any) => {
+      const assignments = Array.isArray(row.assignments) ? row.assignments : []
+      const projectIds = assignments
+        .filter((item:any) => item.scopeType === 'project' && item.scopeId != null)
+        .map((item:any) => Number(item.scopeId))
+        .filter(Number.isFinite)
+      const hasWorkspace = assignments.some((item:any) => item.scopeType === 'workspace')
+      return {
+        ...row,
+        email: row.email || cleanEmail,
+        full_name: row.full_name || rawDisplayName,
+        access_scope: hasWorkspace ? 'workspace' : projectIds.length ? 'project' : null,
+        project_ids: projectIds,
+        project_id: projectIds[0] || null,
+      }
+    })
     setMemberships(memberRows)
 
     if (memberRows.length === 0) {
@@ -719,7 +722,7 @@ export default function ProjectsPage() {
   const greeting = getGreeting()
 
   return (
-    <div data-tour="workspace-hub" className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
+    <div className="min-h-dvh bg-[#f7f8f6] text-[#183044]">
       <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
           <button type="button" onClick={() => navigate('/')} className="text-left">
@@ -735,25 +738,6 @@ export default function ProjectsPage() {
               aria-label="Open my profile"
             >
               <UserCircle size={19} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/product-centre?tab=help')}
-              className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
-              title="Help Centre"
-            >
-              <HelpCircle size={16} />
-              <span>Help</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/feedback?new=1&scope=workspace')}
-              className="hidden h-10 items-center gap-2 rounded-xl px-3.5 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm sm:inline-flex"
-              title="Feedback"
-            >
-              <MessageSquarePlus size={16} />
-              <span>Feedback</span>
             </button>
 
             {canAccessAdmin && (
@@ -808,33 +792,6 @@ export default function ProjectsPage() {
         </section>
 
         <PersonalWorkspacePanel />
-
-        <section className="hub-panel overflow-hidden">
-          <div className="grid gap-0 lg:grid-cols-[0.8fr_1.2fr]">
-            <div className="bg-[#173f5f] p-6 text-white sm:p-7">
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-white/50">Product Centre</div>
-              <h2 className="mt-2 text-2xl font-extrabold">Need help getting something done?</h2>
-              <p className="mt-3 text-sm leading-6 text-white/70">
-                Search guidance, complete onboarding, see what changed or send feedback without entering a project.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/product-centre')}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#173f5f]"
-              >
-                Open Product Centre <ArrowRight size={15} />
-              </button>
-            </div>
-            <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-7 xl:grid-cols-3">
-              <ProductCentreAction icon={HelpCircle} title="Search Help" text="Find guides and troubleshooting." onClick={() => navigate('/product-centre?tab=help')} />
-              <ProductCentreAction icon={MessageSquarePlus} title="Submit Feedback" text="Report a problem or suggest an improvement." onClick={() => navigate('/feedback?new=1&scope=workspace')} />
-              <ProductCentreAction icon={Rocket} title="Onboarding" text="Complete workspace setup steps." onClick={() => navigate('/onboarding')} />
-              <ProductCentreAction icon={Sparkles} title="What's New" text="Review features and fixes." onClick={() => navigate('/product-centre?tab=updates')} />
-              <ProductCentreAction icon={PlayCircle} title="Training Guides" text="Learn PMOCorex workflows." onClick={() => navigate('/product-centre?tab=help')} />
-              <ProductCentreAction icon={Keyboard} title="Shortcuts" text="Use Ctrl + K and move faster." onClick={() => navigate('/product-centre?tab=shortcuts')} />
-            </div>
-          </div>
-        </section>
 
         <section className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
           <div className="hub-panel p-6 sm:p-7">
@@ -908,7 +865,7 @@ export default function ProjectsPage() {
               return (
                 <div
                   key={portfolio.id}
-                  data-tour="portfolio-card" className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
+                  className="group rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_32px_rgba(31,70,104,0.06)] transition hover:-translate-y-1 hover:border-[#b9cedd] hover:shadow-[0_16px_40px_rgba(31,70,104,0.1)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#eaf1f4] text-[#2f6f91]">
@@ -1291,7 +1248,7 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
   return (
     <tr className="border-t border-[#e2e9ed] bg-white transition hover:bg-[#f9fbfb]">
       <td className="px-6 py-4">
-        <button data-tour="project-open" onClick={onOpen} className="text-left">
+        <button onClick={onOpen} className="text-left">
           <div className="font-bold text-[#173f5f] hover:text-[#e87545]">{project.project_name}</div>
           <div className="mt-1 text-xs text-[#7c8d97]">{project.location || 'No location set'}</div>
         </button>
@@ -1388,31 +1345,6 @@ function getGreeting() {
 
 function capitalize(value: string) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value
-}
-
-
-function ProductCentreAction({
-  icon: Icon,
-  title,
-  text,
-  onClick,
-}: {
-  icon: any
-  title: string
-  text: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-2xl border border-[#dbe5ee] bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-[#b9cedd] hover:shadow-md"
-    >
-      <Icon size={18} className="text-[#2f6f91]" />
-      <div className="mt-3 text-sm font-extrabold text-[#173f5f]">{title}</div>
-      <div className="mt-1 text-xs leading-5 text-[#6d7f8b]">{text}</div>
-    </button>
-  )
 }
 
 function formatDate(value: string | null) {
