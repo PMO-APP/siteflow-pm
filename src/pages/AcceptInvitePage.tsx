@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  LogOut,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -35,6 +36,18 @@ type InvitationData = {
   expires_at?: string | null
 }
 
+function isMissingSessionError(error: unknown) {
+  if (!(error instanceof Error)) return false
+
+  const message = error.message.toLowerCase()
+
+  return (
+    message.includes('auth session missing') ||
+    message.includes('session missing') ||
+    message.includes('no session')
+  )
+}
+
 export default function AcceptInvitePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -46,7 +59,9 @@ export default function AcceptInvitePage() {
   const [invite, setInvite] = useState<InvitationData | null>(null)
   const [error, setError] = useState('')
   const [accepted, setAccepted] = useState(false)
+
   const [signedInUserId, setSignedInUserId] = useState<string | null>(null)
+  const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
 
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -82,21 +97,30 @@ export default function AcceptInvitePage() {
       .filter(Number.isFinite)
   }
 
+  async function loadCurrentUser() {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession()
+
+    if (sessionError && !isMissingSessionError(sessionError)) {
+      throw sessionError
+    }
+
+    const user = session?.user || null
+
+    setSignedInUserId(user?.id || null)
+    setSignedInEmail(user?.email?.toLowerCase() || null)
+
+    return user
+  }
+
   async function loadInvite() {
     setLoading(true)
     setError('')
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
-      if (userError) {
-        throw userError
-      }
-
-      setSignedInUserId(user?.id || null)
+      await loadCurrentUser()
 
       if (!token) {
         setError('Invite token is missing.')
@@ -137,6 +161,65 @@ export default function AcceptInvitePage() {
     }
   }
 
+  async function createAccountAndSession(
+    email: string,
+    cleanFullName: string,
+    role: string
+  ) {
+    const {
+      data: signUpData,
+      error: signUpError,
+    } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: cleanFullName,
+          role,
+        },
+      },
+    })
+
+    if (signUpError) {
+      const message = signUpError.message.toLowerCase()
+
+      if (
+        message.includes('already registered') ||
+        message.includes('already exists') ||
+        message.includes('user already registered')
+      ) {
+        throw new Error(
+          'An account already exists for this email. Use Sign in instead, then return to this invitation.'
+        )
+      }
+
+      throw signUpError
+    }
+
+    if (!signUpData.user) {
+      throw new Error('The account could not be created.')
+    }
+
+    /*
+     * When email confirmation is disabled, signUpData.session is returned
+     * immediately and the invitation can be accepted in this same flow.
+     */
+    if (signUpData.session) {
+      setSignedInUserId(signUpData.user.id)
+      setSignedInEmail(signUpData.user.email?.toLowerCase() || email)
+
+      return signUpData.user
+    }
+
+    /*
+     * When email confirmation is enabled, Supabase creates the user but does
+     * not issue a session until the email is confirmed.
+     */
+    throw new Error(
+      'Your account has been created. Please verify your email, then reopen this invitation link to complete your access.'
+    )
+  }
+
   async function acceptInvite() {
     if (!invite) {
       setError(
@@ -145,128 +228,64 @@ export default function AcceptInvitePage() {
       return
     }
 
-    /*
-     * searchParams.get() returns string | null.
-     * This guard narrows token to string for the rest of this function.
-     */
     if (!token) {
       setError('Invite token is missing.')
       return
     }
 
     const cleanFullName = fullName.trim()
+    const invitedEmail = invite.email?.trim().toLowerCase()
+    const role = cleanRole(invite.role) || 'viewer'
 
     if (!cleanFullName) {
       setError('Full name is required.')
       return
     }
 
-    if (!invite.email?.trim()) {
+    if (!invitedEmail) {
       setError('The invitation does not contain a valid email address.')
       return
-    }
-
-    if (!signedInUserId) {
-      if (!password || password.length < 6) {
-        setError('Password must be at least 6 characters.')
-        return
-      }
-
-      if (password !== confirmPassword) {
-        setError('Passwords do not match.')
-        return
-      }
     }
 
     setError('')
     setSubmitting(true)
 
     try {
-      const email = invite.email.trim().toLowerCase()
-      const invitedRole = cleanRole(invite.role)
-      const role = invitedRole || 'viewer'
+      let currentUser = await loadCurrentUser()
 
-      let userId = signedInUserId
+      if (currentUser) {
+        const currentEmail = currentUser.email?.toLowerCase()
 
-      if (userId) {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
-
-        if (userError) {
-          throw userError
-        }
-
-        if (!user) {
-          setSignedInUserId(null)
+        if (!currentEmail || currentEmail !== invitedEmail) {
           setError(
-            'Your session has expired. Please sign in again and reopen the invitation link.'
-          )
-          return
-        }
-
-        if (!user.email || user.email.toLowerCase() !== email) {
-          setError(
-            'This invitation belongs to a different email address. Please sign in with the invited account.'
+            'This invitation belongs to a different email address. Please sign out and use the invited account.'
           )
           return
         }
       } else {
-        const {
-          data: signUpData,
-          error: signUpError,
-        } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: cleanFullName,
-              role,
-            },
-          },
-        })
-
-        if (signUpError) {
-          const errorMessage = signUpError.message.toLowerCase()
-
-          if (
-            errorMessage.includes('already registered') ||
-            errorMessage.includes('already exists')
-          ) {
-            setError(
-              'An account already exists for this email. Sign in, then reopen this invitation link.'
-            )
-            return
-          }
-
-          throw signUpError
-        }
-
-        userId = signUpData.user?.id || null
-
-        if (!userId) {
-          setError(
-            'The account was created, but the user profile was not returned.'
-          )
+        if (!password || password.length < 6) {
+          setError('Password must be at least 6 characters.')
           return
         }
 
-        if (!signUpData.session) {
-          setError(
-            'Your account has been created. Verify your email, sign in, then reopen this invitation link to complete your access.'
-          )
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.')
           return
         }
 
-        setSignedInUserId(userId)
+        currentUser = await createAccountAndSession(
+          invitedEmail,
+          cleanFullName,
+          role
+        )
       }
 
-      /*
-       * Milestone 3.8:
-       * The database RPC validates the signed-in email, invitation status,
-       * expiry, workspace membership and scoped assignments transactionally.
-       */
+      if (!currentUser) {
+        throw new Error(
+          'Your account could not be authenticated. Please try again.'
+        )
+      }
+
       await completeCanonicalInvitation({
         token,
         fullName: cleanFullName,
@@ -286,10 +305,42 @@ export default function AcceptInvitePage() {
     }
   }
 
+  async function switchAccount() {
+    setError('')
+
+    const { error: signOutError } = await supabase.auth.signOut()
+
+    if (signOutError) {
+      setError(signOutError.message)
+      return
+    }
+
+    setSignedInUserId(null)
+    setSignedInEmail(null)
+    setPassword('')
+    setConfirmPassword('')
+  }
+
+  function goToSignIn() {
+    const redirectPath = token
+      ? `/accept-invite?token=${encodeURIComponent(token)}`
+      : '/projects'
+
+    navigate(
+      `/login?redirect=${encodeURIComponent(redirectPath)}`
+    )
+  }
+
   const inviteScope = getInviteScope()
   const projectCount = getProjectIds().length
   const roleLabel = cleanRole(invite?.role) || 'team member'
   const isExternal = EXTERNAL_ROLES.includes(roleLabel)
+
+  const invitedEmail = invite?.email?.trim().toLowerCase() || ''
+  const signedInWithWrongAccount =
+    Boolean(signedInEmail) &&
+    Boolean(invitedEmail) &&
+    signedInEmail !== invitedEmail
 
   if (loading) {
     return (
@@ -323,14 +374,12 @@ export default function AcceptInvitePage() {
                 navigate(
                   isExternal
                     ? '/external-project'
-                    : '/mixta-admin-login'
+                    : '/projects'
                 )
               }
               className="btn-gold btn w-full justify-center mt-6"
             >
-              {isExternal
-                ? 'Go to External Portal'
-                : 'Go to Login'}
+              Enter PMOCorex
             </button>
           </>
         ) : (
@@ -347,7 +396,7 @@ export default function AcceptInvitePage() {
               <p className="text-[#6e7d8c] mt-3">
                 You have been invited as{' '}
                 <span className="text-[#c49e48] font-semibold">
-                  {roleLabel}
+                  {roleLabel.replace(/_/g, ' ')}
                 </span>
                 .
               </p>
@@ -360,10 +409,17 @@ export default function AcceptInvitePage() {
               </div>
             )}
 
-            {signedInUserId && invite && (
+            {signedInUserId && !signedInWithWrongAccount && invite && (
               <div className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-300">
                 You are already signed in. Confirm your name and activate
                 the invitation.
+              </div>
+            )}
+
+            {!signedInUserId && invite && (
+              <div className="mt-4 rounded-xl border border-sky-400/20 bg-sky-400/10 p-3 text-sm text-sky-300">
+                Create your PMOCorex account and password to accept this
+                invitation.
               </div>
             )}
 
@@ -375,6 +431,17 @@ export default function AcceptInvitePage() {
                 />
                 <span>{error}</span>
               </div>
+            )}
+
+            {signedInWithWrongAccount && (
+              <button
+                type="button"
+                onClick={() => void switchAccount()}
+                className="mt-3 w-full rounded-xl border border-[#1d4f70] px-4 py-3 text-sm font-semibold text-[#1d4f70] flex items-center justify-center gap-2"
+              >
+                <LogOut size={16} />
+                Sign out and switch account
+              </button>
             )}
 
             {invite && (
@@ -475,14 +542,14 @@ export default function AcceptInvitePage() {
                 <button
                   type="button"
                   onClick={() => void acceptInvite()}
-                  disabled={submitting}
+                  disabled={submitting || signedInWithWrongAccount}
                   className="btn-gold btn w-full justify-center mt-6"
                 >
                   {submitting
                     ? 'Activating…'
                     : signedInUserId
                       ? 'Accept Invitation'
-                      : 'Activate Account'}
+                      : 'Create Account and Accept Invitation'}
                 </button>
               </>
             )}
@@ -495,17 +562,7 @@ export default function AcceptInvitePage() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    const redirect = token
-                      ? `/accept-invite?token=${encodeURIComponent(token)}`
-                      : '/projects'
-
-                    navigate(
-                      `/mixta-admin-login?redirect=${encodeURIComponent(
-                        redirect
-                      )}`
-                    )
-                  }}
+                  onClick={goToSignIn}
                   className="text-[#c49e48] text-sm hover:underline"
                 >
                   Sign in
