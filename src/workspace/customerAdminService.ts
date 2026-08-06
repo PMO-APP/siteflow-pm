@@ -112,7 +112,7 @@ export async function loadCustomerAdministration(
   let identities: any[] = []
   if (userIds.length) {
     const { data } = await supabase
-      .from('memberships')
+      .from('workspace_members')
       .select('user_id,email,full_name')
       .in('user_id', userIds)
     identities = data || []
