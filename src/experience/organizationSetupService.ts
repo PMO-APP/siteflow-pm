@@ -31,22 +31,31 @@ export type ExistingOrganization={
 }
 
 export async function findUserOrganization(userId:string){
-  const {data:membership,error:membershipError}=await supabase
-    .from('memberships')
-    .select('organization_id')
+  const {data:member,error:memberError}=await supabase
+    .from('workspace_members')
+    .select('legacy_organization_id,is_default')
     .eq('user_id',userId)
-    .not('organization_id','is',null)
+    .order('is_default',{ascending:false})
     .limit(1)
     .maybeSingle()
-  if(membershipError)throw membershipError
+  if(memberError)throw memberError
 
-  if(membership?.organization_id){
-    const {data,error}=await supabase.from('organizations').select('*').eq('id',membership.organization_id).maybeSingle()
+  if(member?.legacy_organization_id){
+    const {data,error}=await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id',member.legacy_organization_id)
+      .maybeSingle()
     if(error)throw error
     return data as ExistingOrganization|null
   }
 
-  const {data,error}=await supabase.from('organizations').select('*').eq('created_by',userId).limit(1).maybeSingle()
+  const {data,error}=await supabase
+    .from('organizations')
+    .select('*')
+    .eq('created_by',userId)
+    .limit(1)
+    .maybeSingle()
   if(error)throw error
   return data as ExistingOrganization|null
 }
