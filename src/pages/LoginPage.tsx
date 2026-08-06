@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { getWorkspaceHome, resolveWorkspace } from '@/platform/access'
+import { resolveCanonicalLoginPath } from '@/auth/canonicalAuthService'
 
 function LoginBrand() {
   return (
@@ -79,20 +79,6 @@ export default function LoginPage() {
     }
   }, [])
 
-  async function getLoginRedirectPath(userId: string, userEmail: string) {
-    const cleanEmail = userEmail.toLowerCase().trim()
-    const { data: memberships, error } = await supabase
-      .from('workspace_members')
-      .select('role, workspace_type, is_default')
-      .eq('user_id', userId)
-      .order('is_default', { ascending: false })
-
-    if (error) throw error
-    const rows = memberships || []
-    const externalMembership = rows.find(item => resolveWorkspace(item.role, item.workspace_type) !== 'internal')
-    const selectedMembership = externalMembership || rows.find(item => item.is_default) || rows[0]
-    return getWorkspaceHome(resolveWorkspace(selectedMembership?.role, selectedMembership?.workspace_type))
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -120,7 +106,7 @@ export default function LoginPage() {
         navigate('/projects')
         return
       }
-      navigate(await getLoginRedirectPath(user.id, cleanEmail))
+      navigate(await resolveCanonicalLoginPath(user.id))
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in. Please try again.')
     } finally {
