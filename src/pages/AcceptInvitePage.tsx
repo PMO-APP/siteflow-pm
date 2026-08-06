@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { addCanonicalAssignment, createCanonicalWorkspaceMember } from '@/access/canonicalMembershipAdminService'
 import {
   CheckCircle,
   AlertTriangle,
@@ -178,24 +179,31 @@ const projectIds = getProjectIds()
         return
       }
 
-      if (inviteScope === 'workspace') {
-        const { error: membershipError } = await supabase
-          .from('memberships')
-          .insert({
-            user_id: userId,
-            organization_id: invite.organization_id || 1,
-            email,
-            full_name: fullName,
-            role,
-            access_scope: 'workspace',
-            project_id: null,
-            portfolio_id: null,
-          })
+      const workspaceId = String(invite.workspace_id || '')
+      if (!workspaceId) {
+        setError('This invitation is not linked to a workspace.')
+        return
+      }
 
-        if (membershipError) {
-          setError(membershipError.message)
-          return
-        }
+      await createCanonicalWorkspaceMember({
+        workspaceId,
+        userId,
+        role,
+        email,
+        fullName,
+        workspaceType: invite.workspace_type || 'internal',
+        portalRole: invite.portal_role || role,
+        isDefault: true,
+      })
+
+      if (inviteScope === 'workspace') {
+        await addCanonicalAssignment({
+          workspaceId,
+          userId,
+          scopeType: 'workspace',
+          accessLevel: ['workspace_admin','admin','pmo'].includes(role) ? 'manage' : 'view',
+          role,
+        })
       }
 
       if (inviteScope === 'project') {
@@ -204,24 +212,15 @@ const projectIds = getProjectIds()
           return
         }
 
-        const membershipRows = projectIds.map(projectId => ({
-          user_id: userId,
-          organization_id: invite.organization_id || 1,
-          email,
-          full_name: fullName,
-          role,
-          access_scope: 'project',
-          project_id: projectId,
-          portfolio_id: null,
-        }))
-
-        const { error: membershipError } = await supabase
-          .from('memberships')
-          .insert(membershipRows)
-
-        if (membershipError) {
-          setError(membershipError.message)
-          return
+        for (const projectId of projectIds) {
+          await addCanonicalAssignment({
+            workspaceId,
+            userId,
+            scopeType: 'project',
+            scopeId: projectId,
+            accessLevel: 'edit',
+            role,
+          })
         }
 
         const teamRows = projectIds.map(projectId => ({
