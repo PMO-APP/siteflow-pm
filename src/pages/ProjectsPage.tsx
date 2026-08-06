@@ -28,7 +28,6 @@ import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
 import PersonalWorkspacePanel from '@/components/personalization/PersonalWorkspacePanel'
-import { canViewInternalPages, isExternalRole } from '@/lib/permissions'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const PROJECT_STATUSES = [
@@ -242,8 +241,8 @@ export default function ProjectsPage() {
       String(membership.role || '').toLowerCase().trim()
     )
 
-    const isInternalUser = userRoles.some(role => canViewInternalPages(role))
-    const isExternalUser = userRoles.some(role => isExternalRole(role))
+    const isExternalUser = accessSession.workspaceType === 'external'
+    const isInternalUser = !isExternalUser
 
     setCanAccessAdmin(can('workspace.manage', { scopeType: 'workspace' }))
     setCanCreateItems(
