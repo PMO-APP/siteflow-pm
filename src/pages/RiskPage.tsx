@@ -1,6 +1,5 @@
 import { useProjectStore } from '@/store/project'
 import { getRole } from '@/lib/access'
-import { canEditRisk } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, Shield } from 'lucide-react'
 import { useRisks, useUpsertRisk } from '@/hooks/useData'
@@ -11,6 +10,7 @@ import { Drawer, TableSkeleton } from '@/components/ui'
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { riskIntelligence } from '@/lib/intelligence'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const CATEGORIES: Risk['category'][] = ['Procurement', 'Programme', 'Design', 'Financial', 'Safety', 'External', 'Contractor']
 const STATUSES: Risk['status'][] = ['Open', 'Mitigated', 'Closed', 'Transferred']
@@ -155,7 +155,8 @@ export default function RiskPage() {
 
   const role = getRole(user?.email)
 
-  const canEdit = canEditRisk(role)
+  const { can } = useAccessSession()
+  const canEdit = can('risk.edit')
   const [modal, setModal] = useState<Risk | null | 'new'>(null)
 
   useQuickActionRoute(() => setModal('new'), canEdit)
