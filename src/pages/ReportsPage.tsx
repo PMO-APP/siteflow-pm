@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
-import { canExportReports } from '@/lib/permissions'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import ReportDocument from '@/components/reports/ReportDocument'
 import {
   useWeeklyReports,
@@ -33,19 +33,6 @@ import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { ExecutiveHealthReportPanel, HealthHistoryChart } from '@/components/health'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
-const PMO_ROLES = ['workspace_admin', 'admin', 'pmo']
-
-function isPMO(role?: string | null) {
-  return PMO_ROLES.includes(role || '')
-}
-
-function inferDiscipline(role?: string | null) {
-  if (role === 'housebuild') return 'Housebuild'
-  if (role === 'infrastructure') return 'Infrastructure'
-  if (role === 'mep') return 'MEP'
-  return ''
-}
-
 function workflowBadge(status?: string | null) {
   if (status === 'Approved' || status === 'Locked') return 'badge-green'
   if (status === 'Submitted' || status === 'Resubmitted') return 'badge-amber'
@@ -127,10 +114,11 @@ function buildSnapshotHealth(report: any, liveHealth: any) {
 export default function ReportsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
+  const {session,can}=useAccessSession()
   const { user } = useAuthStore()
 
-  const canExport = canExportReports(role)
-  const canReview = isPMO(role)
+  const canExport = can('reports.export',{scopeType:'project',scopeId:projectId})
+  const canReview = can('reports.review',{scopeType:'project',scopeId:projectId})
 
   const reportRef = useRef<HTMLDivElement>(null)
   const allReportsRef = useRef<HTMLDivElement>(null)
@@ -206,7 +194,7 @@ export default function ReportsPage() {
     !isApproved
 
   const emptyForm = {
-    department: inferDiscipline(role),
+    department: session.discipline ? session.discipline.charAt(0).toUpperCase()+session.discipline.slice(1) : '',
     block_id: '',
     package_name: '',
     contractor_name: '',
@@ -487,7 +475,7 @@ export default function ReportsPage() {
   function openNewReport() {
     setReportForm({
       ...emptyForm,
-      department: inferDiscipline(role),
+      department: session.discipline ? session.discipline.charAt(0).toUpperCase()+session.discipline.slice(1) : '',
       reporting_officer: user?.full_name || '',
       reporting_officer_email: user?.email || '',
     })
