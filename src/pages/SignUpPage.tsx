@@ -100,20 +100,8 @@ export default function SignUpPage() {
 
       if (orgError) throw orgError
 
-      const { error: membershipError } = await supabase
-        .from('memberships')
-        .insert({
-          user_id: userId,
-          organization_id: organization.id,
-          email: cleanEmail,
-          full_name: cleanName,
-          role: 'workspace_admin',
-          access_scope: 'workspace',
-          portfolio_id: null,
-          project_id: null,
-        })
+      // Tenant and workspace membership are created by the PXE setup wizard after sign-in.
 
-      if (membershipError) throw membershipError
 
       setName('')
       setOrganizationName('')
