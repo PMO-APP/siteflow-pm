@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { addCanonicalAssignment, createCanonicalWorkspaceMember } from '@/access/canonicalMembershipAdminService'
+import { completeCanonicalInvitation } from '@/auth/canonicalInvitationService'
 import {
   CheckCircle,
   AlertTriangle,
@@ -26,6 +26,7 @@ export default function AcceptInvitePage() {
   const [invite, setInvite] = useState<any>(null)
   const [error, setError] = useState('')
   const [accepted, setAccepted] = useState(false)
+  const [signedInUserId, setSignedInUserId] = useState<string | null>(null)
 
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -58,6 +59,9 @@ export default function AcceptInvitePage() {
   }
 
   async function loadInvite() {
+    const {data:{user}}=await supabase.auth.getUser()
+    setSignedInUserId(user?.id||null)
+
     if (!token) {
       setError('Invite token is missing.')
       setLoading(false)
@@ -103,14 +107,16 @@ export default function AcceptInvitePage() {
       return
     }
 
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters.')
-      return
-    }
+    if (!signedInUserId) {
+      if (!password || password.length < 6) {
+        setError('Password must be at least 6 characters.')
+        return
+      }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.')
-      return
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.')
+        return
+      }
     }
 
     try {
@@ -134,126 +140,48 @@ const role = invitedRole
 const inviteScope = getInviteScope()
 const projectIds = getProjectIds()
 
-      const { data: signUpData, error: signUpError } =
-        await supabase.auth.signUp({
+      let userId=signedInUserId
+
+      if(userId){
+        const {data:{user},error:userError}=await supabase.auth.getUser()
+        if(userError)throw userError
+        if(!user?.email||user.email.toLowerCase()!==email){
+          setError('This invitation belongs to a different email address.')
+          return
+        }
+      }else{
+        const {data:signUpData,error:signUpError}=await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-              role,
-            },
-          },
+          options:{data:{full_name:fullName,role}},
         })
 
-      if (signUpError) {
-        if (
-          signUpError.message.toLowerCase().includes('already registered')
-        ) {
-          setError(
-            'An account already exists for this email. Please sign in instead.'
-          )
+        if(signUpError){
+          if(signUpError.message.toLowerCase().includes('already registered')){
+            setError('An account already exists for this email. Sign in, then reopen this invitation link.')
+            return
+          }
+          throw signUpError
+        }
+
+        userId=signUpData.user?.id||null
+        if(!userId){
+          setError('Account created, but the user profile was not returned.')
           return
         }
 
-        setError(signUpError.message)
-        return
+        if(!signUpData.session){
+          setError('Account created. Verify your email, sign in, then reopen this invitation link to complete access.')
+          return
+        }
       }
 
-      const userId = signUpData.user?.id
-
-      if (!userId) {
-        setError('Account created, but user profile was not returned.')
-        return
-      }
-
-      const { error: profileError } = await supabase.from('profiles').upsert({
-  id: userId,
-  email,
-  full_name: fullName,
-  role: profileRole,
-  updated_at: new Date().toISOString(),
-})
-      if (profileError) {
-        setError(profileError.message)
-        return
-      }
-
-      const workspaceId = String(invite.workspace_id || '')
-      if (!workspaceId) {
-        setError('This invitation is not linked to a workspace.')
-        return
-      }
-
-      await createCanonicalWorkspaceMember({
-        workspaceId,
+      await completeCanonicalInvitation({
+        invite,
         userId,
-        role,
         email,
-        fullName,
-        workspaceType: invite.workspace_type || 'internal',
-        portalRole: invite.portal_role || role,
-        isDefault: true,
+        fullName:fullName.trim(),
       })
-
-      if (inviteScope === 'workspace') {
-        await addCanonicalAssignment({
-          workspaceId,
-          userId,
-          scopeType: 'workspace',
-          accessLevel: ['workspace_admin','admin','pmo'].includes(role) ? 'manage' : 'view',
-          role,
-        })
-      }
-
-      if (inviteScope === 'project') {
-        if (projectIds.length === 0) {
-          setError('No project was attached to this invitation.')
-          return
-        }
-
-        for (const projectId of projectIds) {
-          await addCanonicalAssignment({
-            workspaceId,
-            userId,
-            scopeType: 'project',
-            scopeId: projectId,
-            accessLevel: 'edit',
-            role,
-          })
-        }
-
-        const teamRows = projectIds.map(projectId => ({
-  project_id: projectId,
-  email,
-  full_name: fullName,
-  role,
-}))
-
-        const { error: teamError } = await supabase
-          .from('project_team_members')
-          .upsert(teamRows, {
-            onConflict: 'project_id,email',
-          })
-
-        if (teamError) {
-          setError(teamError.message)
-          return
-        }
-      }
-
-      const { error: inviteError } = await supabase
-        .from('team_invitations')
-        .update({
-          status: 'accepted',
-          accepted_at: new Date().toISOString(),
-        })
-        .eq('id', invite.id)
-
-      if (inviteError) {
-        setError(inviteError.message)
-        return
-      }
 
       setAccepted(true)
     } finally {
