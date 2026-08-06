@@ -43,15 +43,22 @@ export async function detectExperienceState(input:{
   if(!input.userId)return {...base,error:'No authenticated user.'}
 
   try{
-    const [{data:profile},{data:memberships},{data:progress}]=await Promise.all([
+    const [{data:profile},{data:members},{data:progress}]=await Promise.all([
       supabase.from('experience_profiles').select('*').eq('user_id',input.userId).maybeSingle(),
-      supabase.from('memberships').select('role,access_scope,organization_id,workspace_id,created_at').or(`user_id.eq.${input.userId}`).order('created_at',{ascending:true}),
+      supabase.from('workspace_members')
+        .select('role,permission_profile_key,legacy_organization_id,workspace_id,is_default,joined_at')
+        .eq('user_id',input.userId)
+        .eq('status','active')
+        .order('is_default',{ascending:false})
+        .order('joined_at',{ascending:true}),
       supabase.from('user_experience_progress').select('*').eq('user_id',input.userId),
     ])
 
-    const earliestMembership=(memberships||[])[0]
-    const workspaceId=input.workspaceId||earliestMembership?.workspace_id||null
-    const organizationId=earliestMembership?.organization_id||null
+    const selectedMember=(members||[]).find((member:any)=>member.workspace_id===input.workspaceId)
+      ||(members||[]).find((member:any)=>member.is_default)
+      ||(members||[])[0]
+    const workspaceId=input.workspaceId||selectedMember?.workspace_id||null
+    const organizationId=selectedMember?.legacy_organization_id||null
 
     const [organizationCount,workspaceCount,portfolioCount,projectCount,scheduleCount]=await Promise.all([
       organizationId?safeCount('organizations',{column:'id',value:organizationId}):safeCount('organizations',{column:'created_by',value:input.userId}),
@@ -69,7 +76,10 @@ export async function detectExperienceState(input:{
     const hasProject=projectCount.count>0
     const hasSchedule=scheduleCount.count>0
     const isWorkspaceCreator=Boolean(profile?.is_workspace_creator)||Boolean(
-      (memberships||[]).some((m:any)=>['workspace_admin','admin'].includes(String(m.role||''))&&m.access_scope==='workspace')
+      (members||[]).some((member:any)=>
+        ['workspace_admin'].includes(String(member.permission_profile_key||''))
+        ||['workspace_admin','admin'].includes(String(member.role||''))
+      )
     )
     const isFirstLogin=!profile?.first_login_completed_at
     let recommendedExperience:ExperienceKind='product_tour'
