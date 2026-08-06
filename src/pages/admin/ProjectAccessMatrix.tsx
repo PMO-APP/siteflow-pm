@@ -247,6 +247,7 @@ export default function ProjectAccessMatrix() {
       body: {
         userId: selectedRow.userId,
         email: selectedRow.email,
+        workspaceId: activeWorkspace?.id,
       },
     })
 
