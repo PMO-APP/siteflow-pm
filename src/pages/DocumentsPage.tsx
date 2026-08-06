@@ -1,7 +1,6 @@
 import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
-import { canUploadDocuments, canEditDocument } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Search, Upload, Download } from 'lucide-react'
 import { useDocuments, useUpsertDocument } from '@/hooks/useData'
@@ -11,6 +10,7 @@ import { fdate } from '@/lib/utils'
 import type { Document } from '@/types'
 import DocumentRepository from '@/components/DocumentRepository'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const TYPES: Document['type'][] = [
   'Drawing',
@@ -499,7 +499,8 @@ export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
 
-  const canCreateDocument = canUploadDocuments(role)
+  const { can } = useAccessSession()
+  const canCreateDocument = can('documents.upload')
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
@@ -696,11 +697,9 @@ export default function DocumentsPage() {
                     </tr>
                   ) : (
                     filtered.map(document => {
-                      const canEditThisDocument = canEditDocument(
-                        role,
-                        document.uploaded_by,
-                        user?.id
-                      )
+                      const canEditThisDocument =
+                        can('documents.upload') &&
+                        (document.uploaded_by === user?.id || can('documents.delete'))
 
                       return (
                         <tr
