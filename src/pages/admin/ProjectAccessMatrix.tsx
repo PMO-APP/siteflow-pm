@@ -13,6 +13,8 @@ import {
   X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { replaceMemberProjectAssignments } from '@/access/canonicalMembershipAdminService'
 
 const WORKSPACE_WIDE_ROLES = new Set([
   'workspace_admin',
@@ -75,6 +77,7 @@ type AccessRow = {
 }
 
 export default function ProjectAccessMatrix() {
+  const { activeWorkspace } = useWorkspace()
   const [memberships, setMemberships] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,7 +99,9 @@ export default function ProjectAccessMatrix() {
 
     const [{ data: memberRows, error: memberError }, { data: projectRows, error: projectError }] =
       await Promise.all([
-        supabase.from('memberships').select('*').order('full_name'),
+        activeWorkspace
+          ? supabase.from('workspace_member_access_summary').select('*').eq('workspace_id', activeWorkspace.id).order('user_id')
+          : Promise.resolve({ data: [], error: null }),
         supabase.from('projects').select('id, project_name, portfolio_id').order('project_name'),
       ])
 
@@ -115,44 +120,28 @@ export default function ProjectAccessMatrix() {
   )
 
   const rows = useMemo<AccessRow[]>(() => {
-    const grouped = new Map<string, AccessRow>()
-
-    memberships.forEach(membership => {
+    return memberships.map((membership:any) => {
+      const assignments = Array.isArray(membership.assignments) ? membership.assignments : []
+      const projectIds = assignments
+        .filter((item:any) => item.scopeType === 'project' && item.scopeId != null)
+        .map((item:any) => Number(item.scopeId))
+        .filter(Number.isFinite)
+      const hasWorkspaceAccess = assignments.some((item:any) => item.scopeType === 'workspace')
       const email = String(membership.email || '').toLowerCase()
       const role = String(membership.role || '').toLowerCase()
-      const key = `${email}-${role}`
-
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          key,
-          email: membership.email || '',
-          fullName: membership.full_name || '',
-          userId: membership.user_id || null,
-          organizationId: membership.organization_id || null,
-          role,
-          accessScope: membership.access_scope || 'project',
-          membershipIds: [],
-          projectIds: [],
-          hasAllProjectAccess: false,
-        })
-      }
-
-      const current = grouped.get(key)!
-      if (membership.id) current.membershipIds.push(membership.id)
-      if (membership.project_id) current.projectIds.push(Number(membership.project_id))
-      if (Array.isArray(membership.project_ids)) {
-        membership.project_ids.forEach((id: number) => {
-          if (id && !current.projectIds.includes(Number(id))) current.projectIds.push(Number(id))
-        })
+      return {
+        key: `${membership.user_id}-${role}`,
+        email,
+        fullName: membership.full_name || '',
+        userId: membership.user_id || null,
+        organizationId: membership.legacy_organization_id || null,
+        role,
+        accessScope: hasWorkspaceAccess ? 'workspace' : 'project',
+        membershipIds: [],
+        projectIds: Array.from(new Set(projectIds)),
+        hasAllProjectAccess: hasWorkspaceAccess || WORKSPACE_WIDE_ROLES.has(role),
       }
     })
-
-    return Array.from(grouped.values()).map(row => ({
-      ...row,
-      projectIds: Array.from(new Set(row.projectIds)),
-      hasAllProjectAccess:
-        row.accessScope === 'workspace' || WORKSPACE_WIDE_ROLES.has(row.role),
-    }))
   }, [memberships])
 
   const filteredRows = rows.filter(row => {
@@ -203,35 +192,21 @@ export default function ProjectAccessMatrix() {
     setNotice('')
     setErrorMessage('')
 
-    const baseRow = {
-      user_id: selectedRow.userId,
-      organization_id: selectedRow.organizationId || 1,
-      email: selectedRow.email,
-      full_name: selectedRow.fullName || null,
-      role: selectedRow.role,
-      access_scope: 'project',
-      portfolio_id: null,
-    }
-
-    const { error: deleteMembershipError } = await supabase
-      .from('memberships')
-      .delete()
-      .eq('email', selectedRow.email)
-      .eq('role', selectedRow.role)
-      .eq('access_scope', 'project')
-
-    if (deleteMembershipError) {
-      setErrorMessage(deleteMembershipError.message)
+    if (!activeWorkspace?.id || !selectedRow.userId) {
+      setErrorMessage('Workspace and user identity are required to update access.')
       setSaving(false)
       return
     }
 
-    const { error: insertMembershipError } = await supabase.from('memberships').insert(
-      draftProjectIds.map(projectId => ({ ...baseRow, project_id: projectId }))
-    )
-
-    if (insertMembershipError) {
-      setErrorMessage(insertMembershipError.message)
+    try {
+      await replaceMemberProjectAssignments({
+        workspaceId: activeWorkspace.id,
+        userId: selectedRow.userId,
+        projectIds: draftProjectIds,
+        role: selectedRow.role,
+      })
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update project access.')
       setSaving(false)
       await loadMatrix()
       return
