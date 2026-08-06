@@ -15,10 +15,9 @@ import { useThemeStore } from '@/store/theme'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useMembershipStore } from '@/store/membership'
-import { canManageUsers, canManageWorkspace } from '@/lib/permissions'
 import ProjectAccessMatrix from '@/pages/admin/ProjectAccessMatrix'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const baseAdminTabs = [
   'Overview',
@@ -87,9 +86,12 @@ export default function WorkspaceAdminPage() {
 
   const { theme, setTheme } = useThemeStore()
   const { user, signOut } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
   const navigate = useNavigate()
   const { activeWorkspace } = useWorkspace()
+  const { can } = useAccessSession()
+  const canManageTeam = can('team.manage', { scopeType: 'workspace' })
+  const canInviteTeam = can('team.invite', { scopeType: 'workspace' })
+  const canManageWorkspaceAccess = can('workspace.manage', { scopeType: 'workspace' })
 
   const [organizations, setOrganizations] = useState<any[]>([])
   const [portfolios, setPortfolios] = useState<any[]>([])
@@ -117,8 +119,8 @@ export default function WorkspaceAdminPage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
 
   const adminTabs = baseAdminTabs.filter(tab => {
-    if (tab === 'Users & Roles') return canManageUsers(role)
-    if (tab === 'Project Access Matrix') return canManageUsers(role)
+    if (tab === 'Users & Roles') return canManageTeam
+    if (tab === 'Project Access Matrix') return canManageTeam
     return true
   })
 
@@ -132,7 +134,7 @@ export default function WorkspaceAdminPage() {
     if (!adminTabs.includes(activeTab)) {
       setActiveTab('Overview')
     }
-  }, [role])
+  }, [canManageTeam, activeTab])
 
   useEffect(() => {
     loadAdminData()
@@ -226,7 +228,7 @@ export default function WorkspaceAdminPage() {
   }
 
   async function sendInvite() {
-    if (!canManageUsers(role)) {
+    if (!canInviteTeam) {
       setNotice('You do not have permission to invite users.')
       return
     }
@@ -269,7 +271,7 @@ if (inviteRole === 'infrastructure_project_owner') {
       return
     }
 
-    if (inviteScope === 'workspace' && !canManageWorkspace(role)) {
+    if (inviteScope === 'workspace' && !canManageWorkspaceAccess) {
       setNotice('You do not have permission to create workspace invitations.')
       return
     }
@@ -612,7 +614,7 @@ if (inviteRole === 'infrastructure_project_owner') {
               </div>
             )}
 
-            {activeTab === 'Users & Roles' && canManageUsers(role) && (
+            {activeTab === 'Users & Roles' && canManageTeam && (
               <div className="space-y-6">
                 <h2 className="text-lg font-semibold text-[#102a43]">
                   Users & Roles
@@ -630,7 +632,7 @@ if (inviteRole === 'infrastructure_project_owner') {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {canManageWorkspace(role) && (
+                    {canManageWorkspaceAccess && (
                       <button
                         type="button"
                         onClick={() => handleScopeChange('workspace')}
@@ -790,7 +792,7 @@ if (inviteRole === 'infrastructure_project_owner') {
             )}
 
             {activeTab === 'Project Access Matrix' &&
-              canManageUsers(role) && <ProjectAccessMatrix />}
+              canManageTeam && <ProjectAccessMatrix />}
           </div>
         )}
       </div>
