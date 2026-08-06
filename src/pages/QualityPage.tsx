@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
-import { isProjectAdmin } from '@/lib/permissions'
 import { ClipboardCheck, Plus, ShieldCheck, AlertTriangle, CheckCircle2, Clock3, ArrowRight, UserRoundCheck } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -13,6 +12,7 @@ import { EnterpriseMetric, EnterpriseSection } from '@/components/ui/enterprise/
 import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { qualityIntelligence } from '@/lib/intelligence'
 import { publishQualityGateMutationEvents } from '@/services/events/domainEventPublishers'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 export default function QualityPage() {
   const { projectId, projectName } = useProjectStore()
@@ -461,10 +461,10 @@ export default function QualityPage() {
     return 'badge-muted'
   }
 
+  const { can } = useAccessSession()
   const normalizedMembershipRole = membershipRole?.toLowerCase() || null
-  const effectiveRole: string = isProjectAdmin(normalizedMembershipRole)
-    ? (normalizedMembershipRole || 'guest')
-    : projectTeamRole || normalizedMembershipRole || 'guest'
+  const effectiveRole: string =
+    projectTeamRole || normalizedMembershipRole || 'guest'
 
   const roleLabels: Record<string, string> = {
     workspace_admin: 'Workspace Admin',
@@ -488,14 +488,8 @@ export default function QualityPage() {
   }
   const effectiveRoleLabel = roleLabels[effectiveRole] || effectiveRole.split('_').join(' ')
 
-  const canCreateGate =
-    isProjectAdmin(effectiveRole) ||
-    effectiveRole === 'contractor' ||
-    ['overall_project_owner', 'project_owner'].includes(effectiveRole)
-
-  const canReview =
-    isProjectAdmin(effectiveRole) ||
-    effectiveRole === 'consultant'
+  const canCreateGate = can('quality.edit')
+  const canReview = can('quality.edit')
 
   const canStartReview = (gate: any) =>
     canReview &&
@@ -663,7 +657,7 @@ export default function QualityPage() {
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6d7d88]">Your access</div>
             <div className="mt-3 text-2xl font-semibold text-[#102943]">{effectiveRoleLabel}</div>
             <p className="mt-2 text-sm leading-6 text-[#65717c]">
-              {isProjectAdmin(effectiveRole)
+              {can('quality.edit')
                 ? 'Full quality-control access for this project, including inspection creation, review, approval and rejection.'
                 : effectiveRole === 'consultant'
                   ? 'Review and sign off contractor inspection requests assigned to this project.'
