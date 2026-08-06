@@ -82,15 +82,15 @@ export default function LoginPage() {
   async function getLoginRedirectPath(userId: string, userEmail: string) {
     const cleanEmail = userEmail.toLowerCase().trim()
     const { data: memberships, error } = await supabase
-      .from('memberships')
-      .select('role, workspace_type, access_scope')
-      .or(`user_id.eq.${userId},email.eq.${cleanEmail}`)
+      .from('workspace_members')
+      .select('role, workspace_type, is_default')
+      .eq('user_id', userId)
+      .order('is_default', { ascending: false })
 
     if (error) throw error
     const rows = memberships || []
     const externalMembership = rows.find(item => resolveWorkspace(item.role, item.workspace_type) !== 'internal')
-    const workspaceMembership = rows.find(item => item.access_scope === 'workspace')
-    const selectedMembership = externalMembership || workspaceMembership || rows[0]
+    const selectedMembership = externalMembership || rows.find(item => item.is_default) || rows[0]
     return getWorkspaceHome(resolveWorkspace(selectedMembership?.role, selectedMembership?.workspace_type))
   }
 
