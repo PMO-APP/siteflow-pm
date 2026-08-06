@@ -6,12 +6,10 @@ import { useMembershipStore } from '@/store/membership'
 import { PackageCheck } from 'lucide-react'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { useAccessSession } from '@/access/AccessSessionProvider'
+import type { PermissionAction } from '@/access/accessTypes'
 
 
-import {
-  canViewInternalPages,
-  isExternalRole,
-} from '@/lib/permissions'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -44,12 +42,6 @@ import {
   MessageSquareText,
   Search,
   Send,
-  Presentation,
-  HelpCircle,
-  MessageSquarePlus,
-  Sparkles,
-  ActivitySquare,
-  Rocket,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import { getInitials } from '@/lib/utils'
@@ -57,14 +49,13 @@ import NotificationsPanel from '@/components/modules/dashboard/NotificationsPane
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { CommandPalette } from '@/components/search'
 import { useCommandPalette } from '@/hooks/useCommandPalette'
-import ProductSupportDock from '@/components/product/ProductSupportDock'
 
 type NavItem = {
   to: string
   icon: any
   label: string
   exact?: boolean
-  roles?: string[]
+  permission?: PermissionAction
   group: NavGroupKey
 }
 
@@ -82,7 +73,7 @@ const NAV_GROUPS: Array<{ key: NavGroupKey; label: string }> = [
 
 const NAV: NavItem[] = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true, group: 'overview' },
-  { to: '/app/executive-dashboard', icon: BarChart3, label: 'Executive Dashboard', roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'], group: 'overview' },
+  { to: '/app/executive-dashboard', icon: BarChart3, label: 'Executive Dashboard', permission: 'reports.view', group: 'overview' },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule', group: 'planning' },
   {
   to: '/app/project-controls',
@@ -142,21 +133,14 @@ const NAV: NavItem[] = [
   to: '/app/report-designer',
   icon: FileText,
   label: 'Report Designer',
-  roles: ['workspace_admin', 'admin', 'pmo'],
+  permission: 'reports.edit',
   group: 'overview',
 },
   {
   to: '/app/report-distribution',
   icon: Send,
   label: 'Report Distribution',
-  roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner'],
-  group: 'overview',
-},
-  {
-  to: '/app/boardroom',
-  icon: Presentation,
-  label: 'Boardroom',
-  roles: ['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'project_owner'],
+  permission: 'reports.view',
   group: 'overview',
 },
  
@@ -177,15 +161,46 @@ const NAV: NavItem[] = [
     to: '/app/administration',
     icon: Shield,
     label: 'Administration',
-    roles: ['workspace_admin', 'admin', 'pmo'],
+    permission: 'workspace.manage',
     group: 'administration',
   },
   { to: '/app/team', icon: Users, label: 'Team', group: 'administration' },
-  { to: '/app/product-centre', icon: HelpCircle, label: 'Product Centre', group: 'administration' },
-  { to: '/app/demo-workspace', icon: Building2, label: 'Demo Workspace', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
-  { to: '/app/system-health', icon: ActivitySquare, label: 'System Health', roles: ['workspace_admin','admin','pmo'], group: 'administration' },
-
 ]
+
+const NAV_PERMISSIONS:Record<string,PermissionAction>={
+  '/app':'workspace.view',
+  '/app/executive-dashboard':'reports.view',
+  '/app/schedule':'schedule.view',
+  '/app/project-controls':'project.view',
+  '/app/schedule-revisions':'schedule.view',
+  '/app/recovery':'schedule.view',
+  '/app/planner':'schedule.view',
+  '/app/procurement':'procurement.view',
+  '/app/approvals':'approvals.view',
+  '/app/site':'project.view',
+  '/app/quality':'quality.view',
+  '/app/hse':'project.view',
+  '/app/snags':'snags.view',
+  '/app/rfis':'project.view',
+  '/app/documents':'documents.view',
+  '/app/costing':'costing.view',
+  '/app/design-reports':'reports.view',
+  '/app/risk':'risk.view',
+  '/app/risk-trends':'risk.view',
+  '/app/reports':'reports.view',
+  '/app/handover':'project.view',
+  '/app/project-packages':'project.view',
+  '/app/pmo-weekly-report':'reports.view',
+  '/app/executive-reporting':'reports.view',
+  '/app/executive-narrative':'reports.view',
+  '/app/report-designer':'reports.edit',
+  '/app/report-distribution':'reports.view',
+  '/app/internal-assignments':'team.manage',
+  '/app/my-assignments':'workspace.view',
+  '/app/business-intelligence':'reports.view',
+  '/app/administration':'workspace.manage',
+  '/app/team':'workspace.view',
+}
 
 const VIEWER_NAV = [
   '/app',
@@ -222,6 +237,7 @@ function formatRoleLabel(role: string | null) {
 }
 
 export default function Layout() {
+  const { can } = useAccessSession()
   useBrowserBranding()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -421,19 +437,11 @@ export default function Layout() {
     : null
 
   const allowedNav = NAV.filter(item => {
-    if (isExternalRole(role)) return false
-
-    if (role === 'viewer' || role === 'guest') {
-      return VIEWER_NAV.includes(item.to)
-    }
-
-    if (!canViewInternalPages(role)) return false
-
-    if (item.roles) {
-      return item.roles.includes(role ?? '')
-    }
-
-    return true
+    const permission=item.permission||NAV_PERMISSIONS[item.to]||'workspace.view'
+    return can(permission,{
+      scopeType:projectId?'project':'workspace',
+      scopeId:projectId||undefined,
+    })
   })
 
   const currentPage = allowedNav.find(n =>
@@ -454,7 +462,6 @@ export default function Layout() {
       )}
 
       <aside
-        data-tour="project-sidebar"
         id="primary-navigation"
         aria-label="Primary navigation"
         className={`layout-sidebar fixed lg:relative z-30 h-full w-[280px] flex-shrink-0 border-r backdrop-blur-xl flex flex-col transform transition-transform duration-200 ${
@@ -545,7 +552,6 @@ export default function Layout() {
                   {items.map(({ to, icon: Icon, label, exact }) => (
                     <NavLink
                       key={to}
-                      data-tour={to === '/app/schedule' ? 'nav-schedule' : to === '/app' ? 'nav-dashboard' : to === '/app/reports' ? 'nav-reports' : undefined}
                       to={to}
                       end={exact}
                       onClick={() => setSidebarOpen(false)}
@@ -681,31 +687,6 @@ export default function Layout() {
             })}
           </div>
 
-          <div data-tour="global-support" className="hidden sm:flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => navigate('/product-centre?tab=help')}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
-            aria-label="Open Help Centre"
-            title="Help"
-          >
-            <HelpCircle size={16} />
-            <span>Help</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/feedback?new=1')}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-[#536170] hover:bg-[#edf3f6] hover:text-[#173f5f]"
-            aria-label="Report an issue or suggest an improvement"
-            title="Feedback"
-          >
-            <MessageSquarePlus size={16} />
-            <span>Feedback</span>
-          </button>
-
-          </div>
-
           <button
             className="relative sidebar-muted hover:text-[#173f5f] transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
@@ -728,8 +709,7 @@ export default function Layout() {
           </div>
         )}
 
-        <ProductSupportDock />
-      <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
+        <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
 
         <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
           <Outlet />
