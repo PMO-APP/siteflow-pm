@@ -1,5 +1,4 @@
 import { useMembershipStore } from '@/store/membership'
-import { canEditProcurement } from '@/lib/permissions'
 import { useState } from 'react'
 import { Plus, X, Search } from 'lucide-react'
 import {
@@ -15,6 +14,7 @@ import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { procurementIntelligence } from '@/lib/intelligence'
 import type { RecordSummary } from '@/components/records/recordTypes'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 const CATS = [
   'Tiles',
@@ -451,7 +451,8 @@ function ProcModal({
 export default function ProcurementPage() {
   const { data: items = [], isLoading } = useProcurement()
   const role = useMembershipStore(state => state.role)
-  const canEdit = canEditProcurement(role)
+  const { can } = useAccessSession()
+  const canEdit = can('procurement.edit')
 
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
 
