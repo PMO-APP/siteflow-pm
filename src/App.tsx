@@ -7,6 +7,7 @@ import { useThemeStore } from '@/store/theme'
 import ThemeProvider from '@/theme/ThemeProvider'
 
 import RequireRole from '@/components/auth/RequireRole'
+import RequirePermission from '@/components/auth/RequirePermission'
 import Layout from '@/components/layout/Layout'
 import NotificationProvider from './components/ui/notifications/NotificationProvider'
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
@@ -314,9 +315,9 @@ export default function App() {
           path="/admin"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+              <RequirePermission action="workspace.manage">
                 <WorkspaceAdminPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -325,9 +326,9 @@ export default function App() {
           path="/admin/audit"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+              <RequirePermission action="workspace.manage">
                 <AuditPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -347,45 +348,45 @@ export default function App() {
     <Route
   path="administration"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <AdministrationPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
 <Route
   path="administration/organizations"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <OrganizationsPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
 <Route
   path="administration/organizations/new"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <CreateOrganizationPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
 <Route
   path="administration/organizations/:organizationId"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <OrganizationDetailPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
 <Route
   path="administration/audit"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <AuditPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
@@ -393,18 +394,18 @@ export default function App() {
 <Route
   path="administration/customer"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <CustomerAdministrationPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
 <Route
   path="administration/workspaces"
   element={
-    <RequireRole allowedRoles={['workspace_admin', 'admin', 'pmo']}>
+    <RequirePermission action="workspace.manage">
       <WorkspaceSettingsPage />
-    </RequireRole>
+    </RequirePermission>
   }
 />
 
