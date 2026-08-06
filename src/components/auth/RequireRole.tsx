@@ -1,31 +1,32 @@
 
 import { Navigate } from 'react-router-dom'
-import { useMembershipStore } from '@/store/membership'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
+/**
+ * @deprecated Use RequirePermission for all new routes.
+ * Retained temporarily for downstream extensions that still pass role/profile keys.
+ */
 export default function RequireRole({
   children,
   allowedRoles,
-}: {
-  children: React.ReactNode
-  allowedRoles: string[]
-}) {
-  const role = useMembershipStore(state => state.role)
-  const permissionProfileKey = useMembershipStore(state => state.permissionProfileKey)
-  const loading = useMembershipStore(state => state.loading)
+}:{
+  children:React.ReactNode
+  allowedRoles:string[]
+}){
+  const {session}=useAccessSession()
 
-  if (loading) {
+  if(session.loading){
     return <div className="min-h-40 grid place-items-center text-sm text-[#71838d]">Checking access…</div>
   }
 
-  const allowed =
-    Boolean(role && allowedRoles.includes(role)) ||
-    Boolean(
-      permissionProfileKey &&
-      allowedRoles.includes(permissionProfileKey)
-    )
+  const descriptors=[
+    session.permissionProfileKey,
+    session.role,
+    session.portalRole,
+  ].filter(Boolean) as string[]
 
-  if (!allowed) {
-    return <Navigate to="/projects" replace />
+  if(!descriptors.some(value=>allowedRoles.includes(value))){
+    return <Navigate to="/projects" replace/>
   }
 
   return <>{children}</>
