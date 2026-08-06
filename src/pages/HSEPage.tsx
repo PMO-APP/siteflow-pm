@@ -19,13 +19,9 @@ import { useMembershipStore } from '@/store/membership'
 import DocumentRepository from '@/components/DocumentRepository'
 import { useAuthStore } from '@/store/auth'
 import { fdate } from '@/lib/utils'
-import {
-  canCreateHSE,
-  canCloseHSE,
-  canEditOwnOrAdmin,
-} from '@/lib/permissions'
 import { CommandHero } from '@/components/ui/command/CommandPrimitives'
 import { publishHSEMutationEvents } from '@/services/events/domainEventPublishers'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 type Tab =
   | 'observations'
@@ -143,7 +139,6 @@ const DOCUMENT_TYPES = [
 
 export default function HSEPage() {
   const { projectId, projectName } = useProjectStore()
-  const role = useMembershipStore(state => state.role)
 
   const [activeTab, setActiveTab] = useState<Tab>('observations')
   const [observations, setObservations] = useState<HSEObservation[]>([])
@@ -164,8 +159,9 @@ export default function HSEPage() {
     | { type: 'document'; item: HSEDocument | null }
   >(null)
 
-  const canCreate = canCreateHSE(role)
-  const canClose = canCloseHSE(role)
+  const { can } = useAccessSession()
+  const canCreate = can('hse.create')
+  const canClose = can('hse.close')
 
   useEffect(() => {
     loadHSE()
@@ -778,10 +774,9 @@ function ObservationModal({
 }) {
   const { projectId } = useProjectStore()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
 
-  const canEdit =
-    !item || canEditOwnOrAdmin(role, item.created_by, user?.id) || canClose
+  const { can } = useAccessSession()
+  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close')
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -968,10 +963,9 @@ function IncidentModal({
 }) {
   const { projectId } = useProjectStore()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
 
-  const canEdit =
-    !item || canEditOwnOrAdmin(role, item.created_by, user?.id) || canClose
+  const { can } = useAccessSession()
+  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close')
 
   const [form, setForm] = useState({
     incident_number: item?.incident_number || '',
@@ -1158,9 +1152,9 @@ function ToolboxModal({
 }) {
   const { projectId } = useProjectStore()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
 
-  const canEdit = !item || canEditOwnOrAdmin(role, item.created_by, user?.id)
+  const { can } = useAccessSession()
+  const canEdit = !item || item.created_by === user?.id || can('hse.close')
 
   const [form, setForm] = useState({
     topic: item?.topic || '',
@@ -1273,10 +1267,10 @@ function DocumentModal({
 }) {
   const { projectId, projectName } = useProjectStore()
   const { user } = useAuthStore()
-  const role = useMembershipStore(state => state.role)
   const [uploading, setUploading] = useState(false)
 
-  const canEdit = !item || canEditOwnOrAdmin(role, item.uploaded_by, user?.id)
+  const { can } = useAccessSession()
+  const canEdit = !item || item.uploaded_by === user?.id || can('hse.close')
 
   const [form, setForm] = useState({
     title: item?.title || '',
