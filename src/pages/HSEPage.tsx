@@ -159,9 +159,9 @@ export default function HSEPage() {
     | { type: 'document'; item: HSEDocument | null }
   >(null)
 
-  const { can } = useAccessSession()
-  const canCreate = can('hse.create')
-  const canClose = can('hse.close')
+  const { can, session } = useAccessSession()
+  const canCreate = Boolean(projectId) && can('hse.create', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
+  const canClose = Boolean(projectId) && can('hse.close', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
 
   useEffect(() => {
     loadHSE()
@@ -776,7 +776,7 @@ function ObservationModal({
   const { user } = useAuthStore()
 
   const { can } = useAccessSession()
-  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close')
+  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -965,7 +965,7 @@ function IncidentModal({
   const { user } = useAuthStore()
 
   const { can } = useAccessSession()
-  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close')
+  const canEdit = !item || item.created_by === user?.id || canClose || can('hse.close', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
 
   const [form, setForm] = useState({
     incident_number: item?.incident_number || '',
@@ -1154,7 +1154,7 @@ function ToolboxModal({
   const { user } = useAuthStore()
 
   const { can } = useAccessSession()
-  const canEdit = !item || item.created_by === user?.id || can('hse.close')
+  const canEdit = !item || item.created_by === user?.id || can('hse.close', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
 
   const [form, setForm] = useState({
     topic: item?.topic || '',
@@ -1270,7 +1270,7 @@ function DocumentModal({
   const [uploading, setUploading] = useState(false)
 
   const { can } = useAccessSession()
-  const canEdit = !item || item.uploaded_by === user?.id || can('hse.close')
+  const canEdit = !item || item.uploaded_by === user?.id || can('hse.close', { scopeType: 'project', scopeId: projectId, discipline: 'hse' })
 
   const [form, setForm] = useState({
     title: item?.title || '',
