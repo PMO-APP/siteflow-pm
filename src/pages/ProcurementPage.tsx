@@ -15,6 +15,7 @@ import { procurementIntelligence } from '@/lib/intelligence'
 import type { RecordSummary } from '@/components/records/recordTypes'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 import { useAccessSession } from '@/access/AccessSessionProvider'
+import { useProjectStore } from '@/store/project'
 
 const CATS = [
   'Tiles',
@@ -451,8 +452,9 @@ function ProcModal({
 export default function ProcurementPage() {
   const { data: items = [], isLoading } = useProcurement()
   const role = useMembershipStore(state => state.role)
-  const { can } = useAccessSession()
-  const canEdit = can('procurement.edit')
+  const { can, session } = useAccessSession()
+  const { projectId } = useProjectStore()
+  const canEdit = Boolean(projectId) && can('procurement.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
 
