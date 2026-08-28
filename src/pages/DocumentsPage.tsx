@@ -499,8 +499,9 @@ export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
 
-  const { can } = useAccessSession()
-  const canCreateDocument = can('documents.upload')
+  const { can, session } = useAccessSession()
+  const { projectId } = useProjectStore()
+  const canCreateDocument = Boolean(projectId) && can('documents.upload', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   const { data: docs = [], isLoading } = useDocuments()
   const [modal, setModal] = useState<Document | null | 'new'>(null)
@@ -698,8 +699,8 @@ export default function DocumentsPage() {
                   ) : (
                     filtered.map(document => {
                       const canEditThisDocument =
-                        can('documents.upload') &&
-                        (document.uploaded_by === user?.id || can('documents.delete'))
+                        can('documents.upload', { scopeType: 'project', scopeId: projectId, discipline: session.discipline }) &&
+                        (document.uploaded_by === user?.id || can('documents.delete', { scopeType: 'project', scopeId: projectId, discipline: session.discipline }))
 
                       return (
                         <tr
