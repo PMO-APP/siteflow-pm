@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 import { pmoConfirm } from '@/lib/notifications'
 const TABS = [
@@ -17,17 +18,8 @@ const TABS = [
 
 const STATUSES = ['Open', 'In Progress', 'Pending', 'Approved', 'Closed']
 
-function canEditDesignReports(role?: string | null) {
-  return [
-    'workspace_admin',
-    'admin',
-    'design',
-    'design_project_owner',
-  ].includes(role || '')
-}
-
 function viewOnlyMessage() {
-  return 'View only. Only the Design team and Administrators can add, submit, update or delete design records.'
+  return 'View only. Only this project’s assigned Design owner, an active delegate, or an Administrator can change Design records.'
 }
 
 function getCurrentReportFriday(now = new Date()) {
@@ -78,8 +70,9 @@ export default function DesignReportsPage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(state => state.role)
   const { projectId, projectName, organizationId, portfolioId } = useProjectStore()
+  const { can } = useAccessSession()
 
-  const canEdit = canEditDesignReports(role)
+  const canEdit = Boolean(projectId) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'design' })
   const reportRef = useRef<HTMLDivElement>(null)
 
   const [reportWeek, setReportWeek] = useState(() => toLocalDateInput(getCurrentReportFriday()))
