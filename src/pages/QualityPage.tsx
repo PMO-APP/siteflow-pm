@@ -461,7 +461,7 @@ export default function QualityPage() {
     return 'badge-muted'
   }
 
-  const { can } = useAccessSession()
+  const { can, session } = useAccessSession()
   const normalizedMembershipRole = membershipRole?.toLowerCase() || null
   const effectiveRole: string =
     projectTeamRole || normalizedMembershipRole || 'guest'
@@ -488,8 +488,8 @@ export default function QualityPage() {
   }
   const effectiveRoleLabel = roleLabels[effectiveRole] || effectiveRole.split('_').join(' ')
 
-  const canCreateGate = can('quality.edit')
-  const canReview = can('quality.edit')
+  const canCreateGate = can('quality.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
+  const canReview = can('quality.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   const canStartReview = (gate: any) =>
     canReview &&
@@ -657,7 +657,7 @@ export default function QualityPage() {
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6d7d88]">Your access</div>
             <div className="mt-3 text-2xl font-semibold text-[#102943]">{effectiveRoleLabel}</div>
             <p className="mt-2 text-sm leading-6 text-[#65717c]">
-              {can('quality.edit')
+              {can('quality.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
                 ? 'Full quality-control access for this project, including inspection creation, review, approval and rejection.'
                 : effectiveRole === 'consultant'
                   ? 'Review and sign off contractor inspection requests assigned to this project.'
