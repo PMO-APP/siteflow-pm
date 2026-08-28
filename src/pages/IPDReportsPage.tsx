@@ -906,7 +906,7 @@ export default function ReportsPage() {
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2 text-[#102943] font-semibold">
             <FileText size={16} className="text-[#df5f41]" />
@@ -977,7 +977,7 @@ export default function ReportsPage() {
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {!selectedReport ? (
             <div className="card p-8 text-center text-[#74818d]">
               Select or create an IPD report.
@@ -1072,8 +1072,8 @@ export default function ReportsPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 2xl:grid-cols-[1fr_320px] gap-4">
-                <div ref={reportRef}>
+              <div className="grid grid-cols-1 gap-4">
+                <div ref={reportRef} className="min-w-0 overflow-hidden">
                   <ReportDocument
                     report={{
                       ...selectedReport,
