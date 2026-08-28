@@ -146,16 +146,15 @@ export default function ReportsPage() {
     }),
     [allReports, isCombinedIPD, routeDiscipline]
   )
-  const canWriteDiscipline = useMemo(() => {
-    if (isCombinedIPD) return false
-    const memberRole = String(role || '').toLowerCase()
-    const memberDiscipline = String(session.discipline || '').toLowerCase()
-    if (['workspace_admin', 'admin', 'pmo'].includes(memberRole)) return true
-    if (routeDiscipline === 'mechanical' || routeDiscipline === 'electrical') {
-      return memberRole === 'mep' || memberDiscipline === 'mep' || memberDiscipline === routeDiscipline
-    }
-    return memberRole === routeDiscipline || memberDiscipline === routeDiscipline
-  }, [isCombinedIPD, role, session.discipline, routeDiscipline])
+  const reportDiscipline =
+    routeDiscipline === 'mechanical' || routeDiscipline === 'electrical'
+      ? 'mep'
+      : routeDiscipline || null
+  const canWriteDiscipline = !isCombinedIPD && Boolean(projectId && reportDiscipline) && can('reports.edit', {
+    scopeType: 'project',
+    scopeId: projectId,
+    discipline: reportDiscipline,
+  })
   const { data: risks = [] } = useRisks()
   const { data: snags = [] } = useSnags()
   const { data: approvals = [] } = useApprovals()
@@ -618,7 +617,7 @@ export default function ReportsPage() {
 
   function openNewReport() {
     if (!canWriteDiscipline) {
-      notify('info', `You can view ${disciplineLabel || 'this'} reports, but only the responsible department can write here.`)
+      notify('info', `You can view ${disciplineLabel || 'this'} reports, but only the assigned project owner or an active delegate can write here.`)
       return
     }
     setReportForm({
@@ -745,7 +744,7 @@ export default function ReportsPage() {
 
   async function saveReport() {
     if (!canWriteDiscipline) {
-      notify('error', `This report is read-only for you. Only the ${disciplineLabel || 'responsible'} team can write here.`)
+      notify('error', `This report is read-only for you. Only this project's assigned ${disciplineLabel || 'responsible'} owner or an active delegate can write here.`)
       return
     }
     try {
