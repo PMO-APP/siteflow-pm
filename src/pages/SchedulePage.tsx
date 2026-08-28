@@ -81,8 +81,25 @@ export default function SchedulePage() {
   const canAdministerPackages = ['workspace_admin', 'admin'].includes(role || '')
 
   const today = new Date()
-  const activePackageIds = new Set(deliveryPackages.map(pkg => pkg.id))
-  const projectTasks: Task[] = allTasks.filter((task: Task) => task.project_id === projectId && (!task.delivery_package_id || activePackageIds.has(task.delivery_package_id)))
+
+  // The tasks query is already scoped to the selected project. Delivery-package
+  // metadata must never decide whether a valid programme activity exists.
+  // A user may be allowed to read project tasks while package metadata is
+  // unavailable (or a legacy/imported task may reference an older package).
+  // Only suppress a task when we can positively identify its package as archived.
+  const deliveryPackageById = new Map(
+    allDeliveryPackages.map(pkg => [String(pkg.id), pkg])
+  )
+  const projectTasks: Task[] = allTasks.filter((task: Task) => {
+    if (projectId != null && task.project_id != null && String(task.project_id) !== String(projectId)) {
+      return false
+    }
+
+    if (!task.delivery_package_id) return true
+
+    const pkg = deliveryPackageById.get(String(task.delivery_package_id))
+    return !pkg || !pkg.archived_at
+  })
   const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => pkg.discipline === disciplineTab)
   const selectedPackage = deliveryPackages.find(pkg => pkg.id === selectedPackageId)
 
