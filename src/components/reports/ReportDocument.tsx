@@ -306,6 +306,38 @@ export default function ReportDocument({
           color: #666;
         }
 
+
+        /* On-screen report preview must fit the available project workspace.
+           A4 dimensions are restored only when printing. */
+        @media screen {
+          .report-document {
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            min-height: auto;
+            padding: clamp(16px, 2.2vw, 32px);
+            overflow-wrap: anywhere;
+          }
+
+          .report-document table {
+            width: 100%;
+            table-layout: fixed;
+          }
+
+          .report-document img {
+            max-width: 100%;
+            height: auto;
+          }
+
+          .report-document .cover-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .report-document .cover-item {
+            grid-template-columns: minmax(88px, 32%) minmax(0, 1fr);
+          }
+        }
+
         @media print {
           html, body {
             margin: 0 !important;
