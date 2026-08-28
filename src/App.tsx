@@ -53,7 +53,7 @@ const InternalAssignmentsPage = lazy(() => import('@/pages/InternalAssignmentsPa
 const MyAssignmentsPage = lazy(() => import('@/pages/MyAssignmentsPage'))
 const TeamAccessPage = lazy(() => import('@/pages/TeamAccessPage'))
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
-const ReportsHubPage = lazy(() => import('@/pages/ReportsHubPage'))
+const IPDReportsPage = lazy(() => import('@/pages/IPDReportsPage'))
 const IPDReportsHubPage = lazy(() => import('@/pages/IPDReportsHubPage'))
 const PMOReportsHubPage = lazy(() => import('@/pages/PMOReportsHubPage'))
 const RecoveryForecastPage = lazy(() => import('@/pages/RecoveryForecastPage'))
@@ -431,9 +431,9 @@ export default function App() {
           <Route path="my-assignments" element={<MyAssignmentsPage />} />
           <Route path="team" element={<TeamPage />} />
           <Route path="team-access" element={<TeamAccessPage />} />
-          <Route path="reports" element={<ReportsHubPage />} />
+          <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/ipd" element={<IPDReportsHubPage />} />
-          <Route path="reports/ipd/:discipline" element={<ReportsPage />} />
+          <Route path="reports/ipd/:discipline" element={<IPDReportsPage />} />
           <Route path="reports/pmo" element={<PMOReportsHubPage />} />
         </Route>
 
