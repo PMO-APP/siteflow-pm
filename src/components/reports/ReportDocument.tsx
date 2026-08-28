@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { fdate, formatCurrency } from '@/lib/utils'
 
 function getActivityStatus(thisWeek: number, planned: number) {
@@ -40,6 +41,9 @@ export default function ReportDocument({
   openRisks = 0,
   pendingProcurement = 0,
   projectHealth,
+  projectImageUrl = null,
+  branding = null,
+  organizationName = 'Organization',
 }: any) {
   if (!report) return null
 
@@ -47,9 +51,13 @@ export default function ReportDocument({
   const plannedProgress = Number(projectHealth?.plannedProgress || 0)
   const status = projectHealth?.status || report.status || 'On Track'
   const varianceLabel = projectHealth?.varianceLabel || 'On Schedule'
+  const reportPrimary = branding?.primaryColor || '#173f5f'
+  const reportAccent = branding?.secondaryColor || '#ef8354'
+  const organizationLabel = branding?.productName || organizationName || 'Organization'
+  const platformLabel = branding?.hidePlatformBrand ? '' : 'PMOCorex'
 
   return (
-    <div className="report-document">
+    <div className="report-document" style={{'--report-primary': reportPrimary, '--report-accent': reportAccent} as CSSProperties}>
       <style>{`
         @page { size: A4 portrait; margin: 0; }
 
@@ -67,7 +75,7 @@ export default function ReportDocument({
         }
 
         .executive-cover {
-          border: 2px solid #c49e48;
+          border: 2px solid var(--report-primary);
           padding: 12px 14px;
           margin-bottom: 16px;
         }
@@ -86,17 +94,21 @@ export default function ReportDocument({
           color: #111827;
         }
 
+
+        .report-project-identity { display:flex; align-items:center; gap:10px; }
+        .report-project-image { width:54px; height:54px; border-radius:10px; object-fit:cover; border:1px solid #d7dee5; }
+        .report-org-logo { max-height:34px; max-width:150px; object-fit:contain; }
         .pmo-logo {
           font-size: 11px;
           font-weight: 800;
           letter-spacing: .18em;
-          color: #7a5a12;
+          color: var(--report-primary);
         }
 
         .cover-title {
           text-align: center;
-          border-top: 1px solid #d6c38a;
-          border-bottom: 1px solid #d6c38a;
+          border-top: 1px solid var(--report-accent);
+          border-bottom: 1px solid var(--report-accent);
           padding: 12px 0;
           margin-bottom: 14px;
         }
@@ -152,7 +164,7 @@ export default function ReportDocument({
 
         .progress-fill {
           height: 100%;
-          background: #c49e48;
+          background: var(--report-primary);
           width: ${progressBar(progress)};
         }
 
@@ -178,8 +190,8 @@ export default function ReportDocument({
           font-weight: 800;
           letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: #7a5a12;
-          border-bottom: 1px solid #d6c38a;
+          color: var(--report-primary);
+          border-bottom: 1px solid var(--report-accent);
           padding-bottom: 5px;
           margin-bottom: 8px;
         }
@@ -359,7 +371,7 @@ export default function ReportDocument({
 
       <div className="executive-cover">
         <div className="brand-row">
-          <div className="mixta-logo">MIXTA AFRICA</div>
+          <div className="mixta-logo">{branding?.logoUrl ? <img src={branding.logoUrl} alt={`${organizationLabel} logo`} className="report-org-logo" /> : organizationLabel}</div>
           <div className="pmo-logo">PMOCOREX</div>
         </div>
 
