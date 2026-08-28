@@ -58,6 +58,7 @@ const IPDReportsHubPage = lazy(() => import('@/pages/IPDReportsHubPage'))
 const PMOReportsHubPage = lazy(() => import('@/pages/PMOReportsHubPage'))
 const RecoveryForecastPage = lazy(() => import('@/pages/RecoveryForecastPage'))
 const ProjectControlsPage = lazy(() => import('@/pages/ProjectControlsPage'))
+const ProjectJourneyPage = lazy(() => import('@/pages/ProjectJourneyPage'))
 const ScheduleRevisionsPage = lazy(() => import('@/pages/ScheduleRevisionsPage'))
 const OrganizationsPage = lazy(() => import('@/features/organizations/pages/OrganizationsPage'))
 const CreateRFIPage = lazy(() => import('@/features/rfi/pages/CreateRFIPage'))
@@ -422,6 +423,7 @@ export default function App() {
           />
           <Route path="project-packages" element={<ProjectPackagesPage />} />
           <Route path="project-controls" element={<ProjectControlsPage />} />
+          <Route path="project-journey" element={<ProjectJourneyPage />} />
           <Route
             path="schedule-revisions"
             element={<ScheduleRevisionsPage />}
