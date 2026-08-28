@@ -16,21 +16,8 @@ import { supabase } from '@/lib/supabase'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { replaceMemberProjectAssignments } from '@/access/canonicalMembershipAdminService'
 
-const WORKSPACE_WIDE_ROLES = new Set([
-  'workspace_admin',
-  'admin',
-  'pmo',
-  'portfolio_manager',
-  'design',
-  'housebuild',
-  'hse_manager',
-  'hse_officer',
-  'costing',
-  'infrastructure',
-  'mep',
-  'viewer',
-  'guest',
-])
+const IMPLICIT_EDIT_ALL_ROLES = new Set(['workspace_admin', 'admin'])
+
 
 const ROLE_LABELS: Record<string, string> = {
   workspace_admin: 'Workspace Admin',
@@ -74,6 +61,7 @@ type AccessRow = {
   membershipIds: number[]
   projectIds: number[]
   hasAllProjectAccess: boolean
+  discipline: string | null
 }
 
 export default function ProjectAccessMatrix() {
@@ -141,7 +129,8 @@ export default function ProjectAccessMatrix() {
         accessScope: hasWorkspaceAccess ? 'workspace' : projectIds.length ? 'project' : 'none',
         membershipIds: [],
         projectIds: Array.from(new Set(projectIds)),
-        hasAllProjectAccess: hasWorkspaceAccess || WORKSPACE_WIDE_ROLES.has(role),
+        hasAllProjectAccess: IMPLICIT_EDIT_ALL_ROLES.has(role),
+        discipline: membership.discipline || null,
       }
     })
   }, [memberships])
@@ -186,7 +175,7 @@ export default function ProjectAccessMatrix() {
   async function saveProjectAccess() {
     if (!selectedRow || selectedRow.hasAllProjectAccess) return
     if (draftProjectIds.length === 0) {
-      setErrorMessage('Select at least one project, or remove the user from the workspace.')
+      setErrorMessage('Select at least one writable project, or close without changing their existing visibility.')
       return
     }
 
@@ -206,6 +195,7 @@ export default function ProjectAccessMatrix() {
         userId: selectedRow.userId,
         projectIds: draftProjectIds,
         role: selectedRow.role,
+        discipline: selectedRow.discipline,
       })
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to update project access.')
@@ -226,6 +216,7 @@ export default function ProjectAccessMatrix() {
         email: selectedRow.email,
         full_name: selectedRow.fullName || null,
         role: selectedRow.role,
+        discipline: selectedRow.discipline,
       }))
     )
 
@@ -274,7 +265,7 @@ export default function ProjectAccessMatrix() {
             </div>
             <h1 className="text-2xl font-black text-[#102943] sm:text-3xl">Project Access Matrix</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66788a]">
-              Review every user’s delivery scope, add or remove project access, and remove users who should no longer enter the workspace.
+              Workspace membership controls visibility. This matrix controls who may edit each project. Team members can see all workspace projects, but only selected projects become writable.
             </p>
           </div>
 
@@ -287,7 +278,7 @@ export default function ProjectAccessMatrix() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <MetricCard icon={Users} title="Access profiles" value={rows.length} description="Unique user and role combinations" />
         <MetricCard icon={FolderKanban} title="Projects" value={projects.length} description="Available delivery environments" />
-        <MetricCard icon={ShieldCheck} title="Selected access" value={selectedAccessCount} description="Users restricted to named projects" />
+        <MetricCard icon={ShieldCheck} title="Selected access" value={selectedAccessCount} description="Users with named writable projects" />
       </div>
 
       <div className="rounded-2xl border border-[#dce6ed] bg-white p-4 shadow-sm">
@@ -332,7 +323,7 @@ export default function ProjectAccessMatrix() {
               <tbody>
                 {filteredRows.map(row => {
                   const names = row.hasAllProjectAccess
-                    ? ['All projects']
+                    ? ['All projects (administrator)']
                     : row.projectIds.map(id => projectMap.get(id)).filter(Boolean) as string[]
 
                   return (
