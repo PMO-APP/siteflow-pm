@@ -23,6 +23,7 @@ import {
   Wallet,
   CheckSquare,
   Activity,
+  Milestone,
   HardHat,
   AlertTriangle,
   FolderOpen,
@@ -81,6 +82,7 @@ const NAV: NavItem[] = [
   label: 'Project Controls',
   group: 'planning',
 },
+  { to: '/app/project-journey', icon: Milestone, label: 'Project Journey', group: 'planning' },
    {
   to: '/app/schedule-revisions',
   icon: FileSpreadsheet,
@@ -139,6 +141,7 @@ const NAV_PERMISSIONS:Record<string,PermissionAction>={
   '/app/executive-dashboard':'reports.view',
   '/app/schedule':'schedule.view',
   '/app/project-controls':'project.view',
+  '/app/project-journey':'project.view',
   '/app/schedule-revisions':'schedule.view',
   '/app/recovery':'schedule.view',
   '/app/planner':'schedule.view',
