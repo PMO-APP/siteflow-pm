@@ -257,7 +257,7 @@ export default function Layout() {
 
   useEffect(() => {
     loadWorkspaceContext()
-  }, [organizationId, portfolioId])
+  }, [organizationId, portfolioId, projectId, activeWorkspace?.id, activeWorkspace?.name])
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -370,29 +370,75 @@ export default function Layout() {
   }
 
   async function loadWorkspaceContext() {
-    if (organizationId) {
-      const { data } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', organizationId)
+    // Project context must resolve consistently for every department.
+    // Some users enter a project through a scoped membership/deep link where
+    // organizationId or portfolioId was never written to local project state.
+    // Recover those IDs from the project itself instead of showing blank labels.
+    let resolvedOrganizationId = organizationId
+    let resolvedPortfolioId = portfolioId
+
+    if (projectId && (!resolvedOrganizationId || !resolvedPortfolioId)) {
+      const { data: projectContext, error: projectContextError } = await supabase
+        .from('projects')
+        .select('organization_id, portfolio_id')
+        .eq('id', projectId)
         .maybeSingle()
 
-      setOrganizationName(data?.name || '')
-    } else {
-      setOrganizationName('')
+      if (projectContextError) {
+        console.error(projectContextError.message)
+      } else {
+        resolvedOrganizationId =
+          resolvedOrganizationId || projectContext?.organization_id || null
+        resolvedPortfolioId =
+          resolvedPortfolioId || projectContext?.portfolio_id || null
+      }
     }
 
-    if (portfolioId) {
-      const { data } = await supabase
+    // Resolve portfolio first because it can also tell us its parent organization.
+    if (resolvedPortfolioId) {
+      const { data: portfolioData, error: portfolioError } = await supabase
         .from('portfolios')
-        .select('name')
-        .eq('id', portfolioId)
+        .select('name, organization_id')
+        .eq('id', resolvedPortfolioId)
         .maybeSingle()
 
-      setPortfolioName(data?.name || '')
+      if (portfolioError) {
+        console.error(portfolioError.message)
+        setPortfolioName('')
+      } else {
+        setPortfolioName(portfolioData?.name || '')
+        resolvedOrganizationId =
+          resolvedOrganizationId || portfolioData?.organization_id || null
+      }
     } else {
       setPortfolioName('')
     }
+
+    if (resolvedOrganizationId) {
+      const { data: organizationData, error: organizationError } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', resolvedOrganizationId)
+        .maybeSingle()
+
+      if (organizationError) {
+        // Department-level RLS may prevent a direct organizations lookup.
+        // Workspace identity is the safe display fallback and keeps the
+        // project header consistent for every internal user.
+        console.error(organizationError.message)
+      }
+
+      setOrganizationName(
+        organizationData?.name ||
+        activeWorkspace?.name ||
+        ''
+      )
+      return
+    }
+
+    // A user can still have valid workspace/project access without the legacy
+    // organization id being present in local storage.
+    setOrganizationName(activeWorkspace?.name || '')
   }
 
   const daysLeft = handoverDate
