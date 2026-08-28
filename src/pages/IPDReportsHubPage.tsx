@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Home, Route, Wrench, Zap, ChevronRight } from 'lucide-react'
+import { Home, Route, Wrench, Zap, ChevronRight, FileBarChart } from 'lucide-react'
 import { useProjectStore } from '@/store/project'
 
 const disciplines = [
@@ -7,6 +7,7 @@ const disciplines = [
   { key: 'infrastructure', title: 'Infrastructure', description: 'Roads, drainage, utilities and infrastructure reporting.', icon: Route },
   { key: 'mechanical', title: 'Mechanical', description: 'Mechanical services and installation reporting.', icon: Wrench },
   { key: 'electrical', title: 'Electrical', description: 'Electrical services and installation reporting.', icon: Zap },
+  { key: 'combined', title: 'Combined IPD Report', description: 'Read and print the consolidated IPD reporting set across all four departments.', icon: FileBarChart },
 ]
 export default function IPDReportsHubPage(){
  const {projectName}=useProjectStore()
