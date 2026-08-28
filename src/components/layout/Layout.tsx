@@ -205,6 +205,7 @@ export default function Layout() {
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
+  const [projectImageUrl, setProjectImageUrl] = useState<string | null>(null)
 
   const { user, signOut } = useAuthStore()
   const { activeWorkspace } = useWorkspace()
@@ -307,12 +308,13 @@ export default function Layout() {
   async function loadProject() {
     if (!projectId && !projectName) {
       setHandoverDate(null)
+      setProjectImageUrl(null)
       return
     }
 
     const query = supabase
       .from('projects')
-      .select('id, handover_date, project_scope, scope_notes')
+      .select('id, handover_date, project_scope, scope_notes, project_image_url')
 
     const { data: projectData, error: projectError } = projectId
       ? await query.eq('id', projectId).maybeSingle()
@@ -321,6 +323,8 @@ export default function Layout() {
     if (projectError) {
       console.error(projectError.message)
     }
+
+    setProjectImageUrl(projectData?.project_image_url || null)
 
     const explicitHandover = safeParseDate(projectData?.handover_date)
 
@@ -457,11 +461,22 @@ export default function Layout() {
 
             <div className="h-px bg-white/[0.06]" />
 
-            <InfoBlock
-              label="Project"
-              value={projectName || 'No project selected'}
-              highlight
-            />
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl border border-[#d7e1e4] bg-[#f6f8f9]">
+                {projectImageUrl ? (
+                  <img src={projectImageUrl} alt={`${projectName || 'Project'} cover`} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="grid h-full place-items-center text-[9px] font-semibold text-[#8a9aa3]">PROJECT</div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <InfoBlock
+                  label="Project"
+                  value={projectName || 'No project selected'}
+                  highlight
+                />
+              </div>
+            </div>
           </div>
             <div className="mt-4"><WorkspaceSwitcher /></div>
         </div>
