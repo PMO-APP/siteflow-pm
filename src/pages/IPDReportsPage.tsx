@@ -18,6 +18,7 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
 import { useAccessSession } from '@/access/AccessSessionProvider'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import ReportDocument from '@/components/reports/ReportDocument'
 import {
   useWeeklyReports,
@@ -118,6 +119,7 @@ export default function ReportsPage() {
   const role = useMembershipStore(state => state.role)
   const {session,can}=useAccessSession()
   const { user } = useAuthStore()
+  const { activeWorkspace } = useWorkspace()
 
   const canExport = can('reports.export',{scopeType:'project',scopeId:projectId})
   const canReview = can('reports.review',{scopeType:'project',scopeId:projectId})
@@ -126,21 +128,25 @@ export default function ReportsPage() {
   const allReportsRef = useRef<HTMLDivElement>(null)
 
   const { data: allReports = [], isLoading } = useWeeklyReports()
-  const disciplineLabel = routeDiscipline
-    ? routeDiscipline.charAt(0).toUpperCase() + routeDiscipline.slice(1)
-    : ''
+  const isCombinedIPD = routeDiscipline === 'combined'
+  const disciplineLabel = isCombinedIPD
+    ? 'Combined IPD Report'
+    : routeDiscipline
+      ? routeDiscipline.charAt(0).toUpperCase() + routeDiscipline.slice(1)
+      : ''
   const reports = useMemo(
     () => allReports.filter((report: any) => {
-      if (!disciplineLabel) return true
+      if (!routeDiscipline || isCombinedIPD) return true
       const department = String(report.department || report.discipline || '').toLowerCase()
       if (routeDiscipline === 'mechanical' || routeDiscipline === 'electrical') {
         return department === routeDiscipline || department === 'mep'
       }
       return department === routeDiscipline
     }),
-    [allReports, disciplineLabel, routeDiscipline]
+    [allReports, isCombinedIPD, routeDiscipline]
   )
   const canWriteDiscipline = useMemo(() => {
+    if (isCombinedIPD) return false
     const memberRole = String(role || '').toLowerCase()
     const memberDiscipline = String(session.discipline || '').toLowerCase()
     if (['workspace_admin', 'admin', 'pmo'].includes(memberRole)) return true
@@ -148,7 +154,7 @@ export default function ReportsPage() {
       return memberRole === 'mep' || memberDiscipline === 'mep' || memberDiscipline === routeDiscipline
     }
     return memberRole === routeDiscipline || memberDiscipline === routeDiscipline
-  }, [role, session.discipline, routeDiscipline])
+  }, [isCombinedIPD, role, session.discipline, routeDiscipline])
   const { data: risks = [] } = useRisks()
   const { data: snags = [] } = useSnags()
   const { data: approvals = [] } = useApprovals()
@@ -159,6 +165,7 @@ export default function ReportsPage() {
   const projectHealth = useProjectHealth(projectId)
 
   const [packages, setPackages] = useState<any[]>([])
+  const [projectImageUrl, setProjectImageUrl] = useState<string | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
@@ -245,6 +252,20 @@ export default function ReportsPage() {
 
   useEffect(() => {
     loadPackages()
+  }, [projectId])
+
+  useEffect(() => {
+    async function loadProjectImage() {
+      if (!projectId) { setProjectImageUrl(null); return }
+      const { data, error } = await supabase
+        .from('projects')
+        .select('project_image_url')
+        .eq('id', projectId)
+        .maybeSingle()
+      if (error) { console.error(error.message); setProjectImageUrl(null); return }
+      setProjectImageUrl(data?.project_image_url || null)
+    }
+    void loadProjectImage()
   }, [projectId])
 
   useEffect(() => {
@@ -839,7 +860,7 @@ export default function ReportsPage() {
 
   function printSelectedReport() {
     if (!reportRef.current) return
-    printHtml(reportRef.current.innerHTML, 'IPD Report')
+    printHtml(reportRef.current.innerHTML, isCombinedIPD ? 'Combined IPD Report' : `${disciplineLabel} Report`)
   }
 
   async function printAllReports() {
@@ -847,7 +868,7 @@ export default function ReportsPage() {
 
     setTimeout(() => {
       if (!allReportsRef.current) return
-      printHtml(allReportsRef.current.innerHTML, 'All IPD Reports')
+      printHtml(allReportsRef.current.innerHTML, isCombinedIPD ? 'Combined IPD Report' : `${disciplineLabel} Reports`)
     }, 300)
   }
 
@@ -869,9 +890,9 @@ export default function ReportsPage() {
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-xl font-semibold text-[#102943]">IPD Reports</div>
+          <div className="text-xl font-semibold text-[#102943]">{disciplineLabel || 'Project Report'}</div>
           <div className="text-[11px] text-[#74818d] mt-1">
-            Internal Project Delivery Weekly Reporting · {projectName}
+            Weekly Project Report · {projectName}
           </div>
         </div>
 
@@ -883,13 +904,13 @@ export default function ReportsPage() {
 
           <button className="btn-ghost btn-sm btn" onClick={printAllReports}>
             <Printer size={13} />
-            Print All IPD
+            {isCombinedIPD ? 'Print Combined IPD' : 'Print All'}
           </button>
 
-          {canExport && (
+          {canWriteDiscipline && (
             <button className="btn-gold btn-sm btn" onClick={openNewReport}>
               <Plus size={13} />
-              New IPD Report
+              Create {disciplineLabel} Report
             </button>
           )}
         </div>
@@ -899,7 +920,7 @@ export default function ReportsPage() {
       <HealthHistoryChart projectId={projectId} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Metric title="IPD Reports" value={reports.length} color="text-[#df5f41]" />
+        <Metric title={isCombinedIPD ? "Department Reports" : `${disciplineLabel} Reports`} value={reports.length} color="text-[#df5f41]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="Open Snags" value={openSnags} color={openSnags > 0 ? 'text-amber-400' : 'text-emerald-400'} />
@@ -917,7 +938,7 @@ export default function ReportsPage() {
             <div className="text-sm text-[#74818d]">Loading reports…</div>
           ) : reports.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-[#74818d]">
-              No IPD reports yet.
+              No reports yet.
             </div>
           ) : (
             reportGroups.map(([date, dateReports]) => (
@@ -980,7 +1001,7 @@ export default function ReportsPage() {
         <div className="min-w-0 space-y-3">
           {!selectedReport ? (
             <div className="card p-8 text-center text-[#74818d]">
-              Select or create an IPD report.
+              Select a report from the history, or create this week’s report if you have write access.
             </div>
           ) : (
             <>
@@ -1092,6 +1113,9 @@ export default function ReportsPage() {
                         selectedReportAny.payment_issues,
                     }}
                     projectName={projectName}
+                    projectImageUrl={projectImageUrl}
+                    branding={activeWorkspace?.branding}
+                    organizationName={activeWorkspace?.name}
                     selectedPackage={selectedPackage}
                     activities={scheduleActivities}
                     photos={reportPhotos}
@@ -1133,6 +1157,9 @@ export default function ReportsPage() {
                     payment_issues: report.payment_issues,
                   }}
                   projectName={projectName}
+                  projectImageUrl={projectImageUrl}
+                  branding={activeWorkspace?.branding}
+                  organizationName={activeWorkspace?.name}
                   selectedPackage={packages.find(item => item.id === report.block_id)}
                   activities={allReportActivities[report.id] || []}
                   photos={allReportPhotos[report.id] || []}
@@ -1185,7 +1212,7 @@ export default function ReportsPage() {
 
       {showReportModal && (
         <Modal
-          title={selectedReportId ? 'Edit IPD Report' : 'New IPD Report'}
+          title={selectedReportId ? 'Edit IPD Report' : 'Create {disciplineLabel} Report'}
           onClose={() => {
             setShowReportModal(false)
             setSelectedReportId(null)
