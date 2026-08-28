@@ -52,7 +52,8 @@ function getWeekRange(dateValue?: string | null) {
   start.setHours(0, 0, 0, 0)
 
   const end = new Date(start)
-  end.setDate(start.getDate() + 6)
+  // Weekly delivery reporting covers Monday through Friday.
+  end.setDate(start.getDate() + 4)
   end.setHours(23, 59, 59, 999)
 
   return {
@@ -394,64 +395,85 @@ export default function ReportsPage() {
   }
 
   function mapActivity(item: any) {
-  const previous = Number(item.previous_progress || 0)
-  const current = Number(item.new_progress || 0)
+    const previous = Number(item.previous_progress || 0)
+    const current = Number(item.new_progress || 0)
 
-  return {
-    id: item.id,
-    taskId: item.task_id,
-    activity:
-      item.tasks?.task_name ||
-      item.tasks?.name ||
-      item.tasks?.activity ||
-      item.tasks?.title ||
-      `Task ${item.task_id || ''}`,
-    last_week: previous,
-    this_week: current,
-    planned: Number(
-      item.tasks?.planned_progress ||
-      item.tasks?.progress_pct ||
-      current ||
-      0
-    ),
-    remarks:
-      item.comments ||
-      item.recovery_action ||
-      item.delay_reason ||
-      `Progress updated from ${previous}% to ${current}%`,
+    return {
+      id: item.id,
+      taskId: item.task_id,
+      activity:
+        item.tasks?.task_name ||
+        item.tasks?.name ||
+        item.tasks?.activity ||
+        item.tasks?.title ||
+        `Task ${item.task_id || ''}`,
+      last_week: previous,
+      this_week: current,
+      planned: Number(
+        item.tasks?.planned_progress ||
+        item.tasks?.progress_pct ||
+        current ||
+        0
+      ),
+      remarks:
+        item.comments ||
+        item.recovery_action ||
+        item.delay_reason ||
+        `Progress updated from ${previous}% to ${current}%`,
+    }
   }
-}
+
   function dedupeActivities(items: any[]) {
-  const map = new Map<string, any>()
+    const map = new Map<string, any>()
 
-  items.forEach(item => {
-    const key = item.taskId || item.activity
+    items.forEach(item => {
+      const key = item.taskId || item.activity
 
-    if (!map.has(key)) {
-      map.set(key, item)
-      return
-    }
+      if (!map.has(key)) {
+        // The first progress log of the week establishes the opening value.
+        map.set(key, item)
+        return
+      }
 
-    const existing = map.get(key)
+      const existing = map.get(key)
 
-    map.set(key, {
-      ...existing,
-      this_week: item.this_week,
-      planned: item.planned,
-      remarks: item.remarks || existing.remarks,
+      // Subsequent updates only move the closing value forward. This means an
+      // activity updated several times during the week appears once in the report.
+      map.set(key, {
+        ...existing,
+        this_week: item.this_week,
+        planned: item.planned,
+        remarks: item.remarks || existing.remarks,
+      })
     })
-  })
 
-  return Array.from(map.values())
-}
+    return Array.from(map.values())
+  }
 
-  async function loadScheduleActivities() {
-    if (!selectedReport?.id || !projectId) {
-      setScheduleActivities([])
-      return
+  function activityBelongsToReport(item: any) {
+    if (!routeDiscipline || isCombinedIPD) return true
+
+    const taskDiscipline = String(item.tasks?.discipline || '').trim().toLowerCase()
+    const requested = String(routeDiscipline).trim().toLowerCase()
+
+    if (requested === 'housebuild' || requested === 'infrastructure') {
+      return taskDiscipline === requested
     }
 
-    const { start, end } = getWeekRange((selectedReport as any).report_date)
+    // Project Controls currently treats MEP as one delivery discipline. Keep
+    // explicitly tagged Mechanical/Electrical tasks separate when available,
+    // while allowing legacy MEP tasks to feed the MEP reporting stream.
+    if (requested === 'mechanical') return taskDiscipline === 'mechanical'
+    if (requested === 'electrical') return taskDiscipline === 'electrical'
+    if (requested === 'mep') return ['mep', 'mechanical', 'electrical'].includes(taskDiscipline)
+
+    return taskDiscipline === requested
+  }
+
+  async function calculateLiveWeekActivities(report: any) {
+    if (!projectId || !report) return []
+
+    const { start, end } = getWeekRange(report.report_date)
 
     let query = supabase
       .from('task_progress_logs')
@@ -461,19 +483,99 @@ export default function ReportsPage() {
       .lte('created_at', end)
       .order('created_at', { ascending: true })
 
-    if ((selectedReport as any).block_id) {
-      query = query.eq('block_id', (selectedReport as any).block_id)
-    }
+    if (report.block_id) query = query.eq('block_id', report.block_id)
 
     const { data, error } = await query
+    if (error) throw error
 
-    if (error) {
-      console.error(error.message)
+    return dedupeActivities(
+      (data || [])
+        .filter(activityBelongsToReport)
+        .map(mapActivity)
+    )
+  }
+
+  async function loadFrozenActivities(reportId: string) {
+    const { data, error } = await supabase
+      .from('weekly_activities')
+      .select('*')
+      .eq('report_id', reportId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      taskId: item.task_id || null,
+      activity: item.activity,
+      last_week: Number(item.last_week || 0),
+      this_week: Number(item.this_week || 0),
+      planned: Number(item.planned || 0),
+      remarks: item.remarks || '',
+    }))
+  }
+
+  async function snapshotWeekActivities(report: any) {
+    if (!report?.id) return []
+
+    const activities = await calculateLiveWeekActivities(report)
+
+    const { error: deleteError } = await supabase
+      .from('weekly_activities')
+      .delete()
+      .eq('report_id', report.id)
+
+    if (deleteError) throw deleteError
+
+    if (activities.length > 0) {
+      const { error: insertError } = await supabase
+        .from('weekly_activities')
+        .insert(
+          activities.map((item: any) => ({
+            report_id: report.id,
+            activity: item.activity,
+            last_week: item.last_week,
+            this_week: item.this_week,
+            planned: item.planned,
+            remarks: item.remarks || null,
+          }))
+        )
+
+      if (insertError) throw insertError
+    }
+
+    return activities
+  }
+
+  async function loadScheduleActivities() {
+    if (!selectedReport?.id || !projectId) {
       setScheduleActivities([])
       return
     }
 
-   setScheduleActivities(dedupeActivities((data || []).map(mapActivity)))
+    try {
+      const status = String((selectedReport as any).workflow_status || 'Draft')
+      const frozenStatuses = ['Submitted', 'Resubmitted', 'Approved', 'Locked', 'Rejected']
+
+      if (frozenStatuses.includes(status)) {
+        const frozen = await loadFrozenActivities(selectedReport.id)
+        const hasSnapshot = Boolean((selectedReport as any).activity_snapshot_at)
+        // A zero-row snapshot is meaningful: it means "No activity recorded this week".
+        // Only legacy reports without a snapshot marker may fall back to live logs.
+        setScheduleActivities(
+          hasSnapshot || frozen.length > 0
+            ? frozen
+            : await calculateLiveWeekActivities(selectedReport)
+        )
+        return
+      }
+
+      // Draft/Returned reports always reflect Project Controls updates made in
+      // the current reporting week. Nobody types progress values in the report.
+      setScheduleActivities(await calculateLiveWeekActivities(selectedReport))
+    } catch (error: any) {
+      console.error(error?.message || error)
+      setScheduleActivities([])
+    }
   }
 
   async function loadAllPrintData() {
@@ -497,21 +599,17 @@ export default function ReportsPage() {
     const activityMap: Record<string, any[]> = {}
 
     for (const report of reports as any[]) {
-      const { start, end } = getWeekRange(report.report_date)
+      const status = String(report.workflow_status || 'Draft')
+      const frozenStatuses = ['Submitted', 'Resubmitted', 'Approved', 'Locked', 'Rejected']
 
-      let query = supabase
-        .from('task_progress_logs')
-        .select('*, tasks(*)')
-        .eq('project_id', projectId)
-        .gte('created_at', start)
-        .lte('created_at', end)
-        .order('created_at', { ascending: true })
-
-      if (report.block_id) query = query.eq('block_id', report.block_id)
-
-      const { data } = await query
-
-      activityMap[report.id] = dedupeActivities((data || []).map(mapActivity))
+      if (frozenStatuses.includes(status)) {
+        const frozen = await loadFrozenActivities(report.id)
+        activityMap[report.id] = report.activity_snapshot_at || frozen.length > 0
+          ? frozen
+          : await calculateLiveWeekActivities(report)
+      } else {
+        activityMap[report.id] = await calculateLiveWeekActivities(report)
+      }
     }
 
     setAllReportPhotos(photoMap)
@@ -777,6 +875,17 @@ export default function ReportsPage() {
     }
 
     if (status === 'Submitted' || status === 'Resubmitted') {
+      // Freeze the Project Controls activity calculation at submission time.
+      // Future progress updates must never rewrite this reporting week's history.
+      try {
+        const frozen = await snapshotWeekActivities(selectedReport)
+        setScheduleActivities(frozen)
+      } catch (snapshotError: any) {
+        notify('error', snapshotError?.message || 'Could not freeze this week’s Project Controls activity.')
+        return
+      }
+
+      payload.activity_snapshot_at = now
       payload.submitted_at = now
       payload.submitted_by = user?.id || null
     }
