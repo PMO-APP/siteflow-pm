@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ArrowLeft,
   Building2,
+  CalendarClock,
   Check,
   Eye,
   EyeOff,
@@ -21,6 +22,8 @@ import { useMembershipStore } from '@/store/membership'
 import { useThemeStore } from '@/store/theme'
 import { getInitials } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
+import { useAccessSession } from '@/access/AccessSessionProvider'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
 
 function formatRoleLabel(role?: string | null) {
   if (!role) return 'Team Member'
@@ -46,6 +49,8 @@ export default function ProfilePage() {
   const { user, signOut } = useAuthStore()
   const { theme, setTheme } = useThemeStore()
   const role = useMembershipStore(state => state.role)
+  const { session, refresh } = useAccessSession()
+  const { activeWorkspace } = useWorkspace()
   const accessScope = useMembershipStore(state => state.accessScope)
   const portfolioId = useMembershipStore(state => state.portfolioId)
   const projectId = useMembershipStore(state => state.projectId)
@@ -53,6 +58,15 @@ export default function ProfilePage() {
 
   const [portfolioName, setPortfolioName] = useState('—')
   const [projectNames, setProjectNames] = useState<string[]>([])
+  const [editableProjects, setEditableProjects] = useState<any[]>([])
+  const [delegates, setDelegates] = useState<any[]>([])
+  const [delegations, setDelegations] = useState<any[]>([])
+  const [handoverProjectId, setHandoverProjectId] = useState('')
+  const [handoverToUserId, setHandoverToUserId] = useState('')
+  const [handoverStart, setHandoverStart] = useState('')
+  const [handoverEnd, setHandoverEnd] = useState('')
+  const [handoverReason, setHandoverReason] = useState('')
+  const [handoverNotice, setHandoverNotice] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -80,6 +94,54 @@ export default function ProfilePage() {
     loadAccessContext()
     return () => { active = false }
   }, [portfolioId, projectId, projectIds])
+
+  useEffect(() => {
+    let active = true
+    async function loadOwnershipContext() {
+      if (!activeWorkspace?.id || !user?.id) return
+      const ownedIds = Array.from(new Set(session.assignments
+        .filter(item => item.scopeType === 'project' && item.source !== 'delegation' && ['edit','manage'].includes(item.accessLevel))
+        .map(item => Number(item.scopeId))
+        .filter(Number.isFinite)))
+      const [projectResult, memberResult, delegationResult] = await Promise.all([
+        ownedIds.length ? supabase.from('projects').select('id,project_name').in('id', ownedIds).order('project_name') : Promise.resolve({ data: [], error: null }),
+        supabase.from('workspace_member_access_summary').select('*').eq('workspace_id', activeWorkspace.id).order('full_name'),
+        supabase.from('project_access_delegations').select('*').eq('workspace_id', activeWorkspace.id).or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`).order('created_at', { ascending: false }),
+      ])
+      if (!active) return
+      setEditableProjects(projectResult.data || [])
+      const myDiscipline = String(session.discipline || role || '').toLowerCase()
+      setDelegates((memberResult.data || []).filter((m:any) => String(m.user_id) !== user.id && String(m.discipline || m.role || '').toLowerCase() === myDiscipline))
+      setDelegations(delegationResult.data || [])
+    }
+    void loadOwnershipContext()
+    return () => { active = false }
+  }, [activeWorkspace?.id, user?.id, session.assignments, session.discipline, role])
+
+  async function createHandover() {
+    setHandoverNotice('')
+    if (!activeWorkspace?.id || !user?.id || !handoverProjectId || !handoverToUserId || !handoverStart || !handoverEnd) {
+      setHandoverNotice('Select a project, colleague, start and end time.')
+      return
+    }
+    const assignment = session.assignments.find(item => item.scopeType === 'project' && String(item.scopeId) === handoverProjectId && item.source !== 'delegation' && ['edit','manage'].includes(item.accessLevel))
+    if (!assignment) { setHandoverNotice('You are not the assigned owner of this project.'); return }
+    const { error } = await supabase.from('project_access_delegations').insert({
+      workspace_id: activeWorkspace.id,
+      project_id: Number(handoverProjectId),
+      from_user_id: user.id,
+      to_user_id: handoverToUserId,
+      discipline: assignment.discipline || session.discipline || null,
+      starts_at: new Date(handoverStart).toISOString(),
+      ends_at: new Date(handoverEnd).toISOString(),
+      reason: handoverReason.trim() || null,
+      status: 'active',
+    })
+    if (error) { setHandoverNotice(error.message); return }
+    setHandoverNotice('Temporary handover created. It will expire automatically at the end time.')
+    setHandoverProjectId(''); setHandoverToUserId(''); setHandoverStart(''); setHandoverEnd(''); setHandoverReason('')
+    await refresh()
+  }
 
   async function updatePassword() {
     setPasswordNotice('')
@@ -138,7 +200,7 @@ export default function ProfilePage() {
             <div className="min-w-[240px] rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
               <div className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">Current permission</div>
               <div className="mt-2 flex items-center gap-2 text-lg font-extrabold text-[#173f5f]"><Shield size={18} className="text-[#ef8354]" /> {displayRole}</div>
-              <div className="mt-2 text-xs text-[#607783]">Access scope: <span className="font-bold text-[#173f5f]">{accessScope || '—'}</span></div>
+              <div className="mt-2 text-xs text-[#607783]">Visibility: <span className="font-bold text-[#173f5f]">Workspace-wide</span><br/>Edit authority: <span className="font-bold text-[#173f5f]">Assigned projects only</span></div>
             </div>
           </div>
         </section>
@@ -154,10 +216,26 @@ export default function ProfilePage() {
                 <InfoCard icon={Building2} label="Portfolio access" value={portfolioName} />
               </div>
               <div className="mt-3 rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
-                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]"><FolderKanban size={14} className="text-[#ef8354]" /> Assigned projects</div>
+                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]"><FolderKanban size={14} className="text-[#ef8354]" /> Editable projects</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {projectNames.length ? projectNames.map(name => <span key={name} className="ui-badge ui-badge--info">{name}</span>) : <span className="text-sm text-[#607783]">Workspace-wide access</span>}
+                  {editableProjects.length ? editableProjects.map((project:any) => <span key={project.id} className="ui-badge ui-badge--info">{project.project_name}</span>) : <span className="text-sm text-[#607783]">No permanent project ownership assigned</span>}
                 </div>
+              </div>
+            </section>
+
+            <section className="card p-6 sm:p-7">
+              <SectionHeading icon={CalendarClock} eyebrow="Access continuity" title="Temporary project handover" copy="Keep workspace visibility unchanged while temporarily giving a colleague your editing authority during leave or another absence." />
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <select className="form-control" value={handoverProjectId} onChange={e=>setHandoverProjectId(e.target.value)}><option value="">Project you own</option>{editableProjects.map((p:any)=><option key={p.id} value={p.id}>{p.project_name}</option>)}</select>
+                <select className="form-control" value={handoverToUserId} onChange={e=>setHandoverToUserId(e.target.value)}><option value="">Colleague in your team</option>{delegates.map((m:any)=><option key={m.user_id} value={m.user_id}>{m.full_name || m.email}</option>)}</select>
+                <input className="form-control" type="datetime-local" value={handoverStart} onChange={e=>setHandoverStart(e.target.value)} />
+                <input className="form-control" type="datetime-local" value={handoverEnd} onChange={e=>setHandoverEnd(e.target.value)} />
+                <input className="form-control md:col-span-2" placeholder="Reason, e.g. annual leave" value={handoverReason} onChange={e=>setHandoverReason(e.target.value)} />
+              </div>
+              {handoverNotice && <div className="mt-3 rounded-xl border border-[#dce7ef] bg-[#f7f9fa] p-3 text-sm text-[#607783]">{handoverNotice}</div>}
+              <button onClick={createHandover} className="ui-button ui-button--primary mt-4" disabled={!editableProjects.length}><CalendarClock size={15}/> Create temporary handover</button>
+              <div className="mt-5 space-y-2">
+                {delegations.slice(0,5).map((d:any)=><div key={d.id} className="rounded-xl border border-[#e5ebef] p-3 text-xs text-[#607783]">{d.from_user_id === user?.id ? 'Handed over' : 'Received'} · Project {d.project_id} · {d.discipline || 'project'} · until {new Date(d.ends_at).toLocaleString()}</div>)}
               </div>
             </section>
 
