@@ -151,12 +151,12 @@ export default function RiskPage() {
   const { data: risks = [], isLoading } = useRisks()
 
   const { user } = useAuthStore()
-  const { projectOwnerEmail } = useProjectStore()
+  const { projectOwnerEmail, projectId } = useProjectStore()
 
   const role = getRole(user?.email)
 
-  const { can } = useAccessSession()
-  const canEdit = can('risk.edit')
+  const { can, session } = useAccessSession()
+  const canEdit = Boolean(projectId) && can('risk.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
   const [modal, setModal] = useState<Risk | null | 'new'>(null)
 
   useQuickActionRoute(() => setModal('new'), canEdit)
