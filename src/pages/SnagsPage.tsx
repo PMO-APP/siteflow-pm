@@ -53,7 +53,7 @@ function SnagModal({
   const { projectId } = useProjectStore()
 
   const { can } = useAccessSession()
-  const canEdit = !item || item.created_by === user?.id || can('project.manage')
+  const canEdit = !item ? can('snags.edit') : can('snags.edit') && item.created_by === user?.id
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -324,7 +324,7 @@ export default function SnagsPage() {
   useQuickActionRoute(() => setModal('new'), canCreate)
 
   const canEditSnag = (snag: Snag) =>
-    can('snags.edit') && (snag.created_by === user?.id || can('project.manage'))
+    can('snags.edit') && snag.created_by === user?.id
 
   const filtered = snags.filter(snag => {
     if (
