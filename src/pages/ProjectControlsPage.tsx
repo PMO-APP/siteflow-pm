@@ -105,6 +105,39 @@ function getLogActor(log: any) {
   )
 }
 
+type ProjectControlsCache = {
+  tasks: any[]
+  schedules: any[]
+  logs: any[]
+}
+
+function projectControlsCacheKey(projectId: number) {
+  return `pmocorex:project-controls:${projectId}`
+}
+
+function readProjectControlsCache(projectId: number): ProjectControlsCache | null {
+  try {
+    const raw = sessionStorage.getItem(projectControlsCacheKey(projectId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return {
+      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
+      schedules: Array.isArray(parsed.schedules) ? parsed.schedules : [],
+      logs: Array.isArray(parsed.logs) ? parsed.logs : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeProjectControlsCache(projectId: number, value: ProjectControlsCache) {
+  try {
+    sessionStorage.setItem(projectControlsCacheKey(projectId), JSON.stringify(value))
+  } catch {
+    // Cache is an optimisation only; Supabase remains the source of truth.
+  }
+}
+
 export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
@@ -123,9 +156,35 @@ export default function ProjectControlsPage() {
   const [notice, setNotice] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, any>>({})
+  const loadRequestRef = useRef(0)
 
   useEffect(() => {
-    loadData()
+    const requestId = ++loadRequestRef.current
+
+    if (!projectId) {
+      setAllTasks([])
+      setSchedules([])
+      setLogs([])
+      setLoading(false)
+      return
+    }
+
+    // Rehydrate the last successful project-control payload immediately.
+    // A background fetch below then refreshes it from Supabase.
+    const cached = readProjectControlsCache(projectId)
+    if (cached) {
+      setAllTasks(cached.tasks)
+      setSchedules(cached.schedules)
+      setLogs(cached.logs)
+      setLoading(false)
+    } else {
+      setAllTasks([])
+      setSchedules([])
+      setLogs([])
+      setLoading(true)
+    }
+
+    void loadData(projectId, requestId, !!cached)
   }, [projectId])
 
   const tasks =
@@ -135,45 +194,96 @@ export default function ProjectControlsPage() {
           task => (task.discipline || 'Housebuild') === disciplineTab
         )
 
-  async function loadData() {
-    if (!projectId) {
+  async function loadData(
+    targetProjectId = projectId,
+    requestId = ++loadRequestRef.current,
+    hasCachedData = allTasks.length > 0
+  ) {
+    if (!targetProjectId) {
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    if (!hasCachedData) setLoading(true)
     setNotice('')
 
-    const [taskResult, scheduleResult, logResult] = await Promise.all([
-      supabase
+    let freshTasks: any[] | null = null
+
+    try {
+      // Tasks are the primary Project Controls dataset. Do not make the page
+      // wait for Schedule or History before showing execution data.
+      const taskResult = await supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', projectId)
-        .order('task_number', { ascending: true }),
+        .eq('project_id', targetProjectId)
+        .order('task_number', { ascending: true })
 
-      supabase
-        .from('schedule_revisions')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false }),
+      if (requestId !== loadRequestRef.current) return
 
-      // No join here. Supabase threw a relationship error because
-      // task_progress_logs.updated_by has no FK relationship to profiles.
-      supabase
-        .from('task_progress_logs')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false }),
-    ])
+      if (taskResult.error) {
+        setNotice(taskResult.error.message)
+      } else {
+        freshTasks = taskResult.data || []
+        setAllTasks(freshTasks)
+      }
 
-    if (taskResult.error) setNotice(taskResult.error.message)
-    if (scheduleResult.error) setNotice(scheduleResult.error.message)
-    if (logResult.error) setNotice(logResult.error.message)
+      // The execution table can render as soon as tasks arrive. Secondary
+      // datasets continue loading without blocking the whole page.
+      setLoading(false)
 
-    setAllTasks(taskResult.data || [])
-    setSchedules(scheduleResult.data || [])
-    setLogs(logResult.data || [])
-    setLoading(false)
+      try {
+        const [scheduleResult, logResult] = await Promise.all([
+          supabase
+            .from('schedule_revisions')
+            .select('*')
+            .eq('project_id', targetProjectId)
+            .order('created_at', { ascending: false }),
+
+          // No join here. Supabase threw a relationship error because
+          // task_progress_logs.updated_by has no FK relationship to profiles.
+          supabase
+            .from('task_progress_logs')
+            .select('*')
+            .eq('project_id', targetProjectId)
+            .order('created_at', { ascending: false }),
+        ])
+
+        if (requestId !== loadRequestRef.current) return
+
+        if (scheduleResult.error) setNotice(scheduleResult.error.message)
+        if (logResult.error) setNotice(logResult.error.message)
+
+        const nextSchedules = scheduleResult.data || []
+        const nextLogs = logResult.data || []
+        setSchedules(nextSchedules)
+        setLogs(nextLogs)
+
+        writeProjectControlsCache(targetProjectId, {
+          tasks: freshTasks ?? allTasks,
+          schedules: nextSchedules,
+          logs: nextLogs,
+        })
+      } catch (secondaryError: any) {
+        if (requestId === loadRequestRef.current) {
+          setNotice(secondaryError?.message || 'Some project-control details could not be refreshed.')
+          if (freshTasks) {
+            writeProjectControlsCache(targetProjectId, {
+              tasks: freshTasks,
+              schedules,
+              logs,
+            })
+          }
+        }
+      }
+    } catch (error: any) {
+      if (requestId === loadRequestRef.current) {
+        setNotice(error?.message || 'Project controls could not be refreshed. Showing the latest available data.')
+      }
+    } finally {
+      // Never leave the page trapped on a loading screen after a rejected
+      // request. Cached/previous data remains visible if refresh fails.
+      if (requestId === loadRequestRef.current) setLoading(false)
+    }
   }
 
   function updateEdit(taskId: string, key: string, value: any) {
