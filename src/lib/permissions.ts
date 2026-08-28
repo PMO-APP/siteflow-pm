@@ -59,7 +59,6 @@ export const INTERNAL_CONTRIBUTOR_ROLES = [
   ...HSE_ROLES,
   ...PROJECT_OWNER_ROLES,
   'project_owner',
-  'design',
   'housebuild',
   'costing',
   'infrastructure',
@@ -247,7 +246,7 @@ export function canImportSchedule(
 }
 
 export function canUploadDocuments(role?: string | null) {
-  return canCreateInternalContribution(role)
+  return role === 'design' || canCreateInternalContribution(role)
 }
 
 export function canEditDocument(
@@ -379,7 +378,7 @@ export function canEditExternalReview(
 }
 
 export function canCreateSnags(role?: string | null) {
-  return canCreateInternalContribution(role)
+  return role === 'design' || canCreateInternalContribution(role)
 }
 
 export function canEditSnag(
@@ -387,10 +386,12 @@ export function canEditSnag(
   createdBy?: string | null,
   userId?: string | null
 ) {
-  return canEditOwnOrAdmin(role, createdBy, userId)
+  if (isExternalRole(role) || isViewerRole(role)) return false
+  return !!createdBy && !!userId && createdBy === userId
 }
 
 export function canCreateExternalAssignments(role?: string | null) {
+  if (role === 'design') return false
   return canCreateInternalContribution(role)
 }
 
