@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import ProjectAccessMatrix from '@/pages/admin/ProjectAccessMatrix'
+import ProjectDelegationsPanel from '@/pages/admin/ProjectDelegationsPanel'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 
@@ -24,6 +25,7 @@ const baseAdminTabs = [
   'Security',
   'Users & Roles',
   'Project Access Matrix',
+  'Delegations',
 ]
 
 type InviteScope = 'workspace' | 'project'
@@ -120,7 +122,7 @@ export default function WorkspaceAdminPage() {
 
   const adminTabs = baseAdminTabs.filter(tab => {
     if (tab === 'Users & Roles') return canManageTeam
-    if (tab === 'Project Access Matrix') return canManageTeam
+    if (tab === 'Project Access Matrix' || tab === 'Delegations') return canManageTeam
     return true
   })
 
@@ -793,6 +795,7 @@ if (inviteRole === 'infrastructure_project_owner') {
 
             {activeTab === 'Project Access Matrix' &&
               canManageTeam && <ProjectAccessMatrix />}
+            {activeTab === 'Delegations' && canManageTeam && <ProjectDelegationsPanel />}
           </div>
         )}
       </div>
