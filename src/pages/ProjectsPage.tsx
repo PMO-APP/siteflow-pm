@@ -142,6 +142,8 @@ export default function ProjectsPage() {
   const [editHousebuildOwnerEmail, setEditHousebuildOwnerEmail] = useState('')
   const [editMepOwnerEmail, setEditMepOwnerEmail] = useState('')
   const [editInfrastructureOwnerEmail, setEditInfrastructureOwnerEmail] = useState('')
+  const [editProjectImageUrl, setEditProjectImageUrl] = useState('')
+  const [projectImageUploading, setProjectImageUploading] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState('')
   const [portfolioFilter, setPortfolioFilter] = useState('All')
@@ -328,7 +330,7 @@ export default function ProjectsPage() {
   }
 
   function openEditProject(project: any) {
-    if (!can('project.edit', { scopeType: 'project', scopeId: project.id })) {
+    if (!can('project.edit', { scopeType: 'project', scopeId: project.id, discipline: 'overall' })) {
       showNotice({
         variant: 'danger',
         title: 'Project access required',
@@ -348,14 +350,34 @@ export default function ProjectsPage() {
     setEditHousebuildOwnerEmail(project.housebuild_owner_email || '')
     setEditMepOwnerEmail(project.mep_owner_email || '')
     setEditInfrastructureOwnerEmail(project.infrastructure_owner_email || '')
+    setEditProjectImageUrl(project.project_image_url || '')
     setShowEditProjectModal(true)
+  }
+
+  async function uploadProjectImage(file: File) {
+    if (!editingProject?.id || !file) return
+    setProjectImageUploading(true)
+    try {
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const path = `${editingProject.id}/project-cover-${Date.now()}.${extension}`
+      const { error: uploadError } = await supabase.storage
+        .from('project-images')
+        .upload(path, file, { upsert: true, cacheControl: '3600' })
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage.from('project-images').getPublicUrl(path)
+      setEditProjectImageUrl(data.publicUrl)
+    } catch (cause: any) {
+      showNotice({ variant: 'danger', title: 'Project image upload failed', message: cause?.message || 'Unable to upload the project image.', confirmLabel: 'Close' })
+    } finally {
+      setProjectImageUploading(false)
+    }
   }
 
   async function updateProject() {
     if (
       !editingProject ||
       !editProjectName.trim() ||
-      !can('project.edit', { scopeType: 'project', scopeId: editingProject.id })
+      !can('project.edit', { scopeType: 'project', scopeId: editingProject.id, discipline: 'overall' })
     ) return
 
     const { error } = await supabase
@@ -372,6 +394,7 @@ export default function ProjectsPage() {
         mep_owner_email: editMepOwnerEmail.trim().toLowerCase() || null,
         infrastructure_owner_email:
           editInfrastructureOwnerEmail.trim().toLowerCase() || null,
+        project_image_url: editProjectImageUrl || null,
       })
       .eq('id', editingProject.id)
 
@@ -1178,6 +1201,18 @@ export default function ProjectsPage() {
             <option value="">Unassigned</option>
             {portfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}
           </select>
+          <FieldLabel>Project image</FieldLabel>
+          <div className="mb-4 rounded-2xl border border-[#d7e1e4] bg-[#f8fafb] p-3">
+            <div className="flex items-center gap-3">
+              <div className="h-16 w-20 overflow-hidden rounded-xl border border-[#d7e1e4] bg-white">
+                {editProjectImageUrl ? <img src={editProjectImageUrl} alt="Project" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-[10px] text-[#8797a1]">No image</div>}
+              </div>
+              <div className="min-w-0 flex-1">
+                <input type="file" accept="image/*" disabled={projectImageUploading} onChange={e => { const file=e.target.files?.[0]; if(file) void uploadProjectImage(file) }} className="block w-full text-xs text-[#657781] file:mr-3 file:rounded-lg file:border-0 file:bg-[#173f5f] file:px-3 file:py-2 file:font-semibold file:text-white" />
+                <div className="mt-1 text-[10px] text-[#8797a1]">Use a site plan, aerial image, render or site photograph. It appears in the sidebar and project reports.</div>
+              </div>
+            </div>
+          </div>
           <OwnerFields values={[editOverallOwnerEmail, editHousebuildOwnerEmail, editMepOwnerEmail, editInfrastructureOwnerEmail]} setters={[setEditOverallOwnerEmail, setEditHousebuildOwnerEmail, setEditMepOwnerEmail, setEditInfrastructureOwnerEmail]} />
           <button className="hub-primary-button mt-5 w-full justify-center" onClick={updateProject}>Save Project Changes</button>
         </Modal>
