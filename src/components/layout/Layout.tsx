@@ -98,10 +98,9 @@ const NAV: NavItem[] = [
   { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs', group: 'technical' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents', group: 'technical' },
   { to: '/app/costing', icon: Wallet, label: 'Costing', group: 'commercial' },
-  { to: '/app/design-reports', icon: PenTool, label: 'Design Reports', group: 'technical' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register', group: 'governance' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends', group: 'governance' },
-  { to: '/app/reports', icon: FileText, label: 'IPD Reports', group: 'governance' },
+  { to: '/app/reports', icon: FileText, label: 'Reports', group: 'governance' },
   { to: '/app/handover', icon: PackageCheck, label: 'Handover', group: 'delivery' },
 
    {
@@ -111,38 +110,6 @@ const NAV: NavItem[] = [
   group: 'administration',
 },
  
-  {
-  to: '/app/pmo-weekly-report',
-  icon: FileText,
-  label: 'Executive Reports',
-  group: 'overview',
-},
-  {
-  to: '/app/executive-reporting',
-  icon: FileSpreadsheet,
-  label: 'Reporting Centre',
-  group: 'overview',
-},
-  {
-  to: '/app/executive-narrative',
-  icon: Brain,
-  label: 'Executive Narrative',
-  group: 'overview',
-},
-  {
-  to: '/app/report-designer',
-  icon: FileText,
-  label: 'Report Designer',
-  permission: 'reports.edit',
-  group: 'overview',
-},
-  {
-  to: '/app/report-distribution',
-  icon: Send,
-  label: 'Report Distribution',
-  permission: 'reports.view',
-  group: 'overview',
-},
  
   {
     to: '/app/internal-assignments',
