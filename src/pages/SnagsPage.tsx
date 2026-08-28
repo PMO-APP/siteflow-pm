@@ -52,8 +52,8 @@ function SnagModal({
   const { user } = useAuthStore()
   const { projectId } = useProjectStore()
 
-  const { can } = useAccessSession()
-  const canEdit = !item ? can('snags.edit') : can('snags.edit') && item.created_by === user?.id
+  const { can, session } = useAccessSession()
+  const canEdit = !item ? can('snags.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline }) : can('snags.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline }) && item.created_by === user?.id
 
   const [form, setForm] = useState({
     title: item?.title || '',
@@ -318,13 +318,13 @@ export default function SnagsPage() {
   const [statFilter, setStatFilter] = useState('')
   const [view, setView] = useState<'list' | 'room'>('list')
 
-  const { can } = useAccessSession()
-  const canCreate = can('snags.edit')
+  const { can, session } = useAccessSession()
+  const canCreate = can('snags.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   useQuickActionRoute(() => setModal('new'), canCreate)
 
   const canEditSnag = (snag: Snag) =>
-    can('snags.edit') && snag.created_by === user?.id
+    can('snags.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline }) && snag.created_by === user?.id
 
   const filtered = snags.filter(snag => {
     if (
