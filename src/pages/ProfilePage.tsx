@@ -200,7 +200,15 @@ export default function ProfilePage() {
             <div className="min-w-[240px] rounded-2xl border border-[#dce7ef] bg-[#f7f9fa] p-4">
               <div className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#7a8c99]">Current permission</div>
               <div className="mt-2 flex items-center gap-2 text-lg font-extrabold text-[#173f5f]"><Shield size={18} className="text-[#ef8354]" /> {displayRole}</div>
-              <div className="mt-2 text-xs text-[#607783]">Visibility: <span className="font-bold text-[#173f5f]">Workspace-wide</span><br/>Edit authority: <span className="font-bold text-[#173f5f]">Assigned projects only</span></div>
+              <div className="mt-2 text-xs text-[#607783]">
+                Visibility: <span className="font-bold text-[#173f5f]">Workspace-wide</span><br/>
+                Edit authority:{' '}
+                <span className="font-bold text-[#173f5f]">
+                  {editableProjects.length
+                    ? editableProjects.map((project:any) => project.project_name).join(', ')
+                    : 'None assigned'}
+                </span>
+              </div>
             </div>
           </div>
         </section>
