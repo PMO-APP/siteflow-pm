@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Save } from 'lucide-react'
 import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
@@ -387,6 +387,21 @@ function ExecutionTab({
   savingId,
   canEdit,
 }: any) {
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+
+  const syncFromTop = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft
+    }
+  }
+
+  const syncFromTable = () => {
+    if (topScrollRef.current && tableScrollRef.current) {
+      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft
+    }
+  }
+
   if (!tasks.length) {
     return (
       <div className="card p-8 text-center text-[#6e7d8c]">
@@ -403,7 +418,26 @@ function ExecutionTab({
         </div>
       )}
 
-      <div className="card overflow-x-auto">
+      <div className="card overflow-hidden">
+        <div className="border-b border-[#e5e8eb] bg-[#fafbfb] px-4 pt-2">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[#82909c]">
+            Scroll horizontally to see all controls
+          </div>
+          <div
+            ref={topScrollRef}
+            onScroll={syncFromTop}
+            className="overflow-x-auto overflow-y-hidden pb-1"
+            aria-label="Horizontal table scroll"
+          >
+            <div className="h-px min-w-[1500px]" />
+          </div>
+        </div>
+
+        <div
+          ref={tableScrollRef}
+          onScroll={syncFromTable}
+          className="overflow-x-auto"
+        >
         <table className="tbl min-w-[1500px]">
           <thead>
             <tr>
@@ -578,6 +612,7 @@ function ExecutionTab({
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
