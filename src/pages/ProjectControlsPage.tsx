@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Save } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, ChevronDown, ChevronUp, Save } from 'lucide-react'
 import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import { fdate } from '@/lib/utils'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
@@ -43,20 +44,6 @@ const RECOVERY_ACTIONS = [
   'Awaiting Approval',
   'No Recovery Plan',
 ]
-
-function canManageSchedule(role?: string | null) {
-  return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
-}
-
-function canEditProjectControls(role?: string | null) {
-  return [
-    'workspace_admin',
-    'admin',
-    'pmo',
-    'project_owner',
-    'overall_project_owner',
-  ].includes(role || '')
-}
 
 function getTaskName(task: any) {
   return task.name || 'Untitled Activity'
@@ -142,12 +129,13 @@ export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
-
-  const canEdit = canEditProjectControls(role)
-  const canUploadSchedule = canManageSchedule(role)
+  const { can } = useAccessSession()
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
+  const disciplinePermission = disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
+  const canEdit = Boolean(projectId) && can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: disciplinePermission })
+  const canUploadSchedule = Boolean(projectId) && can('schedule.import', { scopeType: 'project', scopeId: projectId, discipline: 'overall' })
 
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
@@ -301,7 +289,7 @@ export default function ProjectControlsPage() {
   async function saveTaskProgress(task: any) {
     if (!canEdit) {
       setNotice(
-        'View only. Only Project Owners, PMO and Administrators can update project controls.'
+        'View only. You can see this project, but only its assigned owner or an active delegate can update this discipline.'
       )
       return
     }
@@ -409,7 +397,7 @@ export default function ProjectControlsPage() {
         description="Control schedule performance, progress, delay ownership, recovery actions and delivery history from one operational workspace."
         projectName={projectName || 'No project selected'}
       >
-        {!canEdit && <div className="mt-5"><EnterpriseNotice tone="warning">View only. Only Project Owners, PMO and Administrators can update project controls.</EnterpriseNotice></div>}
+        {!canEdit && <div className="mt-5"><EnterpriseNotice tone="warning">View only. You can see this project, but only its assigned owner or an active delegate can update this discipline.</EnterpriseNotice></div>}
         <div className="mt-5 flex flex-wrap gap-2">
           {DISCIPLINE_TABS.map(tab => <button key={tab} onClick={() => setDisciplineTab(tab)} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${disciplineTab === tab ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170] hover:border-[#9da9b3]'}`}>{tab === 'Overall' ? 'Master' : tab}</button>)}
         </div>
@@ -497,19 +485,13 @@ function ExecutionTab({
   savingId,
   canEdit,
 }: any) {
-  const topScrollRef = useRef<HTMLDivElement>(null)
-  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
 
-  const syncFromTop = () => {
-    if (topScrollRef.current && tableScrollRef.current) {
-      tableScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft
-    }
-  }
-
-  const syncFromTable = () => {
-    if (topScrollRef.current && tableScrollRef.current) {
-      topScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft
-    }
+  const toggleExpanded = (taskId: string) => {
+    setExpandedRows(current => ({
+      ...current,
+      [taskId]: !current[taskId],
+    }))
   }
 
   if (!tasks.length) {
@@ -523,205 +505,238 @@ function ExecutionTab({
   return (
     <div className="space-y-4">
       {!canEdit && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
           View Only. Only Project Owners, PMO and Administrators can update project controls.
         </div>
       )}
 
-      <div className="sticky top-[82px] z-30 rounded-xl border border-[#dfe3e7] bg-white/95 px-4 pt-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
-        <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[#82909c]">
-          Scroll horizontally to see all controls
-        </div>
-        <div
-          ref={topScrollRef}
-          onScroll={syncFromTop}
-          className="overflow-x-auto overflow-y-hidden pb-1"
-          aria-label="Horizontal table scroll"
-        >
-          <div className="h-px min-w-[1500px]" />
-        </div>
-      </div>
-
       <div className="card overflow-hidden">
-        <div
-          ref={tableScrollRef}
-          onScroll={syncFromTable}
-          className="overflow-x-auto"
-        >
-        <table className="tbl min-w-[1500px]">
-          <thead>
-            <tr>
-              <th>Activity</th>
-              <th>Package</th>
-              <th>Discipline</th>
-              <th>Planned Start</th>
-              <th>Planned Finish</th>
-              <th>Progress %</th>
-              <th>Status</th>
-              <th>Delay Reason</th>
-              <th>Recovery Action</th>
-              <th>Comments</th>
-              <th></th>
-            </tr>
-          </thead>
+        <div className="w-full overflow-hidden">
+          <table className="tbl w-full table-fixed">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[13%]" />
+              <col className="w-[12%]" />
+              <col className="w-[17%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Activity</th>
+                <th>Package</th>
+                <th>Discipline</th>
+                <th>Planned Dates</th>
+                <th>Progress</th>
+                <th>Status</th>
+                <th className="text-right">Details</th>
+              </tr>
+            </thead>
 
-          <tbody>
-            {tasks.map((task: any) => {
-              const taskId = task.id
-              const edit = edits[taskId] || {}
-              const progress = edit.progress_pct ?? getProgress(task)
-              const status = getStatus({
-                ...task,
-                ...edit,
-                progress_pct: progress,
-              })
+            <tbody>
+              {tasks.map((task: any) => {
+                const taskId = task.id
+                const edit = edits[taskId] || {}
+                const progress = edit.progress_pct ?? getProgress(task)
+                const status = getStatus({
+                  ...task,
+                  ...edit,
+                  progress_pct: progress,
+                })
+                const isExpanded = !!expandedRows[taskId]
 
-              return (
-                <tr key={taskId}>
-                  <td className="font-medium text-[#102943] min-w-[220px]">
-                    {getTaskName(task)}
-                  </td>
+                return (
+                  <Fragment key={taskId}>
+                    <tr className={isExpanded ? 'bg-[#f8fafc]' : ''}>
+                      <td className="align-top font-medium text-[#102943]">
+                        <div className="break-words pr-2 leading-5">
+                          {getTaskName(task)}
+                        </div>
+                      </td>
 
-                  <td>{task.package_name || 'Project Wide'}</td>
-                  <td>{task.discipline || '—'}</td>
+                      <td className="align-top">
+                        <span className="break-words text-sm">
+                          {task.package_name || 'Project Wide'}
+                        </span>
+                      </td>
 
-                  <td>
-                    {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
-                  </td>
+                      <td className="align-top">
+                        <span className="break-words text-sm">
+                          {task.discipline || '—'}
+                        </span>
+                      </td>
 
-                  <td>
-                    {getPlannedFinish(task)
-                      ? fdate(getPlannedFinish(task))
-                      : '—'}
-                  </td>
+                      <td className="align-top">
+                        <div className="space-y-1 text-xs leading-5 text-[#536170]">
+                          <div>
+                            <span className="font-semibold text-[#102943]">Start:</span>{' '}
+                            {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-[#102943]">Finish:</span>{' '}
+                            {getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}
+                          </div>
+                        </div>
+                      </td>
 
-                  <td>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="form-control w-24 disabled:opacity-60 disabled:cursor-not-allowed"
-                      value={progress}
-                      disabled={!canEdit}
-                      onChange={e =>
-                        updateEdit(
-                          taskId,
-                          'progress_pct',
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </td>
+                      <td className="align-top">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            className="form-control w-[72px] px-2 disabled:cursor-not-allowed disabled:opacity-60"
+                            value={progress}
+                            disabled={!canEdit}
+                            onChange={e =>
+                              updateEdit(
+                                taskId,
+                                'progress_pct',
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                          <span className="text-xs text-[#82909c]">%</span>
+                        </div>
+                      </td>
 
-                  <td>
-                    <span
-                      className={`text-[10px] font-semibold ${statusColor(
-                        status
-                      )}`}
-                    >
-                      {status}
-                    </span>
-                  </td>
+                      <td className="align-top">
+                        <span
+                          className={`inline-block break-words text-[10px] font-semibold leading-4 ${statusColor(
+                            status
+                          )}`}
+                        >
+                          {status}
+                        </span>
+                      </td>
 
-                  <td>
-                    <select
-                      className="form-control min-w-[150px] disabled:opacity-60 disabled:cursor-not-allowed"
-                      value={edit.delay_reason ?? task.delay_reason ?? ''}
-                      disabled={!canEdit}
-                      onChange={e =>
-                        updateEdit(taskId, 'delay_reason', e.target.value)
-                      }
-                    >
-                      {DELAY_REASONS.map(reason => (
-                        <option key={reason} value={reason}>
-                          {reason || 'None'}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                      <td className="align-top text-right">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(taskId)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe3e7] bg-white text-[#123a60] transition hover:bg-[#f3f6f8]"
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? 'Hide task details' : 'Show task details'}
+                          title={isExpanded ? 'Hide details' : 'Show details'}
+                        >
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                      </td>
+                    </tr>
 
-                  <td>
-                    <select
-                      className="form-control min-w-[170px] disabled:opacity-60 disabled:cursor-not-allowed"
-                      value={edit.recovery_action ?? task.recovery_action ?? ''}
-                      disabled={!canEdit}
-                      onChange={e =>
-                        updateEdit(taskId, 'recovery_action', e.target.value)
-                      }
-                    >
-                      {RECOVERY_ACTIONS.map(action => (
-                        <option key={action} value={action}>
-                          {action || 'None'}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                    {isExpanded && (
+                      <tr className="bg-[#f8fafc]">
+                        <td colSpan={7} className="!p-0">
+                          <div className="border-t border-[#e8edf1] px-5 py-5">
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                              <label className="space-y-1.5">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
+                                  Delay Reason
+                                </span>
+                                <select
+                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
+                                  value={edit.delay_reason ?? task.delay_reason ?? ''}
+                                  disabled={!canEdit}
+                                  onChange={e =>
+                                    updateEdit(taskId, 'delay_reason', e.target.value)
+                                  }
+                                >
+                                  {DELAY_REASONS.map(reason => (
+                                    <option key={reason} value={reason}>
+                                      {reason || 'None'}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
 
-                  <td>
-                    <input
-                      className="form-control min-w-[180px] disabled:opacity-60 disabled:cursor-not-allowed"
-                      value={
-                        edit.progress_comments ?? task.progress_comments ?? ''
-                      }
-                      disabled={!canEdit}
-                      onChange={e =>
-                        updateEdit(
-                          taskId,
-                          'progress_comments',
-                          e.target.value
-                        )
-                      }
-                      placeholder="Comment"
-                    />
+                              <label className="space-y-1.5">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
+                                  Recovery Action
+                                </span>
+                                <select
+                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
+                                  value={edit.recovery_action ?? task.recovery_action ?? ''}
+                                  disabled={!canEdit}
+                                  onChange={e =>
+                                    updateEdit(taskId, 'recovery_action', e.target.value)
+                                  }
+                                >
+                                  {RECOVERY_ACTIONS.map(action => (
+                                    <option key={action} value={action}>
+                                      {action || 'None'}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
 
-                    <div className="flex gap-3 mt-2 text-[10px] text-slate-400">
-                      <label className={!canEdit ? 'opacity-60' : ''}>
-                        <input
-                          type="checkbox"
-                          checked={edit.is_on_hold ?? task.is_on_hold ?? false}
-                          disabled={!canEdit}
-                          onChange={e =>
-                            updateEdit(taskId, 'is_on_hold', e.target.checked)
-                          }
-                        />{' '}
-                        On Hold
-                      </label>
+                              <label className="space-y-1.5">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
+                                  Progress Comment
+                                </span>
+                                <input
+                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
+                                  value={edit.progress_comments ?? task.progress_comments ?? ''}
+                                  disabled={!canEdit}
+                                  onChange={e =>
+                                    updateEdit(taskId, 'progress_comments', e.target.value)
+                                  }
+                                  placeholder={canEdit ? 'Add progress comment' : 'No comment'}
+                                />
+                              </label>
+                            </div>
 
-                      <label className={!canEdit ? 'opacity-60' : ''}>
-                        <input
-                          type="checkbox"
-                          checked={edit.is_blocked ?? task.is_blocked ?? false}
-                          disabled={!canEdit}
-                          onChange={e =>
-                            updateEdit(taskId, 'is_blocked', e.target.checked)
-                          }
-                        />{' '}
-                        Blocked
-                      </label>
-                    </div>
-                  </td>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#e8edf1] pt-4">
+                              <div className="flex flex-wrap items-center gap-5 text-xs text-[#536170]">
+                                <label className={`inline-flex items-center gap-2 ${!canEdit ? 'opacity-60' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={edit.is_on_hold ?? task.is_on_hold ?? false}
+                                    disabled={!canEdit}
+                                    onChange={e =>
+                                      updateEdit(taskId, 'is_on_hold', e.target.checked)
+                                    }
+                                  />
+                                  On Hold
+                                </label>
 
-                  <td>
-                    {canEdit ? (
-                      <button
-                        className="btn btn-gold btn-sm"
-                        onClick={() => saveTaskProgress(task)}
-                        disabled={savingId === taskId}
-                      >
-                        <Save size={13} />
-                        {savingId === taskId ? 'Saving…' : 'Save'}
-                      </button>
-                    ) : (
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500">
-                        View Only
-                      </span>
+                                <label className={`inline-flex items-center gap-2 ${!canEdit ? 'opacity-60' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={edit.is_blocked ?? task.is_blocked ?? false}
+                                    disabled={!canEdit}
+                                    onChange={e =>
+                                      updateEdit(taskId, 'is_blocked', e.target.checked)
+                                    }
+                                  />
+                                  Blocked
+                                </label>
+                              </div>
+
+                              {canEdit ? (
+                                <button
+                                  className="btn btn-gold btn-sm"
+                                  onClick={() => saveTaskProgress(task)}
+                                  disabled={savingId === taskId}
+                                >
+                                  <Save size={13} />
+                                  {savingId === taskId ? 'Saving…' : 'Save Update'}
+                                </button>
+                              ) : (
+                                <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                                  View Only
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
