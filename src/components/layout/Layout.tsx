@@ -202,14 +202,6 @@ const NAV_PERMISSIONS:Record<string,PermissionAction>={
   '/app/team':'workspace.view',
 }
 
-const VIEWER_NAV = [
-  '/app',
-  '/app/recovery',
-  '/app/planner',
-  '/app/team',
-  '/app/costing',
-]
-
 function formatRoleLabel(role: string | null) {
   if (!role) return 'Team Member'
 
@@ -436,12 +428,15 @@ export default function Layout() {
     ? differenceInDays(handoverDate, new Date())
     : null
 
+  // Navigation visibility is deliberately separate from edit permissions.
+  // Every active internal team member can see the project-control modules;
+  // individual pages/actions remain permission-gated. Administration stays admin-only.
   const allowedNav = NAV.filter(item => {
-    const permission=item.permission||NAV_PERMISSIONS[item.to]||'workspace.view'
-    return can(permission,{
-      scopeType:projectId?'project':'workspace',
-      scopeId:projectId||undefined,
-    })
+    if (item.permission === 'workspace.manage') {
+      return can('workspace.manage', { scopeType: 'workspace' })
+    }
+
+    return true
   })
 
   const currentPage = allowedNav.find(n =>
