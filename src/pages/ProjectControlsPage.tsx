@@ -418,21 +418,21 @@ function ExecutionTab({
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="border-b border-[#e5e8eb] bg-[#fafbfb] px-4 pt-2">
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[#82909c]">
-            Scroll horizontally to see all controls
-          </div>
-          <div
-            ref={topScrollRef}
-            onScroll={syncFromTop}
-            className="overflow-x-auto overflow-y-hidden pb-1"
-            aria-label="Horizontal table scroll"
-          >
-            <div className="h-px min-w-[1500px]" />
-          </div>
+      <div className="sticky top-[82px] z-30 rounded-xl border border-[#dfe3e7] bg-white/95 px-4 pt-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+        <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[#82909c]">
+          Scroll horizontally to see all controls
         </div>
+        <div
+          ref={topScrollRef}
+          onScroll={syncFromTop}
+          className="overflow-x-auto overflow-y-hidden pb-1"
+          aria-label="Horizontal table scroll"
+        >
+          <div className="h-px min-w-[1500px]" />
+        </div>
+      </div>
 
+      <div className="card overflow-hidden">
         <div
           ref={tableScrollRef}
           onScroll={syncFromTable}
