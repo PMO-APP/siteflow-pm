@@ -7,7 +7,8 @@ import { useMembershipStore } from '@/store/membership'
 
 import { pmoConfirm } from '@/lib/notifications'
 const TABS = [
-  ['report', 'Design Report'],
+  ['my-report', 'My Weekly Report'],
+  ['report', 'Combined Design Report'],
   ['drawings', 'Drawing Register'],
   ['consultants', 'Consultants'],
   ['issues', 'Design Issues'],
@@ -30,40 +31,35 @@ function viewOnlyMessage() {
   return 'View only. Only the Design team and Administrators can add, submit, update or delete design records.'
 }
 
-function getReportWeekFridayDeadline(reportWeek: string) {
-  const selected = new Date(`${reportWeek}T00:00:00`)
-  if (Number.isNaN(selected.getTime())) return null
+function toLocalDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-  const day = selected.getDay()
+function getCurrentReportFriday(now = new Date()) {
+  const day = now.getDay()
   const mondayOffset = day === 0 ? -6 : 1 - day
-
-  const monday = new Date(selected)
-  monday.setDate(selected.getDate() + mondayOffset)
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + mondayOffset)
   monday.setHours(0, 0, 0, 0)
 
   const friday = new Date(monday)
   friday.setDate(monday.getDate() + 4)
-  friday.setHours(23, 0, 0, 0)
-
+  friday.setHours(14, 0, 0, 0)
   return friday
 }
 
-function getReportSubmissionLock(reportWeek: string) {
-  const deadline = getReportWeekFridayDeadline(reportWeek)
+function getReportSubmissionLock(now = new Date()) {
+  const friday = getCurrentReportFriday(now)
+  const day = now.getDay()
+  const isThursday = day === 4
+  const isFriday = day === 5
+  const isAllowed = isThursday || (isFriday && now.getTime() <= friday.getTime())
+  const reportWeek = toLocalDateInput(friday)
 
-  if (!deadline) {
-    return {
-      deadline: null,
-      isAllowed: false,
-      message: 'Invalid report week selected.',
-      deadlineLabel: 'Invalid date',
-    }
-  }
-
-  const now = new Date()
-  const isAllowed = now.getTime() <= deadline.getTime()
-
-  const deadlineLabel = deadline.toLocaleString('en-GB', {
+  const deadlineLabel = friday.toLocaleString('en-GB', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -72,13 +68,25 @@ function getReportSubmissionLock(reportWeek: string) {
     minute: '2-digit',
   })
 
+  let message = `Submissions open Thursday and Friday. Deadline: ${deadlineLabel}.`
+  if (isThursday) {
+    message = `Submission open. Deadline: ${deadlineLabel}.`
+  } else if (isFriday && isAllowed) {
+    message = `Submission open until 2:00 PM today (${deadlineLabel}).`
+  } else if (isFriday) {
+    message = 'Submission closed. The Friday 2:00 PM deadline has passed.'
+  } else if (day === 6 || day === 0) {
+    message = 'Submission closed for this week. Reports are accepted only on Thursday or Friday before 2:00 PM.'
+  } else {
+    message = 'Submission is not open yet. Reports can only be submitted on Thursday or Friday before 2:00 PM.'
+  }
+
   return {
-    deadline,
+    deadline: friday,
     isAllowed,
     deadlineLabel,
-    message: isAllowed
-      ? `Submission open until ${deadlineLabel}.`
-      : 'Submission locked. Design reports can only be submitted latest 11:00 PM on Friday of the selected report week.',
+    reportWeek,
+    message,
   }
 }
 
@@ -104,20 +112,21 @@ export default function DesignReportsPage() {
   const canEdit = canEditDesignReports(role)
   const reportRef = useRef<HTMLDivElement>(null)
 
-  const [reportWeek, setReportWeek] = useState(
-    new Date().toISOString().slice(0, 10)
-  )
+  const [, setClockTick] = useState(0)
+  const reportLock = getReportSubmissionLock()
+  const currentReportWeek = reportLock.reportWeek
+  const [reportWeek, setReportWeek] = useState(currentReportWeek)
+  const canSubmitIndividualReport = ['design', 'design_project_owner'].includes(role || '')
+  const canSubmitReport = canSubmitIndividualReport && reportLock.isAllowed
 
-  const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
-  const canSubmitReport = canEdit && reportLock.isAllowed
-
-  const [activeTab, setActiveTab] = useState('report')
+  const [activeTab, setActiveTab] = useState('my-report')
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
+  const [reportDetails, setReportDetails] = useState<string[]>([''])
 
   const [form, setForm] = useState({
     category: 'Consultant Update',
@@ -132,7 +141,12 @@ export default function DesignReportsPage() {
   useEffect(() => {
     loadData()
     loadSubmissions()
-  }, [projectId, reportWeek])
+  }, [projectId, portfolioId, organizationId, reportWeek])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(value => value + 1), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const matchedReport = submissions.find(
@@ -184,12 +198,24 @@ export default function DesignReportsPage() {
 
 
   async function loadSubmissions() {
-    if (!projectId) return
+    if (!projectId && !portfolioId && !organizationId) return
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('design_report_submissions')
       .select('*')
-      .eq('project_id', projectId)
+
+    // The combined weekly Design Report is portfolio/workspace-wide, not limited
+    // to whichever project PMO currently has open. Fall back safely when older
+    // workspaces do not yet expose organization/portfolio context.
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId)
+    } else if (portfolioId) {
+      query = query.eq('portfolio_id', portfolioId)
+    } else if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+
+    const { data, error } = await query
       .order('report_week', { ascending: false })
       .order('id', { ascending: false })
 
@@ -202,8 +228,8 @@ export default function DesignReportsPage() {
   }
 
   async function submitReport() {
-    if (!canEdit) {
-      setNotice(viewOnlyMessage())
+    if (!canSubmitIndividualReport) {
+      setNotice('Only Design team members can submit an individual weekly design report.')
       return
     }
 
@@ -212,31 +238,49 @@ export default function DesignReportsPage() {
       return
     }
 
-    if (!reportLock.isAllowed) {
-      setNotice(reportLock.message)
+    const liveLock = getReportSubmissionLock()
+    if (!liveLock.isAllowed) {
+      setNotice(liveLock.message)
       return
     }
 
+    const cleanedDetails = reportDetails
+      .map(detail => detail.trim())
+      .filter(Boolean)
+
+    if (!cleanedDetails.length) {
+      setNotice('Add at least one report detail before submitting.')
+      return
+    }
+
+    const alreadySubmitted = submissions.some(
+      submission =>
+        submission.report_week === liveLock.reportWeek &&
+        submission.submitted_by === user?.id
+    )
+
+    if (alreadySubmitted) {
+      setNotice('You have already submitted your report for this project and reporting week.')
+      return
+    }
+
+    const ownItems = items.filter(item => item.created_by === user?.id)
+    const reporterName = user?.full_name || user?.email || '—'
+
     const snapshotData = {
-      projectName,
-      reportWeek,
-      preparedBy: user?.full_name || user?.email || '—',
+      projectName: projectName || '—',
+      reportWeek: liveLock.reportWeek,
+      preparedBy: reporterName,
       generatedAt: new Date().toISOString(),
-
+      reportDetails: cleanedDetails,
       drawings,
-      items,
-
+      items: ownItems,
       stats: {
         totalDrawings: drawings.length,
         approvedDrawings: approvedDrawings.length,
         pendingDrawings: pendingDrawings.length,
         rejectedDrawings: rejectedDrawings.length,
-        consultantUpdates: consultantUpdates.length,
-        designIssues: designIssues.length,
-        weeklyAchievements: weeklyAchievements.length,
-        weeklyChallenges: weeklyChallenges.length,
-        nextWeekFocus: nextWeekFocus.length,
-        managementAttention: managementAttention.length,
+        individualItems: ownItems.length,
       },
     }
 
@@ -244,9 +288,9 @@ export default function DesignReportsPage() {
       organization_id: organizationId,
       portfolio_id: portfolioId,
       project_id: projectId,
-      report_week: reportWeek,
+      report_week: liveLock.reportWeek,
       submitted_by: user?.id || null,
-      submitted_by_name: user?.full_name || user?.email || null,
+      submitted_by_name: reporterName,
       status: 'Submitted',
       snapshot_data: snapshotData,
     })
@@ -256,9 +300,11 @@ export default function DesignReportsPage() {
       return
     }
 
+    setReportDetails([''])
+    setReportWeek(liveLock.reportWeek)
     await loadSubmissions()
     setActiveTab('report')
-    setNotice('Design report submitted successfully and saved to history.')
+    setNotice('Your weekly design report was submitted successfully and added to the combined report.')
   }
 
   async function addItem(category: string) {
@@ -429,6 +475,17 @@ export default function DesignReportsPage() {
     return Object.values(map)
   }, [drawings])
 
+  const weekSubmissions = useMemo(
+    () => submissions.filter(submission => submission.report_week === reportWeek),
+    [submissions, reportWeek]
+  )
+
+  const ownCurrentSubmission = submissions.find(
+    submission =>
+      submission.report_week === currentReportWeek &&
+      submission.submitted_by === user?.id
+  )
+
   const snapshot = selectedSubmission?.snapshot_data || null
   const snapshotStats = snapshot?.stats || {}
 
@@ -520,23 +577,22 @@ export default function DesignReportsPage() {
 
       <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <label className="form-label">Report Week</label>
-          <input
-            type="date"
-            className="form-control max-w-xs"
-            value={reportWeek}
-            onChange={e => {
-              setSelectedSubmission(null)
-              setReportWeek(e.target.value)
-            }}
-          />
+          <label className="form-label">Reporting Week</label>
+          <div className="form-control max-w-xs bg-[#f3f5f7] font-semibold text-[#102943]">
+            {fdate(reportWeek)}
+          </div>
 
+          <div className="mt-2 text-xs text-[#65717c]">
+            The reporting date is set automatically by PMOCorex and cannot be changed.
+          </div>
           <div
-            className={`mt-2 text-xs ${
-              reportLock.isAllowed ? 'text-emerald-400' : 'text-red-400'
+            className={`mt-1 text-xs ${
+              reportLock.isAllowed ? 'text-emerald-600' : 'text-red-500'
             }`}
           >
-            {reportLock.message}
+            {reportWeek === currentReportWeek
+              ? reportLock.message
+              : 'Historical reporting week. Submission is disabled.'}
           </div>
         </div>
 
@@ -546,30 +602,19 @@ export default function DesignReportsPage() {
               className="btn btn-ghost"
               onClick={() => {
                 setSelectedSubmission(null)
-                setReportWeek(new Date().toISOString().slice(0, 10))
+                setReportWeek(currentReportWeek)
               }}
             >
               Back to Current Report
             </button>
           )}
 
-          {canEdit && !selectedSubmission && (
-            <button
-              className="btn btn-ghost disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!canSubmitReport}
-              onClick={submitReport}
-              title={reportLock.message}
-            >
-              Submit Weekly Report
-            </button>
-          )}
-
           <button
             className="btn btn-gold disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!selectedSubmission}
+            disabled={!weekSubmissions.length}
             onClick={() => {
-              if (!selectedSubmission) {
-                setNotice('No design report has been submitted for the selected week yet.')
+              if (!weekSubmissions.length) {
+                setNotice('No individual design reports have been submitted for this reporting week yet.')
                 return
               }
 
@@ -584,8 +629,7 @@ export default function DesignReportsPage() {
 
       {selectedSubmission && (
         <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
-          Viewing historical design report for {fdate(selectedSubmission.report_week)}.
-          This report is a saved snapshot and will not change when new design records are added.
+          Viewing the combined design report for {fdate(reportWeek)}. Individual submissions are preserved as saved snapshots.
         </div>
       )}
 
@@ -611,23 +655,25 @@ export default function DesignReportsPage() {
         <div className="card p-6 text-[#65717c]">Loading design data…</div>
       ) : (
         <>
+          {activeTab === 'my-report' && (
+            <IndividualWeeklyReportForm
+              projectName={projectName}
+              reportWeek={currentReportWeek}
+              reportDetails={reportDetails}
+              setReportDetails={setReportDetails}
+              canSubmit={canSubmitReport && reportWeek === currentReportWeek && !ownCurrentSubmission}
+              alreadySubmitted={!!ownCurrentSubmission}
+              submissionLockMessage={reportLock.message}
+              onSubmit={submitReport}
+            />
+          )}
+
           {activeTab === 'report' && (
-            selectedSubmission ? (
+            weekSubmissions.length ? (
               <div ref={reportRef}>
-                <DesignReportDocument
-                  projectName={reportProjectName}
-                  reportWeek={reportWeekForDocument}
-                  preparedBy={reportPreparedBy}
-                  drawings={reportDrawings}
-                  approvedDrawings={reportApprovedDrawings}
-                  pendingDrawings={reportPendingDrawings}
-                  rejectedDrawings={reportRejectedDrawings}
-                  consultantUpdates={reportConsultantUpdates}
-                  designIssues={reportDesignIssues}
-                  weeklyAchievements={reportWeeklyAchievements}
-                  weeklyChallenges={reportWeeklyChallenges}
-                  nextWeekFocus={reportNextWeekFocus}
-                  managementAttention={reportManagementAttention}
+                <CombinedDesignReportDocument
+                  reportWeek={reportWeek}
+                  submissions={weekSubmissions}
                 />
               </div>
             ) : (
@@ -692,6 +738,190 @@ export default function DesignReportsPage() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+
+function IndividualWeeklyReportForm({
+  projectName,
+  reportWeek,
+  reportDetails,
+  setReportDetails,
+  canSubmit,
+  alreadySubmitted,
+  submissionLockMessage,
+  onSubmit,
+}: {
+  projectName?: string | null
+  reportWeek: string
+  reportDetails: string[]
+  setReportDetails: React.Dispatch<React.SetStateAction<string[]>>
+  canSubmit: boolean
+  alreadySubmitted: boolean
+  submissionLockMessage: string
+  onSubmit: () => void
+}) {
+  function updateDetail(index: number, value: string) {
+    setReportDetails(current => current.map((item, i) => (i === index ? value : item)))
+  }
+
+  function removeDetail(index: number) {
+    setReportDetails(current => {
+      const next = current.filter((_, i) => i !== index)
+      return next.length ? next : ['']
+    })
+  }
+
+  return (
+    <div className="card p-5 space-y-5">
+      <div>
+        <h3 className="text-lg font-bold text-[#102943]">My Weekly Design Report</h3>
+        <p className="mt-1 text-sm text-[#74818d]">
+          Submit only your own update for the selected project. PMOCorex combines all Design team submissions into the weekly Design Report.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="form-label">Project Name</label>
+          <div className="form-control bg-[#f3f5f7] font-semibold text-[#102943]">
+            {projectName || 'No project selected'}
+          </div>
+          <div className="mt-1 text-xs text-[#74818d]">Taken from the project you are currently working in.</div>
+        </div>
+
+        <div>
+          <label className="form-label">Reporting Week</label>
+          <div className="form-control bg-[#f3f5f7] font-semibold text-[#102943]">{fdate(reportWeek)}</div>
+          <div className="mt-1 text-xs text-[#74818d]">System controlled. Backdating is not allowed.</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <label className="form-label">Report Details</label>
+            <p className="text-xs text-[#74818d]">Add each update as a separate item for cleaner presentation in the combined report.</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setReportDetails(current => [...current, ''])}
+          >
+            <Plus size={14} /> Add Item
+          </button>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          {reportDetails.map((detail, index) => (
+            <div key={index} className="flex items-start gap-2">
+              <div className="mt-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#eef3f7] text-xs font-bold text-[#102943]">
+                {index + 1}
+              </div>
+              <textarea
+                className="form-control min-h-[86px] flex-1"
+                placeholder="Enter a clear project/design update..."
+                value={detail}
+                onChange={event => updateDetail(index, event.target.value)}
+                disabled={alreadySubmitted}
+              />
+              {!alreadySubmitted && reportDetails.length > 1 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm mt-1"
+                  onClick={() => removeDetail(index)}
+                  title="Remove item"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {alreadySubmitted ? (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700">
+          Your report for this project and reporting week has already been submitted and locked.
+        </div>
+      ) : (
+        <div className={`rounded-xl border p-3 text-sm ${canSubmit ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/30 bg-amber-500/10 text-amber-700'}`}>
+          {submissionLockMessage}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="btn btn-gold disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canSubmit || alreadySubmitted}
+          onClick={onSubmit}
+        >
+          Submit My Weekly Report
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CombinedDesignReportDocument({ reportWeek, submissions }: any) {
+  const sortedSubmissions = [...submissions].sort((a: any, b: any) =>
+    String(a.submitted_by_name || '').localeCompare(String(b.submitted_by_name || ''))
+  )
+
+  return (
+    <div className="design-report-document">
+      <style>{`
+        .design-report-document { background: white; color: #111827; width: 210mm; min-height: 297mm; padding: 16mm; font-family: Arial, sans-serif; font-size: 12px; line-height: 1.45; box-sizing: border-box; }
+        .dr-border { border: 2px solid #c49e48; padding: 12px; margin-bottom: 16px; }
+        .dr-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #d6c38a; padding-bottom: 10px; margin-bottom: 14px; letter-spacing: 0.12em; font-weight: 800; }
+        .dr-title { text-align: center; font-size: 26px; font-weight: 900; margin: 16px 0; text-transform: uppercase; }
+        .dr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .dr-info { border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+        .dr-label { font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.08em; }
+        .dr-value { font-weight: 700; margin-top: 3px; }
+        .dr-section { margin-top: 16px; page-break-inside: avoid; }
+        .dr-section-title { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #7a5a12; border-bottom: 1px solid #d6c38a; padding-bottom: 5px; margin-bottom: 10px; }
+        .dr-table { width: 100%; border-collapse: collapse; }
+        .dr-table th, .dr-table td { border: 1px solid #333; padding: 6px; vertical-align: top; font-size: 11px; }
+        .dr-table th { background: #f3f4f6; font-weight: 800; }
+        .dr-footer { border-top: 1px solid #ddd; margin-top: 24px; padding-top: 8px; font-size: 10px; color: #666; }
+        @media print { .design-report-document { width: auto; min-height: auto; padding: 14mm; } }
+      `}</style>
+
+      <div className="dr-border">
+        <div className="dr-top"><div>MIXTA AFRICA</div><div>PMOCOREX</div></div>
+        <div className="dr-title">Design Team Weekly Report</div>
+        <div className="dr-grid">
+          <Info label="Report Week" value={fdate(reportWeek)} />
+          <Info label="Individual Submissions" value={sortedSubmissions.length} />
+          <Info label="Generated By" value="PMOCorex" />
+        </div>
+      </div>
+
+      {sortedSubmissions.map((submission: any, submissionIndex: number) => {
+        const snapshot = submission.snapshot_data || {}
+        const details = Array.isArray(snapshot.reportDetails) ? snapshot.reportDetails : []
+        const reporter = submission.submitted_by_name || snapshot.preparedBy || 'Design Team Member'
+        return (
+          <Section key={submission.id || submissionIndex} title={`${submissionIndex + 1}. ${snapshot.projectName || 'Project'} · ${reporter}`}>
+            <div className="mb-2 text-[11px] text-gray-600">
+              Submitted: {submission.submitted_at ? new Date(submission.submitted_at).toLocaleString('en-GB') : '—'}
+            </div>
+            <table className="dr-table">
+              <thead><tr><th style={{ width: '8%' }}>No.</th><th>Report Detail</th></tr></thead>
+              <tbody>
+                {details.length ? details.map((detail: string, index: number) => (
+                  <tr key={index}><td>{index + 1}</td><td>{detail}</td></tr>
+                )) : <tr><td colSpan={2}>No itemized report detail was recorded.</td></tr>}
+              </tbody>
+            </table>
+          </Section>
+        )
+      })}
+
+      <div className="dr-footer">Mixta Africa · Consolidated by PMOCorex · Confidential · {new Date().toLocaleDateString('en-GB')}</div>
     </div>
   )
 }
