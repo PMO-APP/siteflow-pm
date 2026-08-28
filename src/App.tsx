@@ -139,13 +139,6 @@ function RouteFallback() {
   )
 }
 
-const VIEWER_ALLOWED_ROUTES = [
-  '/app',
-  '/app/recovery',
-  '/app/team',
-  '/app/costing',
-]
-
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
 
@@ -164,20 +157,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) return <Navigate to="/login" replace />
-
-  return <>{children}</>
-}
-
-function ViewerRoute({ children }: { children: React.ReactNode }) {
-  const role = useMembershipStore(state => state.role)
-  const path = window.location.pathname
-
-  if (
-    ['viewer', 'guest'].includes(role || '') &&
-    !VIEWER_ALLOWED_ROUTES.includes(path)
-  ) {
-    return <Navigate to="/app" replace />
-  }
 
   return <>{children}</>
 }
@@ -337,9 +316,7 @@ export default function App() {
           path="/app"
           element={
             <RequireAuth>
-              <ViewerRoute>
-                <Layout />
-              </ViewerRoute>
+              <Layout />
             </RequireAuth>
           }
         >
