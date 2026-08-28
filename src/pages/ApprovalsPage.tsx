@@ -10,6 +10,7 @@ import { IntelligencePanel } from '@/components/intelligence/IntelligencePanel'
 import { approvalsIntelligence } from '@/lib/intelligence'
 import { useQuickActionRoute } from '@/hooks/useQuickActionRoute'
 import { useAccessSession } from '@/access/AccessSessionProvider'
+import { useProjectStore } from '@/store/project'
 
 const TYPES: Approval['type'][] = [
   'Material',
@@ -308,8 +309,9 @@ function ApprovalModal({
 export default function ApprovalsPage() {
   const { data: approvals = [], isLoading } = useApprovals()
   const role = useMembershipStore(state => state.role)
-  const { can } = useAccessSession()
-  const canEdit = can('approvals.edit')
+  const { can, session } = useAccessSession()
+  const { projectId } = useProjectStore()
+  const canEdit = Boolean(projectId) && can('approvals.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   const [modal, setModal] = useState<Approval | null | 'new'>(null)
 
