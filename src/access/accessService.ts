@@ -16,7 +16,7 @@ const ACCESS_RANK: Record<AccessLevel, number> = {
 
 const INTERNAL_ROLES = new Set([
   'workspace_admin','admin','pmo','portfolio_manager','project_owner','project_manager',
-  'overall_project_owner','design','design_project_owner','housebuild','housebuild_project_owner',
+  'overall_project_owner','design','landscaping','design_project_owner','housebuild','housebuild_project_owner',
   'infrastructure','infrastructure_project_owner','mep','mep_project_owner','costing',
   'hse','hse_manager','hse_lead','hse_officer','hse_project_owner','viewer',
 ])
@@ -56,6 +56,7 @@ const PROFILE_ACTIONS: Record<string, PermissionAction[]> = {
     'quality.view','quality.edit','snags.view','snags.edit','risk.view','risk.edit','reports.view','reports.edit',
     'reports.export','costing.view','costing.edit','hse.create',
   ],
+  hse: ['workspace.view','portfolio.view','project.view','hse.create','hse.close','reports.view','reports.edit'],
   hse_manager: ['workspace.view','portfolio.view','project.view','hse.create','hse.close','reports.view','reports.edit'],
   hse_officer: ['workspace.view','portfolio.view','project.view','hse.create','reports.view','reports.edit'],
   discipline_member: [
@@ -81,7 +82,7 @@ function normalizeDiscipline(value?: string | null) {
   if (clean === 'mechanical' || clean === 'electrical' || clean === 'm&e' || clean === 'mep') return 'mep'
   if (clean.includes('housebuild')) return 'housebuild'
   if (clean.includes('infrastructure')) return 'infrastructure'
-  if (clean.includes('design')) return 'design'
+  if (clean.includes('design') || clean.includes('landscap')) return 'design'
   if (clean.includes('cost')) return 'costing'
   if (clean.includes('hse') || clean.includes('safety')) return 'hse'
   if (clean === 'overall' || clean.includes('project owner')) return 'overall'
@@ -203,7 +204,7 @@ export function canPerform(
   const roleKey = String(session.role || '').toLowerCase()
   const rawProfile = session.permissionProfileKey || (PROFILE_ACTIONS[roleKey] ? roleKey : 'workspace_member')
   const profile = rawProfile === 'admin' ? 'workspace_admin' : rawProfile
-  const isDesignMember = roleKey === 'design' || normalizeDiscipline(session.discipline) === 'design'
+  const isDesignMember = ['design','landscaping'].includes(roleKey) || normalizeDiscipline(session.discipline) === 'design'
   const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
   if (!allowed.includes(action)) return false
 
