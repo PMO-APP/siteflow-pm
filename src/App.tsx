@@ -21,7 +21,6 @@ const ProjectsPage = lazy(() => import('@/pages/ProjectsPage'))
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'))
 const WorkspaceAdminPage = lazy(() => import('@/pages/WorkspaceAdminPage'))
 const AuditPage = lazy(() => import('@/pages/AuditPage'))
-const PortfolioDashboardPage = lazy(() => import('@/pages/PortfolioDashboardPage'))
 const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
 const CostingPage = lazy(() => import('@/pages/CostingPage'))
 const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
@@ -276,11 +275,7 @@ export default function App() {
 
         <Route
           path="/portfolio-dashboard"
-          element={
-            <RequireAuth>
-              <PortfolioDashboardPage />
-            </RequireAuth>
-          }
+          element={<Navigate to="/executive-dashboard" replace />}
         />
 
         <Route
