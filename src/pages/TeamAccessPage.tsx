@@ -22,7 +22,9 @@ const ROLES = [
   'infrastructure',
   'mep',
   'design',
+  'landscaping',
   'costing',
+  'hse',
   'contractor',
   'viewer',
 ]
