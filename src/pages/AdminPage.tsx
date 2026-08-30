@@ -36,10 +36,12 @@ const WORKSPACE_ROLES = [
   { value: 'pmo', label: 'PMO' },
   { value: 'portfolio_manager', label: 'Portfolio Manager' },
   { value: 'design', label: 'Design Team' },
+  { value: 'landscaping', label: 'Landscaping (Design)' },
   { value: 'housebuild', label: 'Housebuild' },
   { value: 'mep', label: 'MEP' },
   { value: 'infrastructure', label: 'Infrastructure' },
   { value: 'costing', label: 'Costing' },
+  { value: 'hse', label: 'HSE Team' },
   { value: 'viewer', label: 'Viewer' },
   { value: 'guest', label: 'Guest' },
 ]
