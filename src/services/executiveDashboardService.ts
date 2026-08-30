@@ -36,17 +36,23 @@ type ExecutiveTable =
 const errorText = (error: any) => [error?.message,error?.details,error?.hint,error?.code].filter(Boolean).join(' · ')
 const isMissingOptionalTable = (error: any) => /42P01|PGRST205|relation .* does not exist|could not find the table/i.test(errorText(error))
 
-async function loadProjectsForExecutive() {
+async function loadProjectsForExecutive(projectId?: number | null) {
   // Projects across PMOCorex are already protected by RLS/access policies. Most of
   // the existing app queries this table without workspace_id, and older project
   // schemas do not contain that column. Querying it here caused the Executive
   // Dashboard to fail even though the user could open the same projects elsewhere.
-  const result = await supabase.from('projects').select('*').order('id')
+  let query = supabase.from('projects').select('*')
+  if (projectId != null) query = query.eq('id', projectId)
+  const result = await query.order('id')
   if (result.error) throw new Error(`Projects could not be loaded: ${errorText(result.error)}`)
   return result.data || []
 }
 
-async function loadExecutiveTable(table: ExecutiveTable, projectIds: Set<string>) {
+async function loadExecutiveTable(table: ExecutiveTable, projectIds: Set<string>, projectId?: number | null) {
+  // Read through the same RLS-protected table access used elsewhere in PMOCorex,
+  // then apply the active-project scope in memory. This deliberately avoids
+  // requiring every legacy/additive table to expose a project_id filter at the
+  // PostgREST schema level.
   const result = await supabase.from(table).select('*')
 
   if (result.error) {
@@ -63,14 +69,20 @@ async function loadExecutiveTable(table: ExecutiveTable, projectIds: Set<string>
   const rows = result.data || []
   const rowsWithProject = rows.filter((row: any) => row?.project_id != null)
 
-  // Keep project-linked records inside the already-visible project scope. Rows
-  // without project_id (for example some portfolio-level decisions) are retained;
-  // Supabase RLS remains the authority for their visibility.
+  // On the project Executive Dashboard, only the active project's records are
+  // allowed into the snapshot. Portfolio-level rows are intentionally excluded
+  // so another project's/portfolio's signals cannot leak into this view.
+  if (projectId != null) {
+    return rows.filter((row: any) => row?.project_id != null && String(row.project_id) === String(projectId))
+  }
+
+  // Retain the broader behaviour for services that intentionally request a
+  // portfolio snapshot without an active project.
   return rows.filter((row: any) => row?.project_id == null || projectIds.has(String(row.project_id)))
 }
 
-export async function loadExecutivePortfolioSnapshot(_workspaceId: string): Promise<ExecutivePortfolioSnapshot> {
-  const projects = await loadProjectsForExecutive()
+export async function loadExecutivePortfolioSnapshot(_workspaceId: string, projectId?: number | null): Promise<ExecutivePortfolioSnapshot> {
+  const projects = await loadProjectsForExecutive(projectId)
   const projectIds = new Set(projects.map((project: any) => String(project.id)))
 
   const tables: ExecutiveTable[] = [
@@ -78,7 +90,7 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string): Prom
     'hse_incidents','snags','financial_items','project_milestones','generated_reports','executive_decisions'
   ]
 
-  const results = await Promise.all(tables.map(table => loadExecutiveTable(table, projectIds)))
+  const results = await Promise.all(tables.map(table => loadExecutiveTable(table, projectIds, projectId)))
   const [tasks,risks,procurement,approvals,quality,hse,snags,financial,milestones,reports,decisionRows] = results
 
   const rows: ExecutiveProjectRow[] = projects.map((project: any) => {
