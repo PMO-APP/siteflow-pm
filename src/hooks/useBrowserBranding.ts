@@ -34,8 +34,8 @@ export function useBrowserBranding() {
       return
     }
 
-    const primary = activeWorkspace?.branding.primaryColor || '#173f5f'
-    const secondary = hasHighRisk ? '#e05252' : activeWorkspace?.branding.secondaryColor || '#ef8354'
+    const primary = activeWorkspace?.branding.primaryColor || '#0B2A3C'
+    const secondary = hasHighRisk ? '#e05252' : activeWorkspace?.branding.secondaryColor || '#08B5A6'
     const initial = encodeURIComponent(productName.slice(0,1).toUpperCase())
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
       <rect width="64" height="64" rx="14" fill="${primary}"/>
