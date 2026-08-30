@@ -134,7 +134,7 @@ function RouteFallback() {
       aria-live="polite"
       aria-label="Loading page"
     >
-      <div className="route-loading__mark" aria-hidden="true">P</div>
+      <img className="route-loading__mark" src="/brand/pmocorex-mark.svg" alt="" aria-hidden="true" />
       <div>
         <div className="route-loading__title">Loading workspace</div>
         <div className="route-loading__copy">Preparing the latest project information…</div>
@@ -150,9 +150,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f7f9fa]">
         <div className="rounded-3xl border border-[#dbe5eb] bg-white px-10 py-8 text-center shadow-[0_24px_70px_rgba(23,63,95,.10)]">
-          <div className="mx-auto mb-4 h-11 w-11 rounded-2xl bg-[#173f5f] grid place-items-center text-white font-black relative overflow-hidden">
-            <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />P
-          </div>
+          <img src="/brand/pmocorex-mark.svg" alt="PMOCorex" className="mx-auto mb-4 h-11 w-11 object-contain" />
           <div className="font-display text-2xl font-extrabold text-[#173f5f] mb-2">PMOCorex</div>
           <div className="text-[#71838d] text-sm">Preparing your delivery workspace…</div>
         </div>
