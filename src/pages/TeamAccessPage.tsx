@@ -13,6 +13,7 @@ import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { EnterpriseMetric, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
 const ROLES = [
+  'workspace_admin',
   'admin',
   'pmo',
   'project_manager',
