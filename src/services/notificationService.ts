@@ -137,10 +137,36 @@ export async function createAnnouncement(input: {
   message: string
   priority: string
   audienceRole?: string | null
+  audienceLabel?: string | null
+  recipientUserIds?: string[]
   startsAt?: string
   endsAt?: string | null
 }) {
   const { data: auth } = await supabase.auth.getUser()
+  const recipientUserIds = Array.from(new Set((input.recipientUserIds || []).filter(Boolean)))
+
+  // An explicit recipient list is delivered as one notification per workspace member.
+  // This supports people, departments and permission-based teams without overloading
+  // workspace_announcements.audience_role or accidentally broadcasting the message.
+  if (recipientUserIds.length) {
+    const { error } = await supabase.from('notifications').insert(recipientUserIds.map(userId => ({
+      workspace_id: input.workspaceId,
+      user_id: userId,
+      type: 'info',
+      category: 'administration',
+      title: input.title,
+      message: input.message,
+      priority: input.priority,
+      action_url: '/app/notifications',
+      source_module: 'announcements',
+      is_read: false,
+    })))
+    if (error) throw error
+    return
+  }
+
+  // Workspace-wide broadcasts remain true announcements and are visible in the
+  // Announcements tab for everyone in the workspace.
   const { error } = await supabase.from('workspace_announcements').insert({
     workspace_id: input.workspaceId,
     title: input.title,
