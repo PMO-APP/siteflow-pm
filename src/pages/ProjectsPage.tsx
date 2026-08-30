@@ -911,6 +911,35 @@ export default function ProjectsPage() {
           </div>
         </section>
 
+        <section data-tour="all-project-command-center" className="overflow-hidden rounded-[26px] border border-[#cfe3e1] bg-white shadow-[0_16px_50px_rgba(11,42,60,.08)]">
+          <button
+            type="button"
+            onClick={() => navigate('/executive-dashboard')}
+            className="group grid w-full gap-5 p-6 text-left transition hover:bg-[#fbfefe] sm:p-7 lg:grid-cols-[1.25fr_0.75fr] lg:items-center"
+          >
+            <div>
+              <div className="hub-eyebrow text-[#05969B]">Workspace intelligence</div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl font-black tracking-[-0.03em] text-[#0B2A3C] sm:text-3xl">All Project Command Center</h2>
+                <span className="rounded-full bg-[#E8F6F4] px-3 py-1 text-xs font-bold text-[#05969B]">{projects.length} projects</span>
+              </div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[#607580]">
+                One workspace-wide control room for portfolio health, project progress, schedule pressure, cost exposure, risk and executive intervention.
+              </p>
+              <div className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#05969B]">
+                Open command center <ArrowRight size={15} className="transition group-hover:translate-x-1" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+              <MiniMetric label="Portfolios" value={portfolios.length} />
+              <MiniMetric label="Projects" value={projects.length} />
+              <MiniMetric label="Healthy" value={healthyProjects} />
+              <MiniMetric label="Need attention" value={attentionProjects} accent onClick={() => showProjects({ attention: 'Attention' })} />
+            </div>
+          </button>
+        </section>
+
         <section data-tour="portfolio-overview">
           <div className="mb-5">
             <div className="hub-eyebrow">Portfolio overview</div>
