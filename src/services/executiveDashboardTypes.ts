@@ -18,14 +18,22 @@ export type ExecutiveProjectRow = {
   overdueProcurement: number
   overdueApprovals: number
   qualityExceptions: number
+  qualityScore: number | null
+  qualityEvidenceCount: number
   openHseIncidents: number
   openSnags: number
   budget: number
   actualCost: number
+  committedCost: number
+  forecastCost: number | null
+  forecastCostSource: 'explicit' | 'run-rate' | 'none'
+  costProgressGap: number | null
   budgetUtilization: number | null
   spi: number | null
   cpi: number | null
+  plannedCompletion: string | null
   forecastCompletion: string | null
+  forecastDelayDays: number
   latitude: number | null
   longitude: number | null
 }
@@ -71,12 +79,26 @@ export type ExecutiveTimelineItem = {
   actionUrl: string | null
 }
 
+export type ExecutiveTrendPoint = {
+  date: string
+  projectId: number
+  projectName: string
+  progress: number
+  plannedProgress: number
+  budgetUtilization: number | null
+  costProgressGap: number | null
+  scheduleVarianceDays: number
+  highRisks: number
+  qualityScore: number | null
+}
+
 export type ExecutivePortfolioSnapshot = {
   projects: ExecutiveProjectRow[]
   attention: ExecutiveAttentionItem[]
   decisions: ExecutiveDecision[]
   timeline: ExecutiveTimelineItem[]
   insights: string[]
+  trends: ExecutiveTrendPoint[]
   metrics: {
     activeProjects: number
     healthyProjects: number
@@ -87,6 +109,12 @@ export type ExecutivePortfolioSnapshot = {
     portfolioSpi: number | null
     portfolioCpi: number | null
     budgetUtilization: number | null
+    totalBudget: number
+    totalActualCost: number
+    totalCommittedCost: number
+    totalForecastCost: number | null
+    forecastCostVariance: number | null
+    projectsForecastLate: number
     forecastCompletion: string | null
   }
   rankings: {
