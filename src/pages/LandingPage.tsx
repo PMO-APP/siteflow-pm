@@ -61,17 +61,11 @@ const operatingAreas = [
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-[#173f5f] shadow-[0_8px_24px_rgba(23,63,95,0.18)]">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#08B5A6]" />
-        <svg viewBox="0 0 40 40" className="h-7 w-7" aria-hidden="true">
-          <path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="white" />
-          <path d="M27.8 25.4 32 29.6" stroke="#08B5A6" strokeWidth="2.8" strokeLinecap="round" />
-        </svg>
-      </div>
+      <img src="/brand/pmocorex-mark.svg" alt="PMOCorex" className="h-10 w-10 object-contain" />
       {!compact && (
         <div className="leading-none">
           <div className="text-[17px] font-extrabold tracking-[-0.04em] text-[#102a3c]">PMOCorex</div>
-          <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#6d7f8b]">Project delivery control</div>
+          <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#6d7f8b]">Portfolio Control Centre</div>
         </div>
       )}
     </div>
@@ -81,12 +75,12 @@ function Brand({ compact = false }: { compact?: boolean }) {
 function ProductPreview() {
   return (
     <div className="relative mx-auto w-full max-w-[760px]">
-      <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full border border-[#08B5A6]/30" />
+      <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full border border-[#ef8354]/30" />
       <div className="absolute -bottom-8 -right-8 h-36 w-36 bg-[linear-gradient(90deg,rgba(23,63,95,.12)_1px,transparent_1px),linear-gradient(rgba(23,63,95,.12)_1px,transparent_1px)] bg-[size:16px_16px]" />
       <div className="relative overflow-hidden rounded-[22px] border border-[#cbd7de] bg-white shadow-[0_28px_80px_rgba(20,49,68,0.16)]">
         <div className="flex h-12 items-center justify-between border-b border-[#e2e9ed] bg-[#f8fafb] px-4">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#08B5A6]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ef8354]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#f2c14e]" />
             <span className="h-2.5 w-2.5 rounded-full bg-[#4f9d69]" />
           </div>
@@ -123,7 +117,7 @@ function ProductPreview() {
                 ['6', 'Need attention'],
                 ['84%', 'Delivery confidence'],
               ].map(([value, label], index) => (
-                <div key={label} className={`rounded-xl border p-3 ${index === 2 ? 'border-[#08B5A6]/35 bg-[#fff7f3]' : 'border-[#dce5e9] bg-white'}`}>
+                <div key={label} className={`rounded-xl border p-3 ${index === 2 ? 'border-[#ef8354]/35 bg-[#fff7f3]' : 'border-[#dce5e9] bg-white'}`}>
                   <div className="text-xl font-extrabold tracking-[-.04em] text-[#173f5f]">{value}</div>
                   <div className="mt-1 text-[9px] leading-tight text-[#758690]">{label}</div>
                 </div>
@@ -194,7 +188,7 @@ export default function LandingPage() {
 
           <div className="hidden items-center gap-3 lg:flex">
             <button onClick={() => navigate('/login')} className="rounded-lg px-4 py-2.5 text-sm font-bold text-[#173f5f] transition hover:bg-[#e9eff1]">Sign in</button>
-            <button onClick={requestDemo} className="inline-flex items-center gap-2 rounded-lg bg-[#08B5A6] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(8,181,166,.22)] transition hover:-translate-y-0.5 hover:bg-[#05969B]">
+            <button onClick={requestDemo} className="inline-flex items-center gap-2 rounded-lg bg-[#ef8354] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(239,131,84,.22)] transition hover:-translate-y-0.5 hover:bg-[#e87545]">
               Book a demo <ArrowRight size={16} />
             </button>
           </div>
@@ -211,7 +205,7 @@ export default function LandingPage() {
               <a href="#why" className="rounded-lg px-3 py-3 text-sm font-semibold text-[#536974]">Why PMOCorex</a>
               <a href="#security" className="rounded-lg px-3 py-3 text-sm font-semibold text-[#536974]">Security</a>
               <button onClick={() => navigate('/login')} className="mt-2 rounded-lg border border-[#cfdcdf] px-4 py-3 text-sm font-bold text-[#173f5f]">Sign in</button>
-              <button onClick={requestDemo} className="rounded-lg bg-[#08B5A6] px-4 py-3 text-sm font-bold text-white">Book a demo</button>
+              <button onClick={requestDemo} className="rounded-lg bg-[#ef8354] px-4 py-3 text-sm font-bold text-white">Book a demo</button>
             </div>
           </div>
         )}
@@ -223,13 +217,13 @@ export default function LandingPage() {
           <div className="relative mx-auto grid max-w-[1380px] items-center gap-16 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[.86fr_1.14fr] lg:px-12 lg:py-28">
             <div>
               <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#bfd0d7] bg-white px-3 py-1.5 text-xs font-bold text-[#45606e] shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-[#08B5A6]" />
+                <span className="h-2 w-2 rounded-full bg-[#ef8354]" />
                 Built for complex project delivery
               </div>
 
               <h1 className="max-w-[720px] text-[44px] font-extrabold leading-[1.03] tracking-[-0.055em] text-[#173f5f] sm:text-[58px] lg:text-[68px]">
                 See the whole project.
-                <span className="block text-[#08B5A6]">Act before it slips.</span>
+                <span className="block text-[#ef8354]">Act before it slips.</span>
               </h1>
 
               <p className="mt-7 max-w-[610px] text-lg leading-8 text-[#536974]">
@@ -271,7 +265,7 @@ export default function LandingPage() {
         <section id="why" className="mx-auto max-w-[1380px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
           <div className="grid gap-12 lg:grid-cols-[.72fr_1.28fr]">
             <div>
-              <div className="text-xs font-extrabold uppercase tracking-[.18em] text-[#08B5A6]">Why PMOCorex</div>
+              <div className="text-xs font-extrabold uppercase tracking-[.18em] text-[#ef8354]">Why PMOCorex</div>
               <h2 className="mt-4 text-4xl font-extrabold leading-tight tracking-[-.045em] text-[#173f5f]">Project information is everywhere. Control should not be.</h2>
               <p className="mt-5 text-base leading-7 text-[#5e737e]">PMOCorex replaces fragmented updates and reactive reporting with a connected delivery control layer.</p>
             </div>
@@ -318,7 +312,7 @@ export default function LandingPage() {
           <div className="overflow-hidden rounded-[26px] border border-[#d7e1e4] bg-white">
             <div className="grid lg:grid-cols-2">
               <div className="p-8 sm:p-12 lg:p-16">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fff0e9] text-[#05969B]"><Sparkles size={22} /></div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fff0e9] text-[#e87545]"><Sparkles size={22} /></div>
                 <h2 className="mt-8 text-4xl font-extrabold leading-tight tracking-[-.045em] text-[#173f5f]">Recovery intelligence that leads to action.</h2>
                 <p className="mt-5 text-base leading-7 text-[#5e737e]">PMOCorex surfaces critical delayed activities, pressure points and practical recovery priorities so teams can respond before reporting becomes explanation.</p>
                 <div className="mt-8 grid gap-3">
@@ -365,7 +359,7 @@ export default function LandingPage() {
                 const SecurityIcon = Icon as typeof ShieldCheck
                 return (
                   <div key={String(title)} className="rounded-2xl border border-[#d2dddf] bg-white p-6">
-                    <SecurityIcon size={20} className="text-[#08B5A6]" />
+                    <SecurityIcon size={20} className="text-[#ef8354]" />
                     <h3 className="mt-5 text-base font-extrabold text-[#173f5f]">{String(title)}</h3>
                     <p className="mt-2 text-sm leading-6 text-[#6a7d87]">{String(copy)}</p>
                   </div>
@@ -376,7 +370,7 @@ export default function LandingPage() {
         </section>
 
         <section className="mx-auto max-w-[1380px] px-5 py-20 sm:px-8 lg:px-12 lg:py-28">
-          <div className="relative overflow-hidden rounded-[26px] bg-[#08B5A6] px-7 py-12 text-white sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16 lg:py-16">
+          <div className="relative overflow-hidden rounded-[26px] bg-[#ef8354] px-7 py-12 text-white sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16 lg:py-16">
             <div className="absolute right-0 top-0 h-full w-2/5 bg-[linear-gradient(90deg,rgba(255,255,255,.13)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.13)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:linear-gradient(to_left,black,transparent)]" />
             <div className="relative max-w-2xl">
               <div className="text-xs font-extrabold uppercase tracking-[.18em] text-white/70">A clearer way to deliver</div>
