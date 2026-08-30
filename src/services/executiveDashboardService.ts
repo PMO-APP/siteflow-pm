@@ -28,18 +28,58 @@ const daysLate = (date: Date | null) => date ? Math.max(0, Math.floor((now().get
 const projectName = (project: any) => project.project_name || project.name || `Project ${project.id}`
 const sameProject = (row: any, id: number) => String(row.project_id) === String(id)
 
-export async function loadExecutivePortfolioSnapshot(workspaceId: string): Promise<ExecutivePortfolioSnapshot> {
-  const tables = [
-    'projects','tasks','risks','procurement_items','approvals','quality_gates',
-    'hse_incidents','snags','financial_items','project_milestones','generated_reports','executive_decisions'
-  ] as const
+type ExecutiveTable =
+  | 'tasks' | 'risks' | 'procurement_items' | 'approvals' | 'quality_gates'
+  | 'hse_incidents' | 'snags' | 'financial_items' | 'project_milestones'
+  | 'generated_reports' | 'executive_decisions'
 
-  const results = await Promise.all(tables.map(table =>
-    supabase.from(table).select('*').eq('workspace_id', workspaceId)
-  ))
-  const firstError = results.find(result => result.error)?.error
-  if (firstError) throw firstError
-  const [projects,tasks,risks,procurement,approvals,quality,hse,snags,financial,milestones,reports,decisionRows] = results.map(result => result.data || [])
+const errorText = (error: any) => [error?.message,error?.details,error?.hint,error?.code].filter(Boolean).join(' · ')
+const isMissingOptionalTable = (error: any) => /42P01|PGRST205|relation .* does not exist|could not find the table/i.test(errorText(error))
+
+async function loadProjectsForExecutive() {
+  // Projects across PMOCorex are already protected by RLS/access policies. Most of
+  // the existing app queries this table without workspace_id, and older project
+  // schemas do not contain that column. Querying it here caused the Executive
+  // Dashboard to fail even though the user could open the same projects elsewhere.
+  const result = await supabase.from('projects').select('*').order('id')
+  if (result.error) throw new Error(`Projects could not be loaded: ${errorText(result.error)}`)
+  return result.data || []
+}
+
+async function loadExecutiveTable(table: ExecutiveTable, projectIds: Set<string>) {
+  const result = await supabase.from(table).select('*')
+
+  if (result.error) {
+    // These modules are additive executive signals. A module/table that has not
+    // been deployed yet must not take the entire executive dashboard offline.
+    if (isMissingOptionalTable(result.error)) {
+      console.warn(`[Executive Dashboard] optional table ${table} is unavailable:`, result.error)
+      return []
+    }
+    console.warn(`[Executive Dashboard] ${table} could not be loaded:`, result.error)
+    return []
+  }
+
+  const rows = result.data || []
+  const rowsWithProject = rows.filter((row: any) => row?.project_id != null)
+
+  // Keep project-linked records inside the already-visible project scope. Rows
+  // without project_id (for example some portfolio-level decisions) are retained;
+  // Supabase RLS remains the authority for their visibility.
+  return rows.filter((row: any) => row?.project_id == null || projectIds.has(String(row.project_id)))
+}
+
+export async function loadExecutivePortfolioSnapshot(_workspaceId: string): Promise<ExecutivePortfolioSnapshot> {
+  const projects = await loadProjectsForExecutive()
+  const projectIds = new Set(projects.map((project: any) => String(project.id)))
+
+  const tables: ExecutiveTable[] = [
+    'tasks','risks','procurement_items','approvals','quality_gates',
+    'hse_incidents','snags','financial_items','project_milestones','generated_reports','executive_decisions'
+  ]
+
+  const results = await Promise.all(tables.map(table => loadExecutiveTable(table, projectIds)))
+  const [tasks,risks,procurement,approvals,quality,hse,snags,financial,milestones,reports,decisionRows] = results
 
   const rows: ExecutiveProjectRow[] = projects.map((project: any) => {
     const id = Number(project.id)
