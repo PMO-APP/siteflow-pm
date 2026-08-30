@@ -11,8 +11,8 @@ import type { PermissionAction } from '@/access/accessTypes'
 
 
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, useState } from 'react'
-import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   CalendarDays,
@@ -74,7 +74,6 @@ const NAV_GROUPS: Array<{ key: NavGroupKey; label: string }> = [
 
 const NAV: NavItem[] = [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true, group: 'overview' },
-  { to: '/app/executive-dashboard', icon: BarChart3, label: 'Executive Dashboard', permission: 'reports.view', group: 'overview' },
   { to: '/app/schedule', icon: CalendarDays, label: 'Schedule', group: 'planning' },
   {
   to: '/app/project-controls',
@@ -138,7 +137,6 @@ const NAV: NavItem[] = [
 
 const NAV_PERMISSIONS:Record<string,PermissionAction>={
   '/app':'workspace.view',
-  '/app/executive-dashboard':'reports.view',
   '/app/schedule':'schedule.view',
   '/app/project-controls':'project.view',
   '/app/project-journey':'project.view',
@@ -196,65 +194,6 @@ function formatRoleLabel(role: string | null) {
   }
 
   return labels[role] || role.replace(/_/g, ' ')
-}
-
-function InitialRouteDataGate({ children }: { children: React.ReactNode }) {
-  const location = useLocation()
-  const initialFetches = useIsFetching({
-    predicate: query => query.state.data === undefined,
-  })
-  const { loading: workspaceLoading } = useWorkspace()
-  const { session } = useAccessSession()
-  const [coverVisible, setCoverVisible] = useState(true)
-  const routeStartedAt = useRef(Date.now())
-
-  // A route change gets a fresh readiness window. The page still mounts underneath
-  // so its queries can start immediately, but users never see temporary 0/empty/default
-  // values while the first real dataset is still arriving.
-  useEffect(() => {
-    routeStartedAt.current = Date.now()
-    setCoverVisible(true)
-  }, [location.pathname, location.search])
-
-  useEffect(() => {
-    if (workspaceLoading || session.loading || initialFetches > 0) {
-      setCoverVisible(true)
-      return
-    }
-
-    const minimumCoverMs = 120
-    const elapsed = Date.now() - routeStartedAt.current
-    const wait = Math.max(0, minimumCoverMs - elapsed)
-    const timer = window.setTimeout(() => setCoverVisible(false), wait)
-    return () => window.clearTimeout(timer)
-  }, [workspaceLoading, session.loading, initialFetches, location.pathname, location.search])
-
-  return (
-    <div className="relative min-h-full">
-      <div aria-hidden={coverVisible} className={coverVisible ? 'invisible' : 'visible'}>
-        {children}
-      </div>
-
-      {coverVisible && (
-        <div
-          className="absolute inset-0 z-20 flex items-start justify-center bg-[#f7f9fa] pt-16"
-          role="status"
-          aria-live="polite"
-          aria-label="Loading current project data"
-        >
-          <div className="flex items-center gap-3 rounded-2xl border border-[#dbe5eb] bg-white px-5 py-4 shadow-[0_18px_50px_rgba(11,42,60,.08)]">
-            <div className="h-8 w-8 animate-pulse rounded-xl bg-[#0B2A3C] p-2">
-              <div className="h-full w-full rounded-sm border-2 border-[#08B5A6]" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-[#0B2A3C]">Loading current data</div>
-              <div className="mt-0.5 text-xs text-[#71838d]">Fetching the latest project information…</div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function Layout() {
@@ -797,9 +736,7 @@ export default function Layout() {
         <CommandPalette open={commandPalette.open} onClose={commandPalette.close} />
 
         <div id="main-content" tabIndex={-1} className="layout-content min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-6 animate-in">
-          <InitialRouteDataGate>
-            <Outlet />
-          </InitialRouteDataGate>
+          <Outlet />
         </div>
       </main>
     </div>
