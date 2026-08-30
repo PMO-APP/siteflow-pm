@@ -24,6 +24,7 @@ import { getInitials } from '@/lib/utils'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import ReplayTourButton from '@/components/tour/ReplayTourButton'
 
 function formatRoleLabel(role?: string | null) {
   if (!role) return 'Team Member'
@@ -279,6 +280,7 @@ export default function ProfilePage() {
               <SectionHeading icon={FolderKanban} eyebrow="Navigation" title="Quick actions" copy="Return to the areas you use most." />
               <div className="mt-5 space-y-2">
                 <button onClick={() => navigate('/projects')} className="ui-button ui-button--secondary w-full"><ArrowLeft size={15} /> Workspace Hub</button>
+                <ReplayTourButton />
                 {['workspace_admin', 'admin', 'pmo'].includes(role || '') && <button onClick={() => navigate('/admin')} className="ui-button ui-button--secondary w-full"><Shield size={15} /> Admin Console</button>}
               </div>
             </section>
