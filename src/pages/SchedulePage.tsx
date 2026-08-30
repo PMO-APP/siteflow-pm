@@ -64,9 +64,9 @@ export default function SchedulePage() {
   const [packageForm, setPackageForm] = useState({ name: '', code: '', discipline: 'Housebuild' as ScheduleDiscipline, package_type: 'Block' as 'Block' | 'Shared' | 'Other', contractor_name: '', weight_pct: 0 })
 
   const { importExcel, importXml, uploadBackup } = useScheduleImport()
-  const { data: allTasks = [], isLoading } = useTasks()
-  const { data: qualityGates = [] } = useQualityGates()
-  const { data: allDeliveryPackages = [] } = useDeliveryPackages(true)
+  const { data: allTasks = [], isLoading: tasksLoading } = useTasks()
+  const { data: qualityGates = [], isLoading: qualityGatesLoading } = useQualityGates()
+  const { data: allDeliveryPackages = [], isLoading: deliveryPackagesLoading } = useDeliveryPackages(true)
   const deliveryPackages = allDeliveryPackages.filter(pkg => !pkg.archived_at)
   const archivedDeliveryPackages = allDeliveryPackages.filter(pkg => Boolean(pkg.archived_at))
   const createDeliveryPackage = useCreateDeliveryPackage()
@@ -412,6 +412,45 @@ export default function SchedulePage() {
     } catch (error) { pmoToast({ title: 'Delete failed', message: error instanceof Error ? error.message : 'Unable to permanently delete package.', tone: 'error' }) }
   }
 
+  const initialPageLoading = tasksLoading || deliveryPackagesLoading || qualityGatesLoading
+
+  if (initialPageLoading) {
+    return (
+      <div className="min-h-screen bg-[#f6f5f1] -m-4 p-4 sm:-m-6 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-[1600px] space-y-5" aria-busy="true" aria-label="Loading schedule">
+          <section className="overflow-hidden rounded-[24px] border border-[#dfe3e7] bg-white">
+            <div className="grid lg:grid-cols-[1fr_320px]">
+              <div className="animate-pulse p-6 sm:p-8 lg:p-10">
+                <div className="h-3 w-48 rounded bg-[#e8edf0]" />
+                <div className="mt-8 h-10 w-80 max-w-full rounded bg-[#e8edf0]" />
+                <div className="mt-3 h-4 w-28 rounded bg-[#eef2f4]" />
+                <div className="mt-10 h-4 w-full max-w-3xl rounded bg-[#eef2f4]" />
+                <div className="mt-3 h-4 w-4/5 max-w-2xl rounded bg-[#eef2f4]" />
+                <div className="mt-8 flex gap-2">
+                  {[0, 1, 2, 3].map(item => <div key={item} className="h-9 w-24 rounded-full bg-[#eef2f4]" />)}
+                </div>
+              </div>
+              <div className="min-h-[270px] animate-pulse bg-[#0B2A3C] p-7">
+                <div className="h-3 w-32 rounded bg-white/20" />
+                <div className="mt-6 h-16 w-28 rounded bg-white/15" />
+                <div className="mt-8 h-2 w-full rounded-full bg-white/15" />
+                <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/10 pt-5">
+                  <div className="h-12 rounded bg-white/10" /><div className="h-12 rounded bg-white/10" />
+                </div>
+              </div>
+            </div>
+          </section>
+          <section className="animate-pulse rounded-2xl border border-[#dfe3e7] bg-white p-6">
+            <div className="h-4 w-52 rounded bg-[#e8edf0]" />
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {[0, 1, 2].map(item => <div key={item} className="h-36 rounded-2xl bg-[#f0f3f5]" />)}
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 sm:-m-6 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
@@ -550,7 +589,7 @@ export default function SchedulePage() {
               </colgroup>
               <thead className="sticky top-0 z-10 bg-[#f7f8f8] text-[8px] font-semibold uppercase tracking-[0.08em] text-[#74818d] xl:text-[9px]"><tr><th className="px-2 py-3">WBS</th><th className="px-2 py-3">Activity</th>{disciplineTab === 'Overall' && <th className="px-2 py-3">Coverage</th>}<th className="px-2 py-3">Dependencies</th><th className="px-2 py-3">Start</th><th className="px-2 py-3">Finish</th><th className="px-2 py-3">Duration</th><th className="px-2 py-3">Procurement</th><th className="px-2 py-3">Approval</th><th className="px-2 py-3">Health</th><th className="px-2 py-3">Status</th><th className="px-2 py-3">Progress</th><th className="px-2 py-3">Owner</th><th className="px-2 py-3"></th></tr></thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
+                {tasksLoading ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">Loading schedule…</td></tr> : Object.entries(grouped).length === 0 ? <tr><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-12 text-center text-[#7c8892]">No activities match this view.</td></tr> : Object.entries(grouped).map(([phase, phaseTasks]) => <Fragment key={phase}>
                   <tr className="border-y border-[#e5e8eb] bg-[#eef3f6]"><td colSpan={disciplineTab === 'Overall' ? 14 : 13} className="px-2 py-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#123a60]">{phase}</td></tr>
                   {phaseTasks.map(task => {
                     const rag = task.status === 'Completed' ? 'DONE' : getRag(task) || computeRAG(task)
