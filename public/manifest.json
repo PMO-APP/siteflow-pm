@@ -1,14 +1,19 @@
 {
-  "name": "Lakowe SPA — Project Command",
-  "short_name": "SPA Command",
-  "description": "Construction Project Management for Lakowe Lakes SPA",
-  "theme_color": "#0c1014",
-  "background_color": "#0c1014",
+  "id": "/app",
+  "name": "PMOCorex — Portfolio Control Centre",
+  "short_name": "PMOCorex",
+  "description": "Portfolio and project control for construction delivery teams.",
+  "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "start_url": "/",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#F7FAFA",
+  "theme_color": "#0B2A3C",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+    {"src":"/icons/pmocorex-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/icons/pmocorex-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"/icons/pmocorex-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
   ]
 }
