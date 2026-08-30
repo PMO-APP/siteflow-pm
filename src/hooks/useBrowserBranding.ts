@@ -34,14 +34,12 @@ export function useBrowserBranding() {
       return
     }
 
-    const primary = activeWorkspace?.branding.primaryColor || '#0B2A3C'
-    const secondary = hasHighRisk ? '#e05252' : activeWorkspace?.branding.secondaryColor || '#08B5A6'
-    const initial = encodeURIComponent(productName.slice(0,1).toUpperCase())
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-      <rect width="64" height="64" rx="14" fill="${primary}"/>
-      <text x="32" y="42" text-anchor="middle" font-family="Arial" font-size="32" font-weight="700" fill="white">${initial}</text>
-      <rect y="0" width="64" height="6" fill="${secondary}"/>
-    </svg>`
-    favicon.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+    // Keep the official PMOCorex favicon as the default.
+    // Previously this hook replaced /favicon.svg after hydration with a generated
+    // one-letter icon (usually “P”), which caused the browser tab icon to flash
+    // correctly and then change a moment later. Workspace-specific favicons still
+    // override the platform icon when explicitly configured above.
+    favicon.type = 'image/svg+xml'
+    favicon.href = '/favicon.svg'
   }, [projectName, projectId, risks, activeWorkspace])
 }
