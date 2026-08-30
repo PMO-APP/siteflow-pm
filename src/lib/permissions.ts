@@ -12,6 +12,7 @@ export interface DisciplinePermissionContext {
   isInfrastructureOwner?: boolean
 }
 export const HSE_ROLES = [
+  'hse',
   'hse_officer',
   'hse_lead',
   'hse_manager',
@@ -32,6 +33,7 @@ export const INTERNAL_VIEW_ROLES = [
   ...PROJECT_OWNER_ROLES,
   'project_owner',
   'design',
+  'landscaping',
   'housebuild',
   'costing',
   'infrastructure',
@@ -76,6 +78,7 @@ export const PROJECT_ROLES = [
   'vendor',
   'subcontractor',
   'design',
+  'landscaping',
   'housebuild',
   'mep',
   'infrastructure',
@@ -248,7 +251,7 @@ export function canImportSchedule(
 }
 
 export function canUploadDocuments(role?: string | null) {
-  return role === 'design' || canCreateInternalContribution(role)
+  return ['design','landscaping'].includes(role || '') || canCreateInternalContribution(role)
 }
 
 export function canEditDocument(
@@ -380,7 +383,7 @@ export function canEditExternalReview(
 }
 
 export function canCreateSnags(role?: string | null) {
-  return role === 'design' || canCreateInternalContribution(role)
+  return ['design','landscaping'].includes(role || '') || canCreateInternalContribution(role)
 }
 
 export function canEditSnag(
@@ -393,7 +396,7 @@ export function canEditSnag(
 }
 
 export function canCreateExternalAssignments(role?: string | null) {
-  if (role === 'design') return false
+  if (['design','landscaping'].includes(role || '')) return false
   return canCreateInternalContribution(role)
 }
 
