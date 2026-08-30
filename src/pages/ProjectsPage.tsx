@@ -870,19 +870,45 @@ export default function ProjectsPage() {
         </section>
 
         <section>
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <div className="hub-eyebrow">Portfolio overview</div>
-              <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => navigate('/executive-dashboard')} className="hub-secondary-button">
-                <Activity size={16} /> Executive Dashboard
-              </button>
-              <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
-                <BarChart3 size={16} /> Portfolio Dashboard
-              </button>
-            </div>
+          <div className="mb-5">
+            <div className="hub-eyebrow">Portfolio overview</div>
+            <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
+          </div>
+
+          <div className="mb-5 grid gap-4 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => navigate('/executive-dashboard')}
+              className="group flex items-center justify-between rounded-[22px] border border-[#c9e9e5] bg-[#effaf8] p-5 text-left shadow-[0_10px_30px_rgba(8,181,166,0.08)] transition hover:-translate-y-0.5 hover:border-[#08B5A6] hover:shadow-[0_14px_34px_rgba(8,181,166,0.12)]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#08B5A6] shadow-sm">
+                  <Activity size={21} />
+                </div>
+                <div>
+                  <div className="text-base font-extrabold text-[#0B2A3C]">Executive Dashboard</div>
+                  <div className="mt-1 text-sm text-[#607580]">Cross-project health, risk and executive intervention.</div>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-[#08B5A6] transition group-hover:translate-x-1" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/portfolio-dashboard')}
+              className="group flex items-center justify-between rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_30px_rgba(11,42,60,0.06)] transition hover:-translate-y-0.5 hover:border-[#9fc8c2] hover:shadow-[0_14px_34px_rgba(11,42,60,0.09)]"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E8F6F4] text-[#0B2A3C]">
+                  <BarChart3 size={21} />
+                </div>
+                <div>
+                  <div className="text-base font-extrabold text-[#0B2A3C]">Portfolio Dashboard</div>
+                  <div className="mt-1 text-sm text-[#607580]">Portfolio delivery position, progress and control signals.</div>
+                </div>
+              </div>
+              <ArrowRight size={18} className="text-[#08B5A6] transition group-hover:translate-x-1" />
+            </button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -962,41 +988,42 @@ export default function ProjectsPage() {
               </div>
             )}
 
-            {canCreateItems && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedOrgId(organizations[0]?.id || '')
-                    setShowPortfolioModal(true)
-                  }}
-                  className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#cfdde2] bg-[#f9fbfb] p-6 text-center transition hover:-translate-y-1 hover:border-[#ffad89] hover:bg-[#fff7f3]"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#ef8354] shadow-sm">
-                    <Briefcase size={22} />
-                  </div>
-                  <div className="mt-4 font-extrabold text-[#173f5f]">Create portfolio</div>
-                  <div className="mt-1 max-w-[220px] text-sm leading-5 text-[#71838d]">Add a separate delivery environment for a group of projects.</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedOrgId(organizations[0]?.id || '')
-                    setSelectedPortfolioId('')
-                    setShowProjectModal(true)
-                  }}
-                  className="flex min-h-[210px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#c9dce8] bg-[#f7fafc] p-6 text-center transition hover:-translate-y-1 hover:border-[#74a5c3] hover:bg-[#f0f7fb]"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#2f6f91] shadow-sm">
-                    <FolderKanban size={22} />
-                  </div>
-                  <div className="mt-4 font-extrabold text-[#173f5f]">Create project</div>
-                  <div className="mt-1 max-w-[220px] text-sm leading-5 text-[#71838d]">Create a project and assign it to the appropriate portfolio.</div>
-                </button>
-              </>
-            )}
           </div>
+
+          {canCreateItems && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOrgId(organizations[0]?.id || '')
+                  setShowPortfolioModal(true)
+                }}
+                className="flex min-h-[180px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#bfe1dc] bg-[#f7fcfb] p-6 text-center transition hover:-translate-y-1 hover:border-[#08B5A6] hover:bg-[#effaf8]"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#08B5A6] shadow-sm">
+                  <Briefcase size={22} />
+                </div>
+                <div className="mt-4 font-extrabold text-[#0B2A3C]">Create portfolio</div>
+                <div className="mt-1 max-w-[260px] text-sm leading-5 text-[#71838d]">Add a separate delivery environment for a group of projects.</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOrgId(organizations[0]?.id || '')
+                  setSelectedPortfolioId('')
+                  setShowProjectModal(true)
+                }}
+                className="flex min-h-[180px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#bfe1dc] bg-[#f7fcfb] p-6 text-center transition hover:-translate-y-1 hover:border-[#08B5A6] hover:bg-[#effaf8]"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#08B5A6] shadow-sm">
+                  <FolderKanban size={22} />
+                </div>
+                <div className="mt-4 font-extrabold text-[#0B2A3C]">Create project</div>
+                <div className="mt-1 max-w-[260px] text-sm leading-5 text-[#71838d]">Create a project and assign it to the appropriate portfolio.</div>
+              </button>
+            </div>
+          )}
         </section>
 
         <section id="projects-register" className="hub-panel overflow-hidden">
