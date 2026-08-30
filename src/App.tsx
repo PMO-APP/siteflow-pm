@@ -12,6 +12,7 @@ import NotificationProvider from './components/ui/notifications/NotificationProv
 import EventInfrastructureProvider from '@/components/events/EventInfrastructureProvider'
 import { WorkspaceProvider } from '@/workspace/WorkspaceProvider'
 import AccessSessionProvider from '@/access/AccessSessionProvider'
+import PMOCorexTourProvider from '@/components/tour/PMOCorexTourProvider'
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
@@ -251,6 +252,7 @@ export default function App() {
         <AccessSessionProvider>
         <EventInfrastructureProvider>
         <BrowserRouter>
+          <PMOCorexTourProvider>
           <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -472,6 +474,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
           </Suspense>
+          </PMOCorexTourProvider>
         </BrowserRouter>
         </EventInfrastructureProvider>
         </AccessSessionProvider>
