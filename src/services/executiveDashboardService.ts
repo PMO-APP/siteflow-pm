@@ -31,7 +31,7 @@ const sameProject = (row: any, id: number) => String(row.project_id) === String(
 type ExecutiveTable =
   | 'tasks' | 'risks' | 'procurement_items' | 'approvals' | 'quality_gates'
   | 'hse_incidents' | 'snags' | 'financial_items' | 'project_milestones'
-  | 'generated_reports' | 'executive_decisions'
+  | 'generated_reports' | 'executive_decisions' | 'executive_metric_snapshots'
 
 const errorText = (error: any) => [error?.message,error?.details,error?.hint,error?.code].filter(Boolean).join(' · ')
 const isMissingOptionalTable = (error: any) => /42P01|PGRST205|relation .* does not exist|could not find the table/i.test(errorText(error))
@@ -109,6 +109,21 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
     const overdueProcurement = projectProcurement.filter((item: any) => !isClosed(item.status) && daysLate(dateValue(item.expected_delivery_date,item.required_date,item.due_date)) > 0)
     const overdueApprovals = projectApprovals.filter((item: any) => !isClosed(item.status) && daysLate(dateValue(item.due_date,item.required_date)) > 0)
     const qualityExceptions = projectQuality.filter((item: any) => /failed|rejected|non.?conform/.test(lower(item.status || item.result)))
+    const passedQuality = projectQuality.filter((item:any)=>/passed|approved|complete|closed|accepted/.test(lower(item.status||item.result)))
+    const closedSnags = projectSnags.filter((item:any)=>isClosed(item.status))
+    const qualityEvidenceCount = projectQuality.length + projectSnags.length
+    const gatePassRate = projectQuality.length ? passedQuality.length / projectQuality.length : null
+    const snagClosureRate = projectSnags.length ? closedSnags.length / projectSnags.length : null
+    const exceptionControl = projectQuality.length ? Math.max(0,1-qualityExceptions.length/projectQuality.length) : null
+    const qualityComponents = [
+      gatePassRate == null ? null : {weight:.5,value:gatePassRate},
+      snagClosureRate == null ? null : {weight:.3,value:snagClosureRate},
+      exceptionControl == null ? null : {weight:.2,value:exceptionControl},
+    ].filter(Boolean) as Array<{weight:number;value:number}>
+    const qualityWeight = qualityComponents.reduce((sum,item)=>sum+item.weight,0)
+    const qualityScore = qualityEvidenceCount > 0 && qualityWeight > 0
+      ? Math.round(qualityComponents.reduce((sum,item)=>sum+item.value*item.weight,0)/qualityWeight*100)
+      : null
     const openHseIncidents = projectHse.filter((item: any) => !isClosed(item.status))
     const openSnags = projectSnags.filter((item: any) => !isClosed(item.status))
 
@@ -126,6 +141,13 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
 
     const budget = projectFinancial.reduce((sum: number,item: any) => sum + number(item.budget,item.approved_budget,item.contract_sum,item.amount),0) || number(project.budget,project.approved_budget,project.contract_sum)
     const actualCost = projectFinancial.reduce((sum: number,item: any) => sum + number(item.actual_cost,item.paid_amount,item.spent,item.actual),0) || number(project.actual_cost,project.cost_to_date)
+    const committedCost = projectFinancial.reduce((sum:number,item:any)=>sum+number(item.committed_cost,item.committed_amount,item.commitment,item.po_value,item.contract_value),0) || number(project.committed_cost,project.committed_amount)
+    const explicitForecast = projectFinancial.reduce((sum:number,item:any)=>sum+number(item.forecast_cost,item.estimate_at_completion,item.eac),0) || number(project.forecast_cost,project.estimate_at_completion,project.eac)
+    const runRateForecast = progress > 0 && actualCost > 0 ? actualCost / (progress/100) : 0
+    const forecastCost = explicitForecast > 0 ? explicitForecast : runRateForecast > 0 ? runRateForecast : null
+    const forecastCostSource = explicitForecast > 0 ? 'explicit' : runRateForecast > 0 ? 'run-rate' : 'none'
+    const budgetUtilization = budget>0 ? Math.round(actualCost/budget*100) : null
+    const costProgressGap = budgetUtilization == null ? null : Number((budgetUtilization-progress).toFixed(1))
     const earnedValue = number(project.earned_value, budget ? budget * progress / 100 : 0)
     const plannedValue = number(project.planned_value, budget ? budget * plannedProgress / 100 : 0)
     const spi = plannedValue > 0 ? earnedValue / plannedValue : (plannedProgress > 0 ? progress / plannedProgress : null)
@@ -157,10 +179,12 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
       ragLabel:health==='critical'?'Critical':health==='attention'?'Requires attention':'Healthy',
       primaryBlocker:String(blockers[0]?.[1] || 'No material blocker detected'),overdueActivities:overdueTasks.length,
       highRisks:highRisks.length,overdueProcurement:overdueProcurement.length,overdueApprovals:overdueApprovals.length,
-      qualityExceptions:qualityExceptions.length,openHseIncidents:openHseIncidents.length,openSnags:openSnags.length,
-      budget,actualCost,budgetUtilization:budget>0 ? Math.round(actualCost/budget*100) : null,
+      qualityExceptions:qualityExceptions.length,qualityScore,qualityEvidenceCount,openHseIncidents:openHseIncidents.length,openSnags:openSnags.length,
+      budget,actualCost,committedCost,forecastCost:forecastCost==null?null:Math.round(forecastCost),forecastCostSource,costProgressGap,budgetUtilization,
       spi:spi == null ? null : Number(spi.toFixed(2)),cpi:cpi == null ? null : Number(cpi.toFixed(2)),
-      forecastCompletion:(dateValue(project.forecast_completion,project.handover_date,project.end_date)?.toISOString() || null),
+      plannedCompletion:(dateValue(project.handover_date,project.end_date,project.planned_finish)?.toISOString() || null),
+      forecastCompletion:(dateValue(project.forecast_completion,project.forecast_end_date,project.handover_date,project.end_date)?.toISOString() || null),
+      forecastDelayDays:(()=>{const planned=dateValue(project.handover_date,project.end_date,project.planned_finish);const forecast=dateValue(project.forecast_completion,project.forecast_end_date,project.handover_date,project.end_date);return planned&&forecast?Math.max(0,Math.ceil((forecast.getTime()-planned.getTime())/86400000)):0})(),
       latitude:project.latitude == null ? null : Number(project.latitude),longitude:project.longitude == null ? null : Number(project.longitude),
     }
   })
@@ -197,7 +221,12 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
   const weighted = (key: 'progress'|'healthScore') => activeRows.length ? Math.round(activeRows.reduce((sum,row)=>sum+row[key],0)/activeRows.length) : 0
   const avgNullable = (key:'spi'|'cpi') => { const values=activeRows.map(row=>row[key]).filter((v):v is number=>v!=null); return values.length ? Number((values.reduce((a,b)=>a+b,0)/values.length).toFixed(2)) : null }
   const totalBudget=activeRows.reduce((sum,row)=>sum+row.budget,0), totalCost=activeRows.reduce((sum,row)=>sum+row.actualCost,0)
+  const totalCommittedCost=activeRows.reduce((sum,row)=>sum+row.committedCost,0)
+  const forecastCostRows=activeRows.map(row=>row.forecastCost).filter((value):value is number=>value!=null)
+  const totalForecastCost=forecastCostRows.length ? forecastCostRows.reduce((sum,value)=>sum+value,0) : null
+  const forecastCostVariance=totalForecastCost!=null && totalBudget>0 ? totalForecastCost-totalBudget : null
   const forecastDates=activeRows.map(row=>row.forecastCompletion).filter(Boolean).map(value=>new Date(value!).getTime()).filter(Number.isFinite)
+  const projectsForecastLate=activeRows.filter(row=>row.forecastDelayDays>0).length
 
   const insights: string[] = []
   const criticalRows=activeRows.filter(row=>row.health==='critical')
@@ -210,19 +239,55 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
   if(improving) insights.push(`${improving.name} is the strongest delivery signal at ${improving.progress}% progress with healthy controls.`)
   if(!insights.length) insights.push('Portfolio controls are stable. Continue protecting upcoming approvals, procurement dates and milestones.')
 
+  // Persist one genuine daily executive snapshot per project. This starts the
+  // portfolio trend history from deployment onward rather than inventing history.
+  try {
+    await supabase.from('executive_metric_snapshots').upsert(activeRows.map(row=>({
+      snapshot_date:new Date().toISOString().slice(0,10),
+      project_id:row.id,
+      project_name:row.name,
+      progress:row.progress,
+      planned_progress:row.plannedProgress,
+      budget_utilization:row.budgetUtilization,
+      cost_progress_gap:row.costProgressGap,
+      schedule_variance_days:row.scheduleVarianceDays,
+      high_risks:row.highRisks,
+      quality_score:row.qualityScore,
+    })),{onConflict:'snapshot_date,project_id'})
+  } catch(error) {
+    console.warn('[Executive Dashboard] trend snapshot could not be saved:',error)
+  }
+
+  let trends:any[]=[]
+  try {
+    const since=new Date(); since.setDate(since.getDate()-84)
+    const trendResult=await supabase.from('executive_metric_snapshots').select('*').gte('snapshot_date',since.toISOString().slice(0,10)).order('snapshot_date')
+    if(!trendResult.error) trends=(trendResult.data||[]).filter((item:any)=>projectIds.has(String(item.project_id))).map((item:any)=>({
+      date:item.snapshot_date,projectId:Number(item.project_id),projectName:item.project_name,
+      progress:number(item.progress),plannedProgress:number(item.planned_progress),
+      budgetUtilization:item.budget_utilization==null?null:number(item.budget_utilization),
+      costProgressGap:item.cost_progress_gap==null?null:number(item.cost_progress_gap),
+      scheduleVarianceDays:number(item.schedule_variance_days),highRisks:number(item.high_risks),
+      qualityScore:item.quality_score==null?null:number(item.quality_score),
+    }))
+  } catch(error) {
+    console.warn('[Executive Dashboard] trend history could not be loaded:',error)
+  }
+
   return {
-    projects:rows,attention,decisions,timeline,insights,
+    projects:rows,attention,decisions,timeline,insights,trends,
     metrics:{
       activeProjects:activeRows.length,healthyProjects:activeRows.filter(row=>row.health==='healthy').length,
       attentionProjects:activeRows.filter(row=>row.health==='attention').length,criticalProjects:criticalRows.length,
       portfolioHealthScore:weighted('healthScore'),overallProgress:weighted('progress'),portfolioSpi:avgNullable('spi'),portfolioCpi:avgNullable('cpi'),
       budgetUtilization:totalBudget>0?Math.round(totalCost/totalBudget*100):null,
+      totalBudget,totalActualCost:totalCost,totalCommittedCost,totalForecastCost,forecastCostVariance,projectsForecastLate,
       forecastCompletion:forecastDates.length?new Date(Math.max(...forecastDates)).toISOString():null,
     },
     rankings:{
       bestDelivery:[...activeRows].sort((a,b)=>(b.progress-b.plannedProgress)-(a.progress-a.plannedProgress)).slice(0,5),
       lowestRisk:[...activeRows].sort((a,b)=>a.highRisks-b.highRisks||b.healthScore-a.healthScore).slice(0,5),
-      bestQuality:[...activeRows].sort((a,b)=>a.qualityExceptions-b.qualityExceptions||b.healthScore-a.healthScore).slice(0,5),
+      bestQuality:[...activeRows].filter(row=>row.qualityScore!=null).sort((a,b)=>(b.qualityScore||0)-(a.qualityScore||0)||b.qualityEvidenceCount-a.qualityEvidenceCount).slice(0,5),
       mostDelayed:[...activeRows].sort((a,b)=>b.scheduleVarianceDays-a.scheduleVarianceDays).slice(0,5),
     }
   }
