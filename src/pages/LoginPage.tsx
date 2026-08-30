@@ -7,16 +7,10 @@ import { resolveCanonicalLoginPath } from '@/auth/canonicalAuthService'
 function LoginBrand() {
   return (
     <div className="flex items-center gap-3">
-      <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-[#173f5f]">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#08B5A6]" />
-        <svg viewBox="0 0 40 40" className="h-7 w-7" aria-hidden="true">
-          <path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="white" />
-          <path d="M27.8 25.4 32 29.6" stroke="#08B5A6" strokeWidth="2.8" strokeLinecap="round" />
-        </svg>
-      </div>
+      <img src="/brand/pmocorex-mark.svg" alt="PMOCorex" className="h-10 w-10 object-contain" />
       <div className="leading-none">
         <div className="text-[17px] font-extrabold tracking-[-0.04em] text-[#173f5f]">PMOCorex</div>
-        <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#71838d]">Project delivery control</div>
+        <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.19em] text-[#71838d]">Portfolio Control Centre</div>
       </div>
     </div>
   )
@@ -59,15 +53,15 @@ export default function LoginPage() {
         document.documentElement.style.setProperty('--workspace-primary', brand.primary_color)
         document.documentElement.style.setProperty('--workspace-secondary', brand.secondary_color)
         document.title = `${brand.workspace_name} | ${brand.product_name}`
-        if (brand.favicon_url) {
-          let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null
-          if (!favicon) {
-            favicon = document.createElement('link')
-            favicon.rel = 'icon'
-            document.head.appendChild(favicon)
-          }
-          favicon.href = brand.favicon_url
+        const isPmocorexBrand = /^(pmo\s*)?corex$/i.test((brand.product_name || '').trim()) || /^pmocorex$/i.test((brand.product_name || '').trim())
+        let favicon = document.querySelector("link[rel='icon']") as HTMLLinkElement | null
+        if (!favicon) {
+          favicon = document.createElement('link')
+          favicon.rel = 'icon'
+          document.head.appendChild(favicon)
         }
+        favicon.href = !isPmocorexBrand && brand.favicon_url ? brand.favicon_url : '/favicon.svg'
+        favicon.type = 'image/svg+xml' 
       })
   }, [])
 
@@ -148,7 +142,7 @@ export default function LoginPage() {
         >
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,.055)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.055)_1px,transparent_1px)] bg-[size:34px_34px]" />
           <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full border border-white/10" />
-          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#08B5A6]/55" />
+          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#ef8354]/55" />
 
           <div className="relative flex items-center gap-3">
             {publicBranding?.logo_url ? (
