@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react'
 import { useProjectStore } from '@/store/project'
 import { useRisks } from '@/hooks/useData'
@@ -29,16 +28,14 @@ export function useBrowserBranding() {
       document.head.appendChild(favicon)
     }
 
+    // A workspace may explicitly supply its own favicon. Otherwise the platform
+    // favicon defined in index.html remains authoritative. Do not generate a
+    // temporary letter icon after hydration; that was what changed PMOCorex to “P”.
     if (activeWorkspace?.branding.faviconUrl) {
       favicon.href = activeWorkspace.branding.faviconUrl
       return
     }
 
-    // Keep the official PMOCorex favicon as the default.
-    // Previously this hook replaced /favicon.svg after hydration with a generated
-    // one-letter icon (usually “P”), which caused the browser tab icon to flash
-    // correctly and then change a moment later. Workspace-specific favicons still
-    // override the platform icon when explicitly configured above.
     favicon.type = 'image/svg+xml'
     favicon.href = '/favicon.svg'
   }, [projectName, projectId, risks, activeWorkspace])
