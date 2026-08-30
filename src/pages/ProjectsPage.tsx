@@ -150,6 +150,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [phaseFilter, setPhaseFilter] = useState('All')
   const [attentionFilter, setAttentionFilter] = useState<'All' | 'Attention' | 'Healthy'>('All')
+  const [assignedOnly, setAssignedOnly] = useState(false)
 
   const [dialog, setDialog] = useState<DialogState>({ open: false, title: '', message: '', inputValue: '', busy: false })
   const dialogResolver = useRef<((value: boolean) => void) | null>(null)
@@ -706,6 +707,31 @@ export default function ProjectsPage() {
     return map
   }, [projects, projectTasks])
 
+  const assignedProjectIds = useMemo(() => {
+    const ids = new Set(
+      accessSession.assignments
+        .filter(item => item.scopeType === 'project' && item.scopeId != null)
+        .map(item => String(item.scopeId))
+    )
+
+    projects.forEach(project => {
+      const ownerEmails = [
+        project.overall_owner_email,
+        project.housebuild_owner_email,
+        project.mep_owner_email,
+        project.infrastructure_owner_email,
+      ].map(value => String(value || '').toLowerCase().trim())
+      if (currentUserEmail && ownerEmails.includes(currentUserEmail)) ids.add(String(project.id))
+    })
+
+    return ids
+  }, [accessSession.assignments, projects, currentUserEmail])
+
+  const assignedOrDelegatedProjects = useMemo(
+    () => projects.filter(project => assignedProjectIds.has(String(project.id))),
+    [projects, assignedProjectIds]
+  )
+
   const filteredProjects = useMemo(
     () =>
       projects.filter(project => {
@@ -722,16 +748,30 @@ export default function ProjectsPage() {
           (phaseFilter === 'All' || String(project.phase || 'Not set') === phaseFilter) &&
           (attentionFilter === 'All' ||
             (attentionFilter === 'Attention' && needsAttention) ||
-            (attentionFilter === 'Healthy' && !needsAttention))
+            (attentionFilter === 'Healthy' && !needsAttention)) &&
+          (!assignedOnly || assignedProjectIds.has(String(project.id)))
         )
       }),
-    [projects, searchTerm, portfolioFilter, statusFilter, phaseFilter, attentionFilter, projectAttentionMap]
+    [projects, searchTerm, portfolioFilter, statusFilter, phaseFilter, attentionFilter, assignedOnly, assignedProjectIds, projectAttentionMap]
   )
 
   function showProjects(filter: { portfolioId?: string | number; status?: string; attention?: 'All' | 'Attention' | 'Healthy' }) {
+    setAssignedOnly(false)
     setPortfolioFilter(filter.portfolioId !== undefined ? String(filter.portfolioId) : 'All')
     setStatusFilter(filter.status || 'All')
     setAttentionFilter(filter.attention || 'All')
+    requestAnimationFrame(() => {
+      document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  function showAssignedProjects() {
+    setSearchTerm('')
+    setPortfolioFilter('All')
+    setStatusFilter('All')
+    setPhaseFilter('All')
+    setAttentionFilter('All')
+    setAssignedOnly(true)
     requestAnimationFrame(() => {
       document.getElementById('projects-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
@@ -838,20 +878,12 @@ export default function ProjectsPage() {
               </span>
             </div>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <AssignedProjectsFocusCard projects={assignedOrDelegatedProjects} onFilter={showAssignedProjects} onOpen={openProject} />
               <FocusItem icon={FolderKanban} value={myAssignedProjects.length} label="Projects within your working scope" />
               <FocusItem icon={AlertTriangle} value={attentionProjects} label="Projects requiring attention" urgent={attentionProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
               <FocusItem icon={CalendarClock} value={missingTargets} label="Projects without a target date" urgent={missingTargets > 0} />
               <FocusItem icon={Activity} value={activeProjects} label="Projects currently active" />
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button onClick={() => navigate('/executive-dashboard')} className="hub-primary-button">
-                <BarChart3 size={16} /> Executive Dashboard
-              </button>
-              <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
-                Open portfolio command centre <ArrowRight size={16} />
-              </button>
             </div>
           </div>
 
@@ -875,43 +907,7 @@ export default function ProjectsPage() {
             <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
           </div>
 
-          <div className="mb-5 grid gap-4 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => navigate('/executive-dashboard')}
-              className="group flex items-center justify-between rounded-[22px] border border-[#c9e9e5] bg-[#effaf8] p-5 text-left shadow-[0_10px_30px_rgba(8,181,166,0.08)] transition hover:-translate-y-0.5 hover:border-[#08B5A6] hover:shadow-[0_14px_34px_rgba(8,181,166,0.12)]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#08B5A6] shadow-sm">
-                  <Activity size={21} />
-                </div>
-                <div>
-                  <div className="text-base font-extrabold text-[#0B2A3C]">Executive Dashboard</div>
-                  <div className="mt-1 text-sm text-[#607580]">Cross-project health, risk and executive intervention.</div>
-                </div>
-              </div>
-              <ArrowRight size={18} className="text-[#08B5A6] transition group-hover:translate-x-1" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/portfolio-dashboard')}
-              className="group flex items-center justify-between rounded-[22px] border border-[#dbe5ee] bg-white p-5 text-left shadow-[0_10px_30px_rgba(11,42,60,0.06)] transition hover:-translate-y-0.5 hover:border-[#9fc8c2] hover:shadow-[0_14px_34px_rgba(11,42,60,0.09)]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E8F6F4] text-[#0B2A3C]">
-                  <BarChart3 size={21} />
-                </div>
-                <div>
-                  <div className="text-base font-extrabold text-[#0B2A3C]">Portfolio Dashboard</div>
-                  <div className="mt-1 text-sm text-[#607580]">Portfolio delivery position, progress and control signals.</div>
-                </div>
-              </div>
-              <ArrowRight size={18} className="text-[#08B5A6] transition group-hover:translate-x-1" />
-            </button>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}>
             {portfolios.map(portfolio => {
               const portfolioProjects = projects.filter(p => String(p.portfolio_id ?? '') === String(portfolio.id ?? ''))
               const attention = portfolioProjects.filter(p => projectAttentionMap.get(String(p.id))?.needsAttention).length
@@ -1036,6 +1032,11 @@ export default function ProjectsPage() {
               </div>
 
               <div className="flex w-full flex-col gap-2 xl:w-auto xl:items-end">
+                {assignedOnly && (
+                  <button type="button" onClick={() => setAssignedOnly(false)} className="inline-flex self-start items-center gap-2 rounded-full border border-[#bfe1dc] bg-[#effaf8] px-3 py-1.5 text-xs font-bold text-[#05969B] xl:self-end">
+                    Showing projects assigned or delegated to you <X size={13} />
+                  </button>
+                )}
                 {attentionFilter !== 'All' && (
                   <button type="button" onClick={() => setAttentionFilter('All')} className="inline-flex self-start items-center gap-2 rounded-full border border-[#f0c4b2] bg-[#fff0e9] px-3 py-1.5 text-xs font-bold text-[#d86335] xl:self-end">
                     Showing {attentionFilter === 'Attention' ? 'projects requiring attention' : 'healthy projects'} <X size={13} />
@@ -1124,6 +1125,7 @@ export default function ProjectsPage() {
                       setStatusFilter('All')
                       setPhaseFilter('All')
                       setAttentionFilter('All')
+                      setAssignedOnly(false)
                     }}
                     className="hub-secondary-button mt-4"
                   >
@@ -1284,6 +1286,32 @@ function MiniMetric({ label, value, accent = false, onClick }: any) {
       <div className={`text-2xl font-black ${accent ? 'text-[#d86335]' : 'text-[#173f5f]'}`}>{value}</div>
       <div className="mt-1 text-xs font-medium text-[#71838d]">{label}</div>
     </Component>
+  )
+}
+
+function AssignedProjectsFocusCard({ projects, onFilter, onOpen }: { projects: any[]; onFilter: () => void; onOpen: (project: any) => void }) {
+  return (
+    <div className="group relative">
+      <button type="button" onClick={onFilter} className="flex w-full items-center gap-4 rounded-2xl border border-[#bfe1dc] bg-[#effaf8] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#08B5A6] hover:shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#08B5A6] shadow-sm"><UserCircle size={19} /></div>
+        <div className="min-w-0"><div className="text-xl font-black text-[#173f5f]">{projects.length}</div><div className="text-xs leading-5 text-[#71838d]">Projects assigned or temporarily delegated to you</div></div>
+      </button>
+      <div className="pointer-events-none invisible absolute left-0 top-[calc(100%+8px)] z-40 w-full min-w-[280px] translate-y-1 rounded-2xl border border-[#d8e4e1] bg-white p-3 opacity-0 shadow-[0_16px_40px_rgba(11,42,60,0.14)] transition group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[#7d8d96]">Your assigned projects</div>
+        {projects.length === 0 ? (
+          <div className="rounded-xl bg-[#f7f9fa] px-3 py-4 text-xs leading-5 text-[#71838d]">No direct project assignment or active delegation is recorded for you.</div>
+        ) : (
+          <div className="max-h-56 overflow-y-auto">
+            {projects.map(project => (
+              <button key={project.id} type="button" onClick={event => { event.stopPropagation(); onOpen(project) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#173f5f] transition hover:bg-[#effaf8]">
+                <span className="truncate">{project.project_name || project.name}</span><ChevronRight size={14} className="shrink-0 text-[#08B5A6]" />
+              </button>
+            ))}
+          </div>
+        )}
+        {projects.length > 0 && <button type="button" onClick={onFilter} className="mt-2 w-full rounded-xl bg-[#0B2A3C] px-3 py-2 text-xs font-bold text-white">Filter project register</button>}
+      </div>
+    </div>
   )
 }
 
