@@ -71,6 +71,7 @@ const ExecutiveDashboardPage = lazy(() => import('@/pages/ExecutiveDashboardPage
 const ExecutiveNarrativePage = lazy(() => import('@/pages/ExecutiveNarrativePage'))
 const ReportDesignerPage = lazy(() => import('@/pages/ReportDesignerPage'))
 const ReportDistributionPage = lazy(() => import('@/pages/ReportDistributionPage'))
+const BoardroomPage = lazy(() => import('@/pages/BoardroomPage'))
 const CustomerAdministrationPage = lazy(() => import('@/pages/CustomerAdministrationPage'))
 
 
@@ -392,6 +393,7 @@ export default function App() {
           <Route path="executive-narrative" element={<ExecutiveNarrativePage />} />
           <Route path="report-designer" element={<ReportDesignerPage />} />
           <Route path="report-distribution" element={<ReportDistributionPage />} />
+          <Route path="boardroom" element={<BoardroomPage />} />
 
 
 
