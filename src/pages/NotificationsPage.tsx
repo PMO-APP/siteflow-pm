@@ -145,11 +145,33 @@ function buildAnnouncementAudiences(members:CustomerAdminMember[]):AnnouncementA
       addTeam(`role:${member.role}`,`${humanizeRole(member.role)} Team`,member.userId,'permission')
     }
   })
-  const teams=Array.from(teamMap.entries()).map(([key,value])=>({
+  const normalized=(value?:string|null)=>(value||'').trim().toLowerCase().replace(/[\s_-]+/g,' ')
+  const matchesTeam=(member:any,aliases:string[])=>{
+    const values=[member.departmentName,member.role,member.jobTitle].map(normalized).filter(Boolean)
+    return aliases.some(alias=>values.some(value=>value===alias||value.includes(alias)))
+  }
+  const systemTeams=[
+    {id:'system:costing',label:'Costing Team',aliases:['costing','cost','cost management','quantity surveying','qs']},
+    {id:'system:housebuild',label:'Housebuild Team',aliases:['housebuild','house build']},
+    {id:'system:infrastructure',label:'Infrastructure Team',aliases:['infrastructure','infra']},
+    {id:'system:mep',label:'MEP Team',aliases:['mep','mechanical electrical plumbing','mechanical','electrical']},
+    {id:'system:hse',label:'HSE Team',aliases:['hse','health safety environment','health and safety']},
+  ]
+  const explicitTeams=systemTeams.map(team=>{
+    const ids=active.filter(member=>matchesTeam(member,team.aliases)).map(member=>member.userId)
+    return {id:team.id,kind:'team' as const,label:team.label,helper:`${ids.length} member${ids.length===1?'':'s'} · system team`,userIds:Array.from(new Set(ids))}
+  })
+  const ipdIds=Array.from(new Set(explicitTeams.filter(team=>['Housebuild Team','Infrastructure Team','MEP Team','HSE Team'].includes(team.label)).flatMap(team=>team.userIds)))
+  const ipdTeam={id:'system:ipd',kind:'team' as const,label:'IPD',helper:`${ipdIds.length} member${ipdIds.length===1?'':'s'} · Housebuild + Infrastructure + MEP + HSE`,userIds:ipdIds}
+
+  const generatedTeams=Array.from(teamMap.entries()).map(([key,value])=>({
     id:key,kind:'team' as const,label:value.label,
     helper:`${value.userIds.size} member${value.userIds.size===1?'':'s'} · ${Array.from(value.sources).join(' + ')}`,
     userIds:Array.from(value.userIds)
-  })).sort((a,b)=>a.label.localeCompare(b.label))
+  }))
+  const preferredLabels=new Set([ipdTeam.label,...explicitTeams.map(team=>team.label)].map(label=>label.toLowerCase()))
+  const teams=[ipdTeam,...explicitTeams,...generatedTeams.filter(team=>!preferredLabels.has(team.label.toLowerCase()))]
+    .sort((a,b)=>a.label.localeCompare(b.label))
 
   const people=active.map(member=>({
     id:`person:${member.userId}`,kind:'person' as const,label:member.fullName||member.email,
