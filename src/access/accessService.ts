@@ -37,14 +37,6 @@ const PROFILE_ACTIONS: Record<string, PermissionAction[]> = {
     'snags.view','snags.edit','risk.view','risk.edit','reports.view','reports.edit','reports.review','reports.export',
     'costing.view','costing.edit','hse.create','hse.close','team.invite','team.manage','notifications.announce','audit.view',
   ],
-  admin: [
-    'workspace.view','workspace.manage','portfolio.view','portfolio.edit',
-    'project.view','project.contribute','project.edit','project.manage','project.delete',
-    'schedule.view','schedule.edit','schedule.import','documents.view','documents.upload','documents.delete',
-    'procurement.view','procurement.edit','approvals.view','approvals.edit','quality.view','quality.edit',
-    'snags.view','snags.edit','risk.view','risk.edit','reports.view','reports.edit','reports.review','reports.export',
-    'costing.view','costing.edit','hse.create','hse.close','team.invite','team.manage','notifications.announce','audit.view',
-  ],
   pmo: [
     'workspace.view','workspace.manage','portfolio.view','portfolio.edit','project.view','project.contribute','project.edit','project.manage',
     'schedule.view','schedule.edit','schedule.import','documents.view','documents.upload','documents.delete',
@@ -78,6 +70,10 @@ const PROFILE_ACTIONS: Record<string, PermissionAction[]> = {
   viewer: ['workspace.view','portfolio.view','project.view','schedule.view','documents.view','procurement.view','approvals.view','quality.view','snags.view','risk.view','reports.view','costing.view'],
   workspace_member: ['workspace.view','portfolio.view','project.view','schedule.view','documents.view','procurement.view','approvals.view','quality.view','snags.view','risk.view','reports.view','costing.view'],
 }
+
+// Admin and Workspace Admin are intentionally the same authority tier.
+// Keep one canonical permission source so future changes cannot drift apart.
+PROFILE_ACTIONS.admin = PROFILE_ACTIONS.workspace_admin
 
 function normalizeDiscipline(value?: string | null) {
   const clean = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ')
@@ -204,8 +200,10 @@ export function canPerform(
   context?: { scopeType?: AccessScopeType; scopeId?: string | number | null; discipline?: string | null }
 ) {
   if (session.status !== 'active') return false
-  const profile = session.permissionProfileKey || 'workspace_member'
-  const isDesignMember = String(session.role || '').toLowerCase() === 'design' || normalizeDiscipline(session.discipline) === 'design'
+  const roleKey = String(session.role || '').toLowerCase()
+  const rawProfile = session.permissionProfileKey || (PROFILE_ACTIONS[roleKey] ? roleKey : 'workspace_member')
+  const profile = rawProfile === 'admin' ? 'workspace_admin' : rawProfile
+  const isDesignMember = roleKey === 'design' || normalizeDiscipline(session.discipline) === 'design'
   const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
   if (!allowed.includes(action)) return false
 
