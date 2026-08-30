@@ -202,7 +202,13 @@ export function canPerform(
 ) {
   if (session.status !== 'active') return false
   const roleKey = String(session.role || '').toLowerCase()
-  const rawProfile = session.permissionProfileKey || (PROFILE_ACTIONS[roleKey] ? roleKey : 'workspace_member')
+
+  // The actual Admin/Workspace Admin role is authoritative. A stale or lower
+  // permission_profile_key must never downgrade an administrator.
+  const rawProfile = ['workspace_admin','admin'].includes(roleKey)
+    ? 'workspace_admin'
+    : (session.permissionProfileKey || (PROFILE_ACTIONS[roleKey] ? roleKey : 'workspace_member'))
+
   const profile = rawProfile === 'admin' ? 'workspace_admin' : rawProfile
   const isDesignMember = ['design','landscaping'].includes(roleKey) || normalizeDiscipline(session.discipline) === 'design'
   const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
