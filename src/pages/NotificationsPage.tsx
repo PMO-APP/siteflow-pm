@@ -1,6 +1,6 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Bell, CheckCheck, Mail, Megaphone, Settings, ShieldAlert, Plus, RefreshCw } from 'lucide-react'
+import { Bell, CheckCheck, Mail, Megaphone, Settings, ShieldAlert, Plus, RefreshCw, Users, UserRound, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
@@ -12,6 +12,8 @@ import {
   markNotificationRead, markNotificationsRead, saveNotificationPreference
 } from '@/services/notificationService'
 import type { NotificationPreference, WorkspaceAnnouncement, WorkspaceNotification } from '@/services/notificationTypes'
+import { loadCustomerAdministration } from '@/workspace/customerAdminService'
+import type { CustomerAdminMember } from '@/workspace/customerAdminTypes'
 
 type Tab = 'inbox' | 'preferences' | 'announcements'
 
@@ -110,10 +112,125 @@ function Preferences({value,setValue,onSave}:{value:NotificationPreference;setVa
 
 function Announcements({items}:{items:WorkspaceAnnouncement[]}){return <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-6"><h2 className="text-xl font-semibold text-[#102943]">Workspace announcements</h2><div className="mt-5 space-y-3">{items.length===0?<div className="rounded-xl bg-[#f7f9fa] p-8 text-center text-sm text-[#87929b]">No active announcements.</div>:items.map(item=><article key={item.id} className="rounded-2xl border border-[#dfe3e7] p-5"><div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><Megaphone size={16} className="text-[#df5f41]"/><h3 className="font-semibold text-[#102943]">{item.title}</h3></div><p className="mt-3 text-sm leading-6 text-[#6f7d89]">{item.message}</p></div><span className="badge badge-muted capitalize">{item.priority}</span></div><div className="mt-3 text-[11px] text-[#929da5]">Published {new Date(item.createdAt).toLocaleString()}</div></article>)}</div></section>}
 
+type AnnouncementAudience = {
+  id: string
+  kind: 'all' | 'team' | 'person'
+  label: string
+  helper: string
+  userIds: string[]
+}
+
+function humanizeRole(role:string){
+  return role.replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase())
+}
+
+function buildAnnouncementAudiences(members:CustomerAdminMember[]):AnnouncementAudience[]{
+  const active=members.filter(member=>member.status==='active')
+  const audiences:AnnouncementAudience[]=[{
+    id:'all',kind:'all',label:'Everyone in workspace',helper:`${active.length} active member${active.length===1?'':'s'}`,userIds:active.map(member=>member.userId)
+  }]
+
+  const teamMap=new Map<string,{label:string,userIds:Set<string>;sources:Set<string>}>()
+  const addTeam=(_key:string,label:string,userId:string,source:string)=>{
+    // Merge a department and permission group when they resolve to the same
+    // visible team name (for example Design department + design permission).
+    const clean=label.trim().toLowerCase()
+    if(!clean)return
+    const current=teamMap.get(clean)||{label,userIds:new Set<string>(),sources:new Set<string>()}
+    current.userIds.add(userId);current.sources.add(source);teamMap.set(clean,current)
+  }
+  active.forEach(member=>{
+    if(member.departmentName)addTeam(`department:${member.departmentName}`,`${member.departmentName} Team`,member.userId,'department')
+    if(member.role && !['admin','workspace_admin','workspace_member','viewer','guest'].includes(member.role)){
+      addTeam(`role:${member.role}`,`${humanizeRole(member.role)} Team`,member.userId,'permission')
+    }
+  })
+  const teams=Array.from(teamMap.entries()).map(([key,value])=>({
+    id:key,kind:'team' as const,label:value.label,
+    helper:`${value.userIds.size} member${value.userIds.size===1?'':'s'} · ${Array.from(value.sources).join(' + ')}`,
+    userIds:Array.from(value.userIds)
+  })).sort((a,b)=>a.label.localeCompare(b.label))
+
+  const people=active.map(member=>({
+    id:`person:${member.userId}`,kind:'person' as const,label:member.fullName||member.email,
+    helper:[member.jobTitle,member.departmentName,humanizeRole(member.role),member.email].filter(Boolean).join(' · '),
+    userIds:[member.userId]
+  })).sort((a,b)=>a.label.localeCompare(b.label))
+  return [...audiences,...teams,...people]
+}
+
 function AnnouncementDrawer({workspaceId,onClose,onSaved,setMessage}:any){
-  const [form,setForm]=useState({title:'',message:'',priority:'normal',audienceRole:'',endsAt:''});const [saving,setSaving]=useState(false)
-  async function submit(e:FormEvent){e.preventDefault();setSaving(true);try{await createAnnouncement({workspaceId,...form,audienceRole:form.audienceRole||null,endsAt:form.endsAt?new Date(form.endsAt).toISOString():null});await onSaved()}catch(err){setMessage(err instanceof Error?err.message:'Unable to publish announcement.')}finally{setSaving(false)}}
-  return <div className="fixed inset-0 z-50 bg-[#102943]/35" onClick={onClose}><aside className="ml-auto h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl" onClick={e=>e.stopPropagation()}><div className="text-xs uppercase tracking-wider text-[#df5f41]">Workspace communication</div><h2 className="mt-2 text-2xl font-semibold text-[#102943]">New announcement</h2><form onSubmit={submit} className="mt-6 space-y-4"><Field label="Title"><input className="form-control" required value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></Field><Field label="Message"><textarea className="form-control min-h-32" required value={form.message} onChange={e=>setForm({...form,message:e.target.value})}/></Field><Field label="Priority"><select className="form-control" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></Field><Field label="Audience role"><input className="form-control" placeholder="Leave blank for everyone" value={form.audienceRole} onChange={e=>setForm({...form,audienceRole:e.target.value})}/></Field><Field label="Ends at"><input type="datetime-local" className="form-control" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})}/></Field><div className="flex justify-end gap-2 pt-3"><button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button><button disabled={saving} className="btn btn-gold">{saving?'Publishing…':'Publish announcement'}</button></div></form></aside></div>
+  const [form,setForm]=useState({title:'',message:'',priority:'normal',endsAt:''})
+  const [saving,setSaving]=useState(false)
+  const [loadingAudience,setLoadingAudience]=useState(true)
+  const [audiences,setAudiences]=useState<AnnouncementAudience[]>([])
+  const [selected,setSelected]=useState<AnnouncementAudience[]>([])
+  const [query,setQuery]=useState('')
+
+  useEffect(()=>{let live=true;(async()=>{setLoadingAudience(true);try{
+    const data=await loadCustomerAdministration(workspaceId,'Workspace')
+    if(live)setAudiences(buildAnnouncementAudiences(data.members))
+  }catch(err){if(live)setMessage(err instanceof Error?err.message:'Unable to load workspace recipients.')}
+  finally{if(live)setLoadingAudience(false)}})();return()=>{live=false}},[workspaceId])
+
+  const suggestions=useMemo(()=>{
+    const q=query.trim().toLowerCase()
+    const remaining=audiences.filter(item=>!selected.some(chosen=>chosen.id===item.id))
+    if(!q)return remaining.slice(0,10)
+    return remaining.filter(item=>`${item.label} ${item.helper}`.toLowerCase().includes(q)).slice(0,12)
+  },[audiences,selected,query])
+
+  const recipientIds=useMemo(()=>Array.from(new Set(selected.flatMap(item=>item.userIds))),[selected])
+  const choose=(item:AnnouncementAudience)=>{
+    if(item.kind==='all'){setSelected([item])}
+    else setSelected(current=>[...current.filter(chosen=>chosen.kind!=='all'),item])
+    setQuery('')
+  }
+  const remove=(id:string)=>setSelected(current=>current.filter(item=>item.id!==id))
+
+  async function submit(e:FormEvent){
+    e.preventDefault()
+    if(selected.length===0){setMessage('Choose at least one recipient, team, or Everyone in workspace.');return}
+    setSaving(true)
+    try{
+      const isEveryone=selected.some(item=>item.kind==='all')
+      await createAnnouncement({
+        workspaceId,...form,
+        recipientUserIds:isEveryone?undefined:recipientIds,
+        audienceLabel:isEveryone?'Everyone in workspace':selected.map(item=>item.label).join(', '),
+        endsAt:form.endsAt?new Date(form.endsAt).toISOString():null
+      })
+      await onSaved()
+    }catch(err){setMessage(err instanceof Error?err.message:'Unable to publish announcement.')}
+    finally{setSaving(false)}
+  }
+
+  return <div className="fixed inset-0 z-50 bg-[#102943]/35" onClick={onClose}>
+    <aside className="ml-auto h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl" onClick={e=>e.stopPropagation()}>
+      <div className="text-xs uppercase tracking-wider text-[#08B5A6]">Workspace communication</div>
+      <h2 className="mt-2 text-2xl font-semibold text-[#0B2A3C]">New announcement</h2>
+      <form onSubmit={submit} className="mt-6 space-y-4">
+        <Field label="Title"><input className="form-control" required value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/></Field>
+        <Field label="Message"><textarea className="form-control min-h-32" required value={form.message} onChange={e=>setForm({...form,message:e.target.value})}/></Field>
+        <Field label="Priority"><select className="form-control" value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></Field>
+        <Field label="Recipients">
+          <div className="relative">
+            {selected.length>0&&<div className="mb-2 flex flex-wrap gap-2">{selected.map(item=><span key={item.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#E8F6F4] px-3 py-1.5 text-xs font-semibold text-[#0B2A3C]">{item.label}<button type="button" onClick={()=>remove(item.id)} className="rounded-full p-0.5 hover:bg-white" aria-label={`Remove ${item.label}`}><X size={12}/></button></span>)}</div>}
+            <input className="form-control" placeholder="Search a person or team, e.g. Lanre or Design" value={query} onChange={e=>setQuery(e.target.value)}/>
+            <div className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-[#dfe3e7] bg-white p-1">
+              {loadingAudience?<div className="p-3 text-sm text-[#87929b]">Loading Mixta workspace users…</div>:suggestions.length===0?<div className="p-3 text-sm text-[#87929b]">No matching person or team.</div>:suggestions.map(item=><button key={item.id} type="button" onClick={()=>choose(item)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-[#E8F6F4]">
+                <span className="mt-0.5 rounded-lg bg-[#E8F6F4] p-2 text-[#08B5A6]">{item.kind==='person'?<UserRound size={15}/>:<Users size={15}/>}</span>
+                <span className="min-w-0"><span className="block text-sm font-semibold text-[#0B2A3C]">{item.label}</span><span className="mt-0.5 block truncate text-xs text-[#87929b]">{item.helper}</span></span>
+              </button>)}
+            </div>
+            {selected.length>0&&!selected.some(item=>item.kind==='all')&&<div className="mt-2 text-xs text-[#71808c]">{recipientIds.length} unique recipient{recipientIds.length===1?'':'s'} will receive this notification.</div>}
+          </div>
+        </Field>
+        <Field label="Ends at"><input type="datetime-local" className="form-control" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})}/></Field>
+        <div className="flex justify-end gap-2 pt-3"><button type="button" onClick={onClose} className="btn btn-ghost">Cancel</button><button disabled={saving||loadingAudience} className="btn btn-gold">{saving?'Publishing…':'Publish announcement'}</button></div>
+      </form>
+    </aside>
+  </div>
 }
 
 function Toggle({label,checked,onChange}:{label:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="flex items-center justify-between rounded-xl border border-[#dfe3e7] p-4 text-sm font-semibold capitalize text-[#26384a]"><span>{label}</span><input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)} className="h-4 w-4"/></label>}
