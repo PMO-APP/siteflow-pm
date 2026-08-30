@@ -1,3 +1,5 @@
+export const ADMIN_ROLES = ['workspace_admin', 'admin'] as const
+
 export type Discipline =
   | 'Housebuild'
   | 'MEP'
@@ -117,7 +119,7 @@ export function isViewerRole(role?: string | null) {
 }
 
 export function canManageWorkspace(role?: string | null) {
-  return ['workspace_admin', 'admin'].includes(role || '')
+  return ADMIN_ROLES.includes((role || '') as (typeof ADMIN_ROLES)[number])
 }
 
 export function canManageUsers(role?: string | null) {
