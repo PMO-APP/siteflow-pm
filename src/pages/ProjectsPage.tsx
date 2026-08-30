@@ -870,7 +870,7 @@ export default function ProjectsPage() {
           <div className="hub-panel p-6 sm:p-7">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="hub-eyebrow">My work today</div>
+                <div data-tour="my-work-today" className="hub-eyebrow">My work today</div>
                 <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">Your immediate delivery focus</h2>
               </div>
               <span className="rounded-full bg-[#eaf1f4] px-3 py-1 text-xs font-semibold text-[#2f6f91]">
@@ -901,7 +901,7 @@ export default function ProjectsPage() {
           </div>
         </section>
 
-        <section>
+        <section data-tour="portfolio-overview">
           <div className="mb-5">
             <div className="hub-eyebrow">Portfolio overview</div>
             <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
@@ -1022,7 +1022,7 @@ export default function ProjectsPage() {
           )}
         </section>
 
-        <section id="projects-register" className="hub-panel overflow-hidden">
+        <section id="projects-register" data-tour="project-register" className="hub-panel overflow-hidden">
           <div className="border-b border-[#e1e9f0] p-5 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
