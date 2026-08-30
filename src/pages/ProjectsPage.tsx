@@ -708,6 +708,16 @@ export default function ProjectsPage() {
   }, [projects, projectTasks])
 
   const assignedProjectIds = useMemo(() => {
+    const adminAuthority =
+      ['workspace_admin','admin'].includes(String(accessSession.role || '').toLowerCase()) ||
+      ['workspace_admin','admin'].includes(String(accessSession.permissionProfileKey || '').toLowerCase())
+
+    // Workspace Admin/Admin have authority across every project visible in the
+    // active workspace. Their focus card therefore represents the full project set.
+    if (adminAuthority) {
+      return new Set(projects.map(project => String(project.id)))
+    }
+
     const ids = new Set(
       accessSession.assignments
         .filter(item => item.scopeType === 'project' && item.scopeId != null)
@@ -725,7 +735,7 @@ export default function ProjectsPage() {
     })
 
     return ids
-  }, [accessSession.assignments, projects, currentUserEmail])
+  }, [accessSession.assignments, accessSession.role, accessSession.permissionProfileKey, projects, currentUserEmail])
 
   const assignedOrDelegatedProjects = useMemo(
     () => projects.filter(project => assignedProjectIds.has(String(project.id))),
@@ -1294,7 +1304,7 @@ function AssignedProjectsFocusCard({ projects, onFilter, onOpen }: { projects: a
     <div className="group relative">
       <button type="button" onClick={onFilter} className="flex w-full items-center gap-4 rounded-2xl border border-[#bfe1dc] bg-[#effaf8] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#08B5A6] hover:shadow-sm">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#08B5A6] shadow-sm"><UserCircle size={19} /></div>
-        <div className="min-w-0"><div className="text-xl font-black text-[#173f5f]">{projects.length}</div><div className="text-xs leading-5 text-[#71838d]">Projects assigned or temporarily delegated to you</div></div>
+        <div className="min-w-0"><div className="text-xl font-black text-[#173f5f]">{projects.length}</div><div className="text-xs leading-5 text-[#71838d]">Projects assigned, delegated or under your authority</div></div>
       </button>
       <div className="pointer-events-none invisible absolute left-0 top-[calc(100%+8px)] z-40 w-full min-w-[280px] translate-y-1 rounded-2xl border border-[#d8e4e1] bg-white p-3 opacity-0 shadow-[0_16px_40px_rgba(11,42,60,0.14)] transition group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
         <div className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[.14em] text-[#7d8d96]">Your assigned projects</div>
