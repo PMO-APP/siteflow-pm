@@ -293,6 +293,17 @@ export default function App() {
         />
 
         <Route
+          path="/executive-dashboard"
+          element={
+            <RequireAuth>
+              <RequirePermission action="reports.view">
+                <ExecutiveDashboardPage />
+              </RequirePermission>
+            </RequireAuth>
+          }
+        />
+
+        <Route
           path="/admin"
           element={
             <RequireAuth>
@@ -389,7 +400,7 @@ export default function App() {
 />
 
           <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="executive-dashboard" element={<ExecutiveDashboardPage />} />
+          <Route path="executive-dashboard" element={<Navigate to="/executive-dashboard" replace />} />
           <Route path="executive-narrative" element={<ExecutiveNarrativePage />} />
           <Route path="report-designer" element={<ReportDesignerPage />} />
           <Route path="report-distribution" element={<ReportDistributionPage />} />
