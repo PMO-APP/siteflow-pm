@@ -8,10 +8,10 @@ function LoginBrand() {
   return (
     <div className="flex items-center gap-3">
       <div className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[12px] bg-[#173f5f]">
-        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#ef8354]" />
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-[#08B5A6]" />
         <svg viewBox="0 0 40 40" className="h-7 w-7" aria-hidden="true">
           <path d="M8 29V11h10.5c5.5 0 9 3.2 9 8.2 0 5.1-3.5 8.3-9 8.3h-4.2V29H8Zm6.3-7h3.8c2 0 3.2-1 3.2-2.8 0-1.7-1.2-2.7-3.2-2.7h-3.8V22Z" fill="white" />
-          <path d="M27.8 25.4 32 29.6" stroke="#ef8354" strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M27.8 25.4 32 29.6" stroke="#08B5A6" strokeWidth="2.8" strokeLinecap="round" />
         </svg>
       </div>
       <div className="leading-none">
@@ -148,7 +148,7 @@ export default function LoginPage() {
         >
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,.055)_1px,transparent_1px),linear-gradient(rgba(255,255,255,.055)_1px,transparent_1px)] bg-[size:34px_34px]" />
           <div className="absolute -bottom-28 -right-28 h-96 w-96 rounded-full border border-white/10" />
-          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#ef8354]/55" />
+          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full border border-[#08B5A6]/55" />
 
           <div className="relative flex items-center gap-3">
             {publicBranding?.logo_url ? (
