@@ -845,9 +845,14 @@ export default function ProjectsPage() {
               <FocusItem icon={Activity} value={activeProjects} label="Projects currently active" />
             </div>
 
-            <button onClick={() => navigate('/portfolio-dashboard')} className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#2f6f91] hover:text-[#ef8354]">
-              Open portfolio command centre <ArrowRight size={16} />
-            </button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button onClick={() => navigate('/executive-dashboard')} className="hub-primary-button">
+                <BarChart3 size={16} /> Executive Dashboard
+              </button>
+              <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
+                Open portfolio command centre <ArrowRight size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="hub-panel p-6 sm:p-7">
@@ -870,9 +875,14 @@ export default function ProjectsPage() {
               <div className="hub-eyebrow">Portfolio overview</div>
               <h2 className="mt-1 text-2xl font-black text-[#173f5f]">Choose a delivery environment</h2>
             </div>
-            <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
-              <BarChart3 size={16} /> Portfolio Dashboard
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => navigate('/executive-dashboard')} className="hub-secondary-button">
+                <Activity size={16} /> Executive Dashboard
+              </button>
+              <button onClick={() => navigate('/portfolio-dashboard')} className="hub-secondary-button">
+                <BarChart3 size={16} /> Portfolio Dashboard
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
