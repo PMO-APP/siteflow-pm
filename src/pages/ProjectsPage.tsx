@@ -1382,7 +1382,7 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
         <div className="flex flex-nowrap items-center justify-end gap-2">
           {canEdit && <button onClick={onEdit} className="hub-icon-button h-9 w-9" title="Edit project"><Pencil size={15} /></button>}
           {canDelete && <button onClick={onDelete} className="hub-icon-button h-9 w-9 text-[#c56b43] hover:border-[#efc3af] hover:bg-[#fff4ee]" title="Archive project"><Archive size={15} /></button>}
-          <button onClick={onOpen} className="hub-secondary-button flex-shrink-0 whitespace-nowrap py-2">Open <ArrowRight size={14} className="shrink-0" /></button>
+          <button data-tour="project-open" onClick={onOpen} className="hub-secondary-button flex-shrink-0 whitespace-nowrap py-2">Open <ArrowRight size={14} className="shrink-0" /></button>
         </div>
       </td>
     </tr>
