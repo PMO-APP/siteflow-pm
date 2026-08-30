@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuthStore } from '@/store/auth'
 
-const TOUR_KEY = 'pmocorex-guided-tour-v1'
+const TOUR_VERSION = 'v2'
+const tourKey = (userId?: string) => `pmocorex-guided-tour-${TOUR_VERSION}-${userId || 'user'}`
 
 type TourStep = {
   id: string
@@ -15,16 +17,13 @@ type TourStep = {
 }
 
 const STEPS: TourStep[] = [
-  { id:'welcome', title:'Welcome to PMOCorex', body:'We will guide you through the platform while you use it. This takes about three minutes.', route:'/projects', placement:'center' },
-  { id:'workspace', title:'Your Workspace Hub', body:'This is your starting point. It gives you the delivery position across every project you can access.', target:'[data-tour="workspace-hub"]', route:'/projects', placement:'bottom' },
-  { id:'portfolios', title:'Portfolios organise delivery', body:'Projects are grouped into portfolios. Click any portfolio to filter the workspace and continue.', target:'[data-tour="portfolio-card"]', route:'/projects', interaction:true, placement:'bottom' },
-  { id:'projects', title:'Choose a project', body:'Open any project to enter its Project Control Centre. The tour will continue automatically.', target:'[data-tour="project-open"]', route:'/projects', interaction:true, placement:'top' },
-  { id:'sidebar', title:'Project Control Centre', body:'The left navigation contains every module for the selected project. Your permissions determine what you can edit.', target:'[data-tour="project-sidebar"]', route:'/app', placement:'right' },
-  { id:'schedule', title:'Schedule', body:'Open Schedule to see activities, dependencies, progress and critical delivery pressure.', target:'[data-tour="nav-schedule"]', route:'/app', interaction:true, placement:'right' },
-  { id:'dashboard', title:'Project dashboard', body:'Use the dashboard to review health, RAG status, progress, delays and forecasts. Click the highlighted Dashboard link to open it.', target:'[data-tour="nav-dashboard"]', route:'/app/schedule', interaction:true, placement:'right' },
-  { id:'reports', title:'Reporting', body:'Reports turn live project data into management and executive information. Click the highlighted Reports link to open it.', target:'[data-tour="nav-reports"]', route:'/app', interaction:true, placement:'right' },
-  { id:'support', title:'Help and Feedback', body:'Help and Feedback are global. Click the highlighted support controls to see where assistance is always available.', target:'[data-tour="global-support"]', route:'/app/reports', interaction:true, placement:'bottom' },
-  { id:'complete', title:'You are ready', body:'You now know the main PMOCorex navigation. Continue exploring on your own, or replay this tour later from the Product Centre.', placement:'center' },
+  { id:'welcome', title:'Welcome to PMOCorex', body:'This short guide shows you where work starts, how to enter a project, and where to find the controls relevant to your responsibilities.', route:'/projects', placement:'center' },
+  { id:'command', title:'All Project Command Center', body:'This workspace-level view brings together cross-project health, delivery pressure, risk and executive intervention signals.', target:'[data-tour="all-project-command-center"]', route:'/projects', placement:'bottom' },
+  { id:'portfolios', title:'Your portfolios', body:'Projects are organised into delivery environments here. Portfolio cards resize automatically as your workspace grows.', target:'[data-tour="portfolio-overview"]', route:'/projects', placement:'top' },
+  { id:'focus', title:'Your work today', body:'See projects assigned or temporarily delegated to you, active work and projects that need attention.', target:'[data-tour="my-work-today"]', route:'/projects', placement:'top' },
+  { id:'projects', title:'Open a project', body:'Use the Project Register to enter a project and work with its live schedule, controls, documents, risks and reports.', target:'[data-tour="project-register"]', route:'/projects', placement:'top' },
+  { id:'permissions', title:'Controls follow your responsibility', body:'PMOCorex shows the information you need while editing rights follow your role, project assignment and temporary delegations.', route:'/projects', placement:'center' },
+  { id:'complete', title:'You are ready', body:'Start with one of your assigned projects. You can replay this guide at any time from your Profile page.', route:'/projects', placement:'center' },
 ]
 
 type TourContextValue = { startTour: () => void; active: boolean }
@@ -32,14 +31,14 @@ const TourContext = createContext<TourContextValue>({ startTour: () => undefined
 export const usePMOCorexTour = () => useContext(TourContext)
 
 export default function PMOCorexTourProvider({children}:{children:React.ReactNode}){
-  const location=useLocation(); const navigate=useNavigate()
+  const location=useLocation(); const navigate=useNavigate(); const user=useAuthStore(state=>state.user)
   const [active,setActive]=useState(false); const [index,setIndex]=useState(0)
   const [rect,setRect]=useState<DOMRect|null>(null); const step=STEPS[index]
 
   const startTour=useCallback(()=>{setIndex(0);setActive(true);navigate('/projects')},[navigate])
 
   useEffect(()=>{
-    if(location.pathname==='/projects' && !localStorage.getItem(TOUR_KEY)){
+    if(location.pathname==='/projects' && !localStorage.getItem(tourKey(user?.id))){
       const timer=setTimeout(()=>setActive(true),700); return()=>clearTimeout(timer)
     }
   },[location.pathname])
@@ -69,8 +68,8 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
     document.addEventListener('click',handler,true); return()=>document.removeEventListener('click',handler,true)
   },[active,step])
 
-  const finish=()=>{localStorage.setItem(TOUR_KEY,'completed');setActive(false);setIndex(0);navigate('/projects')}
-  const skip=()=>{localStorage.setItem(TOUR_KEY,'skipped');setActive(false)}
+  const finish=()=>{localStorage.setItem(tourKey(user?.id),'completed');setActive(false);setIndex(0);navigate('/projects')}
+  const skip=()=>{localStorage.setItem(tourKey(user?.id),'skipped');setActive(false)}
   const next=()=>{ if(index===STEPS.length-1)finish(); else setIndex(index+1) }
   const previous=()=>setIndex(Math.max(0,index-1))
 
@@ -99,12 +98,12 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
         <div className="fixed right-0 z-[200] bg-[#071726]/70" style={{top:Math.max(0,rect.top-8),height:rect.height+16,left:Math.min(window.innerWidth,rect.right+8)}} />
       </>
     )}
-    {rect&&<div className="pointer-events-none fixed z-[201] rounded-2xl border-4 border-[#ef8354] shadow-[0_0_0_8px_rgba(239,131,84,.22),0_0_40px_rgba(239,131,84,.8)] transition-all duration-300" style={{left:rect.left-8,top:rect.top-8,width:rect.width+16,height:rect.height+16}}/>}
+    {rect&&<div className="pointer-events-none fixed z-[201] rounded-2xl border-4 border-[#08B5A6] shadow-[0_0_0_8px_rgba(239,131,84,.22),0_0_40px_rgba(239,131,84,.8)] transition-all duration-300" style={{left:rect.left-8,top:rect.top-8,width:rect.width+16,height:rect.height+16}}/>}
     <div className="fixed z-[202] w-[min(360px,calc(100vw-32px))] rounded-[22px] border border-white/20 bg-white p-5 shadow-2xl" style={cardStyle as any}>
-      <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-[#df5f41]">PMOCorex tour · {index+1}/{STEPS.length}</div><h2 className="mt-2 text-xl font-extrabold text-[#173f5f]">{step.title}</h2></div><button onClick={skip} className="rounded-lg p-1 text-[#87929b] hover:bg-[#eef3f4]" aria-label="Skip tour"><X size={17}/></button></div>
+      <div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-bold uppercase tracking-[.18em] text-[#05969B]">Getting started · {index+1}/{STEPS.length}</div><h2 className="mt-2 text-xl font-extrabold text-[#0B2A3C]">{step.title}</h2></div><button onClick={skip} className="rounded-lg p-1 text-[#87929b] hover:bg-[#eef3f4]" aria-label="Skip tour"><X size={17}/></button></div>
       <p className="mt-3 text-sm leading-6 text-[#607580]">{step.body}</p>
-      {step.interaction&&<div className="mt-4 rounded-xl bg-[#fff3ed] px-3 py-2 text-xs font-semibold text-[#c85e35]">Click the highlighted item to continue.</div>}
-      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#e7edf0]"><div className="h-full bg-[#ef8354] transition-all" style={{width:`${((index+1)/STEPS.length)*100}%`}}/></div>
+      {step.interaction&&<div className="mt-4 rounded-xl bg-[#E8F6F4] px-3 py-2 text-xs font-semibold text-[#05969B]">Click the highlighted item to continue.</div>}
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-[#e7edf0]"><div className="h-full bg-[#08B5A6] transition-all" style={{width:`${((index+1)/STEPS.length)*100}%`}}/></div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
         <button onClick={previous} disabled={index===0} className="btn btn-ghost disabled:opacity-30"><ArrowLeft size={14}/>Back</button>
         <div className="flex items-center gap-2">
