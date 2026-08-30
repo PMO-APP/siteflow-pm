@@ -578,6 +578,17 @@ export default function Layout() {
                       key={to}
                       to={to}
                       end={exact}
+                      data-tour={
+                        to === '/app' ? 'nav-dashboard' :
+                        to === '/app/my-assignments' ? 'nav-my-assignments' :
+                        to === '/app/schedule' ? 'nav-schedule' :
+                        to === '/app/project-controls' ? 'nav-project-controls' :
+                        to === '/app/project-journey' ? 'nav-project-journey' :
+                        to === '/app/documents' ? 'nav-documents' :
+                        to === '/app/risk' ? 'nav-risk' :
+                        to === '/app/reports' ? 'nav-reports' :
+                        undefined
+                      }
                       onClick={() => setSidebarOpen(false)}
                       className={({ isActive }) =>
                         `layout-nav__item ${isActive ? 'nav-active' : 'nav-inactive'}`
@@ -595,6 +606,7 @@ export default function Layout() {
 
         <div className="border-t border-white/[0.06] p-3 flex-shrink-0">
           <button
+            data-tour="profile-menu"
             type="button"
             onClick={() => navigate('/profile')}
             className="sidebar-panel w-full flex items-center gap-2.5 rounded-xl p-2.5 hover:border-white/[0.12] hover:bg-white/[0.04] transition-all text-left"
@@ -712,6 +724,7 @@ export default function Layout() {
           </div>
 
           <button
+            data-tour="communication-command"
             className="relative sidebar-muted hover:text-[#173f5f] transition-colors p-1"
             onClick={() => setNotifsOpen(!notifsOpen)}
             aria-label={unreadCount ? `Open notifications, ${unreadCount} unread` : 'Open notifications'}
