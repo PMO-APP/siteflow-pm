@@ -36,6 +36,7 @@ export const COSTING_TEAM = [
 ]
 
 export type UserRole =
+  | 'workspace_admin'
   | 'admin'
   | 'project_owner'
   | 'project'
