@@ -41,6 +41,8 @@ export type UserRole =
   | 'project_owner'
   | 'project'
   | 'design'
+  | 'landscaping'
+  | 'hse'
   | 'costing'
   | 'guest'
 
