@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Activity, AlertTriangle, ArrowRight, BarChart3, Building2, CalendarClock,
+  Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Building2, CalendarClock,
   CheckCircle2, Clock3, Expand, Gauge, Lightbulb, MapPin, RefreshCw,
   ShieldAlert, Target, Wallet, X
 } from 'lucide-react'
@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useProjectStore } from '@/store/project'
+import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { loadExecutivePortfolioSnapshot, updateExecutiveDecision } from '@/services/executiveDashboardService'
 import type {
   ExecutiveAttentionItem, ExecutivePortfolioSnapshot, ExecutiveProjectRow
@@ -20,8 +21,6 @@ const RAG = { healthy:'#16a34a', attention:'#08B5A6', critical:'#dc2626' }
 export default function ExecutiveDashboardPage() {
   const navigate=useNavigate()
   const { activeWorkspace }=useWorkspace()
-  const projectId=useProjectStore(state=>state.projectId)
-  const projectName=useProjectStore(state=>state.projectName)
   const setProject=useProjectStore(state=>state.setProject)
   const [data,setData]=useState<ExecutivePortfolioSnapshot|null>(null)
   const [loading,setLoading]=useState(true)
@@ -31,18 +30,18 @@ export default function ExecutiveDashboardPage() {
   const [lens,setLens]=useState<'health'|'schedule'|'risk'|'procurement'|'quality'|'hse'>('health')
 
   async function load(){
-    if(!activeWorkspace||!projectId)return
+    if(!activeWorkspace)return
     setLoading(true);setMessage('')
-    try{const snapshot=await loadExecutivePortfolioSnapshot(activeWorkspace.id,projectId);setData(snapshot);setUpdatedAt(new Date())}
+    try{const snapshot=await loadExecutivePortfolioSnapshot(activeWorkspace.id);setData(snapshot);setUpdatedAt(new Date())}
     catch(err:any){console.error('[Executive Dashboard] load failed:',err);setMessage(err?.message||err?.details||err?.hint||'Unable to load executive portfolio intelligence.')}
     finally{setLoading(false)}
   }
-  useEffect(()=>{void load()},[activeWorkspace?.id,projectId])
+  useEffect(()=>{void load()},[activeWorkspace?.id])
   useEffect(()=>{
     if(!cockpit)return
     const timer=window.setInterval(()=>void load(),60000)
     return()=>window.clearInterval(timer)
-  },[cockpit,activeWorkspace?.id,projectId])
+  },[cockpit,activeWorkspace?.id])
 
   function openProject(project:ExecutiveProjectRow,path='/app'){
     setProject(project.id,project.name,project.organizationId,project.portfolioId)
@@ -54,7 +53,6 @@ export default function ExecutiveDashboardPage() {
   }
 
   if(!activeWorkspace)return <div className="rounded-2xl border bg-white p-8">No active workspace.</div>
-  if(!projectId)return <div className="rounded-2xl border bg-white p-8">Select a project to open Executive Dashboard.</div>
   if(cockpit&&data)return <Cockpit data={data} workspaceName={activeWorkspace.name} onClose={()=>setCockpit(false)} onProject={openProject}/>
 
   const metrics=data?.metrics
@@ -65,27 +63,33 @@ export default function ExecutiveDashboardPage() {
     project
   })).sort((a,b)=>b.value-a.value)
 
-  return <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 sm:-m-6 sm:p-6 lg:p-8">
-    <div className="mx-auto max-w-[1600px] space-y-5">
+  return <div className="min-h-dvh bg-[#f6f5f1]">
+    <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-5 py-4 sm:px-7 lg:px-10">
+        <button type="button" onClick={()=>navigate('/projects')} className="text-left" aria-label="Back to Workspace Hub"><PMOCorexLogo size={40}/></button>
+        <button type="button" onClick={()=>navigate('/projects')} className="btn btn-ghost"><ArrowLeft size={15}/>Workspace Hub</button>
+      </div>
+    </header>
+    <main className="mx-auto max-w-[1600px] space-y-5 px-5 py-6 sm:px-7 lg:px-10 lg:py-8">
       <section className="overflow-hidden rounded-[28px] border border-[#dfe3e7] bg-white">
         <div className="grid lg:grid-cols-[1fr_390px]">
-          <div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#05969B]">Executive command centre</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Project Intelligence</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">A live executive view of <strong>{projectName || 'this project'}</strong>: delivery health, management pressure, decisions and the controls most likely to need intervention.</p><div className="mt-6 flex flex-wrap gap-2"><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button><button onClick={()=>setCockpit(true)} className="btn bg-[#0B2A3C] text-white hover:bg-[#123d55]"><Expand size={15}/>Boardroom mode</button><button onClick={()=>navigate('/app/executive-reporting')} className="btn btn-ghost">Open reporting centre <ArrowRight size={14}/></button></div></div>
-          <div className="bg-[#0B2A3C] p-7 text-white"><Lightbulb size={25} className="text-[#08B5A6]"/><div className="mt-5 text-[11px] uppercase tracking-[.18em] text-white/55">Executive insight</div><p className="mt-3 text-lg font-semibold leading-7">{data?.insights[0]||'Project intelligence is loading.'}</p><div className="mt-5 text-xs text-white/55">{updatedAt ? `Updated ${updatedAt.toLocaleString()}` : 'Waiting for live project data'}</div></div>
+          <div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#05969B]">Executive command centre</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">Portfolio Intelligence</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">A live executive view across <strong>{activeWorkspace.name}</strong>: portfolio health, management pressure, decisions and the projects most likely to need intervention.</p><div className="mt-6 flex flex-wrap gap-2"><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button><button onClick={()=>setCockpit(true)} className="btn bg-[#0B2A3C] text-white hover:bg-[#123d55]"><Expand size={15}/>Boardroom mode</button><button onClick={()=>navigate('/portfolio-dashboard')} className="btn btn-ghost">Open portfolio dashboard <ArrowRight size={14}/></button></div></div>
+          <div className="bg-[#0B2A3C] p-7 text-white"><Lightbulb size={25} className="text-[#08B5A6]"/><div className="mt-5 text-[11px] uppercase tracking-[.18em] text-white/55">Executive insight</div><p className="mt-3 text-lg font-semibold leading-7">{data?.insights[0]||'Portfolio intelligence is loading.'}</p><div className="mt-5 text-xs text-white/55">{updatedAt ? `Updated ${updatedAt.toLocaleString()}` : 'Waiting for live portfolio data'}</div></div>
         </div>
       </section>
 
       {message&&<div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><div className="flex items-start gap-2"><ShieldAlert size={16} className="mt-0.5 shrink-0"/><span>{message}</span></div></div>}
       {loading?<ExecutiveDashboardSkeleton/>:data&&<>
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <Metric icon={Building2} label="Current project" value={metrics?.activeProjects||0} helper={projectName || 'Selected project'}/>
-          <Metric icon={Gauge} label="Project health" value={`${metrics?.portfolioHealthScore||0}%`} helper={(metrics?.criticalProjects||0)>0?'Critical':'Current health'} tone={(metrics?.criticalProjects||0)>0?'red':'green'}/>
+          <Metric icon={Building2} label="Active projects" value={metrics?.activeProjects||0} helper={`${metrics?.healthyProjects||0} healthy`}/>
+          <Metric icon={Gauge} label="Portfolio health" value={`${metrics?.portfolioHealthScore||0}%`} helper={(metrics?.criticalProjects||0)>0?'Critical':'Current health'} tone={(metrics?.criticalProjects||0)>0?'red':'green'}/>
           <Metric icon={Activity} label="Overall progress" value={`${metrics?.overallProgress||0}%`} helper={`SPI ${metrics?.portfolioSpi??'—'}`}/>
           <Metric icon={Wallet} label="Budget utilisation" value={metrics?.budgetUtilization==null?'—':`${metrics.budgetUtilization}%`} helper={`CPI ${metrics?.portfolioCpi??'—'}`}/>
-          <Metric icon={CalendarClock} label="Forecast completion" value={metrics?.forecastCompletion?new Date(metrics.forecastCompletion).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—'} helper="Latest project forecast"/>
+          <Metric icon={CalendarClock} label="Forecast completion" value={metrics?.forecastCompletion?new Date(metrics.forecastCompletion).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—'} helper="Latest portfolio forecast"/>
         </section>
 
         <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6">
-          <div className="flex flex-wrap items-end justify-between gap-4"><div><div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#6f7d89]">Project RAG</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Project health centre</h2><p className="mt-1 text-sm text-[#7b8791]">Live health and control signals for {projectName || 'the selected project'}.</p></div><div className="flex gap-2 text-xs"><span className="badge badge-green">Healthy {metrics?.healthyProjects}</span><span className="inline-flex items-center rounded-full bg-[#E8F6F4] px-2.5 py-1 text-[11px] font-semibold text-[#05969B]">Attention {metrics?.attentionProjects}</span><span className="badge badge-red">Critical {metrics?.criticalProjects}</span></div></div>
+          <div className="flex flex-wrap items-end justify-between gap-4"><div><div className="text-[11px] font-semibold uppercase tracking-[.16em] text-[#6f7d89]">Portfolio RAG</div><h2 className="mt-2 text-xl font-semibold text-[#102943]">Project health centre</h2><p className="mt-1 text-sm text-[#7b8791]">Select a project to open its live command centre.</p></div><div className="flex gap-2 text-xs"><span className="badge badge-green">Healthy {metrics?.healthyProjects}</span><span className="inline-flex items-center rounded-full bg-[#E8F6F4] px-2.5 py-1 text-[11px] font-semibold text-[#05969B]">Attention {metrics?.attentionProjects}</span><span className="badge badge-red">Critical {metrics?.criticalProjects}</span></div></div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{data.projects.length===0?<div className="sm:col-span-2 lg:col-span-3 xl:col-span-4"><Empty text="No active projects are available in this workspace."/></div>:data.projects.map(project=><button key={project.id} onClick={()=>openProject(project)} className="group rounded-2xl border border-[#dfe3e7] p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-semibold text-[#102943]">{project.name}</h3><div className="mt-1 text-xs text-[#87929b]">{project.status}</div></div><span className="h-3 w-3 shrink-0 rounded-full" style={{backgroundColor:RAG[project.health]}}/></div><div className="mt-5 flex items-end justify-between"><div><div className="text-3xl font-semibold text-[#102943]">{project.healthScore}</div><div className="text-[10px] uppercase tracking-wider text-[#87929b]">Health score</div></div><div className="text-right"><div className="text-lg font-semibold text-[#26384a]">{project.progress}%</div><div className="text-[10px] text-[#87929b]">Actual progress</div></div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-[#edf1f3]"><div className="h-full rounded-full" style={{width:`${project.progress}%`,backgroundColor:RAG[project.health]}}/></div><div className="mt-4 rounded-xl bg-[#f7f9fa] p-3 text-xs leading-5 text-[#65717c]">{project.primaryBlocker}</div></button>)}</div>
         </section>
 
@@ -96,7 +100,7 @@ export default function ExecutiveDashboardPage() {
         </div>
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,.9fr)]">
-          <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-[#102943]">Project pressure view</h2><p className="mt-1 text-sm text-[#87929b]">Review the selected project's pressure using each executive lens.</p></div><div className="flex flex-wrap gap-2">{(['health','schedule','risk','procurement','quality','hse'] as const).map(item=><button key={item} onClick={()=>setLens(item)} className={`rounded-lg px-3 py-2 text-xs font-semibold capitalize ${lens===item?'bg-[#0B2A3C] text-white':'bg-[#f1f4f5] text-[#65717c]'}`}>{item}</button>)}</div></div><div className="mt-5 h-[340px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={heatData} layout="vertical" margin={{left:20,right:25}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="name" width={130} tick={{fontSize:11}}/><Tooltip formatter={(value)=>[value,lens]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.fullName||''}/><Bar dataKey="value" radius={[0,7,7,0]} onClick={(entry:any)=>openProject(entry.project)}>{heatData.map((entry,index)=><Cell key={index} fill={lens==='health'?RAG[entry.project.health]:entry.value>3?'#dc2626':entry.value>0?'#08B5A6':'#16a34a'}/>)}</Bar></BarChart></ResponsiveContainer></div></div>
+          <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-[#102943]">Project pressure view</h2><p className="mt-1 text-sm text-[#87929b]">Compare project pressure across the workspace using each executive lens.</p></div><div className="flex flex-wrap gap-2">{(['health','schedule','risk','procurement','quality','hse'] as const).map(item=><button key={item} onClick={()=>setLens(item)} className={`rounded-lg px-3 py-2 text-xs font-semibold capitalize ${lens===item?'bg-[#0B2A3C] text-white':'bg-[#f1f4f5] text-[#65717c]'}`}>{item}</button>)}</div></div><div className="mt-5 h-[340px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={heatData} layout="vertical" margin={{left:20,right:25}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="name" width={130} tick={{fontSize:11}}/><Tooltip formatter={(value)=>[value,lens]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.fullName||''}/><Bar dataKey="value" radius={[0,7,7,0]} onClick={(entry:any)=>openProject(entry.project)}>{heatData.map((entry,index)=><Cell key={index} fill={lens==='health'?RAG[entry.project.health]:entry.value>3?'#dc2626':entry.value>0?'#08B5A6':'#16a34a'}/>)}</Bar></BarChart></ResponsiveContainer></div></div>
           <PortfolioMap projects={data.projects} onProject={openProject}/>
         </section>
 
@@ -107,7 +111,7 @@ export default function ExecutiveDashboardPage() {
 
         {data.projects.length>1&&<section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6"><h2 className="text-xl font-semibold text-[#102943]">Project comparisons</h2><p className="mt-1 text-sm text-[#87929b]">Comparative signals based on available live project data.</p><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Ranking title="Best delivery" rows={data.rankings.bestDelivery} value={p=>`${p.progress-p.plannedProgress>=0?'+':''}${p.progress-p.plannedProgress}% variance`} onProject={openProject}/><Ranking title="Lowest risk" rows={data.rankings.lowestRisk} value={p=>`${p.highRisks} high risks`} onProject={openProject}/><Ranking title="Best quality" rows={data.rankings.bestQuality} value={p=>`${p.qualityExceptions} exceptions`} onProject={openProject}/><Ranking title="Most delayed" rows={data.rankings.mostDelayed} value={p=>`${p.scheduleVarianceDays} days`} onProject={openProject}/></div></section>}
       </>}
-    </div>
+    </main>
   </div>
 }
 
@@ -131,5 +135,5 @@ function Timeline({data,onProject}:{data:ExecutivePortfolioSnapshot;onProject:(p
 
 function Ranking({title,rows,value,onProject}:{title:string;rows:ExecutiveProjectRow[];value:(p:ExecutiveProjectRow)=>string;onProject:(p:ExecutiveProjectRow)=>void}){return <div className="rounded-2xl border border-[#e1e7ea] p-4"><h3 className="font-semibold text-[#102943]">{title}</h3><div className="mt-4 space-y-3">{rows.map((project,index)=><button key={project.id} onClick={()=>onProject(project)} className="flex w-full items-center gap-3 text-left"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef3f5] text-xs font-semibold text-[#52616d]">{index+1}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-[#26384a]">{project.name}</span><span className="text-[11px] text-[#87929b]">{value(project)}</span></span></button>)}</div></div>}
 
-function Cockpit({data,workspaceName,onClose,onProject}:{data:ExecutivePortfolioSnapshot;workspaceName:string;onClose:()=>void;onProject:(p:ExecutiveProjectRow)=>void}){return <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#0B2A3C] p-6 text-white"><div className="mx-auto max-w-[1800px] space-y-6"><div className="flex items-start justify-between"><div><div className="text-xs uppercase tracking-[.2em] text-white/50">Executive cockpit · live</div><h1 className="mt-2 text-4xl font-semibold">{workspaceName}</h1><p className="mt-2 text-white/60">Project health, pressure and decisions. Auto-refreshes every 60 seconds.</p></div><button onClick={onClose} className="rounded-xl bg-white/10 p-3 hover:bg-white/15"><X size={20}/></button></div><div className="grid grid-cols-2 gap-4 lg:grid-cols-5"><CockpitMetric label="Health" value={`${data.metrics.portfolioHealthScore}%`}/><CockpitMetric label="Progress" value={`${data.metrics.overallProgress}%`}/><CockpitMetric label="Critical" value={data.metrics.criticalProjects}/><CockpitMetric label="SPI" value={data.metrics.portfolioSpi??'—'}/><CockpitMetric label="Open decisions" value={data.decisions.filter(d=>!['completed','cancelled'].includes(d.status)).length}/></div><div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><div className="rounded-3xl bg-white/8 p-6"><h2 className="text-xl font-semibold">Project RAG</h2><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.projects.map(p=><button key={p.id} onClick={()=>onProject(p)} className="rounded-2xl border border-white/10 bg-white/[.06] p-4 text-left"><div className="flex justify-between"><span className="font-semibold">{p.name}</span><span className="h-3 w-3 rounded-full" style={{backgroundColor:RAG[p.health]}}/></div><div className="mt-4 text-3xl font-semibold">{p.healthScore}</div><div className="mt-2 text-xs text-white/55">{p.primaryBlocker}</div></button>)}</div></div><div className="space-y-5"><div className="rounded-3xl bg-white/8 p-6"><h2 className="text-xl font-semibold">Top management pressure</h2><div className="mt-4 space-y-3">{data.attention.slice(0,6).map(item=><div key={item.id} className="rounded-xl border border-white/10 bg-white/[.05] p-4"><div className="text-sm font-semibold">{item.projectName} · {item.title}</div><div className="mt-2 text-xs leading-5 text-white/55">{item.reason}</div></div>)}</div></div><div className="rounded-3xl bg-[#08B5A6] p-6 text-[#0B2A3C]"><Lightbulb size={22}/><div className="mt-4 text-lg font-semibold">{data.insights[0]}</div></div></div></div></div></div>}
+function Cockpit({data,workspaceName,onClose,onProject}:{data:ExecutivePortfolioSnapshot;workspaceName:string;onClose:()=>void;onProject:(p:ExecutiveProjectRow)=>void}){return <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#0B2A3C] p-6 text-white"><div className="mx-auto max-w-[1800px] space-y-6"><div className="flex items-start justify-between"><div><div className="text-xs uppercase tracking-[.2em] text-white/50">Executive cockpit · live</div><h1 className="mt-2 text-4xl font-semibold">{workspaceName}</h1><p className="mt-2 text-white/60">Project health, pressure and decisions. Auto-refreshes every 60 seconds.</p></div><button onClick={onClose} className="rounded-xl bg-white/10 p-3 hover:bg-white/15"><X size={20}/></button></div><div className="grid grid-cols-2 gap-4 lg:grid-cols-5"><CockpitMetric label="Health" value={`${data.metrics.portfolioHealthScore}%`}/><CockpitMetric label="Progress" value={`${data.metrics.overallProgress}%`}/><CockpitMetric label="Critical" value={data.metrics.criticalProjects}/><CockpitMetric label="SPI" value={data.metrics.portfolioSpi??'—'}/><CockpitMetric label="Open decisions" value={data.decisions.filter(d=>!['completed','cancelled'].includes(d.status)).length}/></div><div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><div className="rounded-3xl bg-white/8 p-6"><h2 className="text-xl font-semibold">Portfolio RAG</h2><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.projects.map(p=><button key={p.id} onClick={()=>onProject(p)} className="rounded-2xl border border-white/10 bg-white/[.06] p-4 text-left"><div className="flex justify-between"><span className="font-semibold">{p.name}</span><span className="h-3 w-3 rounded-full" style={{backgroundColor:RAG[p.health]}}/></div><div className="mt-4 text-3xl font-semibold">{p.healthScore}</div><div className="mt-2 text-xs text-white/55">{p.primaryBlocker}</div></button>)}</div></div><div className="space-y-5"><div className="rounded-3xl bg-white/8 p-6"><h2 className="text-xl font-semibold">Top management pressure</h2><div className="mt-4 space-y-3">{data.attention.slice(0,6).map(item=><div key={item.id} className="rounded-xl border border-white/10 bg-white/[.05] p-4"><div className="text-sm font-semibold">{item.projectName} · {item.title}</div><div className="mt-2 text-xs leading-5 text-white/55">{item.reason}</div></div>)}</div></div><div className="rounded-3xl bg-[#08B5A6] p-6 text-[#0B2A3C]"><Lightbulb size={22}/><div className="mt-4 text-lg font-semibold">{data.insights[0]}</div></div></div></div></div></div>}
 function CockpitMetric({label,value}:{label:string;value:any}){return <div className="rounded-2xl border border-white/10 bg-white/[.07] p-5"><div className="text-4xl font-semibold">{value}</div><div className="mt-2 text-xs uppercase tracking-wider text-white/50">{label}</div></div>}
