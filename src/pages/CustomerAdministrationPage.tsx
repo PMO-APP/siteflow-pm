@@ -16,7 +16,7 @@ import type {
 } from '@/workspace/customerAdminTypes'
 
 type Tab = 'overview' | 'structure' | 'members' | 'security'
-const ROLES = ['workspace_admin','admin','pmo','portfolio_manager','project_owner','project_manager','design','housebuild','costing','infrastructure','mep','hse','viewer']
+const ROLES = ['workspace_admin','admin','pmo','portfolio_manager','project_owner','project_manager','design','landscaping','housebuild','costing','infrastructure','mep','hse','viewer']
 
 export default function CustomerAdministrationPage() {
   const navigate = useNavigate()
