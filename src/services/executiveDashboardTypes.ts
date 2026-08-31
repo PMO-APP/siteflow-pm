@@ -115,6 +115,7 @@ export type ExecutivePortfolioSnapshot = {
     totalForecastCost: number | null
     forecastCostVariance: number | null
     projectsForecastLate: number
+    delayedProjects: number
     forecastCompletion: string | null
   }
   rankings: {
