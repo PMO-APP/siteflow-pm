@@ -499,24 +499,31 @@ export default function RecoveryForecastPage() {
     const firstTask = workingTasks[0] || null
     const lastTask = workingTasks[workingTasks.length - 1] || null
 
-    const localTargetDate =
+    const scheduleTargetDate =
+      lastTask ? safeDate(getTaskFinish(lastTask)) : null
+
+    const projectFallbackTargetDate =
       safeDate(project?.handover_date) ||
       safeDate(project?.planned_finish) ||
       safeDate(project?.finish_date) ||
       safeDate(project?.target_date) ||
       safeDate(project?.completion_date) ||
-      (lastTask ? safeDate(getTaskFinish(lastTask)) : null)
+      null
 
+    // The approved programme is the source of truth for completion. In PMOCorex,
+    // the last in-scope schedule activity represents handover. Project-level dates
+    // are retained only as fallback when the schedule has no usable final date.
     const targetDate =
+      scheduleTargetDate ||
       sharedIntelligence.forecastV2.targetDate ||
-      localTargetDate
+      projectFallbackTargetDate
 
-    const targetDateSource = project?.handover_date
-      ? 'Project handover date'
-      : project?.planned_finish || project?.finish_date || project?.target_date || project?.completion_date
-      ? 'Project target date'
-      : lastTask
-      ? `Last in-scope schedule activity: ${getTaskName(lastTask)}`
+    const targetDateSource = scheduleTargetDate && lastTask
+      ? `Schedule handover: ${getTaskName(lastTask)}`
+      : sharedIntelligence.forecastV2.targetDate
+      ? 'Approved schedule target'
+      : projectFallbackTargetDate
+      ? 'Project target date (fallback)'
       : 'No target date found'
 
     const sequence = analyseScheduleSequence(
