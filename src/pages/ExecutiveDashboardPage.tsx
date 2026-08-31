@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Activity, AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Building2, CalendarClock,
   CheckCircle2, Clock3, Expand, Gauge, Lightbulb, MapPin, RefreshCw,
@@ -26,13 +26,14 @@ const RAG = { healthy:'#16a34a', attention:'#08B5A6', critical:'#dc2626' }
 
 export default function ExecutiveDashboardPage() {
   const navigate=useNavigate()
+  const [searchParams,setSearchParams]=useSearchParams()
   const { activeWorkspace }=useWorkspace()
   const setProject=useProjectStore(state=>state.setProject)
   const [data,setData]=useState<ExecutivePortfolioSnapshot|null>(null)
   const [loading,setLoading]=useState(true)
   const [message,setMessage]=useState('')
   const [updatedAt,setUpdatedAt]=useState<Date|null>(null)
-  const [cockpit,setCockpit]=useState(false)
+  const cockpit=searchParams.get('mode')==='boardroom'
   const [lens,setLens]=useState<'health'|'schedule'|'risk'|'procurement'|'quality'|'hse'>('health')
   const [trendLens,setTrendLens]=useState<'progress'|'cost'|'schedule'|'risk'|'quality'>('progress')
   const [managementActions,setManagementActions]=useState<ManagementAction[]>([])
@@ -69,7 +70,7 @@ export default function ExecutiveDashboardPage() {
   }
 
   if(!activeWorkspace)return <div className="rounded-2xl border bg-white p-8">No active workspace.</div>
-  if(cockpit&&data)return <Cockpit data={data} workspaceName={activeWorkspace.name} onClose={()=>setCockpit(false)} onProject={openProject}/>
+  if(cockpit&&data)return <Cockpit data={data} workspaceName={activeWorkspace.name} onClose={()=>setSearchParams({}, { replace:true })} onProject={openProject}/>
 
   const metrics=data?.metrics
   const heatData=(data?.projects||[]).map(project=>({
@@ -106,7 +107,7 @@ export default function ExecutiveDashboardPage() {
     <main className="mx-auto max-w-[1600px] space-y-5 px-5 py-6 sm:px-7 lg:px-10 lg:py-8">
       <section className="overflow-hidden rounded-[28px] border border-[#dfe3e7] bg-white">
         <div className="grid lg:grid-cols-[1fr_390px]">
-          <div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#05969B]">Workspace command centre</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">All Project Command Center</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">One workspace-wide control room across <strong>{activeWorkspace.name}</strong>: delivery position, portfolio health, schedule pressure, cost, risk and management intervention.</p><div className="mt-6 flex flex-wrap gap-2"><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button><button onClick={()=>setCockpit(true)} className="btn bg-[#0B2A3C] text-white hover:bg-[#123d55]"><Expand size={15}/>Boardroom mode</button></div></div>
+          <div className="p-7 sm:p-9"><div className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#05969B]">Workspace command centre</div><h1 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#102943] sm:text-4xl">All Project Command Center</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-[#65717c]">One workspace-wide control room across <strong>{activeWorkspace.name}</strong>: delivery position, portfolio health, schedule pressure, cost, risk and management intervention.</p><div className="mt-6 flex flex-wrap gap-2"><button onClick={()=>void load()} className="btn btn-ghost"><RefreshCw size={15}/>Refresh</button><button type="button" onClick={()=>setSearchParams({mode:'boardroom'}, { replace:true })} className="btn bg-[#0B2A3C] text-white hover:bg-[#123d55]"><Expand size={15}/>Boardroom mode</button></div></div>
           <div className="bg-[#0B2A3C] p-7 text-white"><Lightbulb size={25} className="text-[#08B5A6]"/><div className="mt-5 text-[11px] uppercase tracking-[.18em] text-white/55">Management insight</div><p className="mt-3 text-lg font-semibold leading-7">{data?.insights[0]||'Portfolio intelligence is loading.'}</p><div className="mt-5 text-xs text-white/55">{updatedAt ? `Updated ${updatedAt.toLocaleString()}` : 'Waiting for live portfolio data'}</div></div>
         </div>
       </section>
