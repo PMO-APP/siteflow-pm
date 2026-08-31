@@ -227,6 +227,10 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
   const forecastCostVariance=totalForecastCost!=null && totalBudget>0 ? totalForecastCost-totalBudget : null
   const forecastDates=activeRows.map(row=>row.forecastCompletion).filter(Boolean).map(value=>new Date(value!).getTime()).filter(Number.isFinite)
   const projectsForecastLate=activeRows.filter(row=>row.forecastDelayDays>0).length
+  // A project is operationally delayed when its live schedule is behind programme,
+  // even if no separate forecast-completion date has been entered. Missing forecast
+  // data must never be interpreted as 'on time'.
+  const delayedProjects=activeRows.filter(row=>row.scheduleVarianceDays>0).length
 
   const insights: string[] = []
   const criticalRows=activeRows.filter(row=>row.health==='critical')
@@ -281,7 +285,7 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
       attentionProjects:activeRows.filter(row=>row.health==='attention').length,criticalProjects:criticalRows.length,
       portfolioHealthScore:weighted('healthScore'),overallProgress:weighted('progress'),portfolioSpi:avgNullable('spi'),portfolioCpi:avgNullable('cpi'),
       budgetUtilization:totalBudget>0?Math.round(totalCost/totalBudget*100):null,
-      totalBudget,totalActualCost:totalCost,totalCommittedCost,totalForecastCost,forecastCostVariance,projectsForecastLate,
+      totalBudget,totalActualCost:totalCost,totalCommittedCost,totalForecastCost,forecastCostVariance,projectsForecastLate,delayedProjects,
       forecastCompletion:forecastDates.length?new Date(Math.max(...forecastDates)).toISOString():null,
     },
     rankings:{
