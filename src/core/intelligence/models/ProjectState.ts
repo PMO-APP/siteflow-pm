@@ -30,7 +30,15 @@ export type ProjectState = {
       delayReason: string | null
       recoveryAction: string | null
       progressComment: string | null
+      deliveryPackageId: string | null
+      deliveryPackageName: string | null
       updatedAt: string | null
+    }>
+    packages: Array<{
+      id: string
+      name: string
+      contractorName: string | null
+      discipline: string | null
     }>
     totalActivities: number
     completedActivities: number
