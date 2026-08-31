@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
-import { useThemeStore } from '@/store/theme'
 import ThemeProvider from '@/theme/ThemeProvider'
 
 import RequirePermission from '@/components/auth/RequirePermission'
@@ -167,15 +166,6 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { setUser, setLoading } = useAuthStore()
   const { clearMembership } = useMembershipStore()
-  const { setTheme } = useThemeStore()
-
-  useEffect(() => {
-    // PMOCorex now uses one unified light visual system across public and authenticated pages.
-    setTheme('light')
-    document.documentElement.dataset.productTheme = 'pmocorex'
-  }, [setTheme])
-
-
   useEffect(() => {
     let mounted = true
 
