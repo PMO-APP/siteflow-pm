@@ -243,6 +243,16 @@ function getTaskProgress(task?: Task | null) {
   return clamp(Number((task as any).progress_pct || 0))
 }
 
+
+function getRecordedDelayReason(task?: Task | null) {
+  if (!task) return null
+  const value = String((task as any).delay_reason || '').trim()
+  if (!value || ['none', 'n/a', 'na', 'not applicable'].includes(normalise(value))) {
+    return null
+  }
+  return value
+}
+
 function getTaskDuration(task: Task) {
   const explicitDuration = Number((task as any).duration_days || 0)
   if (explicitDuration > 0) return explicitDuration
@@ -699,22 +709,44 @@ export default function RecoveryForecastPage() {
       100
     )
 
-    const plannedReferenceDate = plannedPosition
-      ? safeDate(getTaskStart(plannedPosition)) || safeDate(getTaskFinish(plannedPosition))
-      : null
-    const actualReferenceDate = actualPosition
-      ? safeDate(getTaskFinish(actualPosition)) || safeDate(getTaskStart(actualPosition))
-      : null
+    const recordedDelayTask =
+      (actualPosition && getRecordedDelayReason(actualPosition) ? actualPosition : null) ||
+      blockers.find(task => Boolean(getRecordedDelayReason(task))) ||
+      dueButIncomplete.find(task => Boolean(getRecordedDelayReason(task))) ||
+      workingTasks.find(task => !isComplete(task) && Boolean(getRecordedDelayReason(task))) ||
+      null
 
-    const delayBasis =
-      actualReferenceDate && plannedReferenceDate
-        ? `${formatDate(actualReferenceDate)} → ${formatDate(plannedReferenceDate)}`
-        : 'Insufficient schedule dates'
+    const recordedDelayReason = getRecordedDelayReason(recordedDelayTask)
+    const hasSchedulePositionGap = Boolean(
+      daysBehind > 0 &&
+      actualPosition &&
+      plannedPosition &&
+      activityGap > 0
+    )
+
+    const delayBasis = recordedDelayReason
+      ? `Recorded in Project Controls: ${recordedDelayReason}`
+      : hasSchedulePositionGap
+      ? `System-inferred: ${getTaskName(actualPosition)} is constraining the planned workfront`
+      : daysBehind > 0
+      ? 'Approved schedule-position variance'
+      : 'No active delay'
+
+    const missingScheduleDates = projectTasks.filter(task =>
+      !safeDate(getTaskStart(task)) || !safeDate(getTaskFinish(task))
+    ).length
+    const scheduleDataQualityNote = missingScheduleDates > 0
+      ? `${missingScheduleDates} schedule activit${missingScheduleDates === 1 ? 'y is' : 'ies are'} missing a planned start or finish date.`
+      : null
 
     const executiveSummary =
       recoveryStatus === 'On Track'
         ? 'The project is aligned with the current programme sequence. Maintain daily output and continue monitoring constraints.'
-        : `The project is ${daysBehind} day(s) behind based on the approved schedule position. As at today, the programme expected ${getTaskName(plannedPosition)}, but site is constrained around ${getTaskName(actualPosition)}. The delay is measured from ${delayBasis}, not from percentage variance.`
+        : recordedDelayReason && recordedDelayTask
+        ? `The project is ${daysBehind} day(s) behind the approved schedule position. Project Controls records ${recordedDelayReason} against ${getTaskName(recordedDelayTask)} as the current delay cause. The programme expected ${getTaskName(plannedPosition)} by now, while the site workfront remains around ${getTaskName(actualPosition)}.`
+        : hasSchedulePositionGap
+        ? `The project is ${daysBehind} day(s) behind the approved schedule position. No manual delay reason has been recorded, so PMOCorex infers ${getTaskName(actualPosition)} as the current constraint because the programme expected ${getTaskName(plannedPosition)} by now and the site workfront remains ${activityGap} activit${activityGap === 1 ? 'y' : 'ies'} behind.`
+        : `The project is ${daysBehind} day(s) behind the approved schedule position. No confirmed delay cause has been recorded yet; update Project Controls when the responsible team confirms the constraint.`
 
     const requiredDecisions: string[] = []
 
@@ -808,6 +840,7 @@ export default function RecoveryForecastPage() {
       forecastDate,
       daysBehind,
       delayBasis,
+      scheduleDataQualityNote,
       recoveryStatus,
       targetCanBeMet,
       additionalCrews,
@@ -930,6 +963,11 @@ export default function RecoveryForecastPage() {
               <p className="mt-1 text-xs text-[#7b8791]">
                 {engine.targetDateSource}
               </p>
+              {engine.scheduleDataQualityNote && (
+                <p className="mt-1 text-xs text-[#7b8791]">
+                  Data quality: {engine.scheduleDataQualityNote}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
