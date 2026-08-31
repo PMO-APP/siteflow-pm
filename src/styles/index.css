@@ -1,5 +1,4 @@
 @import './tokens.css';
-@import './theme.css';
 @import './layout.css';
 @import './components.css';
 @import './utilities.css';
@@ -16,3 +15,6 @@
 
 /* Page-specific styles */
 @import './pages/command-center.css';
+
+/* Theme layer must be last so user theme wins over legacy/page-specific styles. */
+@import './theme.css';
