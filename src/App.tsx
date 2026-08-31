@@ -45,6 +45,7 @@ const ApprovalsPage = lazy(() => import('@/pages/ApprovalsPage'))
 const SitePage = lazy(() => import('@/pages/SitePage'))
 const SnagsPage = lazy(() => import('@/pages/SnagsPage'))
 const DocumentsPage = lazy(() => import('@/pages/DocumentsPage'))
+const DesignIntelligencePage = lazy(() => import('@/pages/DesignIntelligencePage'))
 const RiskPage = lazy(() => import('@/pages/RiskPage'))
 const RiskTrendPage = lazy(() => import('@/pages/RiskTrendPage'))
 const TeamPage = lazy(() => import('@/pages/TeamPage'))
@@ -411,6 +412,7 @@ export default function App() {
           <Route path="rfis/new" element={<CreateRFIPage />} />
           <Route path="rfis/:rfiId" element={<RFIDetailPage />} />
           <Route path="documents" element={<DocumentsPage />} />
+          <Route path="design-intelligence" element={<DesignIntelligencePage />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
