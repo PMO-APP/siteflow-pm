@@ -22,6 +22,7 @@ function toNode(activity: ScheduleActivity): DependencyNode {
     status: activity.status,
     isCritical: activity.isCritical,
     isBlocked: activity.isBlocked,
+    deliveryPackageName: activity.deliveryPackageName,
   }
 }
 
