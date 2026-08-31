@@ -39,6 +39,7 @@ export type ProjectState = {
       name: string
       contractorName: string | null
       discipline: string | null
+      weight: number
     }>
     totalActivities: number
     completedActivities: number
