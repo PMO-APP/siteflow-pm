@@ -5,10 +5,9 @@ import { useAuthStore } from '@/store/auth'
 import { supabase } from '@/lib/supabase'
 
 const TOUR_VERSION = 'v2'
-const ONBOARDING_ROLLOUT_AT = new Date('2026-08-30T23:58:29Z').getTime()
 const ONBOARDING_META_KEY = 'pmocorex_onboarding_v2'
 const tourKey = (userId?: string) => `pmocorex-guided-tour-${TOUR_VERSION}-${userId || 'user'}`
-type OnboardingState = 'started' | 'completed' | 'skipped'
+type OnboardingState = 'pending' | 'started' | 'completed' | 'skipped'
 
 type TourStep = {
   id: string
@@ -55,32 +54,69 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
     if(!user?.id)return
     localStorage.setItem(tourKey(user.id),state)
     try{
-      await supabase.auth.updateUser({data:{[ONBOARDING_META_KEY]:state}})
+      await supabase.auth.updateUser({
+        data:{
+          [ONBOARDING_META_KEY]:state,
+          pmocorex_onboarding_required: state === 'pending',
+        },
+      })
     }catch(error){
       console.warn('[PMOCorex onboarding] Could not persist account onboarding state:',error)
     }
   },[user?.id])
 
   useEffect(()=>{
-    if(location.pathname!=='/projects'||!user?.id||!user?.created_at)return
-
-    const createdAt=new Date(user.created_at).getTime()
-    const isNewlyCreated=Number.isFinite(createdAt)&&createdAt>=ONBOARDING_ROLLOUT_AT
-    const accountState=String(user.user_metadata?.[ONBOARDING_META_KEY]||'')
-    const localState=localStorage.getItem(tourKey(user.id))
-
-    // Automatic onboarding is only for accounts created after the rollout and
-    // only once. 'started' also suppresses a repeat after a browser refresh.
-    if(!isNewlyCreated||accountState||localState)return
+    if(location.pathname!=='/projects'||!user?.id||active)return
 
     let cancelled=false
-    const timer=setTimeout(async()=>{
-      if(cancelled)return
-      await persistOnboardingState('started')
-      if(!cancelled){setIndex(0);setActive(true)}
-    },700)
-    return()=>{cancelled=true;clearTimeout(timer)}
-  },[location.pathname,user?.id,user?.created_at,user?.user_metadata,persistOnboardingState])
+    let timer:number|undefined
+
+    async function maybeStartInvitationOnboarding(){
+      try{
+        // Read the authenticated user directly rather than relying only on the
+        // auth store. updateUser() during invitation acceptance may complete
+        // before the store has received its USER_UPDATED event.
+        const {data:{user:authUser},error}=await supabase.auth.getUser()
+        if(error||!authUser||cancelled)return
+
+        const accountState=String(authUser.user_metadata?.[ONBOARDING_META_KEY]||'')
+        const required=authUser.user_metadata?.pmocorex_onboarding_required===true
+        const localState=localStorage.getItem(tourKey(authUser.id))
+
+        // Only an accepted invitation explicitly marked as pending can trigger
+        // automatic onboarding. Login, refresh and future tour-version changes
+        // therefore cannot restart the guide.
+        if(accountState!=='pending'&&!required)return
+        if(localState&&localState!=='pending')return
+
+        timer=window.setTimeout(async()=>{
+          if(cancelled)return
+          // Mark started BEFORE opening the tour. A refresh halfway through
+          // the guide must never auto-launch it again.
+          localStorage.setItem(tourKey(authUser.id),'started')
+          try{
+            await supabase.auth.updateUser({
+              data:{
+                [ONBOARDING_META_KEY]:'started',
+                pmocorex_onboarding_required:false,
+              },
+            })
+          }catch(persistError){
+            console.warn('[PMOCorex onboarding] Could not mark onboarding as started:',persistError)
+          }
+          if(!cancelled){setIndex(0);setActive(true)}
+        },250)
+      }catch(error){
+        console.warn('[PMOCorex onboarding] Could not determine invitation onboarding state:',error)
+      }
+    }
+
+    void maybeStartInvitationOnboarding()
+    return()=>{
+      cancelled=true
+      if(timer)window.clearTimeout(timer)
+    }
+  },[location.pathname,user?.id,active])
 
   useEffect(()=>{
     if(!active||!step)return
