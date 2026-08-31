@@ -26,17 +26,18 @@ const STEPS: TourStep[] = [
   { id:'portfolios', title:'Your portfolios', body:'Projects are grouped into delivery environments here. Use portfolios to organise and filter the workspace.', target:'[data-tour="portfolio-overview"]', route:'/projects', placement:'top' },
   { id:'focus', title:'Your work today', body:'This shows projects assigned, delegated or under your authority, plus active work and projects needing attention.', target:'[data-tour="my-work-today"]', route:'/projects', placement:'top' },
   { id:'open-project', title:'Enter a project', body:'Click Open on a project in the Project Register. The guide will continue inside that project automatically.', target:'[data-tour="project-open"]', route:'/projects', interaction:true, placement:'top' },
+
   { id:'project-command', title:'Project Command', body:'This is the project command/dashboard. Start here to understand the project position, progress, pressure and key control signals.', target:'[data-tour="nav-dashboard"]', route:'/app', placement:'right' },
-  { id:'my-assignments', title:'My Assignments', body:'Use My Assignments to see the specific actions, responsibilities and work items that belong to you in this project.', target:'[data-tour="nav-my-assignments"]', route:'/app', placement:'right' },
-  { id:'communication', title:'Communication Command', body:'The notification bell is your communication command. Open it for alerts and messages; the full Notifications & Announcements centre is available from there.', target:'[data-tour="communication-command"]', route:'/app', placement:'bottom' },
-  { id:'schedule', title:'Schedule', body:'Schedule shows activities, programme status, dependencies and delivery pressure. This is where you check whether the project is tracking to plan.', target:'[data-tour="nav-schedule"]', route:'/app', placement:'right' },
-  { id:'controls', title:'Project Controls', body:'Project Controls brings together the high-level controls used to manage delivery performance and exceptions.', target:'[data-tour="nav-project-controls"]', route:'/app', placement:'right' },
-  { id:'journey', title:'Project Journey', body:'Project Journey tracks whether major lifecycle and handover gates have actually been satisfied, not just physical progress.', target:'[data-tour="nav-project-journey"]', route:'/app', placement:'right' },
-  { id:'documents', title:'Documents', body:'Use Documents for project files, drawings and controlled records. Your permissions determine what you can upload or change.', target:'[data-tour="nav-documents"]', route:'/app', placement:'right' },
-  { id:'risk', title:'Risk Register', body:'The Risk Register is where project risks are recorded, scored, assigned and monitored.', target:'[data-tour="nav-risk"]', route:'/app', placement:'right' },
-  { id:'reports', title:'Reports', body:'Reports turns live project data into structured weekly, discipline and management reporting. Use it instead of keeping reporting in separate spreadsheets and emails.', target:'[data-tour="nav-reports"]', route:'/app', placement:'right' },
-  { id:'profile', title:'Profile and replay guide', body:'Your profile contains account controls and the option to replay this guide at any time.', target:'[data-tour="profile-menu"]', route:'/app', placement:'right' },
-  { id:'complete', title:'You are ready', body:'You now know how to move from the Workspace Hub into a project and find the main PMOCorex controls. Start with My Assignments, then use the project modules as your work requires.', route:'/app', placement:'center' },
+  { id:'my-assignments', title:'My Assignments', body:'Click My Assignments now. This is where you see the specific actions, responsibilities and work items that belong to you in this project.', target:'[data-tour="nav-my-assignments"]', route:'/app', interaction:true, placement:'right' },
+  { id:'communication', title:'Communication Command', body:'You are now inside My Assignments. Click the notification bell to see where alerts and messages are received. The full Notifications & Announcements centre is available from this communication area.', target:'[data-tour="communication-command"]', route:'/app/my-assignments', interaction:true, placement:'bottom' },
+  { id:'schedule', title:'Schedule', body:'Click Schedule. It shows activities, programme status, dependencies and delivery pressure so you can see whether the project is tracking to plan.', target:'[data-tour="nav-schedule"]', route:'/app/my-assignments', interaction:true, placement:'right' },
+  { id:'controls', title:'Project Controls', body:'Click Project Controls. This brings together the high-level controls used to manage delivery performance and exceptions.', target:'[data-tour="nav-project-controls"]', route:'/app/schedule', interaction:true, placement:'right' },
+  { id:'journey', title:'Project Journey', body:'Click Project Journey. It tracks whether major lifecycle and handover gates have actually been satisfied, not just physical progress.', target:'[data-tour="nav-project-journey"]', route:'/app/project-controls', interaction:true, placement:'right' },
+  { id:'documents', title:'Documents', body:'Click Documents. This is where project files, drawings and controlled records are kept. Your permissions determine what you can upload or change.', target:'[data-tour="nav-documents"]', route:'/app/project-journey', interaction:true, placement:'right' },
+  { id:'risk', title:'Risk Register', body:'Click Risk Register. This is where project risks are recorded, scored, assigned and monitored.', target:'[data-tour="nav-risk"]', route:'/app/documents', interaction:true, placement:'right' },
+  { id:'reports', title:'Reports', body:'Click Reports. PMOCorex uses this area for structured weekly, discipline and management reporting instead of disconnected spreadsheets and emails.', target:'[data-tour="nav-reports"]', route:'/app/risk', interaction:true, placement:'right' },
+  { id:'profile', title:'Profile and replay guide', body:'Click your profile area. Your Profile contains account controls and the option to replay this guide whenever you need it.', target:'[data-tour="profile-menu"]', route:'/app/reports', interaction:true, placement:'right' },
+  { id:'complete', title:'You are ready', body:'You now know how to move from the Workspace Hub into a project and find the main PMOCorex controls. Start with My Assignments, then use each project module as your work requires.', route:'/profile', placement:'center' },
 ]
 
 type TourContextValue = { startTour: () => void; active: boolean }
@@ -94,6 +95,19 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
     window.addEventListener('resize',update); window.addEventListener('scroll',update,true)
     return()=>{clearTimeout(timer);observer.disconnect();window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true)}
   },[active,index,location.pathname,navigate,step])
+
+  useEffect(()=>{
+    if(!active||!step?.target||!step?.interaction)return
+    if(step.route && location.pathname!==step.route)return
+    const timer=window.setTimeout(()=>{
+      // If a role does not have this module in its navigation, do not trap the
+      // user on a tour step they cannot complete.
+      if(!document.querySelector(step.target!)){
+        setIndex(i=>Math.min(i+1,STEPS.length-1))
+      }
+    },1400)
+    return()=>window.clearTimeout(timer)
+  },[active,index,location.pathname,step])
 
   useEffect(()=>{
     if(!active||!step?.interaction||!step.target)return
