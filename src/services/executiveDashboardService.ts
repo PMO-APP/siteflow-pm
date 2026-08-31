@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { calculateProjectPlannedProgress, calculateProjectProgress } from '@/core/metrics/progressMetrics'
+import { loadPortfolioProjectHealth } from './portfolioHealthService'
 import type {
   ExecutiveAttentionItem, ExecutiveDecision, ExecutivePortfolioSnapshot,
   ExecutiveProjectRow, ExecutiveTimelineItem
@@ -84,6 +85,7 @@ async function loadExecutiveTable(table: ExecutiveTable, projectIds: Set<string>
 export async function loadExecutivePortfolioSnapshot(_workspaceId: string, projectId?: number | null): Promise<ExecutivePortfolioSnapshot> {
   const projects = await loadProjectsForExecutive(projectId)
   const projectIds = new Set(projects.map((project: any) => String(project.id)))
+  const portfolioHealth = await loadPortfolioProjectHealth(projects)
 
   const tables: ExecutiveTable[] = [
     'tasks','risks','procurement_items','approvals','quality_gates',
@@ -161,8 +163,12 @@ export async function loadExecutivePortfolioSnapshot(_workspaceId: string, proje
       Math.min(8,qualityExceptions.length * 4) +
       Math.min(10,openHseIncidents.length * 5)
     )
-    const healthScore = Math.max(0,Math.round(100-penalty))
-    const health = healthScore < 55 ? 'critical' : healthScore < 80 ? 'attention' : 'healthy'
+    const fallbackHealthScore = Math.max(0,Math.round(100-penalty))
+    const centralHealth = portfolioHealth.get(String(id))
+    const healthScore = centralHealth && centralHealth.label !== 'Not Assessed' ? centralHealth.score : fallbackHealthScore
+    const health = centralHealth && centralHealth.label !== 'Not Assessed'
+      ? centralHealth.label === 'Healthy' ? 'healthy' : centralHealth.label === 'Critical' ? 'critical' : 'attention'
+      : healthScore < 55 ? 'critical' : healthScore < 80 ? 'attention' : 'healthy'
     const blockers = [
       [scheduleVarianceDays, scheduleVarianceDays ? `${scheduleVarianceDays} days behind programme` : ''],
       [highRisks.length * 4, highRisks.length ? `${highRisks.length} high risks` : ''],
