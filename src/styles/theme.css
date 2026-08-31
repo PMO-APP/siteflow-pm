@@ -1,7 +1,10 @@
 :root,
-:root.light,
-:root.dark {
+:root.light {
   color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 html,
@@ -35,3 +38,146 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* PMOCorex dark theme -----------------------------------------------------
+   This layer intentionally sits after the legacy/light styles. It keeps the
+   brand navy + teal system while translating the existing light surfaces and
+   hard-coded legacy utility colours into a consistent dark workspace. */
+:root.dark {
+  --pmx-primary: #08B5A6;
+  --pmx-primary-hover: #05969B;
+  --pmx-primary-soft: #123B40;
+  --pmx-coral: #08B5A6;
+  --pmx-coral-hover: #05969B;
+  --pmx-coral-soft: #123B40;
+
+  --pmx-bg: #071821;
+  --pmx-surface: #0D2632;
+  --pmx-surface-2: #102F3B;
+  --pmx-surface-3: #153945;
+  --pmx-surface-raised: #12313D;
+  --pmx-border: #244653;
+  --pmx-border-strong: #35606D;
+  --pmx-text: #F4F8F9;
+  --pmx-muted: #B7C7CC;
+  --pmx-faint: #81979F;
+
+  /* legacy design tokens still used by older PMOCorex screens */
+  --pmx-navy: #08B5A6;
+  --pmx-navy-hover: #05969B;
+  --pmx-heading: #F4F8F9;
+  --pmx-body: #C5D2D6;
+  --pmx-white: #F4F8F9;
+  --page-bg: #071821;
+  --text-primary: #F4F8F9;
+  --card-border: #244653;
+  --gold: #08B5A6;
+  --gold2: #05969B;
+
+  --pmx-shadow-card: 0 10px 28px rgba(0, 0, 0, .24);
+  --pmx-shadow-panel: 0 14px 38px rgba(0, 0, 0, .30);
+  --pmx-shadow-overlay: 0 28px 80px rgba(0, 0, 0, .48);
+}
+
+html.dark body,
+html.dark #root {
+  background: var(--pmx-bg);
+  color: var(--pmx-muted);
+}
+
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6 {
+  color: var(--pmx-text);
+}
+
+/* Common light surfaces used throughout the current application. */
+html.dark [class*="bg-white"],
+html.dark [class*="bg-[#f7f9fa]"],
+html.dark [class*="bg-[#f7f8f6]"],
+html.dark [class*="bg-[#f9fbfb]"],
+html.dark [class*="bg-[#f5f8fa]"],
+html.dark [class*="bg-[#f7fafb]"],
+html.dark [class*="bg-[#f8fbfb]"],
+html.dark [class*="bg-[#eef3f4]"] {
+  background-color: var(--pmx-surface) !important;
+}
+
+html.dark [class*="bg-[#edf4f8]"],
+html.dark [class*="bg-[#eaf1f4]"],
+html.dark [class*="bg-[#eaf1f7]"],
+html.dark [class*="bg-[#E8F6F4]"] {
+  background-color: var(--pmx-primary-soft) !important;
+}
+
+html.dark [class*="border-[#dce7ef]"],
+html.dark [class*="border-[#dbe5ef]"],
+html.dark [class*="border-[#dbe5eb]"],
+html.dark [class*="border-[#d8e4ee]"],
+html.dark [class*="border-[#dfe7e6]"],
+html.dark [class*="border-[#dfe3e7]"],
+html.dark [class*="border-[#e1e7ea]"],
+html.dark [class*="border-[#e2e9ed]"],
+html.dark [class*="border-[#e7ecef]"] {
+  border-color: var(--pmx-border) !important;
+}
+
+html.dark [class*="text-[#173f5f]"],
+html.dark [class*="text-[#102943]"],
+html.dark [class*="text-[#102a43]"],
+html.dark [class*="text-[#0B2A3C]"],
+html.dark [class*="text-[#183044]"] {
+  color: var(--pmx-text) !important;
+}
+
+html.dark [class*="text-[#607783]"],
+html.dark [class*="text-[#65717c]"],
+html.dark [class*="text-[#64748b]"],
+html.dark [class*="text-[#71838d]"],
+html.dark [class*="text-[#7a8c99]"],
+html.dark [class*="text-[#7b8791]"],
+html.dark [class*="text-[#87929b]"],
+html.dark [class*="text-[#536974]"],
+html.dark [class*="text-[#536170]"] {
+  color: var(--pmx-muted) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select,
+html.dark .form-control,
+html.dark .hub-input,
+html.dark .pmx-input,
+html.dark .pmx-textarea {
+  background-color: var(--pmx-surface-2) !important;
+  border-color: var(--pmx-border) !important;
+  color: var(--pmx-text) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--pmx-faint) !important;
+}
+
+html.dark .card,
+html.dark .hub-panel,
+html.dark .enterprise-card,
+html.dark .ui-card {
+  background-color: var(--pmx-surface) !important;
+  border-color: var(--pmx-border) !important;
+}
+
+html.dark table,
+html.dark thead,
+html.dark tbody,
+html.dark tr {
+  border-color: var(--pmx-border);
+}
+
+/* Keep semantic alert/success colours semantic in both themes. */
+html.dark .bg-red-50 { background-color: rgba(220, 38, 38, .13) !important; }
+html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, .12) !important; }
