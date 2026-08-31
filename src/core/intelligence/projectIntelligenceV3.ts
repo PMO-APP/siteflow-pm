@@ -10,15 +10,20 @@ export function buildProjectIntelligenceV3(
   const base =
     buildProjectIntelligenceV2(state)
 
-  const rootCause = calculateRootCause(state, {
-    enabled:
-      base.forecastV2.delayDays > 0 ||
-      base.forecastV2.activityGap > 0 ||
-      state.schedule.overdueActivities > 0 ||
-      state.schedule.activities.some(
-        activity => activity.isBlocked && activity.progress < 100
-      ),
-  })
+  const shouldAnalyseRootCause =
+    base.forecastV2.delayDays > 0 ||
+    base.forecastV2.activityGap > 0 ||
+    state.schedule.overdueActivities > 0 ||
+    state.schedule.activities.some(
+      activity => activity.isBlocked && activity.progress < 100
+    )
+
+  const rootCause = shouldAnalyseRootCause
+    ? calculateRootCause(state)
+    : calculateRootCause({
+        ...state,
+        schedule: { ...state.schedule, activities: [] },
+      })
 
   const recommendations =
     calculateRecommendations({
