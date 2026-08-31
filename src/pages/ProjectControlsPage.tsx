@@ -1,11 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, ChevronDown, ChevronUp, Save } from 'lucide-react'
-import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
+import { useEffect, useMemo, useState } from 'react'
+import { Activity, Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
-import { useAccessSession } from '@/access/AccessSessionProvider'
 import { fdate } from '@/lib/utils'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
@@ -44,6 +42,20 @@ const RECOVERY_ACTIONS = [
   'Awaiting Approval',
   'No Recovery Plan',
 ]
+
+function canManageSchedule(role?: string | null) {
+  return ['workspace_admin', 'admin', 'pmo'].includes(role || '')
+}
+
+function canEditProjectControls(role?: string | null) {
+  return [
+    'workspace_admin',
+    'admin',
+    'pmo',
+    'project_owner',
+    'overall_project_owner',
+  ].includes(role || '')
+}
 
 function getTaskName(task: any) {
   return task.name || 'Untitled Activity'
@@ -84,58 +96,24 @@ function statusColor(status: string) {
 
 function getLogActor(log: any) {
   return (
+    log.profiles?.full_name ||
+    log.profiles?.email ||
     log.updated_by_name ||
-    log.updated_by_email ||
     log.updated_by_role ||
-    log.updated_by ||
     '—'
   )
-}
-
-type ProjectControlsCache = {
-  tasks: any[]
-  schedules: any[]
-  logs: any[]
-}
-
-function projectControlsCacheKey(projectId: number) {
-  return `pmocorex:project-controls:${projectId}`
-}
-
-function readProjectControlsCache(projectId: number): ProjectControlsCache | null {
-  try {
-    const raw = sessionStorage.getItem(projectControlsCacheKey(projectId))
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return {
-      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
-      schedules: Array.isArray(parsed.schedules) ? parsed.schedules : [],
-      logs: Array.isArray(parsed.logs) ? parsed.logs : [],
-    }
-  } catch {
-    return null
-  }
-}
-
-function writeProjectControlsCache(projectId: number, value: ProjectControlsCache) {
-  try {
-    sessionStorage.setItem(projectControlsCacheKey(projectId), JSON.stringify(value))
-  } catch {
-    // Cache is an optimisation only; Supabase remains the source of truth.
-  }
 }
 
 export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
-  const { can } = useAccessSession()
+
+  const canEdit = canEditProjectControls(role)
+  const canUploadSchedule = canManageSchedule(role)
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
-  const disciplinePermission = disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
-  const canEdit = Boolean(projectId) && can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: disciplinePermission })
-  const canUploadSchedule = Boolean(projectId) && can('schedule.import', { scopeType: 'project', scopeId: projectId, discipline: 'overall' })
 
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [schedules, setSchedules] = useState<any[]>([])
@@ -144,35 +122,9 @@ export default function ProjectControlsPage() {
   const [notice, setNotice] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, any>>({})
-  const loadRequestRef = useRef(0)
 
   useEffect(() => {
-    const requestId = ++loadRequestRef.current
-
-    if (!projectId) {
-      setAllTasks([])
-      setSchedules([])
-      setLogs([])
-      setLoading(false)
-      return
-    }
-
-    // Rehydrate the last successful project-control payload immediately.
-    // A background fetch below then refreshes it from Supabase.
-    const cached = readProjectControlsCache(projectId)
-    if (cached) {
-      setAllTasks(cached.tasks)
-      setSchedules(cached.schedules)
-      setLogs(cached.logs)
-      setLoading(false)
-    } else {
-      setAllTasks([])
-      setSchedules([])
-      setLogs([])
-      setLoading(true)
-    }
-
-    void loadData(projectId, requestId, !!cached)
+    loadData()
   }, [projectId])
 
   const tasks =
@@ -182,96 +134,43 @@ export default function ProjectControlsPage() {
           task => (task.discipline || 'Housebuild') === disciplineTab
         )
 
-  async function loadData(
-    targetProjectId = projectId,
-    requestId = ++loadRequestRef.current,
-    hasCachedData = allTasks.length > 0
-  ) {
-    if (!targetProjectId) {
+  async function loadData() {
+    if (!projectId) {
       setLoading(false)
       return
     }
 
-    if (!hasCachedData) setLoading(true)
+    setLoading(true)
     setNotice('')
 
-    let freshTasks: any[] | null = null
-
-    try {
-      // Tasks are the primary Project Controls dataset. Do not make the page
-      // wait for Schedule or History before showing execution data.
-      const taskResult = await supabase
+    const [taskResult, scheduleResult, logResult] = await Promise.all([
+      supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', targetProjectId)
-        .order('task_number', { ascending: true })
+        .eq('project_id', projectId)
+        .order('task_number', { ascending: true }),
 
-      if (requestId !== loadRequestRef.current) return
+      supabase
+        .from('schedule_revisions')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
 
-      if (taskResult.error) {
-        setNotice(taskResult.error.message)
-      } else {
-        freshTasks = taskResult.data || []
-        setAllTasks(freshTasks)
-      }
+      supabase
+        .from('task_progress_logs')
+        .select('*, profiles:updated_by(full_name, email)')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false }),
+    ])
 
-      // The execution table can render as soon as tasks arrive. Secondary
-      // datasets continue loading without blocking the whole page.
-      setLoading(false)
+    if (taskResult.error) setNotice(taskResult.error.message)
+    if (scheduleResult.error) setNotice(scheduleResult.error.message)
+    if (logResult.error) setNotice(logResult.error.message)
 
-      try {
-        const [scheduleResult, logResult] = await Promise.all([
-          supabase
-            .from('schedule_revisions')
-            .select('*')
-            .eq('project_id', targetProjectId)
-            .order('created_at', { ascending: false }),
-
-          // No join here. Supabase threw a relationship error because
-          // task_progress_logs.updated_by has no FK relationship to profiles.
-          supabase
-            .from('task_progress_logs')
-            .select('*')
-            .eq('project_id', targetProjectId)
-            .order('created_at', { ascending: false }),
-        ])
-
-        if (requestId !== loadRequestRef.current) return
-
-        if (scheduleResult.error) setNotice(scheduleResult.error.message)
-        if (logResult.error) setNotice(logResult.error.message)
-
-        const nextSchedules = scheduleResult.data || []
-        const nextLogs = logResult.data || []
-        setSchedules(nextSchedules)
-        setLogs(nextLogs)
-
-        writeProjectControlsCache(targetProjectId, {
-          tasks: freshTasks ?? allTasks,
-          schedules: nextSchedules,
-          logs: nextLogs,
-        })
-      } catch (secondaryError: any) {
-        if (requestId === loadRequestRef.current) {
-          setNotice(secondaryError?.message || 'Some project-control details could not be refreshed.')
-          if (freshTasks) {
-            writeProjectControlsCache(targetProjectId, {
-              tasks: freshTasks,
-              schedules,
-              logs,
-            })
-          }
-        }
-      }
-    } catch (error: any) {
-      if (requestId === loadRequestRef.current) {
-        setNotice(error?.message || 'Project controls could not be refreshed. Showing the latest available data.')
-      }
-    } finally {
-      // Never leave the page trapped on a loading screen after a rejected
-      // request. Cached/previous data remains visible if refresh fails.
-      if (requestId === loadRequestRef.current) setLoading(false)
-    }
+    setAllTasks(taskResult.data || [])
+    setSchedules(scheduleResult.data || [])
+    setLogs(logResult.data || [])
+    setLoading(false)
   }
 
   function updateEdit(taskId: string, key: string, value: any) {
@@ -289,7 +188,7 @@ export default function ProjectControlsPage() {
   async function saveTaskProgress(task: any) {
     if (!canEdit) {
       setNotice(
-        'View only. You can see this project, but only its assigned owner or an active delegate can update this discipline.'
+        'View only. Only Project Owners, PMO and Administrators can update project controls.'
       )
       return
     }
@@ -355,8 +254,6 @@ export default function ProjectControlsPage() {
       recovery_action: payload.recovery_action,
       comments: payload.progress_comments,
       updated_by: user?.id || null,
-      updated_by_name: user?.full_name || user?.email || null,
-      updated_by_email: user?.email || null,
       updated_by_role: role || null,
     })
 
@@ -377,6 +274,8 @@ export default function ProjectControlsPage() {
     const blocked = tasks.filter(task => task.is_blocked).length
     const onHold = tasks.filter(task => task.is_on_hold).length
 
+    // This now matches your dashboard/report logic:
+    // completed tasks divided by total tasks.
     const overallProgress =
       total === 0 ? 0 : Math.round((completed / total) * 100)
 
@@ -391,23 +290,60 @@ export default function ProjectControlsPage() {
 
   return (
     <div className="space-y-6">
-      <EnterprisePageHero
-        eyebrow="Project governance"
-        title="Project Control Centre"
-        description="Control schedule performance, progress, delay ownership, recovery actions and delivery history from one operational workspace."
-        projectName={projectName || 'No project selected'}
-      >
-        {!canEdit && <div className="mt-5"><EnterpriseNotice tone="warning">View only. You can see this project, but only its assigned owner or an active delegate can update this discipline.</EnterpriseNotice></div>}
-        <div className="mt-5 flex flex-wrap gap-2">
-          {DISCIPLINE_TABS.map(tab => <button key={tab} onClick={() => setDisciplineTab(tab)} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${disciplineTab === tab ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170] hover:border-[#9da9b3]'}`}>{tab === 'Overall' ? 'Master' : tab}</button>)}
+      <section className="rounded-[2rem] border border-[#c49e48]/20 bg-gradient-to-br from-[#111820] via-[#162230] to-[#0f151c] p-6 sm:p-8">
+        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#c49e48]/30 bg-[#c49e48]/10 text-[#c49e48] text-xs">
+          Project Controls
         </div>
-      </EnterprisePageHero>
 
-      {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
+        <h1 className="text-3xl sm:text-4xl font-black text-[#ede8de]">
+          Project Controls
+        </h1>
+
+        <p className="text-slate-400 mt-3 max-w-3xl">
+          PMO/Admin controls schedule uploads. Project Owners update progress,
+          delay reason, recovery action and comments. Other roles are view only.
+        </p>
+
+        <div className="text-xs text-[#6e7d8c] mt-4">
+          Project:{' '}
+          <span className="text-[#c49e48]">
+            {projectName || 'No project selected'}
+          </span>
+        </div>
+
+        {!canEdit && (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+            View Only. Only Project Owners, PMO and Administrators can update project controls.
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {DISCIPLINE_TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setDisciplineTab(tab)}
+              className={`btn-sm btn ${
+                disciplineTab === tab ? 'btn-gold' : 'btn-ghost'
+              }`}
+            >
+              {tab === 'Overall' ? 'Master' : tab}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {notice && (
+        <div className="rounded-xl border border-[#c49e48]/20 bg-[#c49e48]/10 p-3 text-sm text-[#ede8de]">
+          {notice}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
-        <Metric title="Overall Progress" value={`${metrics.overallProgress}%`} />
+        <Metric
+          title="Overall Progress"
+          value={`${metrics.overallProgress}%`}
+        />
         <Metric title="Completed" value={metrics.completed} />
         <Metric title="Delayed" value={metrics.delayed} />
         <Metric title="Blocked" value={metrics.blocked} />
@@ -485,15 +421,6 @@ function ExecutionTab({
   savingId,
   canEdit,
 }: any) {
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
-
-  const toggleExpanded = (taskId: string) => {
-    setExpandedRows(current => ({
-      ...current,
-      [taskId]: !current[taskId],
-    }))
-  }
-
   if (!tasks.length) {
     return (
       <div className="card p-8 text-center text-[#6e7d8c]">
@@ -505,239 +432,186 @@ function ExecutionTab({
   return (
     <div className="space-y-4">
       {!canEdit && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
           View Only. Only Project Owners, PMO and Administrators can update project controls.
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="w-full overflow-hidden">
-          <table className="tbl w-full table-fixed">
-            <colgroup>
-              <col className="w-[28%]" />
-              <col className="w-[13%]" />
-              <col className="w-[12%]" />
-              <col className="w-[17%]" />
-              <col className="w-[12%]" />
-              <col className="w-[10%]" />
-              <col className="w-[8%]" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>Activity</th>
-                <th>Package</th>
-                <th>Discipline</th>
-                <th>Planned Dates</th>
-                <th>Progress</th>
-                <th>Status</th>
-                <th className="text-right">Details</th>
-              </tr>
-            </thead>
+      <div className="card overflow-x-auto">
+        <table className="tbl min-w-[1500px]">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Package</th>
+              <th>Discipline</th>
+              <th>Planned Start</th>
+              <th>Planned Finish</th>
+              <th>Progress %</th>
+              <th>Status</th>
+              <th>Delay Reason</th>
+              <th>Recovery Action</th>
+              <th>Comments</th>
+              <th></th>
+            </tr>
+          </thead>
 
-            <tbody>
-              {tasks.map((task: any) => {
-                const taskId = task.id
-                const edit = edits[taskId] || {}
-                const progress = edit.progress_pct ?? getProgress(task)
-                const status = getStatus({
-                  ...task,
-                  ...edit,
-                  progress_pct: progress,
-                })
-                const isExpanded = !!expandedRows[taskId]
+          <tbody>
+            {tasks.map((task: any) => {
+              const taskId = task.id
+              const edit = edits[taskId] || {}
+              const progress = edit.progress_pct ?? getProgress(task)
+              const status = getStatus({
+                ...task,
+                ...edit,
+                progress_pct: progress,
+              })
 
-                return (
-                  <Fragment key={taskId}>
-                    <tr className={isExpanded ? 'bg-[#f8fafc]' : ''}>
-                      <td className="align-top font-medium text-[#102943]">
-                        <div className="break-words pr-2 leading-5">
-                          {getTaskName(task)}
-                        </div>
-                      </td>
+              return (
+                <tr key={taskId}>
+                  <td className="font-medium text-[#ede8de] min-w-[220px]">
+                    {getTaskName(task)}
+                  </td>
 
-                      <td className="align-top">
-                        <span className="break-words text-sm">
-                          {task.package_name || 'Project Wide'}
-                        </span>
-                      </td>
+                  <td>{task.package_name || 'Project Wide'}</td>
+                  <td>{task.discipline || '—'}</td>
 
-                      <td className="align-top">
-                        <span className="break-words text-sm">
-                          {task.discipline || '—'}
-                        </span>
-                      </td>
+                  <td>
+                    {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
+                  </td>
 
-                      <td className="align-top">
-                        <div className="space-y-1 text-xs leading-5 text-[#536170]">
-                          <div>
-                            <span className="font-semibold text-[#102943]">Start:</span>{' '}
-                            {getPlannedStart(task) ? fdate(getPlannedStart(task)) : '—'}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-[#102943]">Finish:</span>{' '}
-                            {getPlannedFinish(task) ? fdate(getPlannedFinish(task)) : '—'}
-                          </div>
-                        </div>
-                      </td>
+                  <td>
+                    {getPlannedFinish(task)
+                      ? fdate(getPlannedFinish(task))
+                      : '—'}
+                  </td>
 
-                      <td className="align-top">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            className="form-control w-[72px] px-2 disabled:cursor-not-allowed disabled:opacity-60"
-                            value={progress}
-                            disabled={!canEdit}
-                            onChange={e =>
-                              updateEdit(
-                                taskId,
-                                'progress_pct',
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                          <span className="text-xs text-[#82909c]">%</span>
-                        </div>
-                      </td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="form-control w-24 disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={progress}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(
+                          taskId,
+                          'progress_pct',
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </td>
 
-                      <td className="align-top">
-                        <span
-                          className={`inline-block break-words text-[10px] font-semibold leading-4 ${statusColor(
-                            status
-                          )}`}
-                        >
-                          {status}
-                        </span>
-                      </td>
+                  <td>
+                    <span
+                      className={`text-[10px] font-semibold ${statusColor(
+                        status
+                      )}`}
+                    >
+                      {status}
+                    </span>
+                  </td>
 
-                      <td className="align-top text-right">
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(taskId)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#dfe3e7] bg-white text-[#123a60] transition hover:bg-[#f3f6f8]"
-                          aria-expanded={isExpanded}
-                          aria-label={isExpanded ? 'Hide task details' : 'Show task details'}
-                          title={isExpanded ? 'Hide details' : 'Show details'}
-                        >
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      </td>
-                    </tr>
+                  <td>
+                    <select
+                      className="form-control min-w-[150px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={edit.delay_reason ?? task.delay_reason ?? ''}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(taskId, 'delay_reason', e.target.value)
+                      }
+                    >
+                      {DELAY_REASONS.map(reason => (
+                        <option key={reason} value={reason}>
+                          {reason || 'None'}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                    {isExpanded && (
-                      <tr className="bg-[#f8fafc]">
-                        <td colSpan={7} className="!p-0">
-                          <div className="border-t border-[#e8edf1] px-5 py-5">
-                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                              <label className="space-y-1.5">
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
-                                  Delay Reason
-                                </span>
-                                <select
-                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
-                                  value={edit.delay_reason ?? task.delay_reason ?? ''}
-                                  disabled={!canEdit}
-                                  onChange={e =>
-                                    updateEdit(taskId, 'delay_reason', e.target.value)
-                                  }
-                                >
-                                  {DELAY_REASONS.map(reason => (
-                                    <option key={reason} value={reason}>
-                                      {reason || 'None'}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                  <td>
+                    <select
+                      className="form-control min-w-[170px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={edit.recovery_action ?? task.recovery_action ?? ''}
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(taskId, 'recovery_action', e.target.value)
+                      }
+                    >
+                      {RECOVERY_ACTIONS.map(action => (
+                        <option key={action} value={action}>
+                          {action || 'None'}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
 
-                              <label className="space-y-1.5">
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
-                                  Recovery Action
-                                </span>
-                                <select
-                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
-                                  value={edit.recovery_action ?? task.recovery_action ?? ''}
-                                  disabled={!canEdit}
-                                  onChange={e =>
-                                    updateEdit(taskId, 'recovery_action', e.target.value)
-                                  }
-                                >
-                                  {RECOVERY_ACTIONS.map(action => (
-                                    <option key={action} value={action}>
-                                      {action || 'None'}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
+                  <td>
+                    <input
+                      className="form-control min-w-[180px] disabled:opacity-60 disabled:cursor-not-allowed"
+                      value={
+                        edit.progress_comments ?? task.progress_comments ?? ''
+                      }
+                      disabled={!canEdit}
+                      onChange={e =>
+                        updateEdit(
+                          taskId,
+                          'progress_comments',
+                          e.target.value
+                        )
+                      }
+                      placeholder="Comment"
+                    />
 
-                              <label className="space-y-1.5">
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#82909c]">
-                                  Progress Comment
-                                </span>
-                                <input
-                                  className="form-control w-full disabled:cursor-not-allowed disabled:opacity-60"
-                                  value={edit.progress_comments ?? task.progress_comments ?? ''}
-                                  disabled={!canEdit}
-                                  onChange={e =>
-                                    updateEdit(taskId, 'progress_comments', e.target.value)
-                                  }
-                                  placeholder={canEdit ? 'Add progress comment' : 'No comment'}
-                                />
-                              </label>
-                            </div>
+                    <div className="flex gap-3 mt-2 text-[10px] text-slate-400">
+                      <label className={!canEdit ? 'opacity-60' : ''}>
+                        <input
+                          type="checkbox"
+                          checked={edit.is_on_hold ?? task.is_on_hold ?? false}
+                          disabled={!canEdit}
+                          onChange={e =>
+                            updateEdit(taskId, 'is_on_hold', e.target.checked)
+                          }
+                        />{' '}
+                        On Hold
+                      </label>
 
-                            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#e8edf1] pt-4">
-                              <div className="flex flex-wrap items-center gap-5 text-xs text-[#536170]">
-                                <label className={`inline-flex items-center gap-2 ${!canEdit ? 'opacity-60' : ''}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={edit.is_on_hold ?? task.is_on_hold ?? false}
-                                    disabled={!canEdit}
-                                    onChange={e =>
-                                      updateEdit(taskId, 'is_on_hold', e.target.checked)
-                                    }
-                                  />
-                                  On Hold
-                                </label>
+                      <label className={!canEdit ? 'opacity-60' : ''}>
+                        <input
+                          type="checkbox"
+                          checked={edit.is_blocked ?? task.is_blocked ?? false}
+                          disabled={!canEdit}
+                          onChange={e =>
+                            updateEdit(taskId, 'is_blocked', e.target.checked)
+                          }
+                        />{' '}
+                        Blocked
+                      </label>
+                    </div>
+                  </td>
 
-                                <label className={`inline-flex items-center gap-2 ${!canEdit ? 'opacity-60' : ''}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={edit.is_blocked ?? task.is_blocked ?? false}
-                                    disabled={!canEdit}
-                                    onChange={e =>
-                                      updateEdit(taskId, 'is_blocked', e.target.checked)
-                                    }
-                                  />
-                                  Blocked
-                                </label>
-                              </div>
-
-                              {canEdit ? (
-                                <button
-                                  className="btn btn-gold btn-sm"
-                                  onClick={() => saveTaskProgress(task)}
-                                  disabled={savingId === taskId}
-                                >
-                                  <Save size={13} />
-                                  {savingId === taskId ? 'Saving…' : 'Save Update'}
-                                </button>
-                              ) : (
-                                <span className="text-[10px] uppercase tracking-widest text-slate-500">
-                                  View Only
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                  <td>
+                    {canEdit ? (
+                      <button
+                        className="btn btn-gold btn-sm"
+                        onClick={() => saveTaskProgress(task)}
+                        disabled={savingId === taskId}
+                      >
+                        <Save size={13} />
+                        {savingId === taskId ? 'Saving…' : 'Save'}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-widest text-slate-500">
+                        View Only
+                      </span>
                     )}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -775,7 +649,7 @@ function ScheduleTab({ schedules, canUpload }: any) {
             <tbody>
               {schedules.map((item: any) => (
                 <tr key={item.id}>
-                  <td className="font-medium text-[#102943]">
+                  <td className="font-medium text-[#ede8de]">
                     {item.revision_name}
                   </td>
                   <td>{item.revision_type || '—'}</td>
@@ -838,7 +712,7 @@ function ProgressTab({ tasks, metrics }: any) {
           <tbody>
             {byDiscipline.map(item => (
               <tr key={item.discipline}>
-                <td className="font-medium text-[#102943]">
+                <td className="font-medium text-[#ede8de]">
                   {item.discipline}
                 </td>
                 <td>{item.count}</td>
@@ -887,7 +761,7 @@ function DelaysTab({ tasks }: { tasks: any[] }) {
 
             return (
               <tr key={task.id}>
-                <td className="font-medium text-[#102943]">
+                <td className="font-medium text-[#ede8de]">
                   {getTaskName(task)}
                 </td>
                 <td>{task.package_name || 'Project Wide'}</td>
@@ -983,7 +857,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
             return (
               <tr key={log.id}>
                 <td>{fdate(log.created_at)}</td>
-                <td className="font-medium text-[#102943]">
+                <td className="font-medium text-[#ede8de]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
                 <td>{getLogActor(log)}</td>
@@ -1006,8 +880,8 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
 function Metric({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="card p-4">
-      <Activity size={18} className="text-[#df5f41]" />
-      <div className="text-2xl font-black text-white mt-3">{value}</div>
+      <Activity size={18} className="text-[#c49e48]" />
+      <div className="text-2xl font-black text-[#0B2A3C] dark:text-white mt-3">{value}</div>
       <div className="text-[9px] uppercase tracking-widest text-[#6e7d8c] mt-1">
         {title}
       </div>
