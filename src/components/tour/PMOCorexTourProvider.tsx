@@ -2,9 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
+import { supabase } from '@/lib/supabase'
 
 const TOUR_VERSION = 'v2'
+const ONBOARDING_ROLLOUT_AT = new Date('2026-08-30T23:58:29Z').getTime()
+const ONBOARDING_META_KEY = 'pmocorex_onboarding_v2'
 const tourKey = (userId?: string) => `pmocorex-guided-tour-${TOUR_VERSION}-${userId || 'user'}`
+type OnboardingState = 'started' | 'completed' | 'skipped'
 
 type TourStep = {
   id: string
@@ -46,11 +50,36 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
 
   const startTour=useCallback(()=>{setIndex(0);setActive(true);navigate('/projects')},[navigate])
 
-  useEffect(()=>{
-    if(location.pathname==='/projects' && !localStorage.getItem(tourKey(user?.id))){
-      const timer=setTimeout(()=>setActive(true),700); return()=>clearTimeout(timer)
+  const persistOnboardingState=useCallback(async(state:OnboardingState)=>{
+    if(!user?.id)return
+    localStorage.setItem(tourKey(user.id),state)
+    try{
+      await supabase.auth.updateUser({data:{[ONBOARDING_META_KEY]:state}})
+    }catch(error){
+      console.warn('[PMOCorex onboarding] Could not persist account onboarding state:',error)
     }
-  },[location.pathname])
+  },[user?.id])
+
+  useEffect(()=>{
+    if(location.pathname!=='/projects'||!user?.id||!user?.created_at)return
+
+    const createdAt=new Date(user.created_at).getTime()
+    const isNewlyCreated=Number.isFinite(createdAt)&&createdAt>=ONBOARDING_ROLLOUT_AT
+    const accountState=String(user.user_metadata?.[ONBOARDING_META_KEY]||'')
+    const localState=localStorage.getItem(tourKey(user.id))
+
+    // Automatic onboarding is only for accounts created after the rollout and
+    // only once. 'started' also suppresses a repeat after a browser refresh.
+    if(!isNewlyCreated||accountState||localState)return
+
+    let cancelled=false
+    const timer=setTimeout(async()=>{
+      if(cancelled)return
+      await persistOnboardingState('started')
+      if(!cancelled){setIndex(0);setActive(true)}
+    },700)
+    return()=>{cancelled=true;clearTimeout(timer)}
+  },[location.pathname,user?.id,user?.created_at,user?.user_metadata,persistOnboardingState])
 
   useEffect(()=>{
     if(!active||!step)return
@@ -77,8 +106,8 @@ export default function PMOCorexTourProvider({children}:{children:React.ReactNod
     document.addEventListener('click',handler,true); return()=>document.removeEventListener('click',handler,true)
   },[active,step])
 
-  const finish=()=>{localStorage.setItem(tourKey(user?.id),'completed');setActive(false);setIndex(0);navigate('/projects')}
-  const skip=()=>{localStorage.setItem(tourKey(user?.id),'skipped');setActive(false)}
+  const finish=()=>{void persistOnboardingState('completed');setActive(false);setIndex(0);navigate('/projects')}
+  const skip=()=>{void persistOnboardingState('skipped');setActive(false)}
   const next=()=>{ if(index===STEPS.length-1)finish(); else setIndex(index+1) }
   const previous=()=>setIndex(Math.max(0,index-1))
 
