@@ -43,6 +43,7 @@ function predecessors(value: unknown): string[] {
 export function normalizeProjectState({
   project,
   tasks = [],
+  deliveryPackages = [],
   financial = [],
   snags = [],
   risks = [],
@@ -58,6 +59,7 @@ export function normalizeProjectState({
 }: {
   project?: any
   tasks?: any[]
+  deliveryPackages?: any[]
   financial?: any[]
   snags?: any[]
   risks?: any[]
@@ -89,7 +91,11 @@ export function normalizeProjectState({
     isBlocked: Boolean(task.is_blocked || task.is_on_hold || task.status === 'Blocked'),
     delayReason: task.delay_reason || null,
     recoveryAction: task.recovery_action || null,
-    progressComment: task.progress_comments || null,
+    progressComment: task.progress_comments || task.progress_comment || null,
+    deliveryPackageId: task.delivery_package_id ? id(task.delivery_package_id) : null,
+    deliveryPackageName: task.delivery_package_id
+      ? (packageById.get(id(task.delivery_package_id))?.name || null)
+      : null,
     updatedAt: toISO(task.updated_at),
   }))
 
@@ -179,6 +185,12 @@ export function normalizeProjectState({
     },
     schedule: {
       activities,
+      packages: deliveryPackages.map(pkg => ({
+        id: id(pkg.id),
+        name: pkg.name || 'Unnamed package',
+        contractorName: pkg.contractor_name || null,
+        discipline: pkg.discipline || null,
+      })),
       totalActivities: activities.length,
       completedActivities: activities.filter(item => item.progress >= 100).length,
       overdueActivities: activities.filter(item => isPast(item.plannedFinish, today) && item.progress < 100).length,
