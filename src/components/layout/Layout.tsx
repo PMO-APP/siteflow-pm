@@ -42,6 +42,7 @@ import {
   Building2,
   MessageSquareText,
   Search,
+  ScanSearch,
   Send,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
@@ -98,6 +99,7 @@ const NAV: NavItem[] = [
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List', group: 'delivery' },
   { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs', group: 'technical' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents', group: 'technical' },
+  { to: '/app/design-intelligence', icon: ScanSearch, label: 'Design Intelligence', group: 'technical' },
   { to: '/app/costing', icon: Wallet, label: 'Costing', group: 'commercial' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register', group: 'governance' },
   { to: '/app/risk-trends', icon: Shield, label: 'Risk Trends', group: 'governance' },
@@ -151,6 +153,7 @@ const NAV_PERMISSIONS:Record<string,PermissionAction>={
   '/app/snags':'snags.view',
   '/app/rfis':'project.view',
   '/app/documents':'documents.view',
+  '/app/design-intelligence':'documents.view',
   '/app/costing':'costing.view',
   '/app/design-reports':'reports.view',
   '/app/risk':'risk.view',
