@@ -27,9 +27,6 @@ export type ProjectState = {
       predecessorIds: string[]
       isCritical: boolean
       isBlocked: boolean
-      delayReason: string | null
-      recoveryAction: string | null
-      progressComment: string | null
       updatedAt: string | null
     }>
     totalActivities: number
