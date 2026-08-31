@@ -29,6 +29,7 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
 import PersonalWorkspacePanel from '@/components/personalization/PersonalWorkspacePanel'
 import { useAccessSession } from '@/access/AccessSessionProvider'
+import { loadPortfolioProjectHealth, isAtRiskProject, isCriticalProject, isHealthyProject, needsHealthAttention, type PortfolioProjectHealth } from '@/services/portfolioHealthService'
 
 const PROJECT_STATUSES = [
   'Planning',
@@ -98,6 +99,7 @@ export default function ProjectsPage() {
   const { session: accessSession, can } = useAccessSession()
   const [projects, setProjects] = useState<any[]>([])
   const [projectTasks, setProjectTasks] = useState<any[]>([])
+  const [projectHealthById, setProjectHealthById] = useState<Map<string, PortfolioProjectHealth>>(new Map())
   const [archivedProjects, setArchivedProjects] = useState<any[]>([])
   const [showArchivedProjects, setShowArchivedProjects] = useState(false)
   const [organizations, setOrganizations] = useState<any[]>([])
@@ -280,8 +282,10 @@ export default function ProjectsPage() {
       setOrganizations(orgs || [])
       setPortfolios(ports || [])
       const allProjects = projs || []
-      setProjects(allProjects.filter(project => !project.archived_at))
+      const visibleProjects = allProjects.filter(project => !project.archived_at)
+      setProjects(visibleProjects)
       setArchivedProjects(allProjects.filter(project => Boolean(project.archived_at)))
+      setProjectHealthById(await loadPortfolioProjectHealth(visibleProjects))
       setLoading(false)
       return
     }
@@ -306,6 +310,7 @@ export default function ProjectsPage() {
       setPortfolios((ports || []).filter(portfolio => visiblePortfolioIds.includes(portfolio.id)))
       setProjects(visibleProjects)
       setArchivedProjects([])
+      setProjectHealthById(await loadPortfolioProjectHealth(visibleProjects))
       setLoading(false)
       return
     }
@@ -687,17 +692,30 @@ export default function ProjectsPage() {
       const schedulePenalty = Math.min(85, 65 * Math.sqrt(Math.max(0, overdueRatio)))
       const projectStatus = String(project.status || '')
       const statusPenalty = projectStatus === 'On Hold' ? 15 : projectStatus === 'Delayed' ? 10 : 0
-      const healthScore = Math.max(0, Math.min(100, Math.round(100 - schedulePenalty - statusPenalty)))
-      const healthBand = healthScore >= 85
-        ? 'Healthy'
-        : healthScore >= 70
-          ? 'Watch'
-          : healthScore >= 50
-            ? 'At Risk'
-            : 'Critical'
+      const fallbackScore = Math.max(0, Math.min(100, Math.round(100 - schedulePenalty - statusPenalty)))
+      const officialHealth = projectHealthById.get(String(project.id))
+      const hasOfficialAssessment = Boolean(officialHealth && officialHealth.label !== 'Not Assessed')
+      const healthScore = hasOfficialAssessment ? officialHealth!.score : fallbackScore
+      const healthBand: 'Healthy' | 'Watch' | 'At Risk' | 'Critical' = hasOfficialAssessment
+        ? officialHealth!.label === 'Healthy'
+          ? 'Healthy'
+          : officialHealth!.label === 'Recoverable'
+            ? 'Watch'
+            : officialHealth!.label === 'At Risk'
+              ? 'At Risk'
+              : 'Critical'
+        : fallbackScore >= 85
+          ? 'Healthy'
+          : fallbackScore >= 70
+            ? 'Watch'
+            : fallbackScore >= 50
+              ? 'At Risk'
+              : 'Critical'
 
       map.set(String(project.id), {
-        needsAttention: healthScore < 85 || ['Delayed', 'On Hold'].includes(projectStatus),
+        needsAttention: hasOfficialAssessment
+          ? needsHealthAttention(officialHealth) || ['Delayed', 'On Hold', 'Stuck'].includes(projectStatus)
+          : fallbackScore < 85 || ['Delayed', 'On Hold', 'Stuck'].includes(projectStatus),
         overdueTasks,
         totalTasks,
         healthScore,
@@ -706,7 +724,7 @@ export default function ProjectsPage() {
     })
 
     return map
-  }, [projects, projectTasks])
+  }, [projects, projectTasks, projectHealthById])
 
   const assignedProjectIds = useMemo(() => {
     const adminAuthority =
@@ -788,12 +806,10 @@ export default function ProjectsPage() {
     })
   }
 
-  const attentionProjects = projects.filter(project =>
-    projectAttentionMap.get(String(project.id))?.needsAttention
-  ).length
-  const healthyProjects = projects.filter(project =>
-    !projectAttentionMap.get(String(project.id))?.needsAttention
-  ).length
+  const healthyProjects = projects.filter(project => isHealthyProject(projectHealthById.get(String(project.id)))).length
+  const atRiskProjects = projects.filter(project => isAtRiskProject(projectHealthById.get(String(project.id)))).length
+  const criticalProjects = projects.filter(project => isCriticalProject(projectHealthById.get(String(project.id)))).length
+  const attentionProjects = atRiskProjects + criticalProjects
   const missingTargets = projects.filter(
     project => !project.handover_date && !['Completed', 'Cancelled'].includes(project.status)
   ).length
@@ -866,10 +882,10 @@ export default function ProjectsPage() {
               <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#6d8396]">Workspace</div>
               <div className="mt-2 text-2xl font-black text-[#173f5f]">{workspaceName}</div>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <MiniMetric label="Portfolios" value={portfolios.length} />
                 <MiniMetric label="Projects" value={projects.length} />
                 <MiniMetric label="Healthy" value={healthyProjects} />
-                <MiniMetric label="Need attention" value={attentionProjects} accent onClick={() => showProjects({ attention: 'Attention' })} />
+                <MiniMetric label="At risk" value={atRiskProjects} accent={atRiskProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
+                <MiniMetric label="Critical" value={criticalProjects} accent={criticalProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
               </div>
             </div>
           </div>
@@ -933,10 +949,10 @@ export default function ProjectsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-              <MiniMetric label="Portfolios" value={portfolios.length} />
               <MiniMetric label="Projects" value={projects.length} />
               <MiniMetric label="Healthy" value={healthyProjects} />
-              <MiniMetric label="Need attention" value={attentionProjects} accent onClick={() => showProjects({ attention: 'Attention' })} />
+              <MiniMetric label="At risk" value={atRiskProjects} accent={atRiskProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
+              <MiniMetric label="Critical" value={criticalProjects} accent={criticalProjects > 0} onClick={() => showProjects({ attention: 'Attention' })} />
             </div>
           </button>
         </section>
@@ -952,19 +968,11 @@ export default function ProjectsPage() {
               const portfolioProjects = projects.filter(p => String(p.portfolio_id ?? '') === String(portfolio.id ?? ''))
               const attention = portfolioProjects.filter(p => projectAttentionMap.get(String(p.id))?.needsAttention).length
               const active = portfolioProjects.filter(p => p.status === 'Active').length
-              const portfolioHealthRows = portfolioProjects.map(project => ({
-                score: projectAttentionMap.get(String(project.id))?.healthScore ?? 100,
-                weight: Math.max(1, projectAttentionMap.get(String(project.id))?.totalTasks ?? 0),
-              }))
-              const simpleAverage = portfolioHealthRows.length
-                ? portfolioHealthRows.reduce((sum, row) => sum + row.score, 0) / portfolioHealthRows.length
-                : 0
-              const weightedAverage = portfolioHealthRows.length
-                ? portfolioHealthRows.reduce((sum, row) => sum + row.score * row.weight, 0) /
-                  portfolioHealthRows.reduce((sum, row) => sum + row.weight, 0)
-                : 0
+              const portfolioHealthRows = portfolioProjects
+                .map(project => projectHealthById.get(String(project.id)))
+                .filter((health): health is PortfolioProjectHealth => Boolean(health && health.label !== 'Not Assessed'))
               const health = portfolioHealthRows.length
-                ? Math.round(simpleAverage * 0.7 + weightedAverage * 0.3)
+                ? Math.round(portfolioHealthRows.reduce((sum, row) => sum + row.score, 0) / portfolioHealthRows.length)
                 : 0
 
               return (
