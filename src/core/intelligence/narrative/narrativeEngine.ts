@@ -25,14 +25,19 @@ export function buildExecutiveNarrative({
       ? `${projectName} remains recoverable despite a ${forecast.delayDays}-day delay.`
       : `${projectName} is in a critical delivery position with a ${forecast.delayDays}-day delay.`
 
+  const declaredDelayReasons = state.schedule.activities
+    .filter(activity => activity.progress < 100 && activity.delayReason)
+    .map(activity => ({
+      activity: activity.name,
+      reason: activity.delayReason as string,
+    }))
+
   const causeSentence =
     rootCause.primaryCause
-      ? `${rootCause.primaryCause.name} is the most likely root cause and affects ${rootCause.impactedActivities.length} downstream activit${
-          rootCause.impactedActivities.length === 1
-            ? 'y'
-            : 'ies'
-        }.`
-      : 'No reliable root cause has been identified from the current dependency data.'
+      ? rootCause.explanation
+      : declaredDelayReasons.length
+        ? `${declaredDelayReasons[0].activity} has a recorded delay reason in Project Controls: ${declaredDelayReasons[0].reason}.`
+        : 'No reliable root cause has been identified from the current dependency data.'
 
   const productionSentence =
     forecast.production.efficiency >= 100
@@ -49,6 +54,10 @@ export function buildExecutiveNarrative({
         }.`
 
   const keyMessages: string[] = []
+
+  declaredDelayReasons.slice(0, 3).forEach(item => {
+    keyMessages.push(`${item.activity}: ${item.reason}.`)
+  })
 
   if (state.approvals.overdueApprovals > 0) {
     keyMessages.push(
@@ -75,9 +84,7 @@ export function buildExecutiveNarrative({
   }
 
   const outlook =
-    forecast.delayDays === 0
-      ? 'The project is on track. Maintain the current workfront, protect upcoming approvals and monitor the next scheduled activity.'
-      : forecast.recoverable
+    forecast.recoverable
       ? `Recovery remains achievable with ${forecast.recoveryConfidence}% confidence if the primary constraint is resolved and the required production rate is sustained.`
       : 'Executive intervention is required because the current production and constraint position does not support recovery.'
 
