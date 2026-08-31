@@ -18,9 +18,8 @@ export function calculateRecommendations({
   const items: RecommendationItem[] = []
 
   if (
-    forecast.delayDays > 0 &&
     forecast.production.actualPerDay <
-      forecast.production.requiredPerDay
+    forecast.production.requiredPerDay
   ) {
     items.push({
       id: 'increase-production',
@@ -39,17 +38,28 @@ export function calculateRecommendations({
   }
 
   if (rootCause.primaryCause) {
+    const primaryActivity = state.schedule.activities.find(
+      activity => activity.id === rootCause.primaryCause?.id
+    )
+    const hasDeclaredDelayReason = Boolean(primaryActivity?.delayReason)
+
     items.push({
       id: 'resolve-root-cause',
-      title: `Resolve ${rootCause.primaryCause.name}`,
+      title: hasDeclaredDelayReason
+        ? `Resolve ${primaryActivity?.delayReason}`
+        : `Resolve ${rootCause.primaryCause.name}`,
       description:
         rootCause.explanation,
       priority: rootCause.primaryCause.isCritical
         ? 'critical'
         : 'high',
       category: 'schedule',
-      route: '/app/schedule',
-      expectedImpact: `${rootCause.impactedActivities.length} downstream activities may be released.`,
+      route: hasDeclaredDelayReason
+        ? '/app/project-controls'
+        : '/app/schedule',
+      expectedImpact: rootCause.impactedActivities.length
+        ? `${rootCause.impactedActivities.length} downstream activities may be released.`
+        : 'Removes a recorded delivery constraint and improves forecast reliability.',
     })
   }
 
