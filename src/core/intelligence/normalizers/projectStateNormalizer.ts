@@ -73,6 +73,10 @@ export function normalizeProjectState({
   inspections?: any[]
   today?: Date
 }): ProjectState {
+  const packageById = new Map(
+    deliveryPackages.map(pkg => [id(pkg.id), pkg])
+  )
+
   const activities = tasks.map(task => ({
     id: id(task.id),
     taskNumber: Number(task.task_number || 0),
@@ -190,6 +194,7 @@ export function normalizeProjectState({
         name: pkg.name || 'Unnamed package',
         contractorName: pkg.contractor_name || null,
         discipline: pkg.discipline || null,
+        weight: Number(pkg.weight_pct ?? pkg.weight ?? 0),
       })),
       totalActivities: activities.length,
       completedActivities: activities.filter(item => item.progress >= 100).length,
