@@ -69,9 +69,6 @@ export default function ExecutiveDashboardPage() {
     if(project)openProject(project,item.actionUrl)
   }
 
-  if(!activeWorkspace)return <div className="rounded-2xl border bg-white p-8">No active workspace.</div>
-  if(cockpit&&data)return <Cockpit data={data} workspaceName={activeWorkspace.name} onClose={()=>setSearchParams({}, { replace:true })} onProject={openProject}/>
-
   const metrics=data?.metrics
   const heatData=(data?.projects||[]).map(project=>({
     name:project.name.length>18?`${project.name.slice(0,18)}…`:project.name,
@@ -96,6 +93,11 @@ export default function ExecutiveDashboardPage() {
       }
     })
   },[data?.trends])
+
+  // Keep all React hooks above conditional renders. Boardroom mode is a view
+  // of this same page, so changing ?mode=boardroom must never change hook order.
+  if(!activeWorkspace)return <div className="rounded-2xl border bg-white p-8">No active workspace.</div>
+  if(cockpit&&data)return <Cockpit data={data} workspaceName={activeWorkspace.name} onClose={()=>setSearchParams({}, { replace:true })} onProject={openProject}/>
 
   return <div className="min-h-dvh bg-[#f6f5f1]">
     <header className="sticky top-0 z-30 border-b border-[#dfe7e6] bg-white/95 backdrop-blur-xl">
