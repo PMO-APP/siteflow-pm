@@ -34,6 +34,7 @@ const PROJECT_STATUSES = [
   'Planning',
   'Active',
   'On Hold',
+  'Stuck',
   'Inactive',
   'Delayed',
   'Completed',
@@ -1119,12 +1120,13 @@ export default function ProjectsPage() {
             <EmptyHub title="No workspace access" message="You do not currently have access to an organization, portfolio, or project." action={() => navigate('/mixta-admin-login')} />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1050px] border-collapse">
+              <table className="w-full min-w-[1160px] border-collapse">
                 <thead>
                   <tr className="bg-[#f3f6f6] text-left text-[11px] font-bold uppercase tracking-[0.12em] text-[#71838d]">
                     <th className="px-6 py-4">Project</th>
                     <th className="px-5 py-4">Portfolio</th>
                     <th className="px-5 py-4">Health</th>
+                    <th className="px-5 py-4">Status</th>
                     <th className="px-5 py-4">My capacity</th>
                     <th className="px-5 py-4">Phase</th>
                     <th className="px-5 py-4">Target</th>
@@ -1382,6 +1384,33 @@ function PortfolioMetric({ label, value, attention = false, onClick }: any) {
   )
 }
 
+function ProjectStatusBadge({ status }: { status: string }) {
+  const normalized = String(status || 'Not set').toLowerCase()
+  const classes =
+    normalized === 'active'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : normalized === 'completed'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : normalized === 'stuck'
+          ? 'border-red-200 bg-red-50 text-red-700'
+          : normalized === 'on hold'
+            ? 'border-amber-200 bg-amber-50 text-amber-700'
+            : normalized === 'delayed'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : normalized === 'cancelled'
+                ? 'border-red-200 bg-red-50 text-red-700'
+                : normalized === 'planning'
+                  ? 'border-[#b9e6e1] bg-[#E8F6F4] text-[#05969B]'
+                  : 'border-[#dce7ef] bg-[#f2f5f7] text-[#607783]'
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${normalized === 'active' || normalized === 'completed' ? 'bg-emerald-500' : normalized === 'stuck' || normalized === 'delayed' || normalized === 'cancelled' ? 'bg-red-500' : normalized === 'on hold' ? 'bg-amber-500' : 'bg-[#08B5A6]'}`} />
+      {status || 'Not set'}
+    </span>
+  )
+}
+
 function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, canDelete, onOpen, onEdit, onDelete }: any) {
   const status = project.status || 'Not set'
   const overdueTasks = Number(attentionInfo?.overdueTasks || 0)
@@ -1404,6 +1433,7 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
       </td>
       <td className="px-5 py-4 text-sm text-[#536974]">{portfolioName}</td>
       <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${healthScore < 50 ? 'border-[#efb1ae] bg-[#fff0ef] text-[#b83f3b]' : healthScore < 70 ? 'border-[#f0c4b2] bg-[#fff0e9] text-[#d86335]' : healthScore < 85 ? 'border-[#ead08b] bg-[#fff8df] text-[#9a6a00]' : 'border-[#bfe0d0] bg-[#edf9f3] text-[#2f7b59]'}`}><span className={`h-1.5 w-1.5 rounded-full ${healthScore < 50 ? 'bg-[#d84a45]' : healthScore < 70 ? 'bg-[#e56d47]' : healthScore < 85 ? 'bg-[#d79b16]' : 'bg-[#41a878]'}`} />{healthLabel}</span></td>
+      <td className="px-5 py-4"><ProjectStatusBadge status={status} /></td>
       <td className="px-5 py-4"><span className="rounded-full bg-[#eaf1f4] px-2.5 py-1 text-xs font-semibold text-[#2f6f91]">{capacity}</span></td>
       <td className="px-5 py-4 text-sm text-[#536974]">{project.phase || 'Not set'}</td>
       <td className="px-5 py-4 text-sm text-[#536974]">{formatDate(project.handover_date)}</td>
