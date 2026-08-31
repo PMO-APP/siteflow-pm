@@ -291,6 +291,30 @@ export default function AcceptInvitePage() {
         fullName: cleanFullName,
       })
 
+      // Invitation acceptance is the authoritative first-entry event for
+      // PMOCorex onboarding. Do not reset users who have already started,
+      // completed or skipped the guide (for example, when accepting another
+      // project invitation later).
+      const currentOnboardingState = String(
+        currentUser.user_metadata?.pmocorex_onboarding_v2 || ''
+      )
+
+      if (!currentOnboardingState) {
+        const { error: onboardingError } = await supabase.auth.updateUser({
+          data: {
+            pmocorex_onboarding_v2: 'pending',
+            pmocorex_onboarding_required: true,
+          },
+        })
+
+        if (onboardingError) {
+          console.warn(
+            '[PMOCorex onboarding] Invitation was accepted but onboarding could not be marked as pending:',
+            onboardingError
+          )
+        }
+      }
+
       setAccepted(true)
     } catch (acceptError) {
       console.error('Unable to accept invitation:', acceptError)
