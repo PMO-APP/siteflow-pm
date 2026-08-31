@@ -1,7 +1,6 @@
 import { differenceInDays } from 'date-fns'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { isPast, toDate, toISO } from './dateUtils'
-import { calculateProjectProgress, taskProgress } from '@/core/metrics/progressMetrics'
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
@@ -12,7 +11,25 @@ function id(value: unknown) {
 }
 
 function progress(task: any) {
-  return taskProgress(task)
+  if (task.status === 'Completed') return 100
+  if (task.status === 'Not Started') return 0
+  return clamp(Number(task.progress_pct || 0))
+}
+
+function weightedProgress(tasks: any[]) {
+  if (!tasks.length) return 0
+  const totalWeight = tasks.reduce((sum, task) => sum + Number(task.weight_pct || 0), 0)
+
+  if (totalWeight <= 0) {
+    return Math.round(tasks.reduce((sum, task) => sum + progress(task), 0) / tasks.length)
+  }
+
+  const earned = tasks.reduce(
+    (sum, task) => sum + Number(task.weight_pct || 0) * (progress(task) / 100),
+    0
+  )
+
+  return Math.round((earned / totalWeight) * 100)
 }
 
 function predecessors(value: unknown): string[] {
@@ -26,7 +43,6 @@ function predecessors(value: unknown): string[] {
 export function normalizeProjectState({
   project,
   tasks = [],
-  deliveryPackages = [],
   financial = [],
   snags = [],
   risks = [],
@@ -42,7 +58,6 @@ export function normalizeProjectState({
 }: {
   project?: any
   tasks?: any[]
-  deliveryPackages?: any[]
   financial?: any[]
   snags?: any[]
   risks?: any[]
@@ -56,12 +71,7 @@ export function normalizeProjectState({
   inspections?: any[]
   today?: Date
 }): ProjectState {
-  const packageMap = new Map(deliveryPackages.map((pkg: any) => [String(pkg.id), pkg]))
-
-  const activities = tasks.map(task => {
-    const packageId = task.delivery_package_id ? String(task.delivery_package_id) : null
-    const deliveryPackage = packageId ? packageMap.get(packageId) : null
-    return ({
+  const activities = tasks.map(task => ({
     id: id(task.id),
     taskNumber: Number(task.task_number || 0),
     name: task.name || task.task_name || 'Untitled activity',
@@ -77,11 +87,11 @@ export function normalizeProjectState({
     predecessorIds: predecessors(task.predecessor_ids || task.predecessors || task.predecessor),
     isCritical: Boolean(task.is_critical || task.critical_path || task.total_float === 0),
     isBlocked: Boolean(task.is_blocked || task.is_on_hold || task.status === 'Blocked'),
+    delayReason: task.delay_reason || null,
+    recoveryAction: task.recovery_action || null,
+    progressComment: task.progress_comments || null,
     updatedAt: toISO(task.updated_at),
-    deliveryPackageId: packageId,
-    deliveryPackageName: deliveryPackage?.name || task.delivery_package_name || null,
-  })
-  })
+  }))
 
   const scheduleStart =
     toDate(project?.start_date) ||
@@ -93,7 +103,7 @@ export function normalizeProjectState({
     activities.map(item => toDate(item.plannedFinish)).filter(Boolean).sort((a: any, b: any) => b.getTime() - a.getTime())[0] ||
     null
 
-  const actual = calculateProjectProgress(tasks)
+  const actual = weightedProgress(tasks)
   const planned =
     scheduleStart && scheduleFinish
       ? clamp(Math.round(
@@ -177,14 +187,6 @@ export function normalizeProjectState({
       variancePercent: actual - planned,
       startDate: toISO(scheduleStart),
       finishDate: toISO(scheduleFinish),
-      packages: deliveryPackages.map((pkg: any) => ({
-        id: id(pkg.id),
-        name: pkg.name || 'Unnamed package',
-        discipline: pkg.discipline || null,
-        contractorName: pkg.contractor_name || null,
-        weight: Number(pkg.weight_pct || 0),
-        packageType: pkg.package_type || null,
-      })),
       lastUpdatedAt: activities
         .map(item => toDate(item.updatedAt))
         .filter(Boolean)
