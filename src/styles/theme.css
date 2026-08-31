@@ -181,3 +181,155 @@ html.dark tr {
 /* Keep semantic alert/success colours semantic in both themes. */
 html.dark .bg-red-50 { background-color: rgba(220, 38, 38, .13) !important; }
 html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, .12) !important; }
+
+/* Strict dark-surface pass -------------------------------------------------
+   Dark mode must not leave generic application surfaces white/light.
+   Semantic success/danger/warning tints remain intentionally coloured. */
+html.dark,
+html.dark body,
+html.dark #root,
+html.dark main,
+html.dark .layout-content {
+  background-color: var(--pmx-bg) !important;
+}
+
+html.dark .bg-white,
+html.dark [class*="bg-white/"],
+html.dark [class*="bg-[#fff]"],
+html.dark [class*="bg-[#ffffff]"],
+html.dark [class*="bg-[#FFFFFF]"],
+html.dark [class*="bg-[#f7f8f6]"],
+html.dark [class*="bg-[#f7f9fa]"],
+html.dark [class*="bg-[#f7fafb]"],
+html.dark [class*="bg-[#f8fbfb]"],
+html.dark [class*="bg-[#f9fbfb]"],
+html.dark [class*="bg-[#f5f8fa]"],
+html.dark [class*="bg-[#f2f5f7]"],
+html.dark [class*="bg-[#f2f6f8]"],
+html.dark [class*="bg-[#eef3f4]"],
+html.dark [class*="bg-[#edf1f3]"] {
+  background-color: var(--pmx-surface) !important;
+}
+
+html.dark [class*="bg-[#edf4f8]"],
+html.dark [class*="bg-[#eaf1f4]"],
+html.dark [class*="bg-[#eaf1f7]"],
+html.dark [class*="bg-[#edf6fb]"],
+html.dark [class*="bg-[#eaf2ff]"],
+html.dark [class*="bg-[#E8F6F4]"],
+html.dark [class*="bg-[#e8f6f4]"] {
+  background-color: var(--pmx-surface-2) !important;
+}
+
+html.dark .card,
+html.dark .ui-card,
+html.dark .hub-panel,
+html.dark .hub-card,
+html.dark .enterprise-card,
+html.dark .enterprise-page-hero,
+html.dark .enterprise-section,
+html.dark .enterprise-metric,
+html.dark .ui-toolbar,
+html.dark .ui-form-section,
+html.dark .ui-empty-state,
+html.dark .sidebar-panel {
+  background-color: var(--pmx-surface) !important;
+  border-color: var(--pmx-border) !important;
+}
+
+html.dark header[class*="bg-white"],
+html.dark aside[class*="bg-white"],
+html.dark .layout-sidebar {
+  background-color: var(--pmx-surface) !important;
+}
+
+html.dark .btn-ghost,
+html.dark .ui-button--secondary,
+html.dark .tbl-action,
+html.dark .hub-secondary-button,
+html.dark button[class*="bg-white"] {
+  background-color: var(--pmx-surface-2) !important;
+  border-color: var(--pmx-border) !important;
+  color: var(--pmx-text) !important;
+}
+
+html.dark .btn-ghost:hover,
+html.dark .ui-button--secondary:hover,
+html.dark .tbl-action:hover,
+html.dark .hub-secondary-button:hover,
+html.dark button[class*="bg-white"]:hover {
+  background-color: var(--pmx-surface-3) !important;
+}
+
+html.dark table,
+html.dark thead,
+html.dark tbody,
+html.dark tr,
+html.dark th,
+html.dark td {
+  border-color: var(--pmx-border) !important;
+}
+
+html.dark thead,
+html.dark th,
+html.dark .tbl th,
+html.dark .ui-table th {
+  background-color: var(--pmx-surface-2) !important;
+  color: var(--pmx-muted) !important;
+}
+
+html.dark tr[class*="bg-white"],
+html.dark td[class*="bg-white"] {
+  background-color: var(--pmx-surface) !important;
+}
+
+html.dark .tbl tr:hover td,
+html.dark .ui-table tr:hover td,
+html.dark tr:hover td {
+  background-color: var(--pmx-surface-2) !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select,
+html.dark option,
+html.dark .form-control,
+html.dark .input-search,
+html.dark .hub-input,
+html.dark .pmx-input,
+html.dark .pmx-select,
+html.dark .pmx-textarea {
+  background-color: var(--pmx-surface-2) !important;
+  border-color: var(--pmx-border) !important;
+  color: var(--pmx-text) !important;
+}
+
+html.dark option {
+  background-color: var(--pmx-surface-2) !important;
+}
+
+html.dark [class*="border-dashed"][class*="bg-"],
+html.dark .ui-empty-state {
+  background-color: var(--pmx-surface) !important;
+  border-color: var(--pmx-border-strong) !important;
+}
+
+/* Keep semantic state colours meaningful. */
+html.dark .bg-red-50,
+html.dark [class*="bg-[#fff0ef]"],
+html.dark [class*="bg-[#fff0f1]"],
+html.dark [class*="bg-[#fff1f2]"] {
+  background-color: rgba(220, 38, 38, .13) !important;
+}
+
+html.dark .bg-emerald-50,
+html.dark [class*="bg-[#edf9f3]"],
+html.dark [class*="bg-[#ecf8f2]"] {
+  background-color: rgba(16, 185, 129, .12) !important;
+}
+
+html.dark .bg-amber-50,
+html.dark [class*="bg-[#fff8df]"],
+html.dark [class*="bg-[#fff8e8]"] {
+  background-color: rgba(245, 158, 11, .13) !important;
+}
