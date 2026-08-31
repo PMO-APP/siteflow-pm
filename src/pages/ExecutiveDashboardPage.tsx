@@ -118,7 +118,7 @@ export default function ExecutiveDashboardPage() {
           <Metric icon={Gauge} label="Portfolio health" value={`${metrics?.portfolioHealthScore||0}%`} helper={(metrics?.criticalProjects||0)>0?'Critical':'Current health'} tone={(metrics?.criticalProjects||0)>0?'red':'green'}/>
           <Metric icon={Activity} label="Overall progress" value={`${metrics?.overallProgress||0}%`} helper={`SPI ${metrics?.portfolioSpi??'—'}`}/>
           <Metric icon={Wallet} label="Budget utilisation" value={metrics?.budgetUtilization==null?'—':`${metrics.budgetUtilization}%`} helper={`CPI ${metrics?.portfolioCpi??'—'}`}/>
-          <Metric icon={CalendarClock} label="Delivery forecast" value={metrics?`${metrics.projectsForecastLate} late`:'—'} helper={metrics?.forecastCompletion?`Latest completion ${new Date(metrics.forecastCompletion).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}`:'No portfolio forecast yet'} tone={metrics?.projectsForecastLate?'red':'green'}/>
+          <Metric icon={CalendarClock} label="Projects delayed" value={metrics?`${metrics.delayedProjects} delayed`:'—'} helper={metrics?.forecastCompletion?`Latest recorded completion/target ${new Date(metrics.forecastCompletion).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}`:'Forecast dates not recorded yet'} tone={metrics?.delayedProjects?'red':'green'}/>
         </section>
 
         <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 sm:p-6">
