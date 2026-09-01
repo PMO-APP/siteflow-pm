@@ -21,6 +21,14 @@ export type DesignDrawing = {
   level?: string | null
   zone?: string | null
   file_url?: string | null
+  file_path?: string | null
+  file_bucket?: string | null
+  file_name?: string | null
+  mime_type?: string | null
+  file_size?: number | null
+  file_sha256?: string | null
+  analysis_status?: 'Not analysed' | 'Queued' | 'Analysing' | 'Analysed' | 'Failed'
+  last_analysed_at?: string | null
   notes?: string | null
   supersedes_drawing_id?: string | null
   created_at: string
@@ -63,8 +71,26 @@ export type DesignIssue = {
   updated_at: string
 }
 
+export type DesignAnalysisMode = 'single_drawing' | 'revision_compare' | 'cross_discipline'
+
+export type DesignAnalysisJob = {
+  id: string
+  project_id: number
+  mode: DesignAnalysisMode
+  drawing_ids: string[]
+  status: 'Queued' | 'Analysing' | 'Completed' | 'Failed'
+  provider: string
+  model?: string | null
+  result_summary?: string | null
+  finding_count: number
+  error_message?: string | null
+  created_at: string
+  started_at?: string | null
+  completed_at?: string | null
+}
+
 export async function loadDesignIntelligence(projectId: number) {
-  const [drawings, issues, rules] = await Promise.all([
+  const [drawings, issues, rules, jobs] = await Promise.all([
     supabase
       .from('design_drawings')
       .select('*')
@@ -82,9 +108,15 @@ export async function loadDesignIntelligence(projectId: number) {
       .eq('active', true)
       .order('system_rule', { ascending: false })
       .order('code'),
+    supabase
+      .from('design_analysis_jobs')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(20),
   ])
 
-  for (const result of [drawings, issues, rules]) {
+  for (const result of [drawings, issues, rules, jobs]) {
     if (result.error) throw result.error
   }
 
@@ -92,26 +124,8 @@ export async function loadDesignIntelligence(projectId: number) {
     drawings: (drawings.data || []) as DesignDrawing[],
     issues: (issues.data || []) as DesignIssue[],
     rules: (rules.data || []) as DesignRule[],
+    jobs: (jobs.data || []) as DesignAnalysisJob[],
   }
-}
-
-export async function saveDesignDrawing(
-  projectId: number,
-  drawing: Partial<DesignDrawing> & Pick<DesignDrawing, 'drawing_number' | 'title' | 'discipline' | 'revision'>
-) {
-  const payload = {
-    ...drawing,
-    project_id: projectId,
-    updated_at: new Date().toISOString(),
-  }
-
-  const query = drawing.id
-    ? supabase.from('design_drawings').update(payload).eq('id', drawing.id).eq('project_id', projectId)
-    : supabase.from('design_drawings').insert(payload)
-
-  const { data, error } = await query.select().single()
-  if (error) throw error
-  return data as DesignDrawing
 }
 
 export async function saveDesignIssue(
@@ -153,6 +167,50 @@ export async function updateDesignIssue(
 
   if (error) throw error
   return data as DesignIssue
+}
+
+export async function getDesignDrawingUrl(drawing: DesignDrawing, expiresIn = 900) {
+  if (drawing.file_path) {
+    const bucket = drawing.file_bucket || 'project-files'
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(drawing.file_path, expiresIn)
+    if (error) throw error
+    return data.signedUrl
+  }
+  return drawing.file_url || null
+}
+
+export async function queueDesignAnalysis(
+  projectId: number,
+  drawingIds: string[],
+  mode: DesignAnalysisMode
+) {
+  if (!drawingIds.length) throw new Error('Select at least one drawing for analysis.')
+  if (mode === 'revision_compare' && drawingIds.length !== 2) {
+    throw new Error('Revision comparison requires exactly two drawing revisions.')
+  }
+
+  const { data: userData } = await supabase.auth.getUser()
+  const { data: job, error } = await supabase
+    .from('design_analysis_jobs')
+    .insert({
+      project_id: projectId,
+      mode,
+      drawing_ids: drawingIds,
+      status: 'Queued',
+      requested_by: userData.user?.id || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  await supabase.from('design_drawings').update({ analysis_status: 'Queued' }).in('id', drawingIds)
+
+  const { data, error: invokeError } = await supabase.functions.invoke('analyze-design-drawing', {
+    body: { jobId: job.id },
+  })
+  if (invokeError) throw invokeError
+  if (data?.success === false) throw new Error(data.error || 'Automated design review failed.')
+  return data
 }
 
 function normalise(value: string | null | undefined) {
