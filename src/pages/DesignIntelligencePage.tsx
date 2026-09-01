@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
-  BrainCircuit,
+  BrainCircuit, 
   CheckCircle2,
   FileDiff,
   FileSearch,
@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Ruler,
   ScanSearch,
+  Search,
   ShieldCheck,
   Sparkles,
   X,
@@ -72,6 +73,10 @@ export default function DesignIntelligencePage() {
   const [notice, setNotice] = useState('')
   const [showIssue, setShowIssue] = useState(false)
   const [reviewing, setReviewing] = useState(false)
+  const [ruleSearch, setRuleSearch] = useState('')
+  const [ruleDiscipline, setRuleDiscipline] = useState('All')
+  const [ruleSeverity, setRuleSeverity] = useState('All')
+  const [expandedRule, setExpandedRule] = useState<string | null>(null)
 
   const [issueForm, setIssueForm] = useState({
     title: '', category: 'Constructability', severity: 'High' as DesignIssue['severity'],
@@ -107,6 +112,18 @@ export default function DesignIntelligencePage() {
       resolved: issues.filter(item => ['Resolved', 'Closed'].includes(item.status)).length,
     }
   }, [drawings, issues])
+
+  const filteredRules = useMemo(() => {
+    const q = ruleSearch.trim().toLowerCase()
+    return rules.filter(rule => {
+      const disciplineMatch = ruleDiscipline === 'All' || (rule.disciplines || []).includes(ruleDiscipline) || rule.category === ruleDiscipline
+      const severityMatch = ruleSeverity === 'All' || rule.severity === ruleSeverity
+      const haystack = [rule.code, rule.title, rule.category, rule.rule_text, ...(rule.disciplines || []), ...(rule.stages || [])].join(' ').toLowerCase()
+      return disciplineMatch && severityMatch && (!q || haystack.includes(q))
+    })
+  }, [rules, ruleSearch, ruleDiscipline, ruleSeverity])
+
+  const ruleDisciplineOptions = ['All','Architecture','Structural','Mechanical','Electrical','Plumbing','Fire / Life Safety','Infrastructure','Landscaping','Cross-Discipline','Constructability']
 
   const revisionGroups = useMemo(() => {
     const map = new Map<string, DesignDrawing[]>()
@@ -211,9 +228,16 @@ export default function DesignIntelligencePage() {
           <div className="space-y-3">{issues.map(issue => <IssueCard key={issue.id} issue={issue} canManage={canManage} onChange={async patch => { await updateDesignIssue(projectId, issue.id, patch); await load() }}/>)}{!issues.length && <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No design coordination issues recorded yet.</div>}</div>
         </EnterpriseSection>}
 
-        {tab === 'Design Rules' && <EnterpriseSection title="Design Rules Library" description="PMOCorex learns from real delivery failures by turning them into repeatable checks for future projects.">
+        {tab === 'Design Rules' && <EnterpriseSection title="Design Rules Library" description="A governed construction coordination library across Architecture, Structure, MEP, Fire, Infrastructure, Landscape and constructability. Rules are review prompts, not professional design certification.">
           {!canGovernRules && <div className="mb-4"><EnterpriseNotice tone="info">Rules are visible to the project team. Only PMO, Admin and Workspace Admin govern the rules library.</EnterpriseNotice></div>}
-          <div className="grid gap-3 lg:grid-cols-2">{rules.map(rule => <article key={rule.id} className="rounded-2xl border border-slate-200 p-5"><div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wider text-[#05969B]">{rule.code} • {rule.category}</div><h3 className="mt-1 font-bold text-[#0B2A3C]">{rule.title}</h3></div><span className={`rounded-full border px-2 py-1 text-xs font-bold ${severityClass(rule.severity)}`}>{rule.severity}</span></div><p className="mt-3 text-sm leading-6 text-slate-600">{rule.rule_text}</p>{rule.system_rule && <div className="mt-3 text-xs font-semibold text-slate-400">PMOCorex standard rule</div>}</article>)}</div>
+          <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+            <label className="relative block"><Search size={16} className="absolute left-3 top-3.5 text-slate-400"/><input value={ruleSearch} onChange={e=>setRuleSearch(e.target.value)} className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm" placeholder="Search rule, risk, stage or discipline…"/></label>
+            <select value={ruleDiscipline} onChange={e=>setRuleDiscipline(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-[#0B2A3C]">{ruleDisciplineOptions.map(x=><option key={x}>{x}</option>)}</select>
+            <select value={ruleSeverity} onChange={e=>setRuleSeverity(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-[#0B2A3C]">{['All','Critical','High','Medium','Low'].map(x=><option key={x}>{x}</option>)}</select>
+          </div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm"><div className="font-semibold text-[#0B2A3C]">{filteredRules.length} of {rules.length} active rules</div><div className="text-xs text-slate-500">PMOCorex Standard • Lessons Learned • Project-Specific</div></div>
+          <div className="grid gap-3 lg:grid-cols-2">{filteredRules.map(rule => { const open=expandedRule===rule.id; return <article key={rule.id} className="rounded-2xl border border-slate-200 p-5"><button onClick={()=>setExpandedRule(open?null:rule.id)} className="w-full text-left"><div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wider text-[#05969B]">{rule.code} • {rule.category}</div><h3 className="mt-1 font-bold text-[#0B2A3C]">{rule.title}</h3></div><span className={`rounded-full border px-2 py-1 text-xs font-bold ${severityClass(rule.severity)}`}>{rule.severity}</span></div><p className="mt-3 text-sm leading-6 text-slate-600">{rule.rule_text}</p><div className="mt-3 flex flex-wrap gap-1.5">{(rule.disciplines||[]).map(x=><span key={x} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">{x}</span>)}</div></button>{open && <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 text-sm md:grid-cols-2">{rule.why_it_matters && <div><strong className="text-[#0B2A3C]">Why it matters</strong><p className="mt-1 text-slate-600">{rule.why_it_matters}</p></div>}{rule.verification && <div><strong className="text-[#0B2A3C]">What to verify</strong><p className="mt-1 text-slate-600">{rule.verification}</p></div>}{rule.evidence_required && <div><strong className="text-[#0B2A3C]">Evidence</strong><p className="mt-1 text-slate-600">{rule.evidence_required}</p></div>}{rule.resolution_guidance && <div><strong className="text-[#0B2A3C]">Resolution guidance</strong><p className="mt-1 text-slate-600">{rule.resolution_guidance}</p></div>}<div className="md:col-span-2 text-xs font-semibold text-slate-400">{rule.source_class || (rule.system_rule?'PMOCorex Standard':'Project-Specific')} • {(rule.stages||[]).join(' • ')}</div></div>}</article>})}</div>
+          {!filteredRules.length && <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No rules match these filters.</div>}
         </EnterpriseSection>}
 
         {tab === 'Resolution Tracker' && <EnterpriseSection title="Resolution Tracker" description="Close the loop from design finding to verified resolution.">
