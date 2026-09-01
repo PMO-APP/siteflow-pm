@@ -31,6 +31,14 @@ export type DesignDrawing = {
   last_analysed_at?: string | null
   notes?: string | null
   supersedes_drawing_id?: string | null
+  originator_name?: string | null
+  received_by_team?: string | null
+  received_date?: string | null
+  document_custodian?: string | null
+  distribution_status?: 'Not distributed' | 'Partially distributed' | 'Distributed' | 'Recalled' | null
+  distributed_to?: string[]
+  distribution_date?: string | null
+  transmittal_reference?: string | null
   created_at: string
   updated_at: string
 }
@@ -70,6 +78,9 @@ export type DesignIssue = {
   consequence?: string | null
   recommendation?: string | null
   responsible_team?: string | null
+  document_custodian?: string | null
+  technical_owner?: string | null
+  action_owner?: string | null
   drawing_ids: string[]
   rule_id?: string | null
   evidence_url?: string | null
@@ -145,6 +156,8 @@ export async function saveDesignIssue(
     confidence: 'Confirmed',
     status: 'Open',
     source_type: 'Manual',
+    document_custodian: 'Design',
+    action_owner: issue.action_owner || issue.responsible_team || 'Design',
     ...issue,
     project_id: projectId,
     updated_at: new Date().toISOString(),
@@ -252,8 +265,35 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         disciplines: [discipline],
         description: `No current ${discipline} drawing has been registered for this project. Cross-discipline coordination cannot be considered complete.`,
         consequence: 'Design changes or clashes may pass into construction without a coordinated reference set.',
-        recommendation: `Register the current approved ${discipline} drawings and rerun coordination review.`,
-        responsible_team: discipline === 'Architecture' ? 'Design' : discipline,
+        recommendation: `Design Team should obtain/register the current approved ${discipline} drawings from the consultant, distribute the controlled revision and rerun coordination review.`,
+        responsible_team: 'Design',
+        document_custodian: 'Design',
+        technical_owner: discipline,
+        action_owner: 'Design',
+      })
+    }
+  }
+
+  // Design Team is the controlled drawing gateway. A current drawing that has not
+  // been issued onward is a document-control risk even when the consultant drawing exists.
+  for (const drawing of current) {
+    const recipients = drawing.distributed_to || []
+    if (drawing.distribution_status !== 'Distributed' || recipients.length === 0) {
+      findings.push({
+        title: `Current drawing awaiting Design distribution: ${drawing.drawing_number}`,
+        category: 'Drawing Distribution',
+        severity: 'High',
+        confidence: 'Confirmed',
+        source_type: 'Rule',
+        disciplines: [drawing.discipline],
+        drawing_ids: [drawing.id],
+        description: `The controlled current revision ${drawing.revision} has been received/registered but is not recorded as distributed by Design Team to the internal delivery teams.`,
+        consequence: 'Housebuild, MEP or Infrastructure may continue working without the current controlled information or may retain a superseded revision.',
+        recommendation: 'Design Team should complete the controlled distribution, record recipients/date/transmittal and confirm the superseded revision is withdrawn from use.',
+        responsible_team: 'Design',
+        document_custodian: 'Design',
+        technical_owner: drawing.discipline,
+        action_owner: 'Design',
       })
     }
   }
@@ -279,6 +319,9 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         consequence: 'Site teams may construct from conflicting information.',
         recommendation: 'Confirm the approved revision and mark all earlier revisions Superseded.',
         responsible_team: 'Design',
+        document_custodian: 'Design',
+        technical_owner: group[0].discipline,
+        action_owner: 'Design',
       })
     }
 
@@ -298,6 +341,9 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         consequence: 'The approved-for-construction set may not reflect the latest issued design.',
         recommendation: 'Verify approval status before construction continues from this drawing.',
         responsible_team: 'Design',
+        document_custodian: 'Design',
+        technical_owner: group[0].discipline,
+        action_owner: 'Design',
       })
     }
   })
