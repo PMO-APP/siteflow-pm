@@ -45,6 +45,13 @@ export type DesignRule = {
   severity: 'Low' | 'Medium' | 'High' | 'Critical'
   active: boolean
   system_rule: boolean
+  disciplines?: string[]
+  stages?: string[]
+  source_class?: 'PMOCorex Standard' | 'Lessons Learned' | 'Project-Specific'
+  why_it_matters?: string | null
+  verification?: string | null
+  evidence_required?: string | null
+  resolution_guidance?: string | null
   created_at: string
 }
 
