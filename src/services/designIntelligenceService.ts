@@ -237,6 +237,16 @@ function normalise(value: string | null | undefined) {
   return String(value || '').trim().toLowerCase()
 }
 
+function technicalOwnerForDiscipline(discipline: DesignDiscipline | string) {
+  const value = String(discipline || '').trim()
+  if (value === 'Structural') return 'Housebuild'
+  if (value === 'Architecture') return 'Design'
+  if (['MEP', 'Mechanical', 'Electrical', 'Plumbing', 'Fire / Life Safety'].includes(value)) return 'MEP'
+  if (['Infrastructure', 'Civil'].includes(value)) return 'Infrastructure'
+  if (value === 'Landscaping') return 'Landscaping'
+  return value || 'Cross-Discipline'
+}
+
 function revisionRank(value: string) {
   const clean = value.trim().toUpperCase()
   const numeric = Number(clean.replace(/[^0-9.]/g, ''))
@@ -268,7 +278,7 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         recommendation: `Design Team should obtain/register the current approved ${discipline} drawings from the consultant, distribute the controlled revision and rerun coordination review.`,
         responsible_team: 'Design',
         document_custodian: 'Design',
-        technical_owner: discipline,
+        technical_owner: technicalOwnerForDiscipline(discipline),
         action_owner: 'Design',
       })
     }
@@ -292,7 +302,7 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         recommendation: 'Design Team should complete the controlled distribution, record recipients/date/transmittal and confirm the superseded revision is withdrawn from use.',
         responsible_team: 'Design',
         document_custodian: 'Design',
-        technical_owner: drawing.discipline,
+        technical_owner: technicalOwnerForDiscipline(drawing.discipline),
         action_owner: 'Design',
       })
     }
@@ -320,7 +330,7 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         recommendation: 'Confirm the approved revision and mark all earlier revisions Superseded.',
         responsible_team: 'Design',
         document_custodian: 'Design',
-        technical_owner: group[0].discipline,
+        technical_owner: technicalOwnerForDiscipline(group[0].discipline),
         action_owner: 'Design',
       })
     }
@@ -342,7 +352,7 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         recommendation: 'Verify approval status before construction continues from this drawing.',
         responsible_team: 'Design',
         document_custodian: 'Design',
-        technical_owner: group[0].discipline,
+        technical_owner: technicalOwnerForDiscipline(group[0].discipline),
         action_owner: 'Design',
       })
     }
