@@ -12,6 +12,9 @@ import {
   RotateCcw,
   Send,
   XCircle,
+  History,
+  Download,
+  X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
@@ -33,6 +36,8 @@ import { fdate } from '@/lib/utils'
 import type { WeeklyReport } from '@/types'
 import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { ExecutiveHealthReportPanel, HealthHistoryChart } from '@/components/health'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
 function workflowBadge(status?: string | null) {
@@ -127,6 +132,7 @@ export default function ReportsPage() {
 
   const reportRef = useRef<HTMLDivElement>(null)
   const allReportsRef = useRef<HTMLDivElement>(null)
+  const downloadReportRef = useRef<HTMLDivElement>(null)
 
   const { data: allReports = [], isLoading } = useWeeklyReports()
   const isCombinedIPD = routeDiscipline === 'combined'
@@ -170,6 +176,9 @@ export default function ReportsPage() {
   const [showReportModal, setShowReportModal] = useState(false)
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [downloadReportId, setDownloadReportId] = useState<string | null>(null)
+  const [isDownloadingHistory, setIsDownloadingHistory] = useState(false)
 
   const [photos, setPhotos] = useState<File[]>([])
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>({})
@@ -299,6 +308,52 @@ export default function ReportsPage() {
 
     return Object.entries(map).sort(([a], [b]) => b.localeCompare(a))
   }, [reports])
+
+  const currentReport = reports[0] || null
+  const historyReports = reports.slice(1)
+  const downloadReport = reports.find((report: any) => report.id === downloadReportId) as any
+
+  async function downloadHistoricalReport(report: any) {
+    if (!report?.id || isDownloadingHistory) return
+    setIsDownloadingHistory(true)
+    try {
+      await loadAllPrintData()
+      setDownloadReportId(report.id)
+      await new Promise(resolve => setTimeout(resolve, 450))
+
+      const node = downloadReportRef.current
+      if (!node) throw new Error('The report could not be prepared for download.')
+
+      const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+      let position = 0
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      const safeProject = String(projectName || 'Project').replace(/[^a-z0-9_-]+/gi, '-')
+      const safeDiscipline = String(disciplineLabel || 'IPD').replace(/[^a-z0-9_-]+/gi, '-')
+      const safeDate = String(report.report_date || 'report').replace(/[^0-9-]+/g, '')
+      pdf.save(`${safeProject}-${safeDiscipline}-${safeDate}.pdf`)
+    } catch (error: any) {
+      notify('error', error?.message || 'Could not download the report.')
+    } finally {
+      setDownloadReportId(null)
+      setIsDownloadingHistory(false)
+    }
+  }
 
   const openRisks = risks.filter(risk => risk.status === 'Open').length
 
@@ -1005,7 +1060,13 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button className="btn-ghost btn-sm btn" onClick={printSelectedReport}>
+          <button className="btn-ghost btn-sm btn" onClick={() => setShowHistory(true)}>
+            <History size={13} />
+            History
+            {historyReports.length > 0 && <span className="ml-1 rounded-full bg-[#e8f6f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#05969b]">{historyReports.length}</span>}
+          </button>
+
+          <button className="btn-ghost btn-sm btn" onClick={printSelectedReport} disabled={!currentReport}>
             <Printer size={13} />
             Print Selected
           </button>
@@ -1035,81 +1096,11 @@ export default function ReportsPage() {
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)] gap-4 items-start">
-        <div className="card p-4 space-y-3">
-          <div className="flex items-center gap-2 text-[#102943] font-semibold">
-            <FileText size={16} className="text-[#df5f41]" />
-            Report History
-          </div>
-
-          {isLoading ? (
-            <div className="text-sm text-[#74818d]">Loading reports…</div>
-          ) : reports.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-[#74818d]">
-              No reports yet.
-            </div>
-          ) : (
-            reportGroups.map(([date, dateReports]) => (
-              <div key={date} className="space-y-2">
-                <div className="text-[10px] uppercase tracking-widest text-[#df5f41] pt-2">
-                  Week Ending {fdate(date)}
-                </div>
-
-                {dateReports.map(report => {
-                  const reportAny = report as any
-
-                  const packageName =
-                    reportAny.package_name ||
-                    packages.find(item => item.id === reportAny.block_id)?.package_name ||
-                    packages.find(item => item.id === reportAny.block_id)?.block_name ||
-                    'Project Wide'
-
-                  return (
-                    <button
-                      key={report.id}
-                      onClick={() => setSelectedReportId(report.id)}
-                      className={`w-full text-left rounded-xl border p-3 transition ${
-                        selectedReport?.id === report.id
-                          ? 'border-[#c49e48]/40 bg-[#ff7657]/10'
-                          : 'border-white/10 bg-white hover:border-[#ffd1c5]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-semibold text-[#102943]">
-                          {reportAny.department || reportAny.discipline || 'IPD'}
-                        </div>
-
-                        <span className={`badge ${workflowBadge(reportAny.workflow_status || 'Draft')}`}>
-                          {reportAny.workflow_status || 'Draft'}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] text-[#df5f41] mt-1">
-                        {packageName}
-                      </div>
-
-                      <div className="text-[11px] text-[#74818d] mt-1">
-                        Officer: {reportAny.reporting_officer || '—'}
-                      </div>
-
-                      {selectedReport?.id === report.id && reportPhotos.length > 0 && (
-                        <div className="text-[10px] text-[#74818d] mt-1 flex items-center gap-1">
-                          <ImageIcon size={11} />
-                          {reportPhotos.length} photo(s)
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            ))
-          )}
-        </div>
-
+      <div className="grid grid-cols-1 gap-4 items-start">
         <div className="min-w-0 space-y-3">
           {!selectedReport ? (
             <div className="card p-8 text-center text-[#74818d]">
-              Select a report from the history, or create this week’s report if you have write access.
+              No current report yet. Create this week’s report if you have write access. Previous reports are available from History.
             </div>
           ) : (
             <>
@@ -1281,6 +1272,79 @@ export default function ReportsPage() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {showHistory && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#102943]/45 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) setShowHistory(false) }}>
+          <div className="w-full max-w-3xl overflow-hidden rounded-[24px] bg-white shadow-2xl">
+            <div className="h-1.5 bg-[#08b5a6]" />
+            <div className="flex items-start justify-between border-b border-[#e5e8eb] p-6">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#05969b]">Report archive</div>
+                <h2 className="mt-2 text-2xl font-semibold text-[#102943]">{disciplineLabel} History</h2>
+                <p className="mt-1 text-sm text-[#6f7d89]">Previous reports are kept here so the live reporting page stays focused on the current week.</p>
+              </div>
+              <button onClick={() => setShowHistory(false)} className="rounded-lg p-2 text-[#6f7d89] hover:bg-[#f2f5f7]"><X size={18} /></button>
+            </div>
+
+            <div className="max-h-[65vh] overflow-y-auto p-6">
+              {historyReports.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#d9e1e7] p-10 text-center text-sm text-[#74818d]">No previous reports yet.</div>
+              ) : (
+                <div className="space-y-3">
+                  {historyReports.map((report: any) => {
+                    const packageName = report.package_name || packages.find(item => item.id === report.block_id)?.package_name || packages.find(item => item.id === report.block_id)?.block_name || 'Project Wide'
+                    return (
+                      <div key={report.id} className="flex flex-col gap-3 rounded-2xl border border-[#e2e8ec] p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="font-semibold text-[#102943]">Week Ending {fdate(report.report_date)}</div>
+                            <span className={`badge ${workflowBadge(report.workflow_status || 'Draft')}`}>{report.workflow_status || 'Draft'}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-[#6f7d89]">{packageName} · Officer: {report.reporting_officer || '—'}</div>
+                        </div>
+                        <button
+                          className="btn-ghost btn-sm btn shrink-0"
+                          disabled={isDownloadingHistory}
+                          onClick={() => downloadHistoricalReport(report)}
+                        >
+                          <Download size={13} />
+                          {isDownloadingHistory && downloadReportId === report.id ? 'Preparing…' : 'Download PDF'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed left-[-10000px] top-0 w-[794px] bg-white" aria-hidden="true">
+        <div ref={downloadReportRef}>
+          {downloadReport && (
+            <ReportDocument
+              report={{
+                ...downloadReport,
+                status_summary: downloadReport.status_summary || buildSnapshotHealth(downloadReport, reportProjectHealth).statusSummary,
+              }}
+              projectName={projectName}
+              projectImageUrl={projectImageUrl}
+              branding={activeWorkspace?.branding}
+              organizationName={activeWorkspace?.name}
+              selectedPackage={packages.find(item => item.id === downloadReport.block_id)}
+              activities={allReportActivities[downloadReport.id] || []}
+              photos={allReportPhotos[downloadReport.id] || []}
+              contractSum={contractSum}
+              openSnags={openSnags}
+              criticalSnags={criticalSnags}
+              openRisks={openRisks}
+              pendingProcurement={pendingProcurement}
+              projectHealth={buildSnapshotHealth(downloadReport, reportProjectHealth)}
+            />
+          )}
         </div>
       </div>
 
