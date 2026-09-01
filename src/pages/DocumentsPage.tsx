@@ -2,6 +2,7 @@ import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, X, Search, Upload, Download } from 'lucide-react'
 import { useDocuments, useUpsertDocument } from '@/hooks/useData'
 import { uploadFile, backupFileToGoogleDrive } from '@/lib/supabase'
@@ -498,6 +499,8 @@ function DocModal({
 export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const { can, session } = useAccessSession()
   const { projectId } = useProjectStore()
@@ -508,7 +511,7 @@ export default function DocumentsPage() {
 
   useQuickActionRoute(() => setModal('new'), canCreateDocument)
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '')
   const [discFilter, setDiscFilter] = useState('')
   const [statFilter, setStatFilter] = useState('')
   const [viewMode, setViewMode] = useState<'register' | 'library'>('register')
@@ -565,7 +568,11 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="rounded-xl border border-[#b9ebe6] bg-[#E8F6F4] px-4 py-3 text-sm text-[#0B2A3C]">
+        <strong>Document Control is the source of truth.</strong> Drawing uploads, revisions, approvals and superseded records are managed here. Design Intelligence reads these drawing records automatically for revision comparison and coordination review.
+      </div>
+
+      <div className="flex flex-wrap gap-2">
         <button
           className={`btn btn-sm ${
             viewMode === 'register' ? 'btn-gold' : 'btn-ghost'
@@ -582,6 +589,13 @@ export default function DocumentsPage() {
           onClick={() => setViewMode('library')}
         >
           Document Library
+        </button>
+
+        <button
+          className="btn btn-sm btn-ghost"
+          onClick={() => navigate('/app/design-intelligence')}
+        >
+          Design Intelligence
         </button>
       </div>
 
@@ -788,6 +802,16 @@ export default function DocumentsPage() {
                                 >
                                   Drive
                                 </a>
+                              )}
+
+                              {document.type === 'Drawing' && (
+                                <button
+                                  className="tbl-action"
+                                  title="Open this drawing in Design Intelligence"
+                                  onClick={() => navigate(`/app/design-intelligence?document=${document.id}`)}
+                                >
+                                  Design Intel
+                                </button>
                               )}
 
                               {canEditThisDocument ? (
