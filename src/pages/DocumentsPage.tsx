@@ -67,6 +67,8 @@ const ISSUED_FOR = [
 
 const REVISIONS = ['A', 'B', 'C', 'D', 'E', 'P1', 'P2', 'P3', '1', '2', '3']
 
+const INTERNAL_DISTRIBUTION_TEAMS = ['Housebuild', 'MEP', 'Infrastructure']
+
 function getDocumentFolder(type: string, discipline?: string) {
   const cleanDiscipline = (discipline || 'general')
     .toLowerCase()
@@ -129,6 +131,14 @@ function DocModal({
     google_drive_sync_status:
       (item as any)?.google_drive_sync_status || 'pending',
     google_drive_sync_error: (item as any)?.google_drive_sync_error || '',
+    originator_name: (item as any)?.originator_name || (item as any)?.consultant_name || item?.issued_by || '',
+    received_by_team: (item as any)?.received_by_team || 'Design',
+    received_date: (item as any)?.received_date || item?.revision_date || new Date().toISOString().slice(0, 10),
+    document_custodian: (item as any)?.document_custodian || 'Design',
+    distribution_status: (item as any)?.distribution_status || 'Not distributed',
+    distributed_to: Array.isArray((item as any)?.distributed_to) ? (item as any).distributed_to : [],
+    distribution_date: (item as any)?.distribution_date ? String((item as any).distribution_date).slice(0, 10) : '',
+    transmittal_reference: (item as any)?.transmittal_reference || '',
   })
 
   const set = (key: string, value: any) =>
@@ -220,6 +230,8 @@ function DocModal({
       document_type: form.type,
       revision_no: form.revision,
       drawing_number: form.document_number,
+      document_custodian: form.type === 'Drawing' ? 'Design' : undefined,
+      received_by_team: form.type === 'Drawing' ? 'Design' : undefined,
       uploaded_by: item?.uploaded_by || user?.id,
     } as any)
 
@@ -344,10 +356,11 @@ function DocModal({
                 <input
                   className="form-control"
                   value={form.consultant_name}
-                  onChange={event =>
+                  onChange={event => {
                     set('consultant_name', event.target.value)
-                  }
-                  placeholder="Consultant / reviewer"
+                    set('originator_name', event.target.value)
+                  }}
+                  placeholder="Originating external consultant"
                 />
               </div>
             </div>
@@ -422,6 +435,62 @@ function DocModal({
                     <option key={status}>{status}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+          )}
+
+          {form.type === 'Drawing' && (
+            <div className="rounded-xl border border-[#08B5A6]/30 bg-[#E8F6F4]/60 p-4 space-y-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#05969B]">Controlled Drawing Gateway</div>
+                <div className="mt-1 text-[12px] text-[#445b68]">External consultant → Design Team → controlled distribution to Housebuild, MEP and Infrastructure.</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Document Custodian</label>
+                  <input className="form-control bg-white/70" value="Design Team" readOnly />
+                </div>
+                <div>
+                  <label className="form-label">Received Date</label>
+                  <input type="date" className="form-control" value={form.received_date} onChange={event => set('received_date', event.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label">Distribution Status</label>
+                  <select className="form-control" value={form.distribution_status} onChange={event => set('distribution_status', event.target.value)}>
+                    {['Not distributed','Partially distributed','Distributed','Recalled'].map(status => <option key={status}>{status}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Distribution Date</label>
+                  <input type="date" className="form-control" value={form.distribution_date} onChange={event => set('distribution_date', event.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Distributed To</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {INTERNAL_DISTRIBUTION_TEAMS.map(team => {
+                    const checked = form.distributed_to.includes(team)
+                    return <label key={team} className="flex items-center gap-2 rounded-lg border border-[#b8ded9] bg-white px-3 py-2 text-[12px] font-semibold text-[#102943]">
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        const next = checked ? form.distributed_to.filter((item: string) => item !== team) : [...form.distributed_to, team]
+                        set('distributed_to', next)
+                        set('distribution_status', next.length === 0 ? 'Not distributed' : next.length === INTERNAL_DISTRIBUTION_TEAMS.length ? 'Distributed' : 'Partially distributed')
+                        if (next.length > 0 && !form.distribution_date) set('distribution_date', new Date().toISOString().slice(0, 10))
+                      }} />
+                      {team}
+                    </label>
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Transmittal / Distribution Reference</label>
+                <input className="form-control" value={form.transmittal_reference} onChange={event => set('transmittal_reference', event.target.value)} placeholder="e.g. TR-STR-042" />
               </div>
             </div>
           )}
@@ -684,6 +753,7 @@ export default function DocumentsPage() {
                     <th>Rev Date</th>
                     <th>Status</th>
                     <th className="hide-mobile">Issued By</th>
+                    <th className="hide-mobile">Distribution</th>
                     <th className="hide-mobile">Size</th>
                     <th></th>
                   </tr>
@@ -693,7 +763,7 @@ export default function DocumentsPage() {
                   {isLoading ? (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="text-center py-6 text-[#74818d]"
                       >
                         Loading…
@@ -702,7 +772,7 @@ export default function DocumentsPage() {
                   ) : filtered.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="text-center py-8 text-[#74818d]"
                       >
                         {docs.length === 0
@@ -769,7 +839,16 @@ export default function DocumentsPage() {
                           </td>
 
                           <td className="hide-mobile text-[11px] text-[#74818d]">
-                            {document.issued_by || '—'}
+                            {(document as any).originator_name || document.issued_by || '—'}
+                          </td>
+
+                          <td className="hide-mobile">
+                            {document.type === 'Drawing' ? <div>
+                              <span className={`badge ${(document as any).distribution_status === 'Distributed' ? 'badge-success' : (document as any).distribution_status === 'Partially distributed' ? 'badge-warning' : 'badge-muted'}`}>
+                                {(document as any).distribution_status || 'Not distributed'}
+                              </span>
+                              {Array.isArray((document as any).distributed_to) && (document as any).distributed_to.length > 0 && <div className="mt-1 text-[9px] text-[#74818d]">{(document as any).distributed_to.join(', ')}</div>}
+                            </div> : <span className="text-[#74818d]">—</span>}
                           </td>
 
                           <td className="hide-mobile text-[10px] font-mono text-[#74818d]">
