@@ -39,7 +39,7 @@ import { ExecutiveHealthReportPanel, HealthHistoryChart } from '@/components/hea
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
-const IPD_DISCIPLINES = ['Housebuild', 'Infrastructure', 'MEP']
+const IPD_DISCIPLINES = ['Housebuild', 'Mechanical', 'Electrical', 'Infrastructure']
 function workflowBadge(status?: string | null) {
   if (status === 'Approved' || status === 'Locked') return 'badge-green'
   if (status === 'Submitted' || status === 'Resubmitted') return 'badge-amber'
@@ -228,15 +228,18 @@ export default function ReportsPage() {
       selectedReportAny?.reporting_officer_email?.toLowerCase().trim() === currentEmail
     )
 
+  const isPrivilegedEditor = ['workspace_admin', 'admin'].includes(role || '')
+
   const canCreatorEdit =
     Boolean(selectedReport) &&
-    isCreator &&
-    (workflowStatus === 'Draft' || workflowStatus === 'Returned')
+    (isCreator || isPrivilegedEditor) &&
+    !Boolean(selectedReportAny?.sent_to_pmo_at) &&
+    ['Draft', 'Returned', 'Submitted', 'Resubmitted'].includes(workflowStatus)
 
   const canCreatorSubmit =
     Boolean(selectedReport) &&
-    isCreator &&
-    !canReview &&
+    (isCreator || isPrivilegedEditor) &&
+    !isLocked &&
     (workflowStatus === 'Draft' || workflowStatus === 'Returned')
 
   const canReviewerAct =
@@ -250,6 +253,7 @@ export default function ReportsPage() {
   const emptyForm = {
     department: disciplineLabel || (session.discipline ? session.discipline.charAt(0).toUpperCase()+session.discipline.slice(1) : ''),
     block_id: '',
+    delivery_package_id: '',
     package_name: '',
     contractor_name: '',
     reporting_officer: user?.full_name || '',
@@ -297,7 +301,7 @@ export default function ReportsPage() {
   }, [selectedReport?.id])
 
   const selectedPackage = packages.find(
-    item => item.id === selectedReportAny?.block_id
+    item => item.id === (selectedReportAny?.delivery_package_id || selectedReportAny?.block_id)
   )
 
   const reportProjectHealth = {
@@ -307,6 +311,16 @@ export default function ReportsPage() {
     forecastFinish: projectHealth?.forecastFinishIso || null,
     status: projectHealth?.projectHealth || 'On Track',
   }
+
+  const automaticVarianceDays = Number(reportProjectHealth.varianceDays || 0)
+  const automaticDaysBehind = automaticVarianceDays < 0 ? Math.abs(automaticVarianceDays) : 0
+  const automaticReportStatus = automaticVarianceDays <= -15
+    ? 'Stuck'
+    : automaticVarianceDays < 0
+      ? 'Behind'
+      : automaticVarianceDays > 0
+        ? 'Ahead'
+        : 'On Track'
 
   const reportSnapshot = buildSnapshotHealth(selectedReportAny, reportProjectHealth)
 
@@ -409,12 +423,18 @@ export default function ReportsPage() {
       return
     }
 
-    const { data, error } = await supabase
-      .from('project_blocks')
+    let packageQuery = supabase
+      .from('delivery_packages')
       .select('*')
       .eq('project_id', projectId)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
+      .is('archived_at', null)
+      .order('name', { ascending: true })
+
+    if (reportDiscipline === 'housebuild') packageQuery = packageQuery.eq('discipline', 'Housebuild')
+    if (reportDiscipline === 'infrastructure') packageQuery = packageQuery.eq('discipline', 'Infrastructure')
+    if (reportDiscipline === 'mep') packageQuery = packageQuery.eq('discipline', 'MEP')
+
+    const { data, error } = await packageQuery
 
     if (error) {
       console.error(error.message)
@@ -471,15 +491,19 @@ export default function ReportsPage() {
     const previous = Number(item.previous_progress || 0)
     const current = Number(item.new_progress || 0)
 
+    const taskPackageId = item.delivery_package_id || item.tasks?.delivery_package_id || item.block_id || item.tasks?.block_id || null
+    const taskPackage = packages.find(pkg => String(pkg.id) === String(taskPackageId || ''))
+    const baseActivity =
+      item.tasks?.task_name ||
+      item.tasks?.name ||
+      item.tasks?.activity ||
+      item.tasks?.title ||
+      `Task ${item.task_id || ''}`
+
     return {
       id: item.id,
       taskId: item.task_id,
-      activity:
-        item.tasks?.task_name ||
-        item.tasks?.name ||
-        item.tasks?.activity ||
-        item.tasks?.title ||
-        `Task ${item.task_id || ''}`,
+      activity: taskPackage?.name ? `${taskPackage.name} · ${baseActivity}` : baseActivity,
       last_week: previous,
       this_week: current,
       planned: Number(
@@ -556,14 +580,18 @@ export default function ReportsPage() {
       .lte('created_at', end)
       .order('created_at', { ascending: true })
 
-    if (report.block_id) query = query.eq('block_id', report.block_id)
-
     const { data, error } = await query
     if (error) throw error
 
     return dedupeActivities(
       (data || [])
         .filter(activityBelongsToReport)
+        .filter((item: any) => {
+          const packageId = report.delivery_package_id || report.block_id || null
+          if (!packageId) return true
+          const taskPackageId = item.delivery_package_id || item.tasks?.delivery_package_id || item.block_id || item.tasks?.block_id || null
+          return String(taskPackageId || '') === String(packageId)
+        })
         .map(mapActivity)
     )
   }
@@ -605,6 +633,8 @@ export default function ReportsPage() {
         .insert(
           activities.map((item: any) => ({
             report_id: report.id,
+            task_id: item.taskId || null,
+            delivery_package_id: report.delivery_package_id || report.block_id || null,
             activity: item.activity,
             last_week: item.last_week,
             this_week: item.this_week,
@@ -708,10 +738,18 @@ export default function ReportsPage() {
 
   function openEditReport(report: WeeklyReport) {
     const reportAny = report as any
+    const email = user?.email?.toLowerCase().trim() || ''
+    const ownsReport = reportAny.created_by === user?.id || reportAny.reporting_officer_email?.toLowerCase().trim() === email
+    const editableStatus = ['Draft', 'Returned', 'Submitted', 'Resubmitted'].includes(String(reportAny.workflow_status || 'Draft')) && !reportAny.sent_to_pmo_at
+    if (!(isPrivilegedEditor || ownsReport) || !editableStatus) {
+      notify('info', 'This report is view only. Only its creator, Workspace Admin or Admin can edit it before the combined report is sent to PMO.')
+      return
+    }
 
     setReportForm({
       department: reportAny.department || reportAny.discipline || '',
       block_id: reportAny.block_id || '',
+      delivery_package_id: reportAny.delivery_package_id || '',
       package_name: reportAny.package_name || '',
       contractor_name: reportAny.contractor_name || '',
       reporting_officer: reportAny.reporting_officer || '',
@@ -745,8 +783,9 @@ export default function ReportsPage() {
 
     setReportForm(current => ({
       ...current,
-      block_id: packageId,
-      package_name: pkg?.package_name || pkg?.block_name || '',
+      block_id: '',
+      delivery_package_id: packageId,
+      package_name: pkg?.name || pkg?.package_name || pkg?.block_name || '',
       contractor_name: pkg?.contractor_name || current.contractor_name || '',
     }))
   }
@@ -777,48 +816,52 @@ export default function ReportsPage() {
   async function uploadReportPhotos(reportId: string) {
     if (!reportId || photos.length === 0) return
 
-    setUploadingPhotos(true)
-
-    for (const photo of photos) {
-      const safeName = photo.name.replace(/\s+/g, '-').toLowerCase()
-      const filePath = `${reportId}/${Date.now()}-${safeName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('report-photos')
-        .upload(filePath, photo, { cacheControl: '3600', upsert: false })
-
-      if (uploadError) {
-        notify('error', `Photo upload failed: ${uploadError.message}`)
-        setUploadingPhotos(false)
-        return
-      }
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('report-photos').getPublicUrl(filePath)
-
-      const { error: photoInsertError } = await supabase
-        .from('report_photos')
-        .insert({
-          report_id: reportId,
-          photo_url: publicUrl,
-          photo_name: photo.name,
-          caption: photoCaptions[photo.name] || null,
-          uploaded_by: user?.full_name || user?.email || 'User',
-          created_by: user?.id || null,
-          report_type: 'IPD',
-        })
-
-      if (photoInsertError) notify('error', photoInsertError.message)
+    const existingCount = selectedReportId ? reportPhotos.length : 0
+    if (existingCount + photos.length > 10) {
+      notify('error', `A report can contain up to 10 progress photos. You can add ${Math.max(0, 10 - existingCount)} more.`)
+      return
     }
 
-    setUploadingPhotos(false)
-    setPhotos([])
+    setUploadingPhotos(true)
+    try {
+      const stamp = Date.now()
+      await Promise.all(photos.map(async (photo, index) => {
+        const safeName = photo.name.replace(/\s+/g, '-').toLowerCase()
+        const filePath = `${reportId}/${stamp}-${index}-${safeName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('report-photos')
+          .upload(filePath, photo, { cacheControl: '3600', upsert: false })
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage.from('report-photos').getPublicUrl(filePath)
+        const { error: photoInsertError } = await supabase
+          .from('report_photos')
+          .insert({
+            report_id: reportId,
+            photo_url: publicUrl,
+            photo_name: photo.name,
+            caption: photoCaptions[photo.name] || null,
+            uploaded_by: user?.full_name || user?.email || 'User',
+            created_by: user?.id || null,
+            report_type: 'IPD',
+          })
+        if (photoInsertError) throw photoInsertError
+      }))
+      setPhotos([])
+    } finally {
+      setUploadingPhotos(false)
+    }
   }
 
   async function saveReport() {
-    if (!canWriteDiscipline) {
-      notify('error', `This report is read-only for you. Only this project's assigned ${disciplineLabel || 'responsible'} owner or an active delegate can write here.`)
+    const existing = Boolean(selectedReportId)
+    const mayCreate = canWriteDiscipline || isPrivilegedEditor
+    const mayEditExisting = canCreatorEdit
+    if ((existing && !mayEditExisting) || (!existing && !mayCreate)) {
+      notify('error', existing
+        ? 'This report is read-only. Only the report creator, Workspace Admin or Admin can edit it before submission.'
+        : `You can view ${disciplineLabel || 'this'} reports, but you are not authorised to create one for this discipline.`)
       return
     }
     try {
@@ -833,7 +876,7 @@ export default function ReportsPage() {
   overallProgress: reportProjectHealth.overallProgress,
   varianceDays: reportProjectHealth.varianceDays,
   varianceLabel: reportProjectHealth.varianceLabel,
-  status: reportProjectHealth.status,
+  status: automaticReportStatus,
   statusSummary: reportProjectHealth.statusSummary,
 }
       const savedReport = await upsertReport.mutateAsync({
@@ -845,7 +888,9 @@ export default function ReportsPage() {
           ? new Date().toISOString().slice(0, 10)
           : selectedReportAny?.report_date,
 
-        block_id: reportForm.block_id || null,
+        block_id: null,
+        delivery_package_id: reportForm.delivery_package_id || null,
+        status: automaticReportStatus,
         next_meeting: reportForm.next_meeting || null,
         discipline: reportForm.department,
 
@@ -1135,7 +1180,7 @@ export default function ReportsPage() {
             </>
           )}
 
-          {canWriteDiscipline && (
+          {(canWriteDiscipline || isPrivilegedEditor) && (
             <button className="btn-gold btn-sm btn" onClick={openNewReport}>
               <Plus size={13} />
               Create {disciplineLabel} Report
@@ -1325,7 +1370,7 @@ export default function ReportsPage() {
                   projectImageUrl={projectImageUrl}
                   branding={activeWorkspace?.branding}
                   organizationName={activeWorkspace?.name}
-                  selectedPackage={packages.find(item => item.id === report.block_id)}
+                  selectedPackage={packages.find(item => item.id === (report.delivery_package_id || report.block_id))}
                   activities={allReportActivities[report.id] || []}
                   photos={allReportPhotos[report.id] || []}
                   contractSum={contractSum}
@@ -1360,7 +1405,7 @@ export default function ReportsPage() {
               ) : (
                 <div className="space-y-3">
                   {historyReports.map((report: any) => {
-                    const packageName = report.package_name || packages.find(item => item.id === report.block_id)?.package_name || packages.find(item => item.id === report.block_id)?.block_name || 'Project Wide'
+                    const packageName = report.package_name || packages.find(item => item.id === (report.delivery_package_id || report.block_id))?.name || packages.find(item => item.id === (report.delivery_package_id || report.block_id))?.package_name || packages.find(item => item.id === (report.delivery_package_id || report.block_id))?.block_name || 'Project Wide'
                     return (
                       <div key={report.id} className="flex flex-col gap-3 rounded-2xl border border-[#e2e8ec] p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
@@ -1400,7 +1445,7 @@ export default function ReportsPage() {
               projectImageUrl={projectImageUrl}
               branding={activeWorkspace?.branding}
               organizationName={activeWorkspace?.name}
-              selectedPackage={packages.find(item => item.id === downloadReport.block_id)}
+              selectedPackage={packages.find(item => item.id === (downloadReport.delivery_package_id || downloadReport.block_id))}
               activities={allReportActivities[downloadReport.id] || []}
               photos={allReportPhotos[downloadReport.id] || []}
               contractSum={contractSum}
@@ -1481,13 +1526,13 @@ export default function ReportsPage() {
 
             <select
               className="form-control"
-              value={reportForm.block_id}
+              value={reportForm.delivery_package_id}
               onChange={event => onPackageChange(event.target.value)}
             >
               <option value="">Project Wide / No Package</option>
               {packages.map(pkg => (
                 <option key={pkg.id} value={pkg.id}>
-                  {pkg.package_name || pkg.block_name}
+                  {pkg.name || pkg.package_name || pkg.block_name}
                   {pkg.contractor_name ? ` — ${pkg.contractor_name}` : ''}
                 </option>
               ))}
@@ -1529,21 +1574,16 @@ export default function ReportsPage() {
               }
             />
 
-            <select
-              className="form-control"
-              value={reportForm.status}
-              onChange={event =>
-                setReportForm(current => ({
-                  ...current,
-                  status: event.target.value,
-                }))
-              }
-            >
-              <option>Ahead</option>
-              <option>On Track</option>
-              <option>Behind</option>
-              <option>Stuck</option>
-            </select>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#dfe3e7] bg-[#f7f9fa] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#74818d]">Delivery status · automatic</div>
+                <div className="mt-1 text-sm font-semibold text-[#102943]">{automaticReportStatus}</div>
+              </div>
+              <div className="rounded-xl border border-[#dfe3e7] bg-[#f7f9fa] px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#74818d]">Days behind · automatic</div>
+                <div className="mt-1 text-sm font-semibold text-[#102943]">{automaticDaysBehind > 0 ? `${automaticDaysBehind} day${automaticDaysBehind === 1 ? '' : 's'}` : '0 days'}</div>
+              </div>
+            </div>
 
             <input
               type="number"
@@ -1591,6 +1631,7 @@ export default function ReportsPage() {
                 <UploadCloud size={15} className="text-[#df5f41]" />
                 Upload Progress Photos
               </div>
+              <div className="text-xs text-[#74818d]">Select and upload up to 10 photos at once. {selectedReportId ? `${reportPhotos.length}/10 already saved.` : '0/10 saved.'}</div>
 
               <input
                 type="file"
@@ -1598,8 +1639,16 @@ export default function ReportsPage() {
                 accept="image/*"
                 className="form-control"
                 onChange={event => {
-                  setPhotos(Array.from(event.target.files || []))
+                  const selected = Array.from(event.target.files || [])
+                  const remaining = Math.max(0, 10 - (selectedReportId ? reportPhotos.length : 0))
+                  if (selected.length > remaining) {
+                    notify('info', `You can select up to ${remaining} more photo${remaining === 1 ? '' : 's'} for this report.`)
+                    setPhotos(selected.slice(0, remaining))
+                  } else {
+                    setPhotos(selected)
+                  }
                   setPhotoCaptions({})
+                  event.target.value = ''
                 }}
               />
 
