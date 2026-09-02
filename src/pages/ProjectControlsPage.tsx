@@ -349,6 +349,7 @@ export default function ProjectControlsPage() {
       task_id: taskId,
       schedule_revision_id: task.schedule_revision_id || null,
       block_id: task.block_id || null,
+      delivery_package_id: task.delivery_package_id || null,
       previous_progress: previousProgress,
       new_progress: newProgress,
       delay_reason: payload.delay_reason,
