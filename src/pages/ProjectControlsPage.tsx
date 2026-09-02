@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, ChevronDown, ChevronUp, Save } from 'lucide-react'
 import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
+import { taskVisibleInDiscipline } from '@/features/schedule/disciplineProjection'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
@@ -10,11 +11,13 @@ import { fdate } from '@/lib/utils'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
 
-type DisciplineTab = 'Overall' | 'Housebuild' | 'MEP' | 'Infrastructure'
+type DisciplineTab = 'Overall' | 'Housebuild' | 'Mechanical' | 'Electrical' | 'MEP' | 'Infrastructure'
 
 const DISCIPLINE_TABS: DisciplineTab[] = [
   'Overall',
   'Housebuild',
+  'Mechanical',
+  'Electrical',
   'MEP',
   'Infrastructure',
 ]
@@ -133,7 +136,7 @@ export default function ProjectControlsPage() {
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
-  const disciplinePermission = disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
+  const disciplinePermission = ['Mechanical', 'Electrical'].includes(disciplineTab) ? 'mep' : disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
   const canEdit = Boolean(projectId) && can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: disciplinePermission })
   const canUploadSchedule = Boolean(projectId) && can('schedule.import', { scopeType: 'project', scopeId: projectId, discipline: 'overall' })
 
@@ -175,12 +178,7 @@ export default function ProjectControlsPage() {
     void loadData(projectId, requestId, !!cached)
   }, [projectId])
 
-  const tasks =
-    disciplineTab === 'Overall'
-      ? allTasks
-      : allTasks.filter(
-          task => (task.discipline || 'Housebuild') === disciplineTab
-        )
+  const tasks = allTasks.filter(task => taskVisibleInDiscipline(task as any, disciplineTab))
 
   async function loadData(
     targetProjectId = projectId,
@@ -344,22 +342,7 @@ export default function ProjectControlsPage() {
       return
     }
 
-    await supabase.from('task_progress_logs').insert({
-      project_id: projectId,
-      task_id: taskId,
-      schedule_revision_id: task.schedule_revision_id || null,
-      block_id: task.block_id || null,
-      delivery_package_id: task.delivery_package_id || null,
-      previous_progress: previousProgress,
-      new_progress: newProgress,
-      delay_reason: payload.delay_reason,
-      recovery_action: payload.recovery_action,
-      comments: payload.progress_comments,
-      updated_by: user?.id || null,
-      updated_by_name: user?.full_name || user?.email || null,
-      updated_by_email: user?.email || null,
-      updated_by_role: role || null,
-    })
+    // task_progress_logs is written automatically by the database trigger whenever progress_pct changes.
 
     setEdits(current => {
       const copy = { ...current }
