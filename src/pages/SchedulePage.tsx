@@ -26,7 +26,6 @@ import { useMembershipStore } from '@/store/membership'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
 import { useScheduleImport } from '@/features/schedule/imports'
-import { useUpdateTask } from '@/features/schedule/hooks'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 import { useArchiveDeliveryPackage, useCreateDeliveryPackage, useDeleteDeliveryPackage, useDeliveryPackages, useUpdateDeliveryPackage, type DeliveryPackage } from '@/features/schedule/deliveryPackages'
 import { useQualityGates } from '@/hooks/useData'
@@ -37,13 +36,14 @@ import TaskModal from '@/components/modules/schedule/TaskModal'
 import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
 import { pmoConfirm, pmoPrompt, pmoToast } from '@/lib/notifications'
+import { taskVisibleInDiscipline } from '@/features/schedule/disciplineProjection'
 
 type View = 'list' | 'gantt' | 'milestones'
-type DisciplineTab = 'Overall' | 'Housebuild' | 'MEP' | 'Infrastructure'
-type ScheduleDiscipline = Exclude<DisciplineTab, 'Overall'>
+type DisciplineTab = 'Overall' | 'Housebuild' | 'Mechanical' | 'Electrical' | 'MEP' | 'Infrastructure'
+type ScheduleDiscipline = 'Housebuild' | 'MEP' | 'Infrastructure'
 type FocusMode = 'Executive' | 'Planner' | 'Site' | 'Recovery'
 
-const DISCIPLINE_TABS: DisciplineTab[] = ['Overall', 'Housebuild', 'MEP', 'Infrastructure']
+const DISCIPLINE_TABS: DisciplineTab[] = ['Overall', 'Housebuild', 'Mechanical', 'Electrical', 'MEP', 'Infrastructure']
 const FOCUS_MODES: FocusMode[] = ['Executive', 'Planner', 'Site', 'Recovery']
 
 export default function SchedulePage() {
@@ -76,19 +76,10 @@ export default function SchedulePage() {
   const updateDeliveryPackage = useUpdateDeliveryPackage()
   const archiveDeliveryPackage = useArchiveDeliveryPackage()
   const deleteDeliveryPackage = useDeleteDeliveryPackage()
-  const updateTaskProgress = useUpdateTask()
-  const [progressEdits, setProgressEdits] = useState<Record<string, number>>({})
-  const [savingProgressId, setSavingProgressId] = useState<string | null>(null)
-
-  const activeDiscipline = disciplineTab === 'Overall' ? undefined : (disciplineTab as ScheduleDiscipline)
+  const activeDiscipline = ['Housebuild', 'MEP', 'Infrastructure'].includes(disciplineTab) ? disciplineTab as ScheduleDiscipline : undefined
   const canManageScheduleUpload =
     disciplineTab !== 'Overall' && selectedPackageId !== 'all' && ['workspace_admin', 'admin', 'pmo'].includes(role || '')
   const canConfigurePackages = ['workspace_admin', 'admin', 'pmo'].includes(role || '')
-  const progressDiscipline = activeDiscipline ? activeDiscipline.toLowerCase() : 'overall'
-  const canUpdateProgress = Boolean(projectId && activeDiscipline) && (
-    ['workspace_admin', 'admin', 'pmo'].includes(role || '') ||
-    can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: progressDiscipline })
-  )
   const canAdministerPackages = ['workspace_admin', 'admin'].includes(role || '')
 
   const today = new Date()
@@ -111,7 +102,7 @@ export default function SchedulePage() {
     const pkg = deliveryPackageById.get(String(task.delivery_package_id))
     return !pkg || !pkg.archived_at
   })
-  const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => pkg.discipline === disciplineTab)
+  const disciplinePackages = disciplineTab === 'Overall' ? deliveryPackages : deliveryPackages.filter(pkg => disciplineTab === 'Mechanical' || disciplineTab === 'Electrical' ? pkg.discipline === 'MEP' : pkg.discipline === disciplineTab)
   const selectedPackage = deliveryPackages.find(pkg => pkg.id === selectedPackageId)
 
   const getTaskProgress = (task: Task): number => {
@@ -364,25 +355,6 @@ export default function SchedulePage() {
     setPackageForm({ name: '', code: '', discipline: 'Housebuild', package_type: 'Block', contractor_name: '', weight_pct: 0 })
   }
 
-  async function saveInlineProgress(task: Task) {
-    if (!canUpdateProgress || savingProgressId) return
-    const nextProgress = Math.max(0, Math.min(100, Number(progressEdits[task.id] ?? getTaskProgress(task))))
-    if (nextProgress === getTaskProgress(task)) return
-    try {
-      setSavingProgressId(task.id)
-      await updateTaskProgress.mutateAsync({ id: task.id, progress_pct: nextProgress })
-      setProgressEdits(current => {
-        const copy = { ...current }
-        delete copy[task.id]
-        return copy
-      })
-      pmoToast({ title: 'Progress updated', message: `${task.name} is now ${nextProgress}% complete.`, tone: 'success' })
-    } catch (error: any) {
-      pmoToast({ title: 'Progress update failed', message: error?.message || 'Could not update schedule progress.', tone: 'error' })
-    } finally {
-      setSavingProgressId(null)
-    }
-  }
 
   const openCreatePackage = (discipline?: ScheduleDiscipline) => {
     resetPackageForm()
@@ -507,7 +479,7 @@ export default function SchedulePage() {
               {disciplineTab !== 'Overall' && <div className="mt-5 flex flex-wrap items-center gap-2">
                 <button onClick={() => setSelectedPackageId('all')} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === 'all' ? 'bg-[#eaf1f7] text-[#123a60]' : 'border border-[#dfe3e7] text-[#536170]'}`}>All {disciplineTab}</button>
                 {disciplinePackages.map(pkg => <button key={pkg.id} onClick={() => setSelectedPackageId(pkg.id)} className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${selectedPackageId === pkg.id ? 'bg-[#123a60] text-white' : 'border border-[#dfe3e7] bg-white text-[#536170]'}`}>{pkg.name}</button>)}
-                {canConfigurePackages && <button onClick={() => openCreatePackage(disciplineTab)} className="rounded-xl border border-dashed border-[#ff9b83] px-3.5 py-2 text-xs font-semibold text-[#df5f41]"><Plus size={13} className="mr-1 inline" />Add package</button>}
+                {canConfigurePackages && activeDiscipline && <button onClick={() => openCreatePackage(activeDiscipline)} className="rounded-xl border border-dashed border-[#ff9b83] px-3.5 py-2 text-xs font-semibold text-[#df5f41]"><Plus size={13} className="mr-1 inline" />Add package</button>}
               </div>}
             </div>
             <div className="border-t border-[#e7eaed] bg-[#123a60] p-7 text-white lg:border-l lg:border-t-0">
@@ -525,7 +497,7 @@ export default function SchedulePage() {
         {!canManageScheduleUpload && (
           <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
             <LockKeyhole size={16} className="mt-0.5 shrink-0" />
-            <span>{disciplineTab === 'Overall' ? 'The master schedule is generated from approved discipline schedules and cannot be edited directly. Select a discipline to update delivery progress.' : canUpdateProgress ? 'Schedule dates and structure are controlled by PMO/Admin. You can update actual progress directly in the Progress column.' : 'Schedule baseline is view only for you. Assigned project owners/delegates and administrators can update delivery progress.'}</span>
+            <span>{disciplineTab === 'Overall' ? 'The master schedule is generated from the controlled programme. Progress is updated in Project Controls and synchronises here automatically.' : disciplineTab === 'Mechanical' || disciplineTab === 'Electrical' ? `This is a projected ${disciplineTab} schedule. Embedded MEP activities remain in the Housebuild master programme but are mirrored here for the responsible team.` : 'Schedule dates and structure remain controlled. Actual progress is entered once in Project Controls and appears here automatically; no second schedule update is required.'}</span>
           </div>
         )}
 
@@ -634,7 +606,7 @@ export default function SchedulePage() {
                       <td className="break-words px-2 py-3 font-mono text-[9px] leading-4 text-[#7d8993]">{task.dependencies || '—'}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.start_date)}</td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{fdate(task.finish_date)}</td><td className="px-2 py-3 text-center text-[#536170]">{task.duration_days || '—'}</td>
                       <td className="px-2 py-3">{task.procurement_deadline ? <span className={urgencyColor(procDays)}>{fdate(task.procurement_deadline)}</span> : '—'}</td><td className="px-2 py-3">{task.approval_deadline ? <span className={urgencyColor(apprDays)}>{fdate(task.approval_deadline)}</span> : '—'}</td>
                       <td className="px-2 py-3"><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{rag}</span></td><td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.status || 'Not Started'}</td>
-                      <td className="px-2 py-3">{canUpdateProgress && disciplineTab !== 'Overall' ? <div className="flex items-center gap-1"><input type="number" min="0" max="100" value={progressEdits[task.id] ?? getTaskProgress(task)} onChange={event => setProgressEdits(current => ({ ...current, [task.id]: Math.max(0, Math.min(100, Number(event.target.value || 0))) }))} className="w-14 rounded-lg border border-[#dfe3e7] px-2 py-1.5 text-[10px] font-semibold text-[#123a60] outline-none focus:border-[#08B5A6]" aria-label={`Progress for ${task.name}`} /><span className="text-[10px] text-[#6f7c87]">%</span><button disabled={savingProgressId === task.id || Number(progressEdits[task.id] ?? getTaskProgress(task)) === getTaskProgress(task)} onClick={() => saveInlineProgress(task)} className="rounded-lg bg-[#123a60] px-2 py-1.5 text-[9px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-35">{savingProgressId === task.id ? 'Saving…' : 'Save'}</button></div> : <div className="flex min-w-0 items-center gap-1.5"><div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e7ebee]"><div className="h-full rounded-full bg-[#123a60]" style={{ width: `${getTaskProgress(task)}%` }} /></div><span className="text-[10px] text-[#6f7c87]">{getTaskProgress(task)}%</span></div>}</td>
+                      <td className="px-2 py-3"><div className="flex min-w-0 items-center gap-1.5"><div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e7ebee]"><div className="h-full rounded-full bg-[#123a60]" style={{ width: `${getTaskProgress(task)}%` }} /></div><span className="text-[10px] text-[#6f7c87]">{getTaskProgress(task)}%</span></div></td>
                       <td className="break-words px-2 py-3 leading-4 text-[#536170]">{task.responsible || '—'}</td><td className="px-2 py-3">{isTaskLocked(task) ? <div><span className="rounded-full bg-red-50 px-2 py-1 text-[9px] font-semibold text-red-700">LOCKED</span><div className="mt-1 break-words text-[8px] leading-3 text-[#87929b]">{getBlockingGate(task)?.gate_name || 'Quality gate'}</div></div> : canManageScheduleUpload ? <button className="text-[11px] font-semibold text-[#123a60] hover:underline" onClick={() => openTaskModal(task)}>Edit</button> : <span className="text-[10px] text-[#9aa3ab]">View</span>}</td>
                     </tr>
                   })}
