@@ -46,8 +46,10 @@ export default function PMOWeeklyReportPage() {
 
   const canManage = canManageExecutiveReports(role)
 
+  const incomingWeek = new URLSearchParams(window.location.search).get('week')
+  const incomingSource = new URLSearchParams(window.location.search).get('source')
   const [reportWeek, setReportWeek] = useState(
-    new Date().toISOString().slice(0, 10)
+    incomingWeek || new Date().toISOString().slice(0, 10)
   )
 
   const [loading, setLoading] = useState(false)
@@ -128,7 +130,8 @@ export default function PMOWeeklyReportPage() {
         .from('weekly_reports')
         .select('*')
         .eq('project_id', projectId)
-        .eq('report_date', reportWeek),
+        .eq('report_date', reportWeek)
+        .not('sent_to_pmo_at', 'is', null),
 
       supabase.from('weekly_activities').select('*'),
 
@@ -499,6 +502,13 @@ export default function PMOWeeklyReportPage() {
         </div>
         </div>
       </section>
+
+      {incomingSource === 'ipd' && (
+        <div className="mb-4 rounded-xl border border-[#cfe8e4] bg-[#f3fbfa] px-4 py-3 text-sm text-[#365665]">
+          <span className="font-semibold text-[#102943]">Combined IPD report received.</span>{' '}
+          The submitted IPD set is now available to generate the PMO / Executive Weekly Report for this reporting week.
+        </div>
+      )}
 
       {notice && (
         <div className="no-print rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
