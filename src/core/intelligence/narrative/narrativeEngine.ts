@@ -25,18 +25,46 @@ export function buildExecutiveNarrative({
       ? `${projectName} remains recoverable despite a ${forecast.delayDays}-day delay.`
       : `${projectName} is in a critical delivery position with a ${forecast.delayDays}-day delay.`
 
+  const today = new Date()
   const declaredDelayReasons = state.schedule.activities
-    .filter(activity => activity.progress < 100 && activity.delayReason)
-    .map(activity => ({
-      activity: activity.name,
-      reason: activity.delayReason as string,
-    }))
+    .filter(activity => activity.progress < 100)
+    .map(activity => {
+      const dedicatedReason = activity.delayReason?.trim()
+      if (dedicatedReason) {
+        return {
+          activity: activity.name,
+          reason: dedicatedReason,
+          source: 'Delay reason' as const,
+        }
+      }
+
+      const comment = activity.progressComment?.trim()
+      const plannedFinish = activity.plannedFinish
+        ? new Date(activity.plannedFinish)
+        : null
+      const overdue = Boolean(
+        plannedFinish &&
+        !Number.isNaN(plannedFinish.getTime()) &&
+        plannedFinish < today
+      )
+
+      if (comment && (activity.isBlocked || overdue)) {
+        return {
+          activity: activity.name,
+          reason: comment,
+          source: 'Project Controls comment' as const,
+        }
+      }
+
+      return null
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
 
   const causeSentence =
     rootCause.primaryCause
       ? rootCause.explanation
       : declaredDelayReasons.length
-        ? `${declaredDelayReasons[0].activity} has a recorded delay reason in Project Controls: ${declaredDelayReasons[0].reason}.`
+        ? `${declaredDelayReasons[0].activity} has a recorded ${declaredDelayReasons[0].source.toLowerCase()} in Project Controls: ${declaredDelayReasons[0].reason}.`
         : 'No reliable root cause has been identified from the current dependency data.'
 
   const productionSentence =
