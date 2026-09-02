@@ -3,7 +3,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
@@ -69,29 +68,7 @@ export const useUpdateTask = () => {
       const data = await updateProjectTask(projectId, id, updates)
 
       if (newProgress !== previousProgress) {
-        const { error: progressLogError } = await supabase
-          .from('task_progress_logs')
-          .insert({
-            project_id: projectId,
-            task_id: id,
-            schedule_revision_id:
-              (existingTask as any)?.schedule_revision_id || null,
-            block_id: (existingTask as any)?.block_id || null,
-            delivery_package_id: (existingTask as any)?.delivery_package_id || null,
-            previous_progress: previousProgress,
-            new_progress: newProgress,
-            delay_reason: null,
-            recovery_action: null,
-            comments:
-              (updates as any).notes ||
-              `Progress updated from ${previousProgress}% to ${newProgress}%`,
-            updated_by: user?.id || null,
-            updated_by_role: role || null,
-          })
-
-        if (progressLogError) {
-          console.error('Unable to save task progress log:', progressLogError)
-        }
+        // The database trigger owns the canonical weekly progress audit log.
 
         await recordActivitySafely(
           activityBuilders.taskProgressUpdated(
