@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import {
   Printer,
@@ -120,6 +120,7 @@ function buildSnapshotHealth(report: any, liveHealth: any) {
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const { projectId, projectName } = useProjectStore()
   const { discipline: routeDiscipline } = useParams<{ discipline: string }>()
   const role = useMembershipStore(state => state.role)
@@ -134,7 +135,7 @@ export default function ReportsPage() {
   const allReportsRef = useRef<HTMLDivElement>(null)
   const downloadReportRef = useRef<HTMLDivElement>(null)
 
-  const { data: allReports = [], isLoading } = useWeeklyReports()
+  const { data: allReports = [], isLoading, refetch: refetchReports } = useWeeklyReports()
   const isCombinedIPD = routeDiscipline === 'combined'
   const disciplineLabel = isCombinedIPD
     ? 'Combined IPD Report'
@@ -191,8 +192,20 @@ export default function ReportsPage() {
   const [workflowComment, setWorkflowComment] = useState('')
   const [notice, setNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null)
 
+  const combinedQueueReports = useMemo(
+    () => reports.filter((report: any) => Boolean(report.submitted_to_combined_at) && !report.sent_to_pmo_at),
+    [reports]
+  )
+
+  const disciplineActiveReports = useMemo(
+    () => reports.filter((report: any) => ['Draft', 'Returned'].includes(String(report.workflow_status || 'Draft'))),
+    [reports]
+  )
+
+  const visibleReports = isCombinedIPD ? combinedQueueReports : disciplineActiveReports
+
   const selectedReport =
-    reports.find(report => report.id === selectedReportId) || reports[0]
+    visibleReports.find(report => report.id === selectedReportId) || visibleReports[0]
 
   const selectedReportAny = selectedReport as any
   const workflowStatus = selectedReportAny?.workflow_status || 'Draft'
@@ -297,20 +310,26 @@ export default function ReportsPage() {
 
   const reportSnapshot = buildSnapshotHealth(selectedReportAny, reportProjectHealth)
 
+  const historyReports = useMemo(
+    () => isCombinedIPD
+      ? reports.filter((report: any) => Boolean(report.sent_to_pmo_at))
+      : reports.filter((report: any) => !disciplineActiveReports.some((active: any) => active.id === report.id)),
+    [disciplineActiveReports, isCombinedIPD, reports]
+  )
+
   const reportGroups = useMemo(() => {
     const map: Record<string, any[]> = {}
 
-    reports.forEach(report => {
+    historyReports.forEach(report => {
       const key = report.report_date || 'No date'
       if (!map[key]) map[key] = []
       map[key].push(report)
     })
 
     return Object.entries(map).sort(([a], [b]) => b.localeCompare(a))
-  }, [reports])
+  }, [historyReports])
 
-  const currentReport = reports[0] || null
-  const historyReports = reports.slice(1)
+  const currentReport = visibleReports[0] || null
   const downloadReport = reports.find((report: any) => report.id === downloadReportId) as any
 
   async function downloadHistoricalReport(report: any) {
@@ -942,6 +961,9 @@ export default function ReportsPage() {
       payload.activity_snapshot_at = now
       payload.submitted_at = now
       payload.submitted_by = user?.id || null
+      payload.submitted_to_combined_at = now
+      payload.sent_to_pmo_at = null
+      payload.sent_to_pmo_by = null
     }
 
     if (status === 'Approved') {
@@ -986,10 +1008,44 @@ export default function ReportsPage() {
 
     setWorkflowComment('')
 
+    await refetchReports()
+    if (status === 'Submitted' || status === 'Resubmitted') setSelectedReportId(null)
+
     notify(
       status === 'Returned' || status === 'Rejected' ? 'info' : 'success',
-      `Report ${status.toLowerCase()} successfully.`
+      status === 'Submitted' || status === 'Resubmitted'
+        ? 'Report submitted to the Combined IPD Report queue.'
+        : `Report ${status.toLowerCase()} successfully.`
     )
+  }
+
+  async function sendCombinedToPmo() {
+    if (!isCombinedIPD || combinedQueueReports.length === 0) return
+
+    const now = new Date().toISOString()
+    const ids = combinedQueueReports.map((report: any) => report.id)
+    const sortedReportDates = combinedQueueReports
+      .map((report: any) => String(report.report_date || ''))
+      .filter(Boolean)
+      .sort()
+    const latestReportDate = sortedReportDates.length ? sortedReportDates[sortedReportDates.length - 1] : ''
+
+    const { error } = await supabase
+      .from('weekly_reports')
+      .update({
+        sent_to_pmo_at: now,
+        sent_to_pmo_by: user?.id || null,
+      })
+      .in('id', ids)
+
+    if (error) {
+      notify('error', error.message)
+      return
+    }
+
+    await refetchReports()
+    notify('success', 'Combined IPD report sent to PMO / Executive Reporting.')
+    navigate(`/app/pmo-weekly-report?source=ipd${latestReportDate ? `&week=${encodeURIComponent(latestReportDate)}` : ''}`)
   }
 
   function printHtml(html: string, title: string) {
@@ -1066,15 +1122,18 @@ export default function ReportsPage() {
             {historyReports.length > 0 && <span className="ml-1 rounded-full bg-[#e8f6f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#05969b]">{historyReports.length}</span>}
           </button>
 
-          <button className="btn-ghost btn-sm btn" onClick={printSelectedReport} disabled={!currentReport}>
-            <Printer size={13} />
-            Print Selected
-          </button>
-
-          <button className="btn-ghost btn-sm btn" onClick={printAllReports}>
-            <Printer size={13} />
-            {isCombinedIPD ? 'Print Combined IPD' : 'Print All'}
-          </button>
+          {isCombinedIPD && (
+            <>
+              <button className="btn-ghost btn-sm btn" onClick={printAllReports} disabled={combinedQueueReports.length === 0}>
+                <Printer size={13} />
+                Print Combined IPD
+              </button>
+              <button className="btn-gold btn-sm btn" onClick={sendCombinedToPmo} disabled={combinedQueueReports.length === 0}>
+                <Send size={13} />
+                Send to PMO / Executive
+              </button>
+            </>
+          )}
 
           {canWriteDiscipline && (
             <button className="btn-gold btn-sm btn" onClick={openNewReport}>
@@ -1089,18 +1148,25 @@ export default function ReportsPage() {
       <HealthHistoryChart projectId={projectId} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Metric title={isCombinedIPD ? "Department Reports" : `${disciplineLabel} Reports`} value={reports.length} color="text-[#df5f41]" />
+        <Metric title={isCombinedIPD ? "Department Reports" : `${disciplineLabel} Reports`} value={isCombinedIPD ? combinedQueueReports.length : reports.length} color="text-[#df5f41]" />
         <Metric title="Open Risks" value={openRisks} color={openRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="High Risks" value={highRisks} color={highRisks > 0 ? 'text-red-400' : 'text-emerald-400'} />
         <Metric title="Open Snags" value={openSnags} color={openSnags > 0 ? 'text-amber-400' : 'text-emerald-400'} />
         <Metric title="Pending Approvals" value={pendingApprovals} color={pendingApprovals > 0 ? 'text-amber-400' : 'text-emerald-400'} />
       </div>
 
+      {isCombinedIPD && (
+        <div className="card p-4 border border-[#cfe8e4] bg-[#f3fbfa] text-sm text-[#365665]">
+          <span className="font-semibold text-[#102943]">Combined IPD queue:</span>{' '}
+          submitted Housebuild, MEP and Infrastructure reports remain here until the combined set is sent to PMO / Executive Reporting. Printing does not clear the queue; only Send does.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 items-start">
         <div className="min-w-0 space-y-3">
           {!selectedReport ? (
             <div className="card p-8 text-center text-[#74818d]">
-              No current report yet. Create this week’s report if you have write access. Previous reports are available from History.
+              No active report on this page. Once a report is submitted, it moves to the Combined IPD Report queue. Previous submissions remain available in History.
             </div>
           ) : (
             <>
@@ -1236,7 +1302,7 @@ export default function ReportsPage() {
 
       <div style={{ display: 'none' }}>
         <div ref={allReportsRef}>
-          {reports.map((report: any) => {
+          {visibleReports.map((report: any) => {
             const snapshotHealth = buildSnapshotHealth(report, reportProjectHealth)
 
             return (
