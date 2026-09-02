@@ -77,6 +77,7 @@ export const useUpdateTask = () => {
             schedule_revision_id:
               (existingTask as any)?.schedule_revision_id || null,
             block_id: (existingTask as any)?.block_id || null,
+            delivery_package_id: (existingTask as any)?.delivery_package_id || null,
             previous_progress: previousProgress,
             new_progress: newProgress,
             delay_reason: null,
