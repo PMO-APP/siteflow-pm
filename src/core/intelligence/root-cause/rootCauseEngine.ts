@@ -9,9 +9,41 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
 }
 
-function declaredDelayReason(activity: ScheduleActivity): string | null {
-  const value = (activity as any).delayReason
+type ProjectControlEvidence = {
+  text: string
+  source: 'delay_reason' | 'progress_comment'
+}
+
+function cleanText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function declaredProjectControlEvidence(
+  activity: ScheduleActivity,
+  today: Date
+): ProjectControlEvidence | null {
+  // The dedicated Delay Reason field remains the strongest manual evidence.
+  const delayReason = cleanText((activity as any).delayReason)
+  if (delayReason) {
+    return { text: delayReason, source: 'delay_reason' }
+  }
+
+  // In PMOCorex's operating workflow, delay explanations are also commonly
+  // recorded in Project Controls progress comments. Treat a comment as root-
+  // cause evidence only when the activity is objectively constrained: blocked
+  // or beyond its planned finish while still incomplete. This prevents normal
+  // progress notes from being mistaken for a delay cause.
+  const progressComment = cleanText((activity as any).progressComment)
+  if (!progressComment || activity.progress >= 100) return null
+
+  const plannedFinish = safeDate((activity as any).plannedFinish)
+  const isOverdue = Boolean(plannedFinish && plannedFinish < today)
+
+  if (activity.isBlocked || isOverdue) {
+    return { text: progressComment, source: 'progress_comment' }
+  }
+
+  return null
 }
 
 function toNode(activity: ScheduleActivity): DependencyNode {
@@ -202,7 +234,7 @@ export function calculateRootCause(
     .filter(
       activity =>
         activity.progress < 100 &&
-        Boolean(declaredDelayReason(activity))
+        Boolean(declaredProjectControlEvidence(activity, today))
     )
     .sort((a, b) => {
       const aFinish = safeDate((a as any).plannedFinish)?.getTime() || Infinity
@@ -283,8 +315,11 @@ export function calculateRootCause(
         activity.progress < 100
     )
 
+  const primaryProjectControlEvidence =
+    primary ? declaredProjectControlEvidence(primary, today) : null
+
   const primaryDeclaredReason =
-    primary ? declaredDelayReason(primary) : null
+    primaryProjectControlEvidence?.text || null
 
   const isDependencyCause =
     Boolean(
@@ -336,7 +371,11 @@ export function calculateRootCause(
 
   const explanation =
     primaryDeclaredReason && primary
-      ? `${primary.name} has a recorded delay reason in Project Controls: ${primaryDeclaredReason}. This is treated as declared project evidence${
+      ? `${primary.name} has a recorded ${
+          primaryProjectControlEvidence?.source === 'progress_comment'
+            ? 'delay comment'
+            : 'delay reason'
+        } in Project Controls: ${primaryDeclaredReason}. This is treated as declared project evidence${
           primary.isCritical
             ? ' on a critical-path activity'
             : ''
