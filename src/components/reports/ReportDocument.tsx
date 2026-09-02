@@ -387,6 +387,7 @@ export default function ReportDocument({
             label="Package:"
             value={
               report.package_name ||
+              selectedPackage?.name ||
               selectedPackage?.package_name ||
               selectedPackage?.block_name ||
               'Project Wide'
@@ -426,6 +427,7 @@ export default function ReportDocument({
             label="Package"
             value={
               report.package_name ||
+              selectedPackage?.name ||
               selectedPackage?.package_name ||
               selectedPackage?.block_name ||
               'Project Wide'
