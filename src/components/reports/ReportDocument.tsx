@@ -450,7 +450,7 @@ export default function ReportDocument({
           <Info label="Open Risks" value={openRisks} />
           <Info label="Pending Procurement" value={pendingProcurement} />
           <Info label="Next Site Meeting" value={report.next_meeting ? fdate(report.next_meeting) : 'Not set'} />
-          <Info label="Workflow Status" value={report.workflow_status || 'Draft'} />
+          <Info label="Days Behind" value={Number(projectHealth?.varianceDays || 0) < 0 ? `${Math.abs(Number(projectHealth?.varianceDays || 0))} days` : '0 days'} />
         </div>
       </Section>
 
