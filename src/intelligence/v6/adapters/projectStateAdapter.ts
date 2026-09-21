@@ -616,6 +616,7 @@ export function adaptV6StateToLegacy(
           isBlocked:
             task.isBlocked,
           delayReason: null,
+          delayReasonUpdatedAt: null,
           recoveryAction: null,
           progressComment: null,
           updatedAt:
