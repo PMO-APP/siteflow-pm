@@ -94,6 +94,7 @@ export function normalizeProjectState({
     isCritical: Boolean(task.is_critical || task.critical_path || task.total_float === 0),
     isBlocked: Boolean(task.is_blocked || task.is_on_hold || task.status === 'Blocked'),
     delayReason: task.delay_reason || null,
+    delayReasonUpdatedAt: toISO(task.delay_reason_updated_at || task.updated_at),
     recoveryAction: task.recovery_action || null,
     progressComment: task.progress_comments || task.progress_comment || null,
     deliveryPackageId: task.delivery_package_id ? id(task.delivery_package_id) : null,
