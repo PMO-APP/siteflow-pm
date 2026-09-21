@@ -238,13 +238,14 @@ function normalise(value: string | null | undefined) {
 }
 
 function technicalOwnerForDiscipline(discipline: DesignDiscipline | string) {
-  const value = String(discipline || '').trim()
-  if (value === 'Structural') return 'Housebuild'
-  if (value === 'Architecture') return 'Design'
-  if (['MEP', 'Mechanical', 'Electrical', 'Plumbing', 'Fire / Life Safety'].includes(value)) return 'MEP'
-  if (['Infrastructure', 'Civil'].includes(value)) return 'Infrastructure'
-  if (value === 'Landscaping') return 'Landscaping'
-  return value || 'Cross-Discipline'
+  const raw = String(discipline || '').trim()
+  const value = raw.toLowerCase()
+  if (value === 'structural' || value === 'structure') return 'Housebuild'
+  if (value === 'architecture' || value === 'architectural') return 'Design'
+  if (['mep', 'mechanical', 'electrical', 'plumbing', 'fire / life safety', 'fire & life safety'].includes(value)) return 'MEP'
+  if (value === 'infrastructure' || value === 'civil') return 'Infrastructure'
+  if (value === 'landscaping' || value === 'landscape') return 'Landscaping'
+  return raw || 'Cross-Discipline'
 }
 
 function revisionRank(value: string) {
@@ -273,9 +274,9 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
         confidence: 'Confirmed',
         source_type: 'Rule',
         disciplines: [discipline],
-        description: `No current ${discipline} drawing has been registered for this project. Cross-discipline coordination cannot be considered complete.`,
+        description: `No current approved ${discipline} drawing is available in the controlled Documents register for this project. Cross-discipline coordination cannot be considered complete.`,
         consequence: 'Design changes or clashes may pass into construction without a coordinated reference set.',
-        recommendation: `Design Team should obtain/register the current approved ${discipline} drawings from the consultant, distribute the controlled revision and rerun coordination review.`,
+        recommendation: `Consultant to issue the current approved ${discipline} drawing to Design. Design remains the document custodian and should register and distribute the controlled revision. ${technicalOwnerForDiscipline(discipline)} should then complete the technical review before coordination review is rerun.`,
         responsible_team: 'Design',
         document_custodian: 'Design',
         technical_owner: technicalOwnerForDiscipline(discipline),
@@ -370,6 +371,34 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
       .filter((item: any) => !['Resolved', 'Closed', 'Rejected'].includes(item.status))
       .map((item: any) => item.title)
   )
+
+  // Refresh deterministic findings that are already open so ownership and
+  // workflow corrections are reflected immediately instead of being frozen in
+  // the first version that created the issue.
+  const existingOpen = findings.filter(item => openTitles.has(item.title))
+  for (const item of existingOpen) {
+    const { error } = await supabase
+      .from('design_coordination_issues')
+      .update({
+        category: item.category,
+        severity: item.severity,
+        confidence: item.confidence || 'High',
+        disciplines: item.disciplines || [],
+        drawing_ids: item.drawing_ids || [],
+        description: item.description,
+        consequence: item.consequence || null,
+        recommendation: item.recommendation || null,
+        responsible_team: item.responsible_team || 'Design',
+        document_custodian: 'Design',
+        technical_owner: item.technical_owner || 'Cross-Discipline',
+        action_owner: item.action_owner || item.responsible_team || 'Design',
+      })
+      .eq('project_id', projectId)
+      .eq('title', item.title)
+      .in('source_type', ['Rule', 'Revision'])
+      .not('status', 'in', '(Resolved,Closed,Rejected)')
+    if (error) throw error
+  }
 
   const newFindings = findings.filter(item => !openTitles.has(item.title))
   if (newFindings.length) {
