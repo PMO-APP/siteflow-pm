@@ -205,9 +205,12 @@ export function calculateRootCause(
         Boolean(declaredDelayReason(activity))
     )
     .sort((a, b) => {
-      const aFinish = safeDate((a as any).plannedFinish)?.getTime() || Infinity
-      const bFinish = safeDate((b as any).plannedFinish)?.getTime() || Infinity
-      return aFinish - bFinish
+      // Manual Project Controls evidence is chronological evidence.
+      // The newest recorded delay must win; programme position must never
+      // choose which manual cause is presented as the latest input.
+      const aRecorded = safeDate((a as any).delayReasonUpdatedAt)?.getTime() || 0
+      const bRecorded = safeDate((b as any).delayReasonUpdatedAt)?.getTime() || 0
+      return bRecorded - aRecorded
     })
 
   // Keep the latest manual Project Controls evidence even when the activity
@@ -216,8 +219,8 @@ export function calculateRootCause(
   const latestRecordedDelay = activities
     .filter(activity => Boolean(declaredDelayReason(activity)))
     .sort((a, b) => {
-      const aUpdated = safeDate((a as any).updatedAt)?.getTime() || 0
-      const bUpdated = safeDate((b as any).updatedAt)?.getTime() || 0
+      const aUpdated = safeDate((a as any).delayReasonUpdatedAt)?.getTime() || 0
+      const bUpdated = safeDate((b as any).delayReasonUpdatedAt)?.getTime() || 0
       if (aUpdated !== bUpdated) return bUpdated - aUpdated
 
       const aFinish = safeDate((a as any).plannedFinish)?.getTime() || 0
