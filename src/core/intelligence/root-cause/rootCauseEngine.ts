@@ -9,41 +9,9 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
 }
 
-type ProjectControlEvidence = {
-  text: string
-  source: 'delay_reason' | 'progress_comment'
-}
-
-function cleanText(value: unknown): string | null {
+function declaredDelayReason(activity: ScheduleActivity): string | null {
+  const value = (activity as any).delayReason
   return typeof value === 'string' && value.trim() ? value.trim() : null
-}
-
-function declaredProjectControlEvidence(
-  activity: ScheduleActivity,
-  today: Date
-): ProjectControlEvidence | null {
-  // The dedicated Delay Reason field remains the strongest manual evidence.
-  const delayReason = cleanText((activity as any).delayReason)
-  if (delayReason) {
-    return { text: delayReason, source: 'delay_reason' }
-  }
-
-  // In PMOCorex's operating workflow, delay explanations are also commonly
-  // recorded in Project Controls progress comments. Treat a comment as root-
-  // cause evidence only when the activity is objectively constrained: blocked
-  // or beyond its planned finish while still incomplete. This prevents normal
-  // progress notes from being mistaken for a delay cause.
-  const progressComment = cleanText((activity as any).progressComment)
-  if (!progressComment || activity.progress >= 100) return null
-
-  const plannedFinish = safeDate((activity as any).plannedFinish)
-  const isOverdue = Boolean(plannedFinish && plannedFinish < today)
-
-  if (activity.isBlocked || isOverdue) {
-    return { text: progressComment, source: 'progress_comment' }
-  }
-
-  return null
 }
 
 function toNode(activity: ScheduleActivity): DependencyNode {
@@ -234,13 +202,33 @@ export function calculateRootCause(
     .filter(
       activity =>
         activity.progress < 100 &&
-        Boolean(declaredProjectControlEvidence(activity, today))
+        Boolean(declaredDelayReason(activity))
     )
     .sort((a, b) => {
       const aFinish = safeDate((a as any).plannedFinish)?.getTime() || Infinity
       const bFinish = safeDate((b as any).plannedFinish)?.getTime() || Infinity
       return aFinish - bFinish
     })
+
+  // Keep the latest manual Project Controls evidence even when the activity
+  // has since reached 100%. A completed delayed activity can still explain
+  // downstream programme slippage; it must not disappear from the dashboard.
+  const latestRecordedDelay = activities
+    .filter(activity => Boolean(declaredDelayReason(activity)))
+    .sort((a, b) => {
+      const aUpdated = safeDate((a as any).updatedAt)?.getTime() || 0
+      const bUpdated = safeDate((b as any).updatedAt)?.getTime() || 0
+      if (aUpdated !== bUpdated) return bUpdated - aUpdated
+
+      const aFinish = safeDate((a as any).plannedFinish)?.getTime() || 0
+      const bFinish = safeDate((b as any).plannedFinish)?.getTime() || 0
+      return bFinish - aFinish
+    })[0] || null
+
+  const historicalDelayReason =
+    declaredCandidates.length === 0 && latestRecordedDelay
+      ? declaredDelayReason(latestRecordedDelay)
+      : null
 
   // 2. Then use genuine blocked / critical-path evidence.
   const dependencyCandidates = activities
@@ -315,11 +303,8 @@ export function calculateRootCause(
         activity.progress < 100
     )
 
-  const primaryProjectControlEvidence =
-    primary ? declaredProjectControlEvidence(primary, today) : null
-
   const primaryDeclaredReason =
-    primaryProjectControlEvidence?.text || null
+    primary ? declaredDelayReason(primary) : null
 
   const isDependencyCause =
     Boolean(
@@ -371,11 +356,7 @@ export function calculateRootCause(
 
   const explanation =
     primaryDeclaredReason && primary
-      ? `${primary.name} has a recorded ${
-          primaryProjectControlEvidence?.source === 'progress_comment'
-            ? 'delay comment'
-            : 'delay reason'
-        } in Project Controls: ${primaryDeclaredReason}. This is treated as declared project evidence${
+      ? `${primary.name} has a recorded delay reason in Project Controls: ${primaryDeclaredReason}. This is treated as declared project evidence${
           primary.isCritical
             ? ' on a critical-path activity'
             : ''
@@ -405,7 +386,11 @@ export function calculateRootCause(
               scheduleInference.overdueDays
                 ? ` and is ${scheduleInference.overdueDays} day${scheduleInference.overdueDays === 1 ? '' : 's'} beyond its planned finish`
                 : ''
-            }. The project is ${scheduleInference.activityGap} programme activit${scheduleInference.activityGap === 1 ? 'y' : 'ies'} behind this planned workfront. No manual delay reason has been recorded for this constraint.`
+            }. The project is ${scheduleInference.activityGap} programme activit${scheduleInference.activityGap === 1 ? 'y' : 'ies'} behind this planned workfront.${
+              historicalDelayReason && latestRecordedDelay
+                ? ` Project Controls records ${historicalDelayReason} on ${latestRecordedDelay.name} as the latest manual delay evidence. That activity is now ${latestRecordedDelay.progress}% complete, so PMOCorex retains the recorded cause as delay history while identifying ${scheduleInference.cause.name} as the current schedule-position constraint.`
+                : ' No manual delay reason has been recorded in Project Controls for the current delay.'
+            }`
           : 'No reliable root cause has been identified from the current project-control or schedule-position data.'
 
   const recommendedAction =
@@ -414,7 +399,9 @@ export function calculateRootCause(
       : isDependencyCause && primary
         ? `Resolve the blocker affecting ${primary.name}, confirm ownership and establish a dated recovery action.`
         : isScheduleInference && scheduleInference
-          ? `Validate the inferred constraint at ${scheduleInference.cause.name}, record the actual delay reason in Project Controls, and establish a recovery action to move the workfront toward ${scheduleInference.plannedPosition.name}.`
+          ? historicalDelayReason && latestRecordedDelay
+            ? `Confirm whether the recorded cause "${historicalDelayReason}" from ${latestRecordedDelay.name} is still driving the current constraint at ${scheduleInference.cause.name}. If the cause has changed, record the current delay reason and recovery action in Project Controls.`
+            : `Validate the inferred constraint at ${scheduleInference.cause.name}, record the actual delay reason in Project Controls, and establish a recovery action to move the workfront toward ${scheduleInference.plannedPosition.name}.`
           : 'Review the active workfront and record any known delay reason in Project Controls.'
 
   return {
