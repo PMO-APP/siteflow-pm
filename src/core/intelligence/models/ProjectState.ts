@@ -28,6 +28,7 @@ export type ProjectState = {
       isCritical: boolean
       isBlocked: boolean
       delayReason: string | null
+      delayReasonUpdatedAt: string | null
       recoveryAction: string | null
       progressComment: string | null
       deliveryPackageId: string | null
