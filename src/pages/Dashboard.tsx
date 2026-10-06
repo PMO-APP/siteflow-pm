@@ -37,6 +37,7 @@ import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
 import { ProjectTimelinePanel } from '@/components/intelligence/ProjectTimelinePanel'
 import { AutonomousIntelligencePanel } from '@/components/intelligence/AutonomousIntelligencePanel'
 import { calculateProjectProgress, taskProgress } from '@/core/metrics/progressMetrics'
+import { getRevisionTargetDate, isRevisedProgramme, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 
 const colorPool = [
   '#3b82f6',
@@ -100,6 +101,8 @@ export default function Dashboard() {
   const { projectId, projectName } = useProjectStore()
   const [healthDrawerOpen, setHealthDrawerOpen] = useState(false)
   const sharedProjectHealth = useProjectHealth(projectId)
+  const { data: activeRevision } = useActiveScheduleRevision(projectId)
+  const activeRevisionTarget = getRevisionTargetDate(activeRevision)
 
   const { data: taskData = [] } = useTasks()
   const { data: procData = [] } = useProcurement()
@@ -263,12 +266,15 @@ export default function Dashboard() {
     (firstScheduleTask ? toDate(getTaskStart(firstScheduleTask)) : null)
 
   const targetDate =
+    toDate(activeRevisionTarget) ??
     toDate(project?.handover_date) ??
     toDate(project?.planned_finish) ??
     (lastScheduleTask ? toDate(getTaskFinish(lastScheduleTask)) : null)
 
   const handoverSource =
-    project?.handover_date
+    activeRevisionTarget
+      ? `${activeRevision?.revision_name || 'Approved programme'}${isRevisedProgramme(activeRevision) ? ' (Revised)' : ''}`
+      : project?.handover_date
       ? 'Project Handover Date'
       : project?.planned_finish
       ? 'Project Planned Finish'
@@ -943,7 +949,7 @@ export default function Dashboard() {
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${healthTone}`}>{healthLabel}</span>
             </div>
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-700" style={{ width: `${projectHealth}%` }}/></div>
-            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm"><div><div className="text-slate-500">Handover</div><div className="mt-1 font-semibold text-slate-900">{targetDate ? targetDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Not set'}</div></div><div><div className="text-slate-500">Confidence</div><div className="mt-1 font-semibold text-slate-900">{projectIntelligence?.forecast.confidence ?? handoverConfidence ?? '—'}%</div></div></div>
+            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm"><div><div className="text-slate-500">Handover</div><div className="mt-1 font-semibold text-slate-900">{targetDate ? targetDate.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Not set'}{activeRevision && isRevisedProgramme(activeRevision) ? <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-blue-700">Revised</span> : null}</div></div><div><div className="text-slate-500">Confidence</div><div className="mt-1 font-semibold text-slate-900">{projectIntelligence?.forecast.confidence ?? handoverConfidence ?? '—'}%</div></div></div>
           </div>
         </div>
       </section>
