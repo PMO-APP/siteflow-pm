@@ -7,6 +7,7 @@ import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { fdate } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
+import { parseRevisionProgrammeFile, parseRevisionProgrammeUrl } from '@/features/schedule/revisionProgramme'
 
 const REVISION_TYPES = [
   'Baseline',
@@ -144,6 +145,10 @@ export default function ScheduleRevisionsPage() {
       setUploading(true)
 
       const fileData = await uploadFile()
+      let programmeActivities: any[] = []
+      if (form.file && /\.(xlsx?|csv|xml)$/i.test(form.file.name)) {
+        programmeActivities = await parseRevisionProgrammeFile(form.file)
+      }
 
       const { error } = await supabase.from('schedule_revisions').insert({
         organization_id: organizationId,
@@ -175,6 +180,7 @@ export default function ScheduleRevisionsPage() {
         submitted_date: new Date().toISOString().slice(0, 10),
 
         notes: form.notes.trim() || null,
+        programme_activities: programmeActivities,
       })
 
       if (error) {
@@ -215,6 +221,37 @@ export default function ScheduleRevisionsPage() {
       return
     }
 
+    const revision = revisions.find(item => item.id === id)
+    if (!revision) return
+
+    let programmeActivities = Array.isArray(revision.programme_activities)
+      ? revision.programme_activities
+      : []
+
+    // Revisions created before activity snapshots existed are hydrated from the
+    // approved programme attachment the first time they are activated.
+    if (!programmeActivities.length && revision.file_url && /\.(xlsx?|csv|xml)$/i.test(revision.file_name || revision.file_url)) {
+      try {
+        programmeActivities = await parseRevisionProgrammeUrl(
+          revision.file_url,
+          revision.file_name || 'programme.xlsx'
+        )
+        const { error: hydrateError } = await supabase
+          .from('schedule_revisions')
+          .update({ programme_activities: programmeActivities })
+          .eq('id', id)
+        if (hydrateError) throw hydrateError
+      } catch (hydrateError: any) {
+        setNotice(hydrateError?.message || 'Could not read activities from the approved programme.')
+        return
+      }
+    }
+
+    if (!programmeActivities.length) {
+      setNotice('This revision has no machine-readable programme activities. Upload the approved Excel or MS Project XML before activation so the controlled schedule can switch its activity dates.')
+      return
+    }
+
     const { error } = await supabase.rpc('activate_schedule_revision', {
       p_revision_id: id,
     })
@@ -230,6 +267,8 @@ export default function ScheduleRevisionsPage() {
       .eq('id', id)
 
     await queryClient.invalidateQueries({ queryKey: ['active-schedule-revision', projectId] })
+    await queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })
+    await queryClient.invalidateQueries({ queryKey: ['project-health-history', projectId] })
     await loadData()
   }
 
