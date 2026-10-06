@@ -261,6 +261,53 @@ export default function ScheduleRevisionsPage() {
       return
     }
 
+    // Materialise the controlled programme dates into `tasks` as well as keeping
+    // the immutable revision snapshot. A number of legacy/executive consumers
+    // read tasks directly (Project Controls in particular), so an overlay only
+    // on the Schedule query leaves the application with two schedule sources.
+    // Baseline dates are captured once before the first revision is applied.
+    const { data: currentTasks, error: taskReadError } = await supabase
+      .from('tasks')
+      .select('id, task_number, name, start_date, finish_date, baseline_start_date, baseline_finish_date')
+      .eq('project_id', projectId)
+      .order('task_number', { ascending: true })
+
+    if (taskReadError) {
+      setNotice(`Revision activated, but controlled activity dates could not be synchronised: ${taskReadError.message}`)
+      return
+    }
+
+    const normalise = (value: unknown) => String(value || '')
+      .trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ')
+
+    for (const task of currentTasks || []) {
+      const taskName = normalise(task.name)
+      const exactName = programmeActivities.filter((activity: any) => normalise(activity.name) === taskName)
+      const activity = exactName.length === 1
+        ? exactName[0]
+        : exactName.find((item: any) => Number(item.task_number) === Number(task.task_number))
+          || programmeActivities.find((item: any) => Number(item.task_number) === Number(task.task_number) && normalise(item.name) === taskName)
+
+      if (!activity) continue
+
+      const update: Record<string, any> = {
+        start_date: activity.start_date || task.start_date,
+        finish_date: activity.finish_date || task.finish_date,
+        planned_start: activity.start_date || task.start_date,
+        planned_finish: activity.finish_date || task.finish_date,
+        controlled_revision_id: id,
+        updated_at: new Date().toISOString(),
+      }
+      if (!task.baseline_start_date) update.baseline_start_date = task.start_date || null
+      if (!task.baseline_finish_date) update.baseline_finish_date = task.finish_date || null
+
+      const { error: taskUpdateError } = await supabase.from('tasks').update(update).eq('id', task.id)
+      if (taskUpdateError) {
+        setNotice(`Revision activated, but activity ${task.name} could not be synchronised: ${taskUpdateError.message}`)
+        return
+      }
+    }
+
     await supabase
       .from('schedule_revisions')
       .update({ activated_by: user?.id || null })
@@ -508,13 +555,13 @@ export default function ScheduleRevisionsPage() {
                   </td>
 
                   <td>
-                    {canManage && !item.is_active && (
+                    {canManage && (
                       <button
                         className="btn btn-gold btn-sm"
                         onClick={() => activateRevision(item.id)}
                       >
                         <CheckCircle size={13} />
-                        Activate
+                        {item.is_active ? 'Reapply programme' : 'Activate'}
                       </button>
                     )}
                   </td>
