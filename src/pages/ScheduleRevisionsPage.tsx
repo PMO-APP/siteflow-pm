@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { fdate } from '@/lib/utils'
+import { useQueryClient } from '@tanstack/react-query'
 
 const REVISION_TYPES = [
   'Baseline',
@@ -22,6 +23,7 @@ function canManageSchedule(role?: string | null) {
 
 export default function ScheduleRevisionsPage() {
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const role = useMembershipStore(state => state.role)
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
@@ -227,6 +229,7 @@ export default function ScheduleRevisionsPage() {
       .update({ activated_by: user?.id || null })
       .eq('id', id)
 
+    await queryClient.invalidateQueries({ queryKey: ['active-schedule-revision', projectId] })
     await loadData()
   }
 
