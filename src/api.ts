@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types'
 import { publishTaskMutationEvents } from '@/services/events/domainEventPublishers'
-import { normaliseActivityName, type RevisionProgrammeActivity } from './revisionProgramme'
+import { normaliseActivityName, type RevisionProgrammeActivity } from './features/schedule/revisionProgramme'
 
 export async function fetchProjectTasks(projectId: number | string) {
   const { data, error } = await supabase
