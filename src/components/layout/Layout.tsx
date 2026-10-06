@@ -8,6 +8,7 @@ import WorkspaceSwitcher from './WorkspaceSwitcher'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 import type { PermissionAction } from '@/access/accessTypes'
+import { getRevisionTargetDate, isRevisedProgramme } from '@/hooks/useActiveScheduleRevision'
 
 
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -207,6 +208,7 @@ export default function Layout() {
   const [notifsOpen, setNotifsOpen] = useState(false)
   const commandPalette = useCommandPalette()
   const [handoverDate, setHandoverDate] = useState<Date | null>(null)
+  const [handoverIsRevised, setHandoverIsRevised] = useState(false)
   const [organizationName, setOrganizationName] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
   const [projectImageUrl, setProjectImageUrl] = useState<string | null>(null)
@@ -312,6 +314,7 @@ export default function Layout() {
   async function loadProject() {
     if (!projectId && !projectName) {
       setHandoverDate(null)
+      setHandoverIsRevised(false)
       setProjectImageUrl(null)
       return
     }
@@ -331,14 +334,31 @@ export default function Layout() {
     setProjectImageUrl(projectData?.project_image_url || null)
 
     const explicitHandover = safeParseDate(projectData?.handover_date)
+    const resolvedProjectId = projectData?.id || projectId
+
+    if (resolvedProjectId) {
+      const { data: activeRevision } = await supabase
+        .from('schedule_revisions')
+        .select('revision_type, current_finish, planned_finish, forecast_finish')
+        .eq('project_id', resolvedProjectId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const revisionHandover = safeParseDate(getRevisionTargetDate(activeRevision))
+      if (revisionHandover) {
+        setHandoverDate(revisionHandover)
+        setHandoverIsRevised(isRevisedProgramme(activeRevision))
+        return
+      }
+    }
 
     if (explicitHandover) {
       setHandoverDate(explicitHandover)
+      setHandoverIsRevised(false)
       return
     }
-
-
-    const resolvedProjectId = projectData?.id || projectId
 
     if (!resolvedProjectId) {
       setHandoverDate(null)
@@ -371,6 +391,7 @@ export default function Layout() {
       })[0]
 
     setHandoverDate(lastTask?.finishDate || null)
+    setHandoverIsRevised(false)
   }
 
   async function loadWorkspaceContext() {
@@ -562,6 +583,7 @@ export default function Layout() {
                       year: 'numeric',
                     })
                   : 'No handover date'}
+                {handoverIsRevised ? <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[8px] font-bold uppercase text-blue-700">Revised</span> : null}
               </div>
             </div>
           </div>
