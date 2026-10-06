@@ -17,6 +17,7 @@ import { useTasks } from '@/hooks/useTasks'
 import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
+import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 
 type ProjectScope =
   | 'Carcass'
@@ -376,6 +377,8 @@ function makeEmptyContext() {
 
 export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
+  const { data: activeRevision } = useActiveScheduleRevision(projectId)
+  const activeRevisionTarget = getRevisionTargetDate(activeRevision)
   const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
@@ -514,11 +517,14 @@ export default function RecoveryForecastPage() {
     // the last in-scope schedule activity represents handover. Project-level dates
     // are retained only as fallback when the schedule has no usable final date.
     const targetDate =
+      safeDate(activeRevisionTarget) ||
       scheduleTargetDate ||
       sharedIntelligence.forecastV2.targetDate ||
       projectFallbackTargetDate
 
-    const targetDateSource = scheduleTargetDate && lastTask
+    const targetDateSource = activeRevisionTarget
+      ? `Active programme revision: ${activeRevision?.revision_name || 'Approved revision'}`
+      : scheduleTargetDate && lastTask
       ? `Schedule handover: ${getTaskName(lastTask)}`
       : sharedIntelligence.forecastV2.targetDate
       ? 'Approved schedule target'
