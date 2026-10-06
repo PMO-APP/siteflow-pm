@@ -37,6 +37,7 @@ import GanttView from '@/components/modules/schedule/GanttView'
 import MilestoneTracker from '@/components/modules/schedule/MilestoneTracker'
 import { pmoConfirm, pmoPrompt, pmoToast } from '@/lib/notifications'
 import { taskVisibleInDiscipline } from '@/features/schedule/disciplineProjection'
+import { getRevisionTargetDate, isRevisedProgramme, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 
 type View = 'list' | 'gantt' | 'milestones'
 type DisciplineTab = 'Overall' | 'Housebuild' | 'Mechanical' | 'Electrical' | 'MEP' | 'Infrastructure'
@@ -68,6 +69,8 @@ export default function SchedulePage() {
 
   const { importExcel, importXml, uploadBackup } = useScheduleImport()
   const { data: allTasks = [], isLoading: tasksLoading } = useTasks()
+  const { data: activeRevision } = useActiveScheduleRevision(projectId)
+  const activeRevisionTarget = getRevisionTargetDate(activeRevision)
   const { data: qualityGates = [], isLoading: qualityGatesLoading } = useQualityGates()
   const { data: allDeliveryPackages = [], isLoading: deliveryPackagesLoading } = useDeliveryPackages(true)
   const deliveryPackages = allDeliveryPackages.filter(pkg => !pkg.archived_at)
@@ -83,6 +86,24 @@ export default function SchedulePage() {
   const canAdministerPackages = ['workspace_admin', 'admin'].includes(role || '')
 
   const today = new Date()
+
+  const revisionBanner = activeRevision ? (
+    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span className="font-semibold text-slate-900">Active programme: {activeRevision.revision_name || 'Approved revision'}</span>
+          {isRevisedProgramme(activeRevision) && (
+            <span className="ml-2 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Revised</span>
+          )}
+          <div className="mt-1 text-xs text-slate-500">This approved revision is the current programme source for project handover reporting.</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Current handover</div>
+          <div className="font-semibold text-slate-900">{activeRevisionTarget ? fdate(activeRevisionTarget) : 'Not set'}</div>
+        </div>
+      </div>
+    </div>
+  ) : null
 
   // The tasks query is already scoped to the selected project. Delivery-package
   // metadata must never decide whether a valid programme activity exists.
