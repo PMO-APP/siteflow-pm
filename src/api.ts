@@ -35,18 +35,24 @@ export async function fetchProjectTasks(projectId: number | string) {
   if (!revisions.length) return baseTasks
 
   return baseTasks.map(task => {
-    const scoped = revisions.find(revision => revision.block_id && String(revision.block_id) === String(task.delivery_package_id))
-    const projectWide = revisions.find(revision => !revision.block_id)
-    const revision = scoped || projectWide
+    // Package revisions control only their own contractor/package programme.
+    // A project-wide revision is applied to the consolidated master in SchedulePage,
+    // never sprayed across underlying contractor programmes where task numbers can repeat.
+    const revision = task.delivery_package_id
+      ? revisions.find(item => item.block_id && String(item.block_id) === String(task.delivery_package_id))
+      : revisions.find(item => !item.block_id)
     const activities = (revision?.programme_activities || []) as RevisionProgrammeActivity[]
     if (!revision || !activities.length) return task
 
     const taskName = normaliseActivityName(task.name)
-    const byName = activities.filter(activity => normaliseActivityName(activity.name) === taskName)
-    const activity = byName.length === 1
-      ? byName[0]
-      : byName.find(activity => Number(activity.task_number) === Number(task.task_number))
-        || activities.find(activity => Number(activity.task_number) === Number(task.task_number) && normaliseActivityName(activity.name) === taskName)
+    const taskNumber = Number(task.task_number)
+    const numbered = Number.isFinite(taskNumber)
+      ? activities.filter(activity => Number(activity.task_number) === taskNumber)
+      : []
+    const named = activities.filter(activity => normaliseActivityName(activity.name) === taskName)
+    // Within one package, task number is the strongest identity. Name is the
+    // fallback for legacy imports. Ambiguous matches are deliberately ignored.
+    const activity = numbered.length === 1 ? numbered[0] : named.length === 1 ? named[0] : undefined
     if (!activity) return task
 
     return {
