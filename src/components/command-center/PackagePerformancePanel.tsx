@@ -46,7 +46,7 @@ export default function PackagePerformancePanel({ packages }: { packages: Delive
                   </p>
                 </div>
               </div>
-              <StatusPill label={`${pkg.healthScore}% · ${pkg.healthLabel}`} tone={tone(pkg.healthLabel)} />
+              <StatusPill label={pkg.progress === 0 && pkg.plannedProgress === 0 ? 'Not yet due / unverified' : `${pkg.healthScore}% · ${pkg.healthLabel}`} tone={pkg.progress === 0 && pkg.plannedProgress === 0 ? 'primary' : tone(pkg.healthLabel)} />
             </div>
 
             <div className="mt-4 grid grid-cols-3 gap-3 border-t border-[var(--pmx-border)] pt-4">
