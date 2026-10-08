@@ -338,8 +338,21 @@ export function calculateForecastV2(
     toDate(state.project.targetDate) ||
     toDate(state.schedule.finishDate)
 
-  const forecastDate =
-    targetDate && delayDays > 0 ? addDays(targetDate, delayDays) : targetDate
+  // A multi-package master finishes when its last active package finishes.
+  // Do not apply the worst package delay to a different package's target date.
+  const packageForecastDates = Array.from(packageGroups.values()).map(group => {
+    const dated = group.map(activity => toDate(activity.plannedFinish)).filter((date): date is Date => date !== null)
+    if (!dated.length) return null
+    const packageFinish = new Date(Math.max(...dated.map(date => date.getTime())))
+    const position = packagePositions.find(item => group.some(activity => activity.deliveryPackageId === item.packageId))
+    return addDays(packageFinish, Math.max(0, position?.delayDays || 0))
+  }).filter((date): date is Date => date !== null)
+  const latestPackageForecast = packageForecastDates.length
+    ? new Date(Math.max(...packageForecastDates.map(date => date.getTime())))
+    : null
+  const forecastDate = isMultiPackage
+    ? latestPackageForecast || targetDate
+    : targetDate && delayDays > 0 ? addDays(targetDate, delayDays) : targetDate
 
   const blockedCritical = activities.filter(activity => {
     const plannedStart = toDate(activity.plannedStart)
