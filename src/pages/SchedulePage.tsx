@@ -366,10 +366,10 @@ export default function SchedulePage() {
       : `The approved schedule is stable. No overdue activities are currently recorded, and delivery is progressing at ${stats.avgProgress}% overall completion.`
 
   const outstandingPaymentConstraint = tasks.some(task =>
-    /valuation.*payment|payment.*mobilis/i.test(task.name) && task.progress < 100
+    /valuation.*payment|payment.*mobilis/i.test(task.name) && Number(task.progress_pct || 0) < 100
   )
   const handoverTasks = tasks.filter(task =>
-    /snag|inspection|handover|cleaning|reinspection/i.test(task.name) && task.progress < 100 && task.finish_date
+    /snag|inspection|handover|cleaning|reinspection/i.test(task.name) && Number(task.progress_pct || 0) < 100 && task.finish_date
   ).sort((a, b) => new Date(a.finish_date!).getTime() - new Date(b.finish_date!).getTime())
   const recoveryText = outstandingPaymentConstraint
     ? `Resolve the outstanding valuation-payment and mobilisation constraint first. Confirm the payment owner, clearance date and affected packages before sequencing their remaining work. ${handoverTasks.length ? `Protect the nearest handover workfront: “${handoverTasks[0].name}” (${fdate(handoverTasks[0].finish_date)}).` : ''}`
