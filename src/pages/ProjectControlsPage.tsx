@@ -8,6 +8,7 @@ import { useMembershipStore } from '@/store/membership'
 import { useAuthStore } from '@/store/auth'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 import { fdate } from '@/lib/utils'
+import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
 
 const TABS = ['Execution', 'Schedule', 'Progress', 'Delays', 'Forecast', 'Recovery', 'History']
 
@@ -135,6 +136,8 @@ export default function ProjectControlsPage() {
   const { can } = useAccessSession()
 
   const [activeTab, setActiveTab] = useState('Execution')
+  const [selectedPackageId, setSelectedPackageId] = useState('all')
+  const { data: deliveryPackages = [] } = useDeliveryPackages()
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
   const disciplinePermission = ['Mechanical', 'Electrical'].includes(disciplineTab) ? 'mep' : disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
   const canEdit = Boolean(projectId) && can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: disciplinePermission })
@@ -178,7 +181,22 @@ export default function ProjectControlsPage() {
     void loadData(projectId, requestId, !!cached)
   }, [projectId])
 
-  const tasks = allTasks.filter(task => taskVisibleInDiscipline(task as any, disciplineTab))
+  const packageNames = useMemo(() => new Map(deliveryPackages.map(pkg => [String(pkg.id), pkg.name])), [deliveryPackages])
+  const scopedTasks = useMemo(() => allTasks
+    .filter(task => taskVisibleInDiscipline(task as any, disciplineTab))
+    .map(task => ({ ...task, package_name: task.delivery_package_id
+      ? (packageNames.get(String(task.delivery_package_id)) || 'Unknown package')
+      : 'Project Wide' })), [allTasks, disciplineTab, packageNames])
+  const tasks = selectedPackageId === 'all' ? scopedTasks
+    : scopedTasks.filter(task => selectedPackageId === 'project-wide'
+      ? !task.delivery_package_id : String(task.delivery_package_id) === selectedPackageId)
+  const packageOptions = deliveryPackages.filter(pkg => scopedTasks.some(task => String(task.delivery_package_id) === String(pkg.id)))
+  const groupedTasks = useMemo(() => [...tasks].sort((a, b) => {
+    const aName = a.package_name || 'Project Wide'
+    const bName = b.package_name || 'Project Wide'
+    return aName.localeCompare(bName, undefined, { numeric: true }) ||
+      String(a.task_number ?? '').localeCompare(String(b.task_number ?? ''), undefined, { numeric: true })
+  }), [tasks])
 
   async function loadData(
     targetProjectId = projectId,
@@ -389,6 +407,23 @@ export default function ProjectControlsPage() {
 
       {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
+      <div className="card p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="font-bold text-[#0B2A3C] dark:text-white">Delivery package</div>
+            <p className="text-xs text-slate-500">Select a package to update only its activities. Master shows all packages separately.</p>
+          </div>
+          <select aria-label="Delivery package" value={selectedPackageId} onChange={event => setSelectedPackageId(event.target.value)} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-[#0B2A3C] min-w-[210px]">
+            <option value="all">All packages · Master</option>
+            {packageOptions.map(pkg => <option key={pkg.id} value={String(pkg.id)}>{pkg.name}</option>)}
+            {scopedTasks.some(task => !task.delivery_package_id) && <option value="project-wide">General / Project Wide</option>}
+          </select>
+        </div>
+        {selectedPackageId === 'all' && packageOptions.length > 0 && <div className="flex flex-wrap gap-2">
+          {packageOptions.map(pkg => <button key={pkg.id} type="button" onClick={() => setSelectedPackageId(String(pkg.id))} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-[#0B2A3C] hover:bg-teal-50">{pkg.name}</button>)}
+        </div>}
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <Metric title="Tasks" value={metrics.total} />
         <Metric title="Overall Progress" value={`${metrics.overallProgress}%`} />
@@ -420,7 +455,8 @@ export default function ProjectControlsPage() {
         <>
           {activeTab === 'Execution' && (
             <ExecutionTab
-              tasks={tasks}
+              tasks={groupedTasks}
+              showPackageGroups={selectedPackageId === 'all'}
               edits={edits}
               updateEdit={updateEdit}
               saveTaskProgress={saveTaskProgress}
@@ -452,6 +488,8 @@ export default function ProjectControlsPage() {
             <HistoryTab
               logs={logs}
               tasks={allTasks}
+              selectedTaskIds={new Set(tasks.map(task => String(task.id)))}
+              packageNames={packageNames}
               disciplineTab={disciplineTab}
             />
           )}
@@ -463,6 +501,7 @@ export default function ProjectControlsPage() {
 
 function ExecutionTab({
   tasks,
+  showPackageGroups,
   edits,
   updateEdit,
   saveTaskProgress,
@@ -519,7 +558,8 @@ function ExecutionTab({
             </thead>
 
             <tbody>
-              {tasks.map((task: any) => {
+              {tasks.map((task: any, index: number) => {
+                const groupStart = showPackageGroups && (index === 0 || tasks[index - 1]?.package_name !== task.package_name)
                 const taskId = task.id
                 const edit = edits[taskId] || {}
                 const progress = edit.progress_pct ?? getProgress(task)
@@ -532,6 +572,7 @@ function ExecutionTab({
 
                 return (
                   <Fragment key={taskId}>
+                    {groupStart && <tr className="bg-[#eaf4f4]"><td colSpan={7} className="px-4 py-3 text-sm font-bold text-[#0B2A3C]">{task.package_name} <span className="ml-2 text-xs font-normal text-slate-500">{tasks.filter((item: any) => item.package_name === task.package_name).length} activities</span></td></tr>}
                     <tr className={isExpanded ? 'bg-[#f8fafc]' : ''}>
                       <td className="align-top font-medium text-[#102943]">
                         <div className="break-words pr-2 leading-5">
@@ -928,11 +969,12 @@ function RecoveryTab({ tasks }: { tasks: any[] }) {
   )
 }
 
-function HistoryTab({ logs, tasks, disciplineTab }: any) {
+function HistoryTab({ logs, tasks, disciplineTab, selectedTaskIds, packageNames }: any) {
+  const scopedLogs = logs.filter((log: any) => selectedTaskIds.has(String(log.task_id)))
   const filteredLogs =
     disciplineTab === 'Overall'
-      ? logs
-      : logs.filter((log: any) => {
+      ? scopedLogs
+      : scopedLogs.filter((log: any) => {
           const task = tasks.find((item: any) => item.id === log.task_id)
           return (task?.discipline || 'Housebuild') === disciplineTab
         })
@@ -952,6 +994,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
           <tr>
             <th>Date</th>
             <th>Activity</th>
+            <th>Package</th>
             <th>Updated By</th>
             <th>Progress Change</th>
             <th>Delay Reason</th>
@@ -970,6 +1013,7 @@ function HistoryTab({ logs, tasks, disciplineTab }: any) {
                 <td className="font-medium text-[#102943]">
                   {task ? getTaskName(task) : `Task ${log.task_id}`}
                 </td>
+                <td>{task?.delivery_package_id ? packageNames.get(String(task.delivery_package_id)) || 'Unknown package' : 'Project Wide'}</td>
                 <td>{getLogActor(log)}</td>
                 <td>
                   {Number(log.previous_progress || 0)}% →{' '}
