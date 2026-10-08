@@ -268,7 +268,7 @@ export default function ScheduleRevisionsPage() {
     // Baseline dates are captured once before the first revision is applied.
     const { data: currentTasks, error: taskReadError } = await supabase
       .from('tasks')
-      .select('id, task_number, name, start_date, finish_date, baseline_start_date, baseline_finish_date')
+      .select('id, task_number, name, start_date, finish_date, baseline_start_date, baseline_finish_date, delivery_package_id')
       .eq('project_id', projectId)
       .order('task_number', { ascending: true })
 
@@ -281,12 +281,21 @@ export default function ScheduleRevisionsPage() {
       .trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ')
 
     for (const task of currentTasks || []) {
+      // A package revision must never update another contractor's programme.
+      // A project-wide revision controls the consolidated master view and therefore
+      // only materialises into legacy unscoped task rows; package rows stay intact.
+      const inRevisionScope = revision.block_id
+        ? String(task.delivery_package_id || '') === String(revision.block_id)
+        : !task.delivery_package_id
+      if (!inRevisionScope) continue
+
       const taskName = normalise(task.name)
-      const exactName = programmeActivities.filter((activity: any) => normalise(activity.name) === taskName)
-      const activity = exactName.length === 1
-        ? exactName[0]
-        : exactName.find((item: any) => Number(item.task_number) === Number(task.task_number))
-          || programmeActivities.find((item: any) => Number(item.task_number) === Number(task.task_number) && normalise(item.name) === taskName)
+      const taskNumber = Number(task.task_number)
+      const numbered = Number.isFinite(taskNumber)
+        ? programmeActivities.filter((item: any) => Number(item.task_number) === taskNumber)
+        : []
+      const named = programmeActivities.filter((item: any) => normalise(item.name) === taskName)
+      const activity = numbered.length === 1 ? numbered[0] : named.length === 1 ? named[0] : undefined
 
       if (!activity) continue
 
