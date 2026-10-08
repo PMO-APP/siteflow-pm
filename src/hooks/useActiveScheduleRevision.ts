@@ -12,6 +12,9 @@ export type ActiveScheduleRevision = {
   baseline_finish: string | null
   current_finish: string | null
   forecast_finish: string | null
+  block_id: string | null
+  package_name: string | null
+  programme_activities: unknown[] | null
   is_active: boolean
 }
 
@@ -34,7 +37,7 @@ export function useActiveScheduleRevision(projectId?: string | number | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedule_revisions')
-        .select('id, project_id, revision_name, revision_no, revision_type, planned_start, planned_finish, baseline_finish, current_finish, forecast_finish, is_active')
+        .select('id, project_id, revision_name, revision_no, revision_type, planned_start, planned_finish, baseline_finish, current_finish, forecast_finish, block_id, package_name, programme_activities, is_active')
         .eq('project_id', projectId as string | number)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
