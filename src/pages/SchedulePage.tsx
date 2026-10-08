@@ -365,9 +365,19 @@ export default function SchedulePage() {
       ? `Delivery remains broadly on plan. ${stats.atRisk} ${stats.atRisk === 1 ? 'activity is' : 'activities are'} entering the watch window and should be protected before available time is lost.`
       : `The approved schedule is stable. No overdue activities are currently recorded, and delivery is progressing at ${stats.avgProgress}% overall completion.`
 
-  const recoveryText = delayedTasks.length
-    ? `Start with “${delayedTasks[0].name}”. Confirm the blocker, assign a recovery owner and protect all downstream activities before the next reporting cycle.`
-    : `No immediate recovery intervention is required. Focus on protecting upcoming milestones and closing approvals before they affect site execution.`
+  const outstandingPaymentConstraint = tasks.some(task =>
+    /valuation.*payment|payment.*mobilis/i.test(task.name) && task.progress < 100
+  )
+  const handoverTasks = tasks.filter(task =>
+    /snag|inspection|handover|cleaning|reinspection/i.test(task.name) && task.progress < 100 && task.finish_date
+  ).sort((a, b) => new Date(a.finish_date!).getTime() - new Date(b.finish_date!).getTime())
+  const recoveryText = outstandingPaymentConstraint
+    ? `Resolve the outstanding valuation-payment and mobilisation constraint first. Confirm the payment owner, clearance date and affected packages before sequencing their remaining work. ${handoverTasks.length ? `Protect the nearest handover workfront: “${handoverTasks[0].name}” (${fdate(handoverTasks[0].finish_date)}).` : ''}`
+    : handoverTasks.length
+      ? `Protect the nearest outstanding handover activity: “${handoverTasks[0].name}” (${fdate(handoverTasks[0].finish_date)}). Confirm the responsible package, inspection readiness and recovery owner.`
+      : delayedTasks.length
+        ? `Start with “${delayedTasks[0].name}”. Confirm the blocker, assign a recovery owner and protect downstream activities.`
+        : `No immediate recovery intervention is recorded. Protect the next package milestone and close outstanding approvals.`
 
   const isTaskLocked = (task: Task) => qualityGates.some(
     gate => gate.blocks_task_id === task.id && gate.status !== 'Approved' && gate.status !== 'Reapproved'
