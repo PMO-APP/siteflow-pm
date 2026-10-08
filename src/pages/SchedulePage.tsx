@@ -213,8 +213,63 @@ export default function SchedulePage() {
     }).sort((a, b) => Number(a.task_number || 0) - Number(b.task_number || 0))
   }, [projectTasks, deliveryPackages])
 
+  // Project-wide revisions control the consolidated master schedule, not each
+  // contractor programme underneath it. This preserves duplicate activities
+  // such as Painting across several contractors while allowing the master
+  // programme to move independently and audibly.
+  const controlledOverallTasks = useMemo(() => {
+    if (!activeRevision || activeRevision.block_id || !Array.isArray(activeRevision.programme_activities) || !activeRevision.programme_activities.length) {
+      return overallTasks
+    }
+
+    const normalise = (value?: string | null) => String(value || '')
+      .trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ')
+    const activities = activeRevision.programme_activities as any[]
+    const taskNumberCounts = new Map<number, number>()
+    overallTasks.forEach(task => {
+      const n = Number(task.task_number)
+      if (Number.isFinite(n)) taskNumberCounts.set(n, (taskNumberCounts.get(n) || 0) + 1)
+    })
+    const revisionNumberCounts = new Map<number, number>()
+    activities.forEach(activity => {
+      const n = Number(activity.task_number)
+      if (Number.isFinite(n)) revisionNumberCounts.set(n, (revisionNumberCounts.get(n) || 0) + 1)
+    })
+
+    return overallTasks.map(task => {
+      const taskName = normalise(task.name)
+      const taskPhase = normalise(task.phase)
+      const sameName = activities.filter(activity => normalise(activity.name) === taskName)
+      const samePhaseAndName = sameName.filter(activity => !taskPhase || !normalise(activity.phase) || normalise(activity.phase) === taskPhase)
+      const n = Number(task.task_number)
+      const uniqueNumber = Number.isFinite(n) && taskNumberCounts.get(n) === 1 && revisionNumberCounts.get(n) === 1
+        ? activities.find(activity => Number(activity.task_number) === n)
+        : undefined
+      const activity = samePhaseAndName.length === 1
+        ? samePhaseAndName[0]
+        : sameName.length === 1
+          ? sameName[0]
+          : uniqueNumber
+      if (!activity) return task
+
+      return {
+        ...task,
+        start_date: activity.start_date || task.start_date,
+        finish_date: activity.finish_date || task.finish_date,
+        planned_start: activity.start_date || (task as any).planned_start || task.start_date,
+        planned_finish: activity.finish_date || (task as any).planned_finish || task.finish_date,
+        dependencies: activity.dependencies ?? task.dependencies,
+        responsible: activity.responsible ?? task.responsible,
+        is_milestone: Boolean(activity.is_milestone) || task.is_milestone,
+        controlled_revision_id: activeRevision.id,
+        controlled_revision_no: activeRevision.revision_no,
+        controlled_revision_name: activeRevision.revision_name,
+      } as Task
+    })
+  }, [overallTasks, activeRevision])
+
   const disciplineTasks = disciplineTab === 'Overall'
-    ? overallTasks
+    ? controlledOverallTasks
     : projectTasks.filter(task => ((task as any).discipline || 'Housebuild') === disciplineTab)
   const tasks: Task[] = selectedPackageId === 'all'
     ? disciplineTasks
