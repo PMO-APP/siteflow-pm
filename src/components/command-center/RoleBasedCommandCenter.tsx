@@ -205,8 +205,18 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         </section>
       </div>
 
-      <PackagePerformancePanel packages={intelligence.deliveryTwin.packages} />
-      <DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} />
+      <section className="pmx-section-panel">
+        <div className="pmx-eyebrow">Delivery groups</div>
+        <h2 className="mt-2 text-lg font-semibold">Master finish outlook</h2>
+        <p className="mt-2 text-sm text-[var(--pmx-muted)]">The master forecast uses the latest package forecast. Management recovery deadlines remain separate from the forecast.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">October recovery target</div><strong>31 Oct 2026</strong><div className="mt-1 text-xs">A1–A14 and B1–B6</div></div>
+          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">December recovery target</div><strong>31 Dec 2026</strong><div className="mt-1 text-xs">B9–B12 and B14</div></div>
+          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">Existing programme</div><strong>B13</strong><div className="mt-1 text-xs">Existing dates retained</div></div>
+        </div>
+      </section>
+      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Detailed package performance</summary><div className="mt-4"><PackagePerformancePanel packages={intelligence.deliveryTwin.packages} /></div></details>
+      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Digital project twin and predictive scenarios</summary><div className="mt-4"><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div></details>
       {import.meta.env.DEV ? <V6IntelligenceComparison project={project} /> : null}
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
