@@ -270,6 +270,8 @@ export default function CostingPage() {
   const [contractsLoading, setContractsLoading] = useState(true)
   const [paymentsLoading, setPaymentsLoading] = useState(true)
   const [notice, setNotice] = useState('')
+  const submittingRef = useRef(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [form, setForm] = useState({
     section: 'Pre-Contract',
@@ -863,6 +865,10 @@ export default function CostingPage() {
   }
 
   async function submitReport() {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
+    try {
     if (!canEdit) {
       setNotice(viewOnlyMessage())
       return
@@ -882,6 +888,23 @@ export default function CostingPage() {
       .select('id').eq('project_id', projectId).eq('report_week', reportWeek).limit(1)
     if (duplicateCheckError) { setNotice(duplicateCheckError.message); return }
     if (existingReport?.length) { setNotice('This project already has a submitted Costing report for this week.'); return }
+
+    // These checks block inconsistent financial submissions without altering draft records.
+    const invalidAmounts = [...contracts, ...payments, ...variations, ...procurements, ...financialItems]
+      .filter((record: any) => record.amount != null && record.amount !== '' &&
+        (!Number.isFinite(Number(record.amount)) || Number(record.amount) < 0))
+    if (invalidAmounts.length) {
+      setNotice('Financial validation failed: correct negative or invalid amounts before submitting.')
+      return
+    }
+    if (totalPaidOnContracts > totalContractValue && totalContractValue > 0) {
+      setNotice('Financial validation: contract payments exceed the total contract value. Review before submission.')
+      return
+    }
+    if (payments.some((payment: any) => payment.payment_status === 'Paid' && !Number.isFinite(Number(payment.amount)))) {
+      setNotice('Financial validation: a paid payment is missing a valid amount.')
+      return
+    }
 
     const snapshotData = {
       projectName,
@@ -939,6 +962,10 @@ export default function CostingPage() {
     await loadSubmissions()
     setActiveTab('report')
     setNotice('Weekly cost report submitted successfully and saved to history.')
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
+    }
   }
 
   function printReport() {
@@ -1349,7 +1376,8 @@ export default function CostingPage() {
             onDelete={deleteItem}
             onSubmit={submitReport}
             canEdit={canEdit}
-            canSubmitReport={canSubmitReport}
+            canSubmitReport={canSubmitReport && !isSubmitting}
+            isSubmitting={isSubmitting}
             submissionLockMessage={reportLock.message}
             submissionDeadlineLabel={reportLock.deadlineLabel}
           />
@@ -2105,6 +2133,7 @@ function WeeklyReportTab({
   onSubmit,
   canEdit,
   canSubmitReport,
+  isSubmitting,
   submissionLockMessage,
   submissionDeadlineLabel,
 }: any) {
@@ -2137,7 +2166,7 @@ function WeeklyReportTab({
               onClick={onSubmit}
               title={submissionLockMessage}
             >
-              Submit Weekly Report
+              {isSubmitting ? 'Submitting…' : 'Submit Weekly Report'}
             </button>
           ) : (
             <div className="text-sm text-amber-300">{viewOnlyMessage()}</div>
