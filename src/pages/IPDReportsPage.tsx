@@ -37,6 +37,15 @@ import jsPDF from 'jspdf'
 import { projectedTaskDiscipline } from '@/features/schedule/disciplineProjection'
 
 const IPD_DISCIPLINES = ['Housebuild', 'Mechanical', 'Electrical', 'Infrastructure']
+
+// UTC+1 year-round: Thursday 12:00 through Friday 16:00 Lagos time.
+function isIpdSubmissionOpen(at = new Date()) {
+  const lagos = new Date(at.getTime() + 60 * 60 * 1000)
+  const day = lagos.getUTCDay()
+  const minutes = lagos.getUTCHours() * 60 + lagos.getUTCMinutes()
+  return (day === 4 && minutes >= 12 * 60) || (day === 5 && minutes < 16 * 60)
+}
+
 function workflowBadge(status?: string | null) {
   if (status === 'Approved' || status === 'Locked') return 'badge-green'
   if (status === 'Submitted' || status === 'Resubmitted') return 'badge-amber'
@@ -219,7 +228,13 @@ export default function ReportsPage() {
     !Boolean(selectedReportAny?.sent_to_pmo_at) &&
     String(workflowStatus || 'Draft') === 'Draft'
 
-  const canCreatorSubmit = canCreatorEdit
+  const [submissionClock, setSubmissionClock] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = window.setInterval(() => setSubmissionClock(Date.now()), 30000)
+    return () => window.clearInterval(interval)
+  }, [])
+  const submissionOpen = isIpdSubmissionOpen(new Date(submissionClock))
+  const canCreatorSubmit = canCreatorEdit && submissionOpen
 
   const emptyForm = {
     department: disciplineLabel || (session.discipline ? session.discipline.charAt(0).toUpperCase()+session.discipline.slice(1) : ''),
@@ -957,6 +972,14 @@ export default function ReportsPage() {
 
   async function updateWorkflow(status: string, comment?: string | null) {
     if (!selectedReport?.id) return
+    if ((status === 'Submitted' || status === 'Resubmitted') && !isIpdSubmissionOpen()) {
+      notify('error', 'IPD submissions open Thursday at 12:00 PM and close Friday at 4:00 PM (Lagos time). Your draft remains saved.')
+      return
+    }
+    if ((status === 'Submitted' || status === 'Resubmitted') && String((selectedReport as any).workflow_status || 'Draft') !== 'Draft') {
+      notify('error', 'Submitted reports are permanently locked.')
+      return
+    }
 
     const now = new Date().toISOString()
 
@@ -1547,6 +1570,9 @@ export default function ReportsPage() {
               ))}
             </div>
 
+            {!submissionOpen && (
+              <p className="text-sm text-amber-700" role="status">Drafts can be saved at any time. Final submission opens Thursday at 12:00 PM and closes Friday at 4:00 PM (Lagos time).</p>
+            )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 className="btn-ghost btn flex-1 justify-center"
