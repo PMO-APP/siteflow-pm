@@ -147,42 +147,25 @@ function getReportWeekFridayDeadline(reportWeek: string) {
   return friday
 }
 
+function toLagosDateInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function getReportSubmissionLock(reportWeek: string) {
   const deadline = getReportWeekFridayDeadline(reportWeek)
-
-  if (!deadline) {
-    return {
-      deadline: null,
-      isAllowed: false,
-      message: 'Invalid report week selected.',
-      deadlineLabel: 'Invalid date',
-    }
-  }
-
-  const now = new Date()
-  const isAllowed = now.getTime() <= deadline.getTime()
-
+  const lagos = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }))
+  const day = lagos.getDay()
+  const hour = lagos.getHours() + lagos.getMinutes() / 60
+  const currentFriday = getReportWeekFridayDeadline(toLagosDateInput(lagos))
+  const isCurrentWeek = Boolean(deadline && currentFriday &&
+    toLagosDateInput(deadline) === toLagosDateInput(currentFriday))
+  const isAllowed = isCurrentWeek && ((day === 4 && hour >= 12) || (day === 5 && hour < 16))
   return {
-    deadline,
-    isAllowed,
-    deadlineLabel: deadline.toLocaleString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
+    deadline, isAllowed,
+    deadlineLabel: 'Friday 4:00 PM (Lagos time)',
     message: isAllowed
-      ? `Submission open until ${deadline.toLocaleString('en-GB', {
-          weekday: 'short',
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}.`
-      : `Submission locked. Reports can only be submitted latest 11:00 PM on Friday of the selected report week.`,
+      ? 'Submissions close Friday at 4:00 PM (Lagos time).'
+      : 'Only the current reporting week can be submitted, Thursday 12:00 PM to Friday 4:00 PM (Lagos time).',
   }
 }
 
@@ -894,6 +877,11 @@ export default function CostingPage() {
       setNotice(reportLock.message)
       return
     }
+
+    const { data: existingReport, error: duplicateCheckError } = await supabase.from('cost_report_submissions')
+      .select('id').eq('project_id', projectId).eq('report_week', reportWeek).limit(1)
+    if (duplicateCheckError) { setNotice(duplicateCheckError.message); return }
+    if (existingReport?.length) { setNotice('This project already has a submitted Costing report for this week.'); return }
 
     const snapshotData = {
       projectName,
