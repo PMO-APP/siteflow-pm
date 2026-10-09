@@ -118,7 +118,14 @@ export default function ProjectAccessMatrix() {
         .filter(Number.isFinite)
       const hasWorkspaceAccess = assignments.some((item:any) => scopeTypeOf(item) === 'workspace')
       const email = String(membership.email || '').trim().toLowerCase()
-      const role = String(membership.role || '').trim().toLowerCase()
+      const membershipRole = String(membership.role || '').trim().toLowerCase()
+      // Show the assigned functional role when a legacy membership still says
+      // viewer. This is presentation only; edit rights remain assignment-scoped.
+      const assignedRole = assignments
+        .filter((item:any) => ['workspace', 'project'].includes(scopeTypeOf(item)))
+        .map((item:any) => String(item?.assignmentRole ?? item?.assignment_role ?? '').trim().toLowerCase())
+        .find((value:string) => value && value !== 'viewer')
+      const role = membershipRole === 'viewer' && assignedRole ? assignedRole : membershipRole
       return {
         key: `${membership.user_id}-${role}`,
         email,
