@@ -137,7 +137,7 @@ export default function ProjectControlsPage() {
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [selectedPackageId, setSelectedPackageId] = useState('all')
-  const { data: deliveryPackages = [] } = useDeliveryPackages()
+  const { data: deliveryPackages = [], isLoading: packagesLoading, isError: packagesFailed, error: packagesError } = useDeliveryPackages()
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
   // Land discipline users on their writable stream, not the read-only Master.
   useEffect(() => {
@@ -201,7 +201,19 @@ export default function ProjectControlsPage() {
   const tasks = selectedPackageId === 'all' ? scopedTasks
     : scopedTasks.filter(task => selectedPackageId === 'project-wide'
       ? !task.delivery_package_id : String(task.delivery_package_id) === selectedPackageId)
-  const packageOptions = deliveryPackages.filter(pkg => scopedTasks.some(task => String(task.delivery_package_id) === String(pkg.id)))
+  // Package discovery must not depend on which task rows the user can currently see.
+  // In particular, an RLS-filtered task result must not hide valid project packages.
+  const packageOptions = useMemo(() => deliveryPackages.filter(pkg =>
+    disciplineTab === 'Overall' ||
+    pkg.discipline === disciplineTab ||
+    (['Mechanical', 'Electrical'].includes(disciplineTab) && pkg.discipline === 'MEP')
+  ), [deliveryPackages, disciplineTab])
+  useEffect(() => {
+    if (selectedPackageId !== 'all' && selectedPackageId !== 'project-wide' &&
+      !packageOptions.some(pkg => String(pkg.id) === selectedPackageId)) {
+      setSelectedPackageId('all')
+    }
+  }, [selectedPackageId, packageOptions])
   const groupedTasks = useMemo(() => [...tasks].sort((a, b) => {
     const aName = a.package_name || 'Project Wide'
     const bName = b.package_name || 'Project Wide'
@@ -417,6 +429,8 @@ export default function ProjectControlsPage() {
       </EnterprisePageHero>
 
       {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
+      {packagesFailed && <EnterpriseNotice tone="warning">Delivery packages could not be loaded: {packagesError instanceof Error ? packagesError.message : 'Database access error'}. Ask your administrator to check the delivery_packages read policy for assigned project members.</EnterpriseNotice>}
+      {!packagesLoading && !packagesFailed && deliveryPackages.length === 0 && allTasks.length > 0 && <EnterpriseNotice tone="warning">The project has activities, but no delivery packages were returned for your account. The delivery_packages database access policy may be restricting your view. Contact your workspace administrator.</EnterpriseNotice>}
 
       <div className="card p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
