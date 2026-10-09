@@ -216,8 +216,28 @@ export function canPerform(
     : disciplineRoles.has(roleKey) && ['workspace_member','discipline_member','',roleKey].includes(rawProfile)
       ? 'discipline_project_owner' : rawProfile
   const isDesignMember = ['design','landscaping'].includes(roleKey) || normalizeDiscipline(session.discipline) === 'design'
+  // An explicit, scoped delivery assignment is authoritative even when an old
+  // workspace membership still carries a viewer permission profile. Never grant
+  // workspace-wide edit rights from this fallback.
+  const scopedDeliveryAssignment = context?.scopeType === 'project' && context.scopeId != null &&
+    session.assignments.some(item =>
+      item.scopeType === 'project' && item.scopeId === String(context.scopeId) &&
+      ACCESS_RANK[item.accessLevel] >= ACCESS_RANK.edit &&
+      disciplinesMatch(item.discipline, context.discipline) &&
+      item.assignmentRole && item.assignmentRole !== 'viewer'
+    )
+  const scopedRole = scopedDeliveryAssignment
+    ? session.assignments.find(item =>
+        item.scopeType === 'project' && item.scopeId === String(context!.scopeId) &&
+        ACCESS_RANK[item.accessLevel] >= ACCESS_RANK.edit &&
+        disciplinesMatch(item.discipline, context!.discipline) &&
+        item.assignmentRole && item.assignmentRole !== 'viewer'
+      )?.assignmentRole?.toLowerCase()
+    : null
+  const scopedActions = scopedRole && (PROFILE_ACTIONS[scopedRole] ||
+    (normalizeDiscipline(scopedRole) ? PROFILE_ACTIONS.discipline_project_owner : undefined))
   const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
-  if (!allowed.includes(action)) return false
+  if (!allowed.includes(action) && !(scopedActions?.includes(action))) return false
 
   // PMO governance actions remain workspace-wide even though PMO no longer has
   // invisible edit-any-project authority.
