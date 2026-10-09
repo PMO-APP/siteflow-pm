@@ -133,12 +133,23 @@ export default function ProjectControlsPage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
-  const { can } = useAccessSession()
+  const { can, session } = useAccessSession()
 
   const [activeTab, setActiveTab] = useState('Execution')
   const [selectedPackageId, setSelectedPackageId] = useState('all')
   const { data: deliveryPackages = [] } = useDeliveryPackages()
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
+  // Land discipline users on their writable stream, not the read-only Master.
+  useEffect(() => {
+    if (!projectId || session.loading) return
+    const roleDiscipline = String(session.discipline || session.role || '').toLowerCase()
+    const preferred: DisciplineTab = roleDiscipline.includes('housebuild') ? 'Housebuild'
+      : roleDiscipline.includes('infrastructure') ? 'Infrastructure'
+      : roleDiscipline.includes('mep') ? 'MEP'
+      : roleDiscipline.includes('mechanical') ? 'Mechanical'
+      : roleDiscipline.includes('electrical') ? 'Electrical' : 'Overall'
+    if (preferred !== 'Overall' && can('project.edit', { scopeType:'project', scopeId:projectId, discipline:preferred === 'Mechanical' || preferred === 'Electrical' ? 'mep' : preferred.toLowerCase() })) setDisciplineTab(preferred)
+  }, [projectId, session.loading, session.role, session.discipline, can])
   const disciplinePermission = ['Mechanical', 'Electrical'].includes(disciplineTab) ? 'mep' : disciplineTab === 'Overall' ? 'overall' : disciplineTab.toLowerCase()
   const canEdit = Boolean(projectId) && can('project.edit', { scopeType: 'project', scopeId: projectId, discipline: disciplinePermission })
   const canUploadSchedule = Boolean(projectId) && can('schedule.import', { scopeType: 'project', scopeId: projectId, discipline: 'overall' })
