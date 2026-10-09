@@ -1,3 +1,4 @@
+import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PenTool, Plus, Printer, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -781,6 +782,7 @@ function DesignReportHistoryTab({
                 >
                   View / Download
                 </button>
+                <RequestReportAmendment department="design" submission={submission} />
               </td>
             </tr>
           ))}
