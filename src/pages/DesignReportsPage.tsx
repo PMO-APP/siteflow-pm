@@ -38,18 +38,18 @@ function toLocalDateInput(date: Date) {
 }
 
 function getReportSubmissionLock(now = new Date()) {
-  const deadline = getCurrentReportFriday(now)
-  const day = now.getDay()
-  const isThursday = day === 4
-  const isFriday = day === 5
-  const isAllowed = isThursday || (isFriday && now.getTime() <= deadline.getTime())
-  const deadlineLabel = deadline.toLocaleString('en-GB', { weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
-  let message = `Reports open Thursday and Friday. Deadline: ${deadlineLabel}.`
-  if (isThursday) message = `Submission open. Deadline: ${deadlineLabel}.`
-  else if (isFriday && isAllowed) message = `Submission open until 2:00 PM today.`
-  else if (isFriday) message = 'Submission closed. The Friday 2:00 PM deadline has passed.'
-  else message = 'Submission closed. Design reports can only be submitted on Thursday or Friday before 2:00 PM.'
-  return { deadline, isAllowed, deadlineLabel, message }
+  const lagos = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }))
+  const day = lagos.getDay()
+  const hour = lagos.getHours() + lagos.getMinutes() / 60
+  const isAllowed = (day === 4 && hour >= 12) || (day === 5 && hour < 16)
+  const deadline = getCurrentReportFriday(lagos)
+  return {
+    deadline, isAllowed,
+    deadlineLabel: 'Friday 4:00 PM (Lagos time)',
+    message: isAllowed
+      ? 'Submissions close Friday at 4:00 PM (Lagos time).'
+      : 'Submissions open Thursday at 12:00 PM and close Friday at 4:00 PM (Lagos time).',
+  }
 }
 
 function fdate(value?: string | null) {
@@ -194,6 +194,15 @@ export default function DesignReportsPage() {
       setNotice(reportLock.message)
       return
     }
+
+    if (reportWeek !== toLocalDateInput(getCurrentReportFriday(new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }))))) {
+      setNotice('Only the current reporting week can be submitted.')
+      return
+    }
+    const { data: existingReport, error: duplicateCheckError } = await supabase.from('design_report_submissions')
+      .select('id').eq('project_id', projectId).eq('report_week', reportWeek).limit(1)
+    if (duplicateCheckError) { setNotice(duplicateCheckError.message); return }
+    if (existingReport?.length) { setNotice('This project already has a submitted Design report for this week.'); return }
 
     const snapshotData = {
       projectName,
