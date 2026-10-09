@@ -209,7 +209,12 @@ export function canPerform(
     ? 'workspace_admin'
     : (session.permissionProfileKey || (PROFILE_ACTIONS[roleKey] ? roleKey : 'workspace_member'))
 
-  const profile = rawProfile === 'admin' ? 'workspace_admin' : rawProfile
+  // Legacy membership rows can carry workspace_member even when their actual
+  // role is a discipline owner. Honour the assigned role without broadening scope.
+  const disciplineRoles = new Set(['housebuild','housebuild_project_owner','infrastructure','infrastructure_project_owner','mep','mep_project_owner','mechanical','electrical','costing','design_project_owner','hse_project_owner'])
+  const profile = rawProfile === 'admin' ? 'workspace_admin'
+    : disciplineRoles.has(roleKey) && ['workspace_member','discipline_member','',roleKey].includes(rawProfile)
+      ? 'discipline_project_owner' : rawProfile
   const isDesignMember = ['design','landscaping'].includes(roleKey) || normalizeDiscipline(session.discipline) === 'design'
   const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
   if (!allowed.includes(action)) return false
