@@ -1,3 +1,4 @@
+import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Printer, Trash2, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -1651,6 +1652,7 @@ function CostReportHistoryTab({
                 >
                   View / Download
                 </button>
+                <RequestReportAmendment department="costing" submission={submission} />
               </td>
             </tr>
           ))}
