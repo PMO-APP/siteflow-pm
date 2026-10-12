@@ -101,6 +101,7 @@ export function useUpdateDeliveryPackage() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: DeliveryPackageInput }) => {
+      if (!projectId) throw new Error('No project selected.')
       const { data, error } = await supabase
         .from('delivery_packages')
         .update({
@@ -117,6 +118,7 @@ export function useUpdateDeliveryPackage() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('project_id', projectId)
         .select('*')
         .single()
       if (error) throw error
@@ -131,8 +133,9 @@ export function useArchiveDeliveryPackage() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, restore = false }: { id: string; restore?: boolean }) => {
+      if (!projectId) throw new Error('No project selected.')
       const { data: userData } = await supabase.auth.getUser()
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('delivery_packages')
         .update({
           archived_at: restore ? null : new Date().toISOString(),
@@ -140,7 +143,10 @@ export function useArchiveDeliveryPackage() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('project_id', projectId)
+        .select('id')
       if (error) throw error
+      if (!data?.length) throw new Error('Package not found in the selected project, or update permission denied.')
     },
     onSuccess: () => invalidatePackages(queryClient, projectId),
   })
