@@ -39,6 +39,8 @@ function formatRoleLabel(role?: string | null) {
     housebuild: 'Housebuild',
     mep: 'MEP',
     infrastructure: 'Infrastructure',
+    hse: 'HSE',
+    landscaping: 'Landscaping',
     viewer: 'Viewer',
     guest: 'Guest',
   }
@@ -167,7 +169,17 @@ export default function ProfilePage() {
 
   const displayName = user?.full_name || user?.email || 'User'
   const displayEmail = user?.email || 'No email available'
-  const displayRole = formatRoleLabel(role || user?.role)
+  // Workspace membership is authoritative for the displayed role.
+  // Never fall back to stale auth metadata ('viewer') while canonical access loads.
+  const displayRole = session.loading
+    ? 'Loading workspace role…'
+    : session.role
+      ? formatRoleLabel(session.role)
+      : session.error
+        ? 'Workspace role unavailable'
+        : activeWorkspace?.id
+          ? 'No active workspace membership'
+          : 'No workspace selected'
   const hasMinLength = newPassword.length >= 8
   const hasUppercase = /[A-Z]/.test(newPassword)
   const hasNumber = /[0-9]/.test(newPassword)
