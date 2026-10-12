@@ -236,7 +236,12 @@ export function canPerform(
     : null
   const scopedActions = scopedRole && (PROFILE_ACTIONS[scopedRole] ||
     (normalizeDiscipline(scopedRole) ? PROFILE_ACTIONS.discipline_project_owner : undefined))
-  const allowed = isDesignMember ? DESIGN_ALLOWED_ACTIONS : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
+  // Workspace administrators retain their full permission profile even when
+  // their membership also carries a Design discipline.
+  const isWorkspaceAdministrator = ['workspace_admin', 'admin'].includes(roleKey) || profile === 'workspace_admin'
+  const allowed = isDesignMember && !isWorkspaceAdministrator
+    ? DESIGN_ALLOWED_ACTIONS
+    : (PROFILE_ACTIONS[profile] || PROFILE_ACTIONS.workspace_member)
   if (!allowed.includes(action) && !(scopedActions?.includes(action))) return false
 
   // PMO governance actions remain workspace-wide even though PMO no longer has
