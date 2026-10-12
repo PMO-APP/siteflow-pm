@@ -173,6 +173,12 @@ export function hasScopeAccess(
 ) {
   if (session.status !== 'active') return false
 
+  // Fail closed: a missing project/portfolio identifier must not match an
+  // unrelated scoped assignment. Administrators retain their explicit override.
+  const missingScopedId = (scopeType === 'project' || scopeType === 'portfolio') &&
+    (scopeId === null || scopeId === undefined || String(scopeId).trim() === '')
+  if (missingScopedId) return false
+
   const profile = session.permissionProfileKey || ''
   const role = String(session.role || '').toLowerCase()
 
@@ -189,7 +195,7 @@ export function hasScopeAccess(
 
   return session.assignments.some(item =>
     item.scopeType === scopeType &&
-    (scopeType === 'workspace' || !scopeId || item.scopeId === String(scopeId)) &&
+    (scopeType === 'workspace' || item.scopeId === String(scopeId)) &&
     (!discipline || disciplinesMatch(item.discipline, discipline)) &&
     ACCESS_RANK[item.accessLevel] >= ACCESS_RANK[minimum]
   )
