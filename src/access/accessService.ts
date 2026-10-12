@@ -240,8 +240,21 @@ export function canPerform(
         item.assignmentRole && item.assignmentRole !== 'viewer'
       )?.assignmentRole?.toLowerCase()
     : null
-  const scopedActions = scopedRole && (PROFILE_ACTIONS[scopedRole] ||
-    (normalizeDiscipline(scopedRole) ? PROFILE_ACTIONS.discipline_project_owner : undefined))
+  // Project assignment labels must not confer workspace administrator/PMO powers.
+  // Only explicitly recognized delivery roles may contribute additional actions,
+  // and those actions still pass the scoped access-level check below.
+  const scopedDeliveryRoles = new Set([
+    'project_owner', 'project_manager', 'overall_project_owner',
+    'discipline_project_owner', 'design_project_owner', 'housebuild_project_owner',
+    'infrastructure_project_owner', 'mep_project_owner', 'hse_project_owner',
+    'design', 'landscaping', 'housebuild', 'infrastructure', 'mep',
+    'mechanical', 'electrical', 'costing', 'hse',
+  ])
+  const scopedActions = scopedRole && scopedDeliveryRoles.has(scopedRole)
+    ? (scopedRole === 'project_owner' || scopedRole === 'project_manager' || scopedRole === 'overall_project_owner'
+        ? PROFILE_ACTIONS.project_owner
+        : PROFILE_ACTIONS.discipline_project_owner)
+    : undefined
   // Workspace administrators retain their full permission profile even when
   // their membership also carries a Design discipline.
   const isWorkspaceAdministrator = ['workspace_admin', 'admin'].includes(roleKey) || profile === 'workspace_admin'
