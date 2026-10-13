@@ -7,6 +7,8 @@ import type { FinancialItem } from '@/types'
 
 const FINANCE_ROLES = new Set(['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'costing'])
 type Entry = FinancialItem & { project_id?: string }
+type ContractRecord = { contract_value: number | string | null }
+type VariationRecord = { amount: number | string | null; status: string | null }
 type PaymentRecord = {
   id: string
   amount: number | string | null
@@ -41,6 +43,10 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   const [rows, setRows] = useState<Entry[]>([])
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([])
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [costContracts, setCostContracts] = useState<ContractRecord[]>([])
+  const [costVariations, setCostVariations] = useState<VariationRecord[]>([])
+  const [exposureError, setExposureError] = useState<string | null>(null)
+  const [exposureLoading, setExposureLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,6 +55,10 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     setRows([])
     setPaymentRecords([])
     setPaymentError(null)
+    setCostContracts([])
+    setCostVariations([])
+    setExposureError(null)
+    setExposureLoading(false)
     setError(null)
     if (!permitted || !projectId) { setLoading(false); return () => { alive = false } }
     setLoading(true)
@@ -60,6 +70,24 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
         setError(requestError?.message || null)
         setLoading(false)
       })
+    setExposureLoading(true)
+    Promise.all([
+      supabase.from('cost_contracts').select('contract_value').eq('project_id', projectId),
+      supabase.from('cost_variations').select('amount,status').eq('project_id', projectId),
+    ]).then(([contractsResult, variationsResult]) => {
+      if (!alive) return
+      const err = contractsResult.error || variationsResult.error
+      if (err) setExposureError(err.message)
+      else {
+        setCostContracts((contractsResult.data || []) as ContractRecord[])
+        setCostVariations((variationsResult.data || []) as VariationRecord[])
+      }
+      setExposureLoading(false)
+    }).catch(() => {
+      if (!alive) return
+      setExposureError('Could not load Costing commitments.')
+      setExposureLoading(false)
+    })
     // The Costing payment register is a separate source. Do not add its amounts
     // to financial_items totals, as the same disbursement may exist in both.
     supabase.from('cost_payments').select('id,amount,payment_status,due_date,paid_date,payment_title')
@@ -128,6 +156,16 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
       datedNotPaid: paymentRecords.filter(r => !!r.paid_date && normal(r.payment_status) !== 'paid').length }
   }, [paymentRecords])
 
+  const costExposure = useMemo(() => {
+    const all = [...costContracts.map(r => r.contract_value), ...costVariations.map(r => r.amount)]
+    if (all.some(v => v === null || v === '' || !Number.isFinite(Number(v)) || Number(v) < 0)) return null
+    if (!costContracts.length) return null
+    const contractValue = costContracts.reduce((sum, r) => sum + Number(r.contract_value), 0)
+    const approved = costVariations.filter(r => normal(r.status) === 'approved').reduce((sum, r) => sum + Number(r.amount), 0)
+    const pending = costVariations.filter(r => normal(r.status) === 'pending').reduce((sum, r) => sum + Number(r.amount), 0)
+    return { contractValue, approved, pending, committed: contractValue + approved, exposure: contractValue + approved + pending }
+  }, [costContracts, costVariations])
+
   if (!permitted) return null
   const progressKnown = Number.isFinite(physicalProgress) && physicalProgress >= 0
   const progress = progressKnown ? Math.min(100, physicalProgress) : 0
@@ -173,7 +211,19 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
           </div>
           {(figures.paidWithoutDateCount > 0 || figures.datedPaymentsMissingStatusCount > 0) && <p role="status" className="mt-2 text-xs text-amber-700">Payment reconciliation required: {figures.paidWithoutDateCount} marked paid without payment date; {figures.datedPaymentsMissingStatusCount} dated but not marked paid.</p>}
           {latestAge !== null && latestAge > 14 && <p role="status" className="mt-2 text-xs text-amber-700">Financial register has not been updated for {latestAge} days. Confirm data freshness with Costing.</p>}
-          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Forecast final cost / cost overrun: awaiting an authorised estimate at completion. Pending variations alone are not a forecast.</p>
+          <div className="mt-3 border-t border-[var(--pmx-border)] pt-3">
+            <div className="font-semibold">Contract commitments & variation exposure</div>
+            {exposureLoading ? <p className="mt-1 text-xs">Loading Costing commitments…</p> : exposureError ? <p role="alert" className="mt-1 text-xs text-amber-700">Costing commitments unavailable: {exposureError}</p> : costExposure ? <>
+              <p className="mt-1">Contract value: <strong>{money(costExposure.contractValue, 'NGN')}</strong></p>
+              <p className="mt-1">Approved variations: <strong>{money(costExposure.approved, 'NGN')}</strong></p>
+              <p className="mt-1">Committed contract value: <strong>{money(costExposure.committed, 'NGN')}</strong></p>
+              <p className="mt-1">Pending variation exposure: <strong>{money(costExposure.pending, 'NGN')}</strong></p>
+              <p className="mt-1">Indicative total exposure: <strong>{money(costExposure.exposure, 'NGN')}</strong></p>
+              {figures.budget !== null && !figures.currencyConflict && figures.currency === 'NGN' && costExposure.committed > figures.budget && <p role="status" className="mt-1 text-xs text-red-700">Committed contract value is {money(costExposure.committed - figures.budget, 'NGN')} above the financial-register approved budget. Reconcile both sources before confirming an overrun.</p>}
+              <p className="mt-2 text-xs text-[var(--pmx-muted)]">Indicative exposure is contracts plus approved and pending variations; it is NOT an authorised estimate at completion or verified forecast. Costing register figures assume NGN. Do not add these amounts to financial register totals.</p>
+            </> : <p className="mt-1 text-xs text-[var(--pmx-muted)]">No complete, valid Costing contract data available. Exposure is withheld.</p>}
+          </div>
+          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Authorised forecast final cost and verified cost overrun remain unavailable until an approved estimate-at-completion source is integrated.</p>
         </div>
       </div>
       <p className="mt-4 text-xs text-[var(--pmx-muted)]">Operational financial register, not an audited financial statement. {figures.latest ? `Last record update ${fmtDate(figures.latest)}.` : 'No financial records available.'} {figures.invalid ? `${figures.invalid} invalid-amount records excluded.` : ''} Financial totals require Costing verification.</p>
