@@ -22,7 +22,11 @@ export default function ProjectCostForecast({projectId,approvedBudget,budgetCurr
   setItems((data||[]) as Forecast[]);setError(err?.message||'');setLoading(false)
  },[projectId])
  useEffect(()=>{setItems([]);setError('');void reload();void supabase.auth.getUser().then(({data})=>setUserId(data.user?.id||null))},[reload])
- const approved=useMemo(()=>items.find(i=>i.status==='approved'),[items])
+ const approvedHistory=useMemo(()=>items.filter(i=>i.status==='approved'&&i.reviewed_at).sort((a,b)=>new Date(b.reviewed_at!).getTime()-new Date(a.reviewed_at!).getTime()),[items])
+ const approved=approvedHistory[0]
+ const previous=approvedHistory[1]
+ const movement=approved&&previous&&approved.currency===previous.currency?Number(approved.forecast_final_cost)-Number(previous.forecast_final_cost):null
+ const stale=approved?.reviewed_at?Math.floor((Date.now()-new Date(approved.reviewed_at).getTime())/86400000)>30:false
  const pending=items.filter(i=>i.status==='submitted')
  const variance=approved&&approvedBudget!==null&&approved.currency===budgetCurrency?Number(approved.forecast_final_cost)-approvedBudget:null
  const submit=async()=>{
@@ -49,6 +53,9 @@ export default function ProjectCostForecast({projectId,approvedBudget,budgetCurr
     <p>Actual cost to date: {currencyFormat(Number(approved.actual_cost),approved.currency)} · Estimate to complete: {currencyFormat(Number(approved.estimate_to_complete),approved.currency)}</p>
     <p>Forecast budget variance: <strong>{variance===null?'Unavailable (budget missing or currency mismatch)':`${variance>0?'+':''}${currencyFormat(variance,approved.currency)}`}</strong></p>
     <p className="text-xs text-[var(--pmx-muted)]">Approved {approved.reviewed_at?new Date(approved.reviewed_at).toLocaleDateString('en-GB'):'date unavailable'}. Basis: {approved.basis}</p>
+    {movement!==null&&<p className={movement>0?'text-xs font-semibold text-red-700':'text-xs font-semibold'}>Change since previous approved forecast: {movement>0?'+':''}{currencyFormat(movement,approved.currency)} {movement>0?'(increased exposure)':movement<0?'(reduced forecast)':'(unchanged)'}</p>}
+    {stale&&<p role="status" className="text-xs text-amber-700">Forecast last approved more than 30 days ago. Request an updated Costing forecast.</p>}
+    {approvedHistory.length>1&&<details className="mt-2 text-xs"><summary className="cursor-pointer font-semibold">Approved forecast history ({approvedHistory.length})</summary><div className="mt-2 max-h-48 overflow-y-auto"><table className="w-full text-left"><thead><tr><th className="py-1">Approved</th><th>Forecast final cost</th><th>Change</th></tr></thead><tbody>{approvedHistory.map((f,index)=>{const older=approvedHistory[index+1];const diff=older&&older.currency===f.currency?Number(f.forecast_final_cost)-Number(older.forecast_final_cost):null;return <tr key={f.id} className="border-t border-[var(--pmx-border)]"><td className="py-1">{new Date(f.reviewed_at!).toLocaleDateString('en-GB')}</td><td>{currencyFormat(Number(f.forecast_final_cost),f.currency)}</td><td>{diff===null?'—':`${diff>0?'+':''}${currencyFormat(diff,f.currency)}`}</td></tr>})}</tbody></table></div><p className="mt-1 text-[var(--pmx-muted)]">Showing up to 40 most recently submitted forecasts; older history may not be included.</p></details>
    </div>:<p className="mt-2 text-xs text-[var(--pmx-muted)]">No independently approved estimate at completion yet. No forecast or budget variance is assumed.</p>}
    {pending.length>0&&<div className="mt-3 space-y-2"><p className="text-xs font-semibold">Awaiting review ({pending.length})</p>{pending.map(f=><div key={f.id} className="rounded-lg border border-[var(--pmx-border)] p-3 text-xs">
     <p><strong>{currencyFormat(Number(f.forecast_final_cost),f.currency)}</strong> · submitted {new Date(f.submitted_at).toLocaleDateString('en-GB')}</p><p className="mt-1">{f.basis}</p>
