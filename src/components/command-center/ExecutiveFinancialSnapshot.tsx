@@ -7,6 +7,20 @@ import type { FinancialItem } from '@/types'
 
 const FINANCE_ROLES = new Set(['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'costing'])
 type Entry = FinancialItem & { project_id?: string }
+type PaymentRecord = {
+  id: string
+  amount: number | string | null
+  payment_status: string | null
+  due_date: string | null
+  paid_date: string | null
+  payment_title: string | null
+}
+const parseLocalDate = (value: string | null) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value.slice(0, 10))) return null
+  const d = new Date(`${value.slice(0, 10)}T00:00:00`)
+  return Number.isFinite(d.getTime()) ? d : null
+}
+
 const amount = (row: Entry) => Number(row.amount)
 const valid = (row: Entry) => Number.isFinite(amount(row)) && amount(row) >= 0
 const total = (items: Entry[]) => items.reduce((sum, row) => sum + amount(row), 0)
@@ -25,12 +39,16 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   const role = useMembershipStore(s => s.role)
   const permitted = FINANCE_ROLES.has(role || '')
   const [rows, setRows] = useState<Entry[]>([])
+  const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([])
+  const [paymentError, setPaymentError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
     setRows([])
+    setPaymentRecords([])
+    setPaymentError(null)
     setError(null)
     if (!permitted || !projectId) { setLoading(false); return () => { alive = false } }
     setLoading(true)
@@ -41,6 +59,14 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
         setRows(requestError ? [] : (data || []) as Entry[])
         setError(requestError?.message || null)
         setLoading(false)
+      })
+    // The Costing payment register is a separate source. Do not add its amounts
+    // to financial_items totals, as the same disbursement may exist in both.
+    supabase.from('cost_payments').select('id,amount,payment_status,due_date,paid_date,payment_title')
+      .eq('project_id', projectId).then(({ data, error: requestError }) => {
+        if (!alive) return
+        setPaymentRecords(requestError ? [] : (data || []) as PaymentRecord[])
+        setPaymentError(requestError?.message || null)
       })
     return () => { alive = false }
   }, [projectId, permitted])
@@ -84,6 +110,24 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     }
   }, [rows])
 
+  const paymentAlerts = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const soon = new Date(today)
+    soon.setDate(today.getDate() + 7)
+    const active = paymentRecords.filter(r => !['paid', 'rejected'].includes(normal(r.payment_status)) && !r.paid_date)
+    const validAmount = (r: PaymentRecord) => r.amount !== null && r.amount !== '' && Number.isFinite(Number(r.amount)) && Number(r.amount) >= 0
+    const overdue = active.filter(r => { const d = parseLocalDate(r.due_date); return d !== null && d < today })
+    const upcoming = active.filter(r => { const d = parseLocalDate(r.due_date); return d !== null && d >= today && d <= soon })
+    const noDueDate = active.filter(r => !parseLocalDate(r.due_date))
+    const sum = (items: PaymentRecord[]) => items.every(validAmount) ? items.reduce((s, r) => s + Number(r.amount), 0) : null
+    return { overdueCount: overdue.length, overdueAmount: sum(overdue), upcomingCount: upcoming.length,
+      upcomingAmount: sum(upcoming), noDueDateCount: noDueDate.length,
+      invalidAmounts: active.filter(r => !validAmount(r)).length,
+      paidMissingDate: paymentRecords.filter(r => normal(r.payment_status) === 'paid' && !r.paid_date).length,
+      datedNotPaid: paymentRecords.filter(r => !!r.paid_date && normal(r.payment_status) !== 'paid').length }
+  }, [paymentRecords])
+
   if (!permitted) return null
   const progressKnown = Number.isFinite(physicalProgress) && physicalProgress >= 0
   const progress = progressKnown ? Math.min(100, physicalProgress) : 0
@@ -115,7 +159,17 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
             <div className="font-semibold">Payment pipeline</div>
             <p className="mt-1">Approved/certified awaiting payment: <strong>{money(figures.approvedAwaitingPaymentCount ? figures.approvedAwaitingPayment : paymentsKnown(figures.pending) ? 0 : null, figures.currency)}</strong> <span className="text-xs">({figures.approvedAwaitingPaymentCount} records)</span></p>
             <p className="mt-1">Submitted/pending approval: <strong>{money(figures.submittedAwaitingApprovalCount ? figures.submittedAwaitingApproval : paymentsKnown(figures.pending) ? 0 : null, figures.currency)}</strong> <span className="text-xs">({figures.submittedAwaitingApprovalCount} records)</span></p>
-            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Overdue payments cannot be determined: the financial register does not contain contractual due dates.</p>
+            <div className="mt-3 border-t border-[var(--pmx-border)] pt-3">
+            <div className="font-semibold">Payment deadlines · Costing register</div>
+            {paymentError ? <p className="mt-1 text-xs text-amber-700">Payment deadline data unavailable: {paymentError}</p> : <>
+              <p className="mt-1">Overdue: <strong>{paymentAlerts.overdueCount} payment(s)</strong> · <strong>{money(paymentAlerts.overdueAmount, 'NGN')}</strong></p>
+              <p className="mt-1">Due within 7 days: <strong>{paymentAlerts.upcomingCount} payment(s)</strong> · <strong>{money(paymentAlerts.upcomingAmount, 'NGN')}</strong></p>
+              {paymentAlerts.noDueDateCount > 0 && <p className="mt-1 text-xs text-amber-700">{paymentAlerts.noDueDateCount} outstanding payment(s) have no valid due date and cannot be classified.</p>}
+              {paymentAlerts.invalidAmounts > 0 && <p className="mt-1 text-xs text-amber-700">{paymentAlerts.invalidAmounts} payment(s) have missing or invalid amounts; affected totals are withheld.</p>}
+              {(paymentAlerts.paidMissingDate > 0 || paymentAlerts.datedNotPaid > 0) && <p className="mt-1 text-xs text-amber-700">Costing payment reconciliation: {paymentAlerts.paidMissingDate} paid without date; {paymentAlerts.datedNotPaid} dated but not marked paid.</p>}
+              <p className="mt-2 text-xs text-[var(--pmx-muted)]">Due-date figures come from the separate Costing payments register (NGN). They are not added to the financial register totals above. Payment status and dates require Costing verification.</p>
+            </>}
+          </div>
           </div>
           {(figures.paidWithoutDateCount > 0 || figures.datedPaymentsMissingStatusCount > 0) && <p role="status" className="mt-2 text-xs text-amber-700">Payment reconciliation required: {figures.paidWithoutDateCount} marked paid without payment date; {figures.datedPaymentsMissingStatusCount} dated but not marked paid.</p>}
           {latestAge !== null && latestAge > 14 && <p role="status" className="mt-2 text-xs text-amber-700">Financial register has not been updated for {latestAge} days. Confirm data freshness with Costing.</p>}
