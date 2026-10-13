@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import type { FinancialItem } from '@/types'
+import ProjectCostForecast from './ProjectCostForecast'
 
 const FINANCE_ROLES = new Set(['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'costing'])
 type Entry = FinancialItem & { project_id?: string }
@@ -223,7 +224,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
               <p className="mt-2 text-xs text-[var(--pmx-muted)]">Indicative exposure is contracts plus approved and pending variations; it is NOT an authorised estimate at completion or verified forecast. Costing register figures assume NGN. Do not add these amounts to financial register totals.</p>
             </> : <p className="mt-1 text-xs text-[var(--pmx-muted)]">No complete, valid Costing contract data available. Exposure is withheld.</p>}
           </div>
-          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Authorised forecast final cost and verified cost overrun remain unavailable until an approved estimate-at-completion source is integrated.</p>
+          <ProjectCostForecast projectId={Number(projectId)} approvedBudget={figures.currencyConflict ? null : figures.budget} budgetCurrency={figures.currency} role={role || ''} />
         </div>
       </div>
       <p className="mt-4 text-xs text-[var(--pmx-muted)]">Operational financial register, not an audited financial statement. {figures.latest ? `Last record update ${fmtDate(figures.latest)}.` : 'No financial records available.'} {figures.invalid ? `${figures.invalid} invalid-amount records excluded.` : ''} Financial totals require Costing verification.</p>
