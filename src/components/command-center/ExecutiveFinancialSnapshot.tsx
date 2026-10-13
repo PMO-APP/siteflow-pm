@@ -5,6 +5,7 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import type { FinancialItem } from '@/types'
 import ProjectCostForecast from './ProjectCostForecast'
+import FinancialHealthSignal from './FinancialHealthSignal'
 
 const FINANCE_ROLES = new Set(['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'costing'])
 type Entry = FinancialItem & { project_id?: string }
@@ -181,6 +182,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
       <button className="pmx-btn-secondary" type="button" onClick={() => navigate('/app/costing')}>Open Costing →</button>
     </div>
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
+      <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
       <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div></div>)}</div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">{[
