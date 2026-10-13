@@ -27,6 +27,7 @@ import RecommendationsPanel from './RecommendationsPanel'
 import HealthTrend from './HealthTrend'
 import DeliveryTwinPanel from './DeliveryTwinPanel'
 import PackagePerformancePanel from './PackagePerformancePanel'
+import ExecutiveFinancialSnapshot from './ExecutiveFinancialSnapshot'
 
 import {
   ActivityFeed,
@@ -105,227 +106,61 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
     { id: 'governance', label: 'Governance', value: intelligence.health.breakdown.governance, tone: metricTone(intelligence.health.breakdown.governance) },
   ]
 
+  const isParkVillas = /park villa/i.test(String(project?.project_name || project?.name || ''))
+  const progress = intelligence.metrics.scheduleProgress
+  const planned = intelligence.metrics.plannedProgress
+  const gap = progress - planned
+  const packages = forecast.packagePositions || []
+  const shortSummary = forecast.delayDays > 0
+    ? `Completion is forecast ${forecast.delayDays} days behind the current target. ${forecast.pressurePackage ? `${forecast.pressurePackage.packageName} needs particular attention.` : 'Review delivery constraints and recovery actions.'}`
+    : 'Review the current forecast and delivery priorities.'
+
   return (
-    <div className="pmx-command-v2">
-      <section className="pmx-executive-brief">
-        <div className="pmx-executive-brief-copy">
-          <div className="pmx-eyebrow">Project command center</div>
-          <div className="pmx-executive-heading-row">
-            <div>
-              <h1 className="pmx-executive-title">
-                {project?.project_name || project?.name || 'Selected Project'}
-              </h1>
-              <p className="pmx-executive-subtitle">
-                {isExecutive ? 'Executive delivery briefing' : 'Project delivery workspace'}
-              </p>
-            </div>
-            <StatusPill label={intelligence.health.label} tone={healthTone(intelligence.health.score)} dot />
-          </div>
-
-          <div className="pmx-briefing-copy">
-            <span className="pmx-briefing-lead">Current outlook.</span>{' '}
-            {intelligence.narrative.summary}
-          </div>
-
-          <div className="pmx-briefing-actions">
-            <button type="button" className="pmx-btn-primary" onClick={() => navigate('/app/recovery')}>
-              Open recovery plan <ArrowRight size={15} />
-            </button>
-            <button type="button" className="pmx-btn-secondary" onClick={() => navigate('/app/schedule')}>
-              Review programme
-            </button>
-          </div>
+    <div className="pmx-command-v2 space-y-4">
+      <section className="pmx-section-panel">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><div className="pmx-eyebrow">Project overview</div><h1 className="mt-1 text-3xl font-bold">{project?.project_name || project?.name || 'Selected Project'}</h1><p className="mt-2 max-w-3xl text-sm text-[var(--pmx-muted)]">{shortSummary}</p></div>
+          <StatusPill label={intelligence.health.label} tone={healthTone(intelligence.health.score)} dot />
         </div>
-
-        <div className="pmx-health-score-card">
-          <div className="pmx-health-score-topline">
-            <span>Project health</span>
-            <Target size={17} />
-          </div>
-          <div className="pmx-health-score-value">{intelligence.health.score}</div>
-          <div className="pmx-health-score-scale">out of 100</div>
-          <div className="pmx-health-score-track">
-            <div style={{ width: `${Math.max(0, Math.min(100, intelligence.health.score))}%` }} />
-          </div>
-          <div className="pmx-health-score-footer">
-            <span>{intelligence.health.label}</span>
-            <span>{forecast.recoveryConfidence}% recovery confidence</span>
-          </div>
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            ['Actual progress', `${progress}%`, `Planned ${planned}%`],
+            ['Forecast completion', formatDate(forecast.forecastDate), `Target ${formatDate(forecast.targetDate)}`],
+            ['Schedule delay', `${forecast.delayDays} days`, 'Against target'],
+            ['Project health', `${intelligence.health.score}/100`, intelligence.health.label],
+          ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
+        </div>
+        <div className="mt-5 rounded-xl bg-[var(--pmx-surface-2)] p-4">
+          <div className="mb-3 flex justify-between text-sm"><strong>Progress against programme</strong><span className={gap < 0 ? 'text-rose-600' : 'text-emerald-600'}>{gap > 0 ? '+' : ''}{gap.toFixed(1)} percentage points</span></div>
+          {[['Actual', progress, 'bg-sky-700'], ['Planned', planned, 'bg-slate-400']].map(([label, value, color]) => <div key={String(label)} className="mb-3"><div className="mb-1 flex justify-between text-xs"><span>{label}</span><span>{value}%</span></div><div className="h-2 rounded-full bg-slate-200"><div className={`h-2 rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, Number(value)))}%` }} /></div></div>)}
         </div>
       </section>
 
-      <section className="pmx-command-strip" aria-label="Executive metrics">
-        <div><span>Forecast completion</span><strong>{formatDate(forecast.forecastDate)}</strong><small>Target {formatDate(forecast.targetDate)}</small></div>
-        <div><span>Progress</span><strong>{intelligence.metrics.scheduleProgress}%</strong><small>Planned {intelligence.metrics.plannedProgress}%</small></div>
-        <div><span>Delay</span><strong>{forecast.delayDays}</strong><small>days behind</small></div>
-        <div><span>Open risks</span><strong>{intelligence.metrics.openRisks}</strong><small>{intelligence.metrics.highRisks} high</small></div>
-        <div><span>Approvals</span><strong>{intelligence.metrics.pendingApprovals}</strong><small>{intelligence.metrics.overdueApprovals} overdue</small></div>
-        <div><span>Snags</span><strong>{intelligence.metrics.openSnags}</strong><small>{intelligence.metrics.criticalSnags} critical</small></div>
-      </section>
-
-      <div className="pmx-command-primary-grid">
-        <section className="pmx-section-panel pmx-priority-panel">
-          <SectionHeader
-            eyebrow="Today"
-            title="Executive priorities"
-            description="The highest-impact actions from the current project position."
-            action={<span className="pmx-priority-count">{recommendations.length} priorities</span>}
-          />
-          <div className="pmx-priority-list">
-            {recommendations.length === 0 ? (
-              <div className="pmx-empty-state">
-                <CheckCircle2 size={22} className="text-emerald-500" />
-                <div><div className="pmx-empty-title">No urgent intervention</div><div className="pmx-empty-copy">The current delivery position does not require an immediate management action.</div></div>
-              </div>
-            ) : recommendations.map((item: any, index: number) => (
-              <button key={item.id} type="button" className="pmx-priority-item" onClick={() => item.route && navigate(item.route)}>
-                <div className={`pmx-priority-index is-${item.priority || 'medium'}`}>{String(index + 1).padStart(2, '0')}</div>
-                <div className="pmx-priority-body">
-                  <div className="pmx-priority-meta"><span>{item.priority || 'priority'}</span>{item.expectedImpact ? <span>{item.expectedImpact}</span> : null}</div>
-                  <div className="pmx-priority-title">{item.title}</div>
-                  <div className="pmx-priority-copy">{item.description}</div>
-                </div>
-                <ArrowRight size={16} />
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="pmx-intelligence-panel">
-          <div className="pmx-intelligence-icon"><Sparkles size={18} /></div>
-          <div className="pmx-eyebrow">Executive intelligence</div>
-          <h2>{intelligence.narrative.headline}</h2>
-          <p>{intelligence.narrative.outlook}</p>
-          {intelligence.narrative.keyMessages.length > 0 ? (
-            <div className="pmx-intelligence-points">
-              {intelligence.narrative.keyMessages.slice(0, 3).map((message: string) => <div key={message}>{message}</div>)}
-            </div>
-          ) : null}
-          <button type="button" onClick={() => navigate('/app/recovery')}>View intelligence detail <ArrowRight size={14} /></button>
-        </section>
-      </div>
+      <ExecutiveFinancialSnapshot physicalProgress={progress} />
 
       <section className="pmx-section-panel">
-        <div className="pmx-eyebrow">Delivery groups</div>
-        <h2 className="mt-2 text-lg font-semibold">Master finish outlook</h2>
-        <p className="mt-2 text-sm text-[var(--pmx-muted)]">The master forecast uses the latest package forecast. Management recovery deadlines remain separate from the forecast.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">October recovery target</div><strong>31 Oct 2026</strong><div className="mt-1 text-xs">A1–A14 and B1–B6</div></div>
-          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">December recovery target</div><strong>31 Dec 2026</strong><div className="mt-1 text-xs">B9–B12 and B14</div></div>
-          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">Existing programme</div><strong>B13</strong><div className="mt-1 text-xs">Existing dates retained</div></div>
-        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="pmx-eyebrow">Delivery performance</div><h2 className="mt-1 text-xl font-semibold">Delivery packages</h2></div><button className="pmx-btn-secondary" onClick={() => navigate('/app/schedule')}>Review programme →</button></div>
+        {packages.length > 0 ? <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {isParkVillas && <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">October recovery · A1–A14, B1–B6</div><div className="mt-2 font-semibold">31 Oct 2026</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Management target</div></div>}
+          {isParkVillas && <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">December recovery · B9–B12, B14</div><div className="mt-2 font-semibold">31 Dec 2026</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Management target</div></div>}
+          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">Highest delivery pressure</div><div className="mt-2 font-semibold">{forecast.pressurePackage?.packageName || 'Not identified'}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Existing package programmes remain unchanged</div></div>
+        </div> : <p className="mt-4 text-sm text-[var(--pmx-muted)]">No package programme has been recorded.</p>}
+        <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">View detailed package performance</summary><div className="mt-3"><PackagePerformancePanel packages={intelligence.deliveryTwin.packages} /></div></details>
       </section>
-      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Detailed package performance</summary><div className="mt-4"><PackagePerformancePanel packages={intelligence.deliveryTwin.packages} /></div></details>
-      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Digital project twin and predictive scenarios</summary><div className="mt-4"><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div></details>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="pmx-section-panel"><div className="pmx-eyebrow">Delivery constraints</div><h2 className="mt-1 text-xl font-semibold">Critical risks & constraints</h2>
+          <p className="mt-3 text-sm">{forecast.pressurePackage ? `${forecast.pressurePackage.packageName}: ${forecast.pressurePackage.delayDays} days behind its programme.` : 'No specific package constraint identified.'}</p>
+          <p className="mt-2 text-sm text-[var(--pmx-muted)]">{intelligence.metrics.highRisks} high risks · {intelligence.metrics.criticalSnags} critical snags · {intelligence.metrics.overdueTasks} overdue tasks</p>
+          <button className="mt-4 text-sm font-semibold text-sky-700" onClick={() => navigate('/app/recovery')}>View recovery analysis →</button>
+        </section>
+        <section className="pmx-section-panel"><div className="pmx-eyebrow">Management attention</div><h2 className="mt-1 text-xl font-semibold">Decisions & immediate actions</h2>
+          <div className="mt-3 space-y-3">{recommendations.slice(0, 2).map((item: any) => <button key={item.id} className="block w-full text-left text-sm" onClick={() => item.route && navigate(item.route)}><strong>{item.title}</strong><span className="ml-2 text-sky-700">→</span></button>)}
+          <p className="text-xs text-[var(--pmx-muted)]">{intelligence.metrics.pendingApprovals} pending approvals · {intelligence.metrics.overdueApprovals} overdue</p></div>
+        </section>
+      </div>
+      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Detailed intelligence and operational controls</summary><div className="mt-5 space-y-4"><RoleAwareCommandSections project={project} /><div className="grid gap-4 lg:grid-cols-2"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div><HealthTrend days={30} /><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div></details>
       {import.meta.env.DEV ? <V6IntelligenceComparison project={project} /> : null}
-
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <RoleAwareCommandSections project={project} />
-        <section className="pmx-section-panel">
-          <SectionHeader
-            eyebrow="Delivery position"
-            title={forecast.packagePositions.length > 1 ? 'Block and contractor positions' : 'Planned vs actual'}
-            description={forecast.packagePositions.length > 1
-              ? 'Each delivery package is assessed against its own approved programme. The highest-pressure package drives the project alert.'
-              : 'Current workfront compared with the scheduled position for today.'}
-          />
-
-          {forecast.packagePositions.length > 1 ? (
-            <div className="mt-5 space-y-4">
-              {forecast.pressurePackage ? (
-                <div className={`pmx-package-pressure is-${forecast.pressurePackage.status}`}>
-                  <AlertTriangle size={18} />
-                  <div>
-                    <div className="pmx-package-pressure-label">Main delivery pressure</div>
-                    <div className="pmx-package-pressure-title">{forecast.pressurePackage.packageName}</div>
-                    <div className="pmx-package-pressure-copy">
-                      {forecast.pressurePackage.contractorName ? `${forecast.pressurePackage.contractorName} · ` : ''}
-                      {forecast.pressurePackage.delayDays} day{forecast.pressurePackage.delayDays === 1 ? '' : 's'} behind, {forecast.pressurePackage.activityGap} activity step{forecast.pressurePackage.activityGap === 1 ? '' : 's'} behind.
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="pmx-package-position-list">
-                {forecast.packagePositions.map((item: any) => (
-                  <article key={item.packageId} className={`pmx-package-position-card is-${item.status}`}>
-                    <div className="pmx-package-position-head">
-                      <div>
-                        <div className="pmx-package-position-name">{item.packageName}</div>
-                        <div className="pmx-package-position-meta">
-                          {[item.contractorName, item.discipline, `${item.progress}% complete`].filter(Boolean).join(' · ')}
-                        </div>
-                      </div>
-                      <StatusPill
-                        label={item.delayDays > 0 ? `${item.delayDays}d behind` : 'On track'}
-                        tone={item.delayDays <= 0 ? 'success' : item.delayDays <= 7 ? 'warning' : 'danger'}
-                      />
-                    </div>
-                    <div className="pmx-package-position-grid">
-                      <div>
-                        <div className="pmx-position-label">Should be today</div>
-                        <div className="pmx-position-value">{item.plannedPosition?.name || 'No planned position found'}</div>
-                      </div>
-                      <div>
-                        <div className="pmx-position-label">Actual site position</div>
-                        <div className="pmx-position-value">{item.actualPosition?.name || 'No active site position found'}</div>
-                      </div>
-                      <div className="pmx-package-position-gap">
-                        <div className="pmx-position-label">Sequence gap</div>
-                        <strong>{item.activityGap}</strong>
-                        <span>step{item.activityGap === 1 ? '' : 's'}</span>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-5 space-y-4">
-              <div className="pmx-position-row"><div><div className="pmx-position-label">Should be today</div><div className="pmx-position-value">{forecast.plannedPosition?.name || 'No planned position found'}</div></div><CalendarDays size={18} className="text-[var(--pmx-muted)]" /></div>
-              <div className="pmx-position-row"><div><div className="pmx-position-label">Actual site position</div><div className="pmx-position-value">{forecast.actualPosition?.name || 'No active site position found'}</div></div><Clock3 size={18} className="text-[var(--pmx-muted)]" /></div>
-              <div className="pmx-position-gap"><div><div className="pmx-position-label">Activity gap</div><div className="pmx-position-gap-value">{forecast.activityGap}</div></div><div className="pmx-position-gap-copy">activity step{forecast.activityGap === 1 ? '' : 's'} behind</div></div>
-            </div>
-          )}
-        </section>
-      </div>
-
-      <section className="pmx-section-panel">
-        <SectionHeader eyebrow="Delivery controls" title="Project pulse" description="Current performance across the main delivery dimensions." />
-        <div className="mt-5 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <TimelineBar showLegend={false} segments={deliveryPulseSegments as any} onSegmentClick={segment => {
-            if (segment.id === 'schedule') navigate('/app/schedule')
-            if (segment.id === 'commercial') navigate('/app/costing')
-            if (segment.id === 'quality') navigate('/app/quality')
-            if (segment.id === 'risk') navigate('/app/risk')
-          }} />
-          <HealthTrend days={30} />
-        </div>
-      </section>
-
-      <div className="grid gap-4 xl:grid-cols-2"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /></div>
-      <div className="grid gap-4 xl:grid-cols-2"><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div>
-
-      <section className="pmx-section-panel">
-        <SectionHeader eyebrow="Operational metrics" title="Key controls" description="Supporting project indicators requiring regular monitoring." />
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Schedule Progress" value={`${intelligence.metrics.scheduleProgress}%`} helper={`Planned ${intelligence.metrics.plannedProgress}%`} icon={TrendingUp} tone={intelligence.metrics.scheduleProgress >= intelligence.metrics.plannedProgress ? 'success' : 'warning'} compact />
-          <MetricCard label="Overdue Tasks" value={intelligence.metrics.overdueTasks} helper="Beyond planned finish" icon={AlertTriangle} tone={intelligence.metrics.overdueTasks > 0 ? 'danger' : 'success'} compact />
-          <MetricCard label="Pending Approvals" value={intelligence.metrics.pendingApprovals} helper={`${intelligence.metrics.overdueApprovals} overdue`} icon={FileCheck} tone={intelligence.metrics.overdueApprovals > 0 ? 'danger' : intelligence.metrics.pendingApprovals > 0 ? 'warning' : 'success'} compact />
-          <MetricCard label="Governance" value={`${intelligence.governance.score}%`} helper={intelligence.governance.complianceLabel} icon={Shield} tone={healthTone(intelligence.governance.score)} compact />
-        </div>
-      </section>
-
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="pmx-section-panel">
-          <SectionHeader eyebrow="System activity" title="Live activity" description="Recent changes across PMOCorex modules." />
-          <div className="mt-3">{activityLoading ? <div className="space-y-3">{[1,2,3].map(item => <div key={item} className="h-16 animate-pulse rounded-lg bg-[var(--pmx-surface-2)]" />)}</div> : <ActivityFeed items={activityItems as any} emptyText="No recent activity has been recorded." maxItems={8} onItemClick={item => { const source = (activity as any[]).find(row => String(row.id) === String(item.id)); if (source?.route) navigate(source.route) }} />}</div>
-        </section>
-        <section className="pmx-section-panel">
-          <SectionHeader eyebrow="Governance" title="Exceptions" description="Management, reporting and compliance gaps requiring attention." action={intelligence.governance.exceptions.length > 0 ? <span className="text-xs font-medium text-[var(--pmx-muted)]">{intelligence.governance.exceptions.length} open</span> : null} />
-          <div className="mt-4">{intelligence.governance.exceptions.length === 0 ? <div className="pmx-empty-state"><CheckCircle2 size={22} className="text-emerald-500" /><div><div className="pmx-empty-title">No governance exception</div><div className="pmx-empty-copy">The monitored governance requirements are currently being met.</div></div></div> : <div className="divide-y divide-[var(--pmx-border)]">{intelligence.governance.exceptions.slice(0,8).map((item:any) => <button type="button" key={item.id} onClick={() => item.route && navigate(item.route)} className="pmx-exception-row"><span className={item.severity === 'critical' ? 'pmx-exception-dot is-critical' : item.severity === 'warning' ? 'pmx-exception-dot is-warning' : 'pmx-exception-dot is-info'} /><div className="min-w-0 flex-1"><div className="pmx-exception-title">{item.title}</div><div className="pmx-exception-copy">{item.description}</div></div><ArrowRight size={15} className="text-[var(--pmx-faint)]" /></button>)}</div>}</div>
-        </section>
-      </div>
     </div>
   )
 }
