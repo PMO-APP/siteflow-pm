@@ -15,7 +15,7 @@ const ACCESS_RANK: Record<AccessLevel, number> = {
 }
 
 const INTERNAL_ROLES = new Set([
-  'workspace_admin','admin','pmo','portfolio_manager','project_owner','project_manager',
+  'workspace_admin','admin','pmo','portfolio_manager','project_owner','project manager',
   'overall_project_owner','design','landscaping','design_project_owner','housebuild','housebuild_project_owner',
   'infrastructure','infrastructure_project_owner','mep','mep_project_owner','costing',
   'hse','hse_manager','hse_lead','hse_officer','hse_project_owner','viewer',
