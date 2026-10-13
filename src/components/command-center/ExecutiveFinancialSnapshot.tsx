@@ -13,6 +13,11 @@ const total = (items: Entry[]) => items.reduce((sum, row) => sum + amount(row), 
 const money = (value: number | null, currency: string) => value === null ? 'Awaiting data' : new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value)
 const normal = (value: unknown) => String(value || '').trim().toLowerCase()
 const fmtDate = (date: string) => new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+const paymentsKnown = (value: number | null) => value !== null
+const daysSince = (value: string) => {
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? Math.max(0, Math.floor((Date.now() - timestamp) / 86400000)) : null
+}
 
 export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physicalProgress: number }) {
   const navigate = useNavigate()
@@ -58,10 +63,19 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     const paidTotal = payments.length ? total(paid) : null
     const certified = certifiedRows.length ? total(certifiedRows) : null
     const pendingTotal = payments.length ? total(pending) : null
+    const approvedAwaitingPayment = pending.filter(r => normal(r.status) === 'approved' || normal(r.status) === 'certified')
+    const submittedAwaitingApproval = pending.filter(r => ['pending', 'open', 'in progress', 'submitted'].includes(normal(r.status)))
+    const certifiedWithoutPayment = payments.filter(r => normal(r.status) === 'certified' && !r.payment_date)
+    const datedPaymentsMissingStatus = payments.filter(r => Boolean(r.payment_date) && normal(r.status) !== 'paid')
+    const paidWithoutDate = payments.filter(r => normal(r.status) === 'paid' && !r.payment_date)
     const pendingVariationTotal = pendingVariations.length ? total(pendingVariations) : null
     return {
       currency, currencyConflict, budget, paid: paidTotal, certified, pending: pendingTotal,
       pendingVariations: pendingVariationTotal,
+      approvedAwaitingPayment: total(approvedAwaitingPayment), approvedAwaitingPaymentCount: approvedAwaitingPayment.length,
+      submittedAwaitingApproval: total(submittedAwaitingApproval), submittedAwaitingApprovalCount: submittedAwaitingApproval.length,
+      certifiedWithoutPaymentCount: certifiedWithoutPayment.length,
+      datedPaymentsMissingStatusCount: datedPaymentsMissingStatus.length, paidWithoutDateCount: paidWithoutDate.length,
       paymentPct: budget !== null && budget > 0 && paidTotal !== null ? paidTotal / budget * 100 : null,
       paidCertifiedGap: paidTotal !== null && certified !== null ? paidTotal - certified : null,
       paidOverBudget: budget !== null && paidTotal !== null && paidTotal > budget ? paidTotal - budget : null,
@@ -77,7 +91,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     ['Approved budget', figures.budget], ['Payments made', figures.paid],
     ['Certified work', figures.certified], ['Pending payments', figures.pending],
   ]
-  const financialAvailable = !figures.currencyConflict && !error
+  const latestAge = figures.latest ? daysSince(figures.latest) : null
   return <section className="pmx-section-panel" aria-label="Financial health">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, certified work and physical delivery in one view.</p></div>
@@ -97,6 +111,14 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
           {figures.paidCertifiedGap !== null && figures.paidCertifiedGap > 0 && <p className="mt-1 text-xs text-amber-700">Payments are ahead of recorded certification. Reconcile advances, materials, retention and incomplete certificates before classifying this as overpayment.</p>}
           {figures.paidOverBudget !== null && <p className="mt-2 text-xs text-red-700">Recorded payments exceed the approved budget by {money(figures.paidOverBudget, figures.currency)}.</p>}
           <p className="mt-2">Pending variation exposure: <strong>{money(figures.pendingVariations, figures.currency)}</strong></p>
+          <div className="mt-3 border-t border-[var(--pmx-border)] pt-3">
+            <div className="font-semibold">Payment pipeline</div>
+            <p className="mt-1">Approved/certified awaiting payment: <strong>{money(figures.approvedAwaitingPaymentCount ? figures.approvedAwaitingPayment : paymentsKnown(figures.pending) ? 0 : null, figures.currency)}</strong> <span className="text-xs">({figures.approvedAwaitingPaymentCount} records)</span></p>
+            <p className="mt-1">Submitted/pending approval: <strong>{money(figures.submittedAwaitingApprovalCount ? figures.submittedAwaitingApproval : paymentsKnown(figures.pending) ? 0 : null, figures.currency)}</strong> <span className="text-xs">({figures.submittedAwaitingApprovalCount} records)</span></p>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Overdue payments cannot be determined: the financial register does not contain contractual due dates.</p>
+          </div>
+          {(figures.paidWithoutDateCount > 0 || figures.datedPaymentsMissingStatusCount > 0) && <p role="status" className="mt-2 text-xs text-amber-700">Payment reconciliation required: {figures.paidWithoutDateCount} marked paid without payment date; {figures.datedPaymentsMissingStatusCount} dated but not marked paid.</p>}
+          {latestAge !== null && latestAge > 14 && <p role="status" className="mt-2 text-xs text-amber-700">Financial register has not been updated for {latestAge} days. Confirm data freshness with Costing.</p>}
           <p className="mt-2 text-xs text-[var(--pmx-muted)]">Forecast final cost / cost overrun: awaiting an authorised estimate at completion. Pending variations alone are not a forecast.</p>
         </div>
       </div>
