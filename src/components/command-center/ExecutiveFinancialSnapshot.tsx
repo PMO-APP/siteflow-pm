@@ -3,31 +3,37 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import type { FinancialItem } from '@/types'
 
 const FINANCE_ROLES = new Set(['workspace_admin', 'admin', 'pmo', 'portfolio_manager', 'costing'])
-const money = (value: number | null) => value === null ? 'Awaiting data' : `₦${value.toLocaleString('en-NG', { maximumFractionDigits: 0 })}`
-const sum = (items: any[]) => items.reduce((total, item) => total + Number(item.amount || 0), 0)
+type Entry = FinancialItem & { project_id?: string }
+const amount = (row: Entry) => Number(row.amount)
+const valid = (row: Entry) => Number.isFinite(amount(row)) && amount(row) >= 0
+const total = (items: Entry[]) => items.reduce((sum, row) => sum + amount(row), 0)
+const money = (value: number | null, currency: string) => value === null ? 'Awaiting data' : new Intl.NumberFormat('en-NG', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value)
+const normal = (value: unknown) => String(value || '').trim().toLowerCase()
+const fmtDate = (date: string) => new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 
 export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physicalProgress: number }) {
   const navigate = useNavigate()
   const projectId = useProjectStore(s => s.projectId)
   const role = useMembershipStore(s => s.role)
   const permitted = FINANCE_ROLES.has(role || '')
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [rows, setRows] = useState<Entry[]>([])
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
     setRows([])
     setError(null)
+    if (!permitted || !projectId) { setLoading(false); return () => { alive = false } }
     setLoading(true)
-    if (!permitted || !projectId) { setLoading(false); return }
-    supabase.from('financial_items').select('type,amount,status,certified_date,created_at')
-      .eq('project_id', projectId).order('created_at', { ascending: false })
+    // Read through the existing RLS-protected financial register; do not bypass Supabase policies.
+    supabase.from('financial_items').select('*').eq('project_id', projectId).order('created_at', { ascending: false })
       .then(({ data, error: requestError }) => {
         if (!alive) return
-        setRows(requestError ? [] : data || [])
+        setRows(requestError ? [] : (data || []) as Entry[])
         setError(requestError?.message || null)
         setLoading(false)
       })
@@ -35,58 +41,66 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   }, [projectId, permitted])
 
   const figures = useMemo(() => {
-    const type = (name: string) => rows.filter(r => String(r.type || '').toLowerCase() === name.toLowerCase())
-    const contract = type('Contract Sum')
-    const approved = type('Variation').filter(r => ['approved', 'implemented'].includes(String(r.status || '').toLowerCase()))
-    const payments = type('Payment')
-    const paid = payments.filter(r => String(r.status || '').toLowerCase() === 'paid')
-    const pending = payments.filter(r => ['pending', 'open', 'in progress', 'approved'].includes(String(r.status || '').toLowerCase()))
-    // Certification is only recognised on explicitly certified entries; payment and contract records are excluded.
-    const certified = rows.filter(r => !['payment', 'contract sum', 'variation'].includes(String(r.type || '').toLowerCase()) && (r.certified_date || String(r.status || '').toLowerCase() === 'certified'))
-    const budget = contract.length ? sum(contract) + sum(approved) : null
-    const paidTotal = paid.length ? sum(paid) : null
-    const certifiedTotal = certified.length ? sum(certified) : null
+    const byType = (type: string) => rows.filter(r => normal(r.type) === normal(type) && valid(r))
+    const contracts = byType('Contract Sum')
+    const approvedVariations = byType('Variation').filter(r => ['approved', 'implemented'].includes(normal(r.status)))
+    const pendingVariations = byType('Variation').filter(r => ['pending', 'open', 'in progress', 'submitted'].includes(normal(r.status)))
+    const payments = byType('Payment')
+    const paid = payments.filter(r => normal(r.status) === 'paid' || Boolean(r.payment_date))
+    const pending = payments.filter(r => ['pending', 'open', 'in progress', 'submitted', 'approved', 'certified'].includes(normal(r.status)) && !r.payment_date)
+    // Payment entries and budget entries must not be counted as certified work.
+    const certifiedRows = rows.filter(r => !['payment', 'contract sum', 'variation', 'retention', 'contingency', 'provisional sum', 'pc sum'].includes(normal(r.type)) && valid(r) && (Boolean(r.certified_date) || normal(r.status) === 'certified'))
+    const currencies = [...new Set(rows.filter(valid).map(r => r.currency || 'NGN'))]
+    const currency = currencies.length === 1 ? currencies[0] : 'NGN'
+    const currencyConflict = currencies.length > 1
+    const base = contracts.length ? total(contracts) : null
+    const budget = base === null ? null : base + approvedVariations.reduce((s, r) => s + (normal(r.direction) === 'omission' ? -amount(r) : amount(r)), 0)
+    const paidTotal = payments.length ? total(paid) : null
+    const certified = certifiedRows.length ? total(certifiedRows) : null
+    const pendingTotal = payments.length ? total(pending) : null
+    const pendingVariationTotal = pendingVariations.length ? total(pendingVariations) : null
     return {
-      budget, paid: paidTotal, certified: certifiedTotal,
-      pending: pending.length ? sum(pending) : payments.length ? 0 : null,
-      paymentPct: budget && paidTotal !== null ? 100 * paidTotal / budget : null,
-      variance: paidTotal !== null && certifiedTotal !== null ? paidTotal - certifiedTotal : null,
-      lastUpdated: rows[0]?.created_at || null,
+      currency, currencyConflict, budget, paid: paidTotal, certified, pending: pendingTotal,
+      pendingVariations: pendingVariationTotal,
+      paymentPct: budget !== null && budget > 0 && paidTotal !== null ? paidTotal / budget * 100 : null,
+      paidCertifiedGap: paidTotal !== null && certified !== null ? paidTotal - certified : null,
+      paidOverBudget: budget !== null && paidTotal !== null && paidTotal > budget ? paidTotal - budget : null,
+      latest: rows[0]?.updated_at || rows[0]?.created_at || null,
+      invalid: rows.filter(r => !valid(r)).length,
     }
   }, [rows])
 
   if (!permitted) return null
-  const safeProgress = Math.max(0, Math.min(100, Number(physicalProgress) || 0))
-  const paymentPct = figures.paymentPct
-  const cards = [
-    ['Approved contract value', figures.budget],
-    ['Payments recorded', figures.paid],
-    ['Certified work', figures.certified],
-    ['Pending payments', figures.pending],
-  ] as const
-
+  const progressKnown = Number.isFinite(physicalProgress) && physicalProgress >= 0
+  const progress = progressKnown ? Math.min(100, physicalProgress) : 0
+  const cards: Array<[string, number | null]> = [
+    ['Approved budget', figures.budget], ['Payments made', figures.paid],
+    ['Certified work', figures.certified], ['Pending payments', figures.pending],
+  ]
+  const financialAvailable = !figures.currencyConflict && !error
   return <section className="pmx-section-panel" aria-label="Financial health">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, verified work and delivery progress at a glance.</p></div>
+      <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, certified work and physical delivery in one view.</p></div>
       <button className="pmx-btn-secondary" type="button" onClick={() => navigate('/app/costing')}>Open Costing →</button>
     </div>
-    {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p className="mt-5 text-sm text-amber-700">Financial data unavailable. Check access to the Costing register.</p> : <>
-      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value)}</div></div>)}</div>
+    {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
+      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div></div>)}</div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
-          {[{ label: 'Physical progress', value: safeProgress, known: true }, { label: 'Budget paid', value: paymentPct || 0, known: paymentPct !== null }].map(item => <div key={item.label}>
-            <div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><strong>{item.known ? `${item.value.toFixed(1)}%` : 'Awaiting data'}</strong></div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-[var(--pmx-surface-2)]"><div className="h-full rounded-full bg-sky-700" style={{ width: `${Math.min(100, item.value)}%` }} /></div>
-          </div>)}
-        </div>
+        <div className="space-y-4">{[
+          { label: 'Physical progress', value: progressKnown ? progress : null },
+          { label: 'Budget paid', value: figures.paymentPct },
+          { label: 'Certified value / budget', value: figures.budget && figures.certified !== null ? 100 * figures.certified / figures.budget : null },
+        ].map(item => <div key={item.label}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><strong>{item.value === null ? 'Awaiting data' : `${item.value.toFixed(1)}%`}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-[var(--pmx-surface-2)]"><div className="h-full rounded-full bg-sky-700" style={{ width: `${Math.min(100, Math.max(0, item.value ?? 0))}%` }} /></div></div>)}</div>
         <div className="rounded-xl bg-[var(--pmx-surface-2)] p-4 text-sm">
-          <div className="font-semibold">Payment vs certified work</div>
-          <div className="mt-2 text-lg font-semibold">{money(figures.variance)}</div>
-          <p className="mt-1 text-xs text-[var(--pmx-muted)]">Positive difference means recorded payments exceed certified work. Review advances, retention and materials before concluding there is overpayment.</p>
-          <p className="mt-3 text-xs text-[var(--pmx-muted)]">Forecast final cost and budget overrun: awaiting a verified cost forecast.</p>
+          <div className="font-semibold">Management attention</div>
+          <p className="mt-2">Paid less certified work: <strong>{money(figures.paidCertifiedGap, figures.currency)}</strong></p>
+          {figures.paidCertifiedGap !== null && figures.paidCertifiedGap > 0 && <p className="mt-1 text-xs text-amber-700">Payments are ahead of recorded certification. Reconcile advances, materials, retention and incomplete certificates before classifying this as overpayment.</p>}
+          {figures.paidOverBudget !== null && <p className="mt-2 text-xs text-red-700">Recorded payments exceed the approved budget by {money(figures.paidOverBudget, figures.currency)}.</p>}
+          <p className="mt-2">Pending variation exposure: <strong>{money(figures.pendingVariations, figures.currency)}</strong></p>
+          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Forecast final cost / cost overrun: awaiting an authorised estimate at completion. Pending variations alone are not a forecast.</p>
         </div>
       </div>
-      <p className="mt-4 text-xs text-[var(--pmx-muted)]">Source: project financial register (unverified operational snapshot). {figures.lastUpdated ? `Latest entry ${new Date(figures.lastUpdated).toLocaleDateString('en-GB')}.` : 'No entries recorded.'} Financial totals require Costing verification.</p>
+      <p className="mt-4 text-xs text-[var(--pmx-muted)]">Operational financial register, not an audited financial statement. {figures.latest ? `Last record update ${fmtDate(figures.latest)}.` : 'No financial records available.'} {figures.invalid ? `${figures.invalid} invalid-amount records excluded.` : ''} Financial totals require Costing verification.</p>
     </>}
   </section>
 }
