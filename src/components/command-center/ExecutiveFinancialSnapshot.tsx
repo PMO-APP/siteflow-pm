@@ -172,7 +172,6 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     return { contractValue, approved, pending, committed: contractValue + approved, exposure: contractValue + approved + pending }
   }, [costContracts, costVariations])
 
-  if (!permitted) return null
   const progressKnown = Number.isFinite(physicalProgress) && physicalProgress >= 0
   const progress = progressKnown ? Math.min(100, physicalProgress) : 0
   // Costing payments are a separate source. Use them only as clearly labelled
@@ -192,6 +191,10 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     ['Pending payments', figures.pending ?? (costingFallback ? costingPaymentTotals.pending : null), figures.pending === null && costingFallback && costingPaymentTotals.pending !== null ? 'Costing payment register · unverified' : undefined],
   ]
   const latestAge = figures.latest ? daysSince(figures.latest) : null
+  // Costing contract totals are indicative only; they do not prove budget approval.
+  const costingBudgetCandidate = !exposureLoading && !exposureError && costExposure && figures.currency === 'NGN'
+    ? costExposure.committed : null
+  if (!permitted) return null
   return <section className="pmx-section-panel" aria-label="Financial health">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, certified work and physical delivery in one view.</p></div>
@@ -199,6 +202,17 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     </div>
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
       {rows.length === 0 && !paymentLoading && <p className="mt-3 text-xs text-amber-700">No financial register entries found for this project. Costing payment records, where available, are shown separately as unverified and cannot establish the approved budget or certified value. Confirm records and project access in Costing.</p>}
+      <details className="mt-3 rounded-xl border border-[var(--pmx-border)] p-3 text-xs" aria-label="Financial data source reconciliation">
+        <summary className="cursor-pointer font-semibold">Financial data sources & reconciliation</summary>
+        <div className="mt-2 space-y-2 text-[var(--pmx-muted)]">
+          <p>Approved budget: {figures.budget !== null ? 'Financial register contract sum plus approved variations' : 'No approved budget established from financial register'}.</p>
+          <p>Certified value: {figures.certified !== null ? 'Dated or certified financial register entries (subject to Costing verification)' : 'No certified valuation entries established'}.</p>
+          <p>Payments: {figures.paid !== null ? 'Financial register' : costingFallback && costingPaymentTotals.paid !== null ? 'Costing payment register (unverified fallback)' : 'No usable payment source'}.</p>
+          <p>Costing contract exposure: {exposureLoading ? 'Loading…' : exposureError ? 'Unavailable: ' + exposureError : costingBudgetCandidate !== null ? `${money(costingBudgetCandidate, 'NGN')} indicative commitments (NOT an approved budget)` : 'No complete comparable contracts available'}.</p>
+          <p>These sources may contain overlapping transactions. They are not combined. An empty result can also reflect row-level security or project ID mapping; confirm source records with an authorised Costing user.</p>
+          {figures.budget !== null && costingBudgetCandidate !== null && Math.abs(figures.budget - costingBudgetCandidate) > 0.01 && <p className="text-amber-700">Financial register budget and Costing commitments differ by {money(Math.abs(figures.budget - costingBudgetCandidate), 'NGN')}. Reconcile before using either as a verified comparison.</p>}
+        </div>
+      </details>
       <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
       <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value, source]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div>{source && <div className="mt-1 text-xs text-amber-700">{source}</div>}</div>)}</div>
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--pmx-border)] p-3 text-sm" aria-label="Payment deadline snapshot">
