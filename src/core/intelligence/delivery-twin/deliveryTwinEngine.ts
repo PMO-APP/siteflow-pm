@@ -126,7 +126,14 @@ function calculatePackages(
       ? Math.round(clamp((differenceInDays(now, start) / durationDays) * 100))
       : 0
     const variance = progress - plannedProgress
-    const score = packageHealth(overdue, activities.length)
+    // Health combines overdue burden with the measured shortfall against the programme.
+    // An unstarted or delayed package must not appear healthy solely because its
+    // activities have not yet passed their individual finish dates.
+    const overdueScore = packageHealth(overdue, activities.length)
+    const scheduleShortfall = Math.max(0, plannedProgress - progress)
+    const score = activities.length === 0 || !start || !finish
+      ? Math.min(overdueScore, 69) // insufficient programme evidence: never Healthy or Watch
+      : Math.round(clamp(Math.min(overdueScore, 100 - scheduleShortfall * 1.25)))
     const primaryDelay = [...overdue].sort((a,b) => {
       const ac = (a.isCritical ? 1000 : 0) + (100 - a.progress)
       const bc = (b.isCritical ? 1000 : 0) + (100 - b.progress)
