@@ -270,31 +270,29 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
           <p className="mt-2 text-xs text-[var(--pmx-muted)]">{intelligence.metrics.pendingApprovals} pending approvals · {intelligence.metrics.overdueApprovals} overdue</p>
         </section>
       </div>
-      {/* Keep the executive dashboard scannable. Advanced controls are available on demand. */}
-      <section className="pmx-section-panel" aria-label="Advanced project analysis">
+      {/* Executive summary stays above; specialist intelligence is organised by decision purpose. */}
+      <section className="pmx-section-panel" aria-label="Detailed project intelligence">
         <div className="pmx-eyebrow">Explore further</div>
-        <h2 className="mt-1 text-lg font-semibold">Project analysis</h2>
-        <p className="mt-1 text-sm text-[var(--pmx-muted)]">Open only the analysis you need. Your project overview, financial position, delivery risks and management actions remain above.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <h2 className="mt-1 text-lg font-semibold">Project intelligence</h2>
+        <p className="mt-1 text-sm text-[var(--pmx-muted)]">Choose a topic to inspect. The executive overview above remains the primary management view.</p>
+        <div className="mt-4 space-y-3">
           <details className="rounded-xl border border-[var(--pmx-border)] p-4">
-            <summary className="cursor-pointer text-sm font-semibold">Delivery diagnostics</summary>
-            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Readiness, production, root causes and recovery options.</p>
+            <summary className="cursor-pointer text-sm font-semibold">Delivery intelligence</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Digital project twin, package status, milestones and historical performance.</p>
+            <div className="mt-4 space-y-4">
+              <DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} />
+              <details className="rounded-xl border border-[var(--pmx-border)] p-3"><summary className="cursor-pointer text-sm font-medium">Project health history</summary><div className="mt-3"><HealthTrend days={30} /></div></details>
+            </div>
+          </details>
+          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Forecast &amp; recovery</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Production performance, readiness, delivery constraints and recovery options.</p>
             <div className="mt-4 space-y-4"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div>
           </details>
           <details className="rounded-xl border border-[var(--pmx-border)] p-4">
-            <summary className="cursor-pointer text-sm font-semibold">Digital twin & forecasts</summary>
-            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Package intelligence, scenarios and dependencies.</p>
-            <div className="mt-4"><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div>
-          </details>
-          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
-            <summary className="cursor-pointer text-sm font-semibold">Management controls</summary>
-            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Role-specific operational information and decisions.</p>
+            <summary className="cursor-pointer text-sm font-semibold">Risks &amp; decisions</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Role-specific controls, operational exceptions and management follow-through.</p>
             <div className="mt-4"><RoleAwareCommandSections project={project} /></div>
-          </details>
-          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
-            <summary className="cursor-pointer text-sm font-semibold">Historical trends</summary>
-            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Project health over the last 30 days.</p>
-            <div className="mt-4"><HealthTrend days={30} /></div>
           </details>
         </div>
       </section>
