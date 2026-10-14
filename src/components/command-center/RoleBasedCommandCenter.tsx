@@ -1,5 +1,5 @@
 import V6IntelligenceComparison from '@/components/dev/V6IntelligenceComparison'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 
 import { useMembershipStore } from '@/store/membership'
+import { useProjectStore } from '@/store/project'
+import { supabase } from '@/lib/supabase'
 import { useActivityFeed } from '@/hooks/useActivityFeed'
 import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 
@@ -36,6 +38,55 @@ import {
   StatusPill,
   TimelineBar,
 } from '@/components/ui'
+
+type ActionRecord = { id: number; title: string; status: string | null; priority: string | null; due_date: string | null; assigned_person_name: string | null; assigned_person_email: string | null; assigned_department: string | null; assigned_role: string | null }
+
+function ManagementActionSnapshot({ projectId }: { projectId: number | null }) {
+  const navigate = useNavigate()
+  const [actions, setActions] = useState<ActionRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  useEffect(() => {
+    let active = true
+    setActions([])
+    setError(false)
+    setLoading(true)
+    if (!projectId) { setLoading(false); return () => { active = false } }
+    void (async () => {
+      try {
+        const { data, error: queryError } = await supabase.from('internal_tasks')
+          .select('id,title,status,priority,due_date,assigned_person_name,assigned_person_email,assigned_department,assigned_role')
+          .eq('project_id', projectId)
+          .order('due_date', { ascending: true, nullsFirst: false })
+          .limit(100)
+        if (queryError) throw queryError
+        if (active) setActions((data || []) as ActionRecord[])
+      } catch { if (active) setError(true) }
+      finally { if (active) setLoading(false) }
+    })()
+    return () => { active = false }
+  }, [projectId])
+  const open = actions.filter(a => !['completed','cancelled','canceled'].includes(String(a.status || '').toLowerCase()))
+  const today = new Date().toISOString().slice(0, 10)
+  const priority = (a: ActionRecord) => a.priority === 'Critical' ? 0 : a.priority === 'High' ? 1 : 2
+  const top = [...open].sort((a,b) => {
+    const overdueA = a.due_date && a.due_date < today ? 0 : 1
+    const overdueB = b.due_date && b.due_date < today ? 0 : 1
+    return overdueA - overdueB || priority(a) - priority(b) || (a.due_date || '9999').localeCompare(b.due_date || '9999')
+  }).slice(0, 3)
+  return <div className="mt-3 space-y-3">
+    {loading ? <p className="text-sm text-[var(--pmx-muted)]">Loading tracked actions…</p> : error ? <p className="text-sm text-amber-700">Assignments unavailable. Check access or try again.</p> : top.length ? top.map(a => {
+      const overdue = Boolean(a.due_date && a.due_date < today)
+      const owner = a.assigned_person_name || a.assigned_department || a.assigned_person_email || a.assigned_role || 'Owner not assigned'
+      return <div key={a.id} className="border-b border-[var(--pmx-border)] pb-2 last:border-0">
+        <div className="text-sm font-semibold">{a.title}</div>
+        <div className="mt-1 text-xs text-[var(--pmx-muted)]">{owner} · {a.due_date ? `Due ${a.due_date}` : 'No deadline'} · {a.status || 'Status unknown'}{overdue ? ' · OVERDUE' : ''}</div>
+      </div>
+    }) : <p className="text-sm text-[var(--pmx-muted)]">No open tracked assignments found for this project.</p>}
+    <button className="text-sm font-semibold text-sky-700" onClick={() => navigate('/app/internal-assignments')}>View all tracked actions →</button>
+    <p className="text-xs text-[var(--pmx-muted)]">Only assignments accessible to your account are shown. Recommendations are not treated as assigned actions.</p>
+  </div>
+}
 
 function formatDate(value?: Date | null) {
   if (!value) return '—'
@@ -71,6 +122,7 @@ function metricTone(score: number) {
 
 export default function RoleBasedCommandCenter({ project }: { project?: any }) {
   const navigate = useNavigate()
+  const projectId = useProjectStore(state => state.projectId)
   const role = useMembershipStore(state => state.role)
   const intelligence = useProjectIntelligence({ project })
   const { data: activity = [], isLoading: activityLoading } = useActivityFeed(10)
@@ -196,8 +248,9 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
           <button className="mt-4 text-sm font-semibold text-sky-700" onClick={() => navigate('/app/recovery')}>View recovery analysis →</button>
         </section>
         <section className="pmx-section-panel"><div className="pmx-eyebrow">Management attention</div><h2 className="mt-1 text-xl font-semibold">Decisions & immediate actions</h2>
-          <div className="mt-3 space-y-3">{recommendations.slice(0, 2).map((item: any) => <button key={item.id} className="block w-full text-left text-sm" onClick={() => item.route && navigate(item.route)}><strong>{item.title}</strong><span className="ml-2 text-sky-700">→</span></button>)}
-          <p className="text-xs text-[var(--pmx-muted)]">{intelligence.metrics.pendingApprovals} pending approvals · {intelligence.metrics.overdueApprovals} overdue</p></div>
+          <ManagementActionSnapshot projectId={projectId} />
+          <details className="mt-3"><summary className="cursor-pointer text-xs text-[var(--pmx-muted)]">System-recommended recovery actions (unassigned)</summary><div className="mt-2 space-y-2">{recommendations.slice(0, 2).map((item: any) => <button key={item.id} className="block w-full text-left text-sm" onClick={() => item.route && navigate(item.route)}>{item.title} →</button>)}</div></details>
+          <p className="mt-2 text-xs text-[var(--pmx-muted)]">{intelligence.metrics.pendingApprovals} pending approvals · {intelligence.metrics.overdueApprovals} overdue</p>
         </section>
       </div>
       <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Detailed intelligence and operational controls</summary><div className="mt-5 space-y-4"><RoleAwareCommandSections project={project} /><div className="grid gap-4 lg:grid-cols-2"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div><HealthTrend days={30} /><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div></details>
