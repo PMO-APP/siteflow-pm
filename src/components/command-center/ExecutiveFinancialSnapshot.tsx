@@ -202,17 +202,6 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     </div>
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
       {rows.length === 0 && !paymentLoading && <p className="mt-3 text-xs text-amber-700">No financial register entries found for this project. Costing payment records, where available, are shown separately as unverified and cannot establish the approved budget or certified value. Confirm records and project access in Costing.</p>}
-      <details className="mt-3 rounded-xl border border-[var(--pmx-border)] p-3 text-xs" aria-label="Financial data source reconciliation">
-        <summary className="cursor-pointer font-semibold">Financial data sources & reconciliation</summary>
-        <div className="mt-2 space-y-2 text-[var(--pmx-muted)]">
-          <p>Approved budget: {figures.budget !== null ? 'Financial register contract sum plus approved variations' : 'No approved budget established from financial register'}.</p>
-          <p>Certified value: {figures.certified !== null ? 'Dated or certified financial register entries (subject to Costing verification)' : 'No certified valuation entries established'}.</p>
-          <p>Payments: {figures.paid !== null ? 'Financial register' : costingFallback && costingPaymentTotals.paid !== null ? 'Costing payment register (unverified fallback)' : 'No usable payment source'}.</p>
-          <p>Costing contract exposure: {exposureLoading ? 'Loading…' : exposureError ? 'Unavailable: ' + exposureError : costingBudgetCandidate !== null ? `${money(costingBudgetCandidate, 'NGN')} indicative commitments (NOT an approved budget)` : 'No complete comparable contracts available'}.</p>
-          <p>These sources may contain overlapping transactions. They are not combined. An empty result can also reflect row-level security or project ID mapping; confirm source records with an authorised Costing user.</p>
-          {figures.budget !== null && costingBudgetCandidate !== null && Math.abs(figures.budget - costingBudgetCandidate) > 0.01 && <p className="text-amber-700">Financial register budget and Costing commitments differ by {money(Math.abs(figures.budget - costingBudgetCandidate), 'NGN')}. Reconcile before using either as a verified comparison.</p>}
-        </div>
-      </details>
       <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
       <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value, source]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div>{source && <div className="mt-1 text-xs text-amber-700">{source}</div>}</div>)}</div>
       <div className="mt-4 rounded-xl border border-[var(--pmx-border)] p-4" aria-label="Funding versus delivery summary">
@@ -246,15 +235,10 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
           {paymentAlerts.noDueDateCount > 0 && <span className="text-amber-700">{paymentAlerts.noDueDateCount} missing due dates</span>}
         </>}
       </div>
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">{[
-          { label: 'Physical progress', value: progressKnown ? progress : null },
-          { label: 'Budget paid', value: figures.paymentPct },
-          { label: 'Certified value / budget', value: figures.budget && figures.certified !== null ? 100 * figures.certified / figures.budget : null },
-        ].map(item => <div key={item.label}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><strong>{item.value === null ? 'Awaiting data' : `${item.value.toFixed(1)}%`}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-[var(--pmx-surface-2)]"><div className="h-full rounded-full bg-sky-700" style={{ width: `${Math.min(100, Math.max(0, item.value ?? 0))}%` }} /></div></div>)}</div>
+      <div className="mt-4">
         <details className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4 text-sm">
-          <summary className="cursor-pointer font-semibold">Financial details, payment pipeline & forecast management</summary>
-          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Expand for reconciliation, contracts, variation exposure, and forecast submissions. Figures are not added across registers.</p>
+          <summary className="cursor-pointer font-semibold">Payment pipeline, variations & cost forecast</summary>
+          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Detailed Costing records and forecasts. Figures from separate registers are not added together.</p>
           <div className="mt-4 font-semibold">Management attention</div>
           <p className="mt-2">Paid less certified work: <strong>{money(figures.paidCertifiedGap, figures.currency)}</strong></p>
           {figures.paidCertifiedGap !== null && figures.paidCertifiedGap > 0 && <p className="mt-1 text-xs text-amber-700">Payments are ahead of recorded certification. Reconcile advances, materials, retention and incomplete certificates before classifying this as overpayment.</p>}
@@ -293,6 +277,17 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
           <ProjectCostForecast projectId={Number(projectId)} approvedBudget={figures.currencyConflict ? null : figures.budget} budgetCurrency={figures.currency} role={role || ''} />
         </details>
       </div>
+      <details className="mt-3 rounded-xl border border-[var(--pmx-border)] p-3 text-xs" aria-label="Financial data source reconciliation">
+        <summary className="cursor-pointer font-semibold">Financial data sources & reconciliation</summary>
+        <div className="mt-2 space-y-2 text-[var(--pmx-muted)]">
+          <p>Approved budget: {figures.budget !== null ? 'Financial register contract sum plus approved variations' : 'No approved budget established from financial register'}.</p>
+          <p>Certified value: {figures.certified !== null ? 'Dated or certified financial register entries (subject to Costing verification)' : 'No certified valuation entries established'}.</p>
+          <p>Payments: {figures.paid !== null ? 'Financial register' : costingFallback && costingPaymentTotals.paid !== null ? 'Costing payment register (unverified fallback)' : 'No usable payment source'}.</p>
+          <p>Costing contract exposure: {exposureLoading ? 'Loading…' : exposureError ? 'Unavailable: ' + exposureError : costingBudgetCandidate !== null ? `${money(costingBudgetCandidate, 'NGN')} indicative commitments (NOT an approved budget)` : 'No complete comparable contracts available'}.</p>
+          <p>These sources may contain overlapping transactions. They are not combined. An empty result can also reflect row-level security or project ID mapping; confirm source records with an authorised Costing user.</p>
+          {figures.budget !== null && costingBudgetCandidate !== null && Math.abs(figures.budget - costingBudgetCandidate) > 0.01 && <p className="text-amber-700">Financial register budget and Costing commitments differ by {money(Math.abs(figures.budget - costingBudgetCandidate), 'NGN')}. Reconcile before using either as a verified comparison.</p>}
+        </div>
+      </details>
       <p className="mt-4 text-xs text-[var(--pmx-muted)]">Operational financial register, not an audited financial statement. {figures.latest ? `Last record update ${fmtDate(figures.latest)}.` : 'No financial records available.'} {figures.invalid ? `${figures.invalid} invalid-amount records excluded.` : ''} Financial totals require Costing verification.</p>
     </>}
   </section>
