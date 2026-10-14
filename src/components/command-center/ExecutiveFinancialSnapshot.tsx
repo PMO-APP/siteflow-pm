@@ -228,9 +228,9 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
         {figures.currencyConflict || figures.budget === null || figures.paid === null || figures.certified === null
           ? <p className="mt-3 text-xs text-amber-700">A reliable paid-versus-delivered assessment requires an approved budget, reconciled payments and certified work from the financial register. Costing fallback payments are not treated as verified.</p>
           : <p className="mt-3 text-xs text-[var(--pmx-muted)]">
-              {figures.paidCertifiedGap > 0
+              {figures.paidCertifiedGap !== null && figures.paidCertifiedGap > 0
                 ? 'Payments exceed recorded certified value. Review advances, materials on site, retention and outstanding certificates with Costing.'
-                : figures.paidCertifiedGap < 0
+                : figures.paidCertifiedGap !== null && figures.paidCertifiedGap < 0
                   ? 'Certified work exceeds recorded payments. Review unpaid certificates and payment commitments with Costing.'
                   : 'Recorded payments and certified value are equal.'}
               {' '}Budget disbursement and physical progress are different measures; their percentage-point difference is not proof of overpayment or underperformance.
