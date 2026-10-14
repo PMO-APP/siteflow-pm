@@ -329,9 +329,24 @@ export function calculateDeliveryTwin(state: ProjectState): DeliveryTwinResult {
     const hasStarted = progress > 0 && progress < 100
     const blockers = [...scheduleBlockers, ...(hasStarted ? buildGlobalBlockers(state, stage) : [])]
     const criticalActivityCount = activities.filter(a => a.isCritical && a.progress < 100).length
-    const readinessScore = stage.id === 'handover'
-      ? (allScheduleComplete ? 100 : 0)
-      : clamp(100 - blockers.filter(b => b.severity === 'critical').length * 20 - blockers.filter(b => b.severity === 'warning').length * 10 - criticalActivityCount * 5)
+    // Readiness measures whether the stage can proceed, not just whether it has
+    // few registered blockers. Incomplete physical predecessors cap readiness.
+    // Missing predecessor evidence is treated conservatively, not as 100% ready.
+    const prerequisite: Record<string, [string, number][]> = {
+      'superstructure': [['substructure', 80]],
+      'roofing': [['superstructure', 80]],
+      'mep-first-fix': [['substructure', 80]],
+      'internal-finishes': [['roofing', 80]],
+      'testing-commissioning': [['internal-finishes', 80]],
+      'snagging': [['internal-finishes', 90], ['testing-commissioning', 80]],
+      'handover': [['snagging', 100], ['testing-commissioning', 100]],
+    }
+    const unmetPrerequisites = (prerequisite[stage.id] || []).filter(([id, minimum]) =>
+      templates.some(item => item.id === id) && (credibleProgress.get(id) || 0) < minimum)
+    const blockerReadiness = clamp(100 - blockers.filter(b => b.severity === 'critical').length * 20 - blockers.filter(b => b.severity === 'warning').length * 10 - criticalActivityCount * 5)
+    const readinessScore = stage.id === 'handover' && !allScheduleComplete
+      ? 0
+      : unmetPrerequisites.length > 0 ? Math.min(25, blockerReadiness) : blockerReadiness
 
     return {
       id: stage.id,
