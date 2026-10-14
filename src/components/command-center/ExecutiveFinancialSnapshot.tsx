@@ -215,6 +215,29 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
       </details>
       <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
       <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value, source]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div>{source && <div className="mt-1 text-xs text-amber-700">{source}</div>}</div>)}</div>
+      <div className="mt-4 rounded-xl border border-[var(--pmx-border)] p-4" aria-label="Funding versus delivery summary">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Funding versus delivery</h3>
+          <span className="text-xs text-[var(--pmx-muted)]">Management snapshot</span>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div><div className="text-xs text-[var(--pmx-muted)]">Physical completion</div><strong>{progressKnown ? `${progress.toFixed(1)}%` : 'Awaiting data'}</strong></div>
+          <div><div className="text-xs text-[var(--pmx-muted)]">Approved budget disbursed</div><strong>{figures.currencyConflict || figures.paymentPct === null ? 'Awaiting verified data' : `${figures.paymentPct.toFixed(1)}%`}</strong></div>
+          <div><div className="text-xs text-[var(--pmx-muted)]">Certified value less payments</div><strong>{figures.currencyConflict || figures.paidCertifiedGap === null ? 'Awaiting verified data' : money(-figures.paidCertifiedGap, figures.currency)}</strong></div>
+        </div>
+        {figures.currencyConflict || figures.budget === null || figures.paid === null || figures.certified === null
+          ? <p className="mt-3 text-xs text-amber-700">A reliable paid-versus-delivered assessment requires an approved budget, reconciled payments and certified work from the financial register. Costing fallback payments are not treated as verified.</p>
+          : <p className="mt-3 text-xs text-[var(--pmx-muted)]">
+              {figures.paidCertifiedGap > 0
+                ? 'Payments exceed recorded certified value. Review advances, materials on site, retention and outstanding certificates with Costing.'
+                : figures.paidCertifiedGap < 0
+                  ? 'Certified work exceeds recorded payments. Review unpaid certificates and payment commitments with Costing.'
+                  : 'Recorded payments and certified value are equal.'}
+              {' '}Budget disbursement and physical progress are different measures; their percentage-point difference is not proof of overpayment or underperformance.
+            </p>}
+        {figures.budget !== null && figures.paid !== null && figures.paid > figures.budget &&
+          <p role="alert" className="mt-2 text-xs font-semibold text-red-700">Recorded payments exceed approved budget by {money(figures.paid - figures.budget, figures.currency)}. Costing reconciliation required.</p>}
+      </div>
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--pmx-border)] p-3 text-sm" aria-label="Payment deadline snapshot">
         <span className="font-semibold">Payment deadlines</span>
         {paymentError ? <span className="text-amber-700">Deadline records unavailable</span> : paymentLoading ? <span className="text-[var(--pmx-muted)]">Checking deadlines…</span> : paymentRecords.length === 0 ? <span className="text-[var(--pmx-muted)]">No payment deadline records available; overdue status cannot be assessed</span> : <>
