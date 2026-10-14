@@ -111,6 +111,33 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
   const planned = intelligence.metrics.plannedProgress
   const gap = progress - planned
   const packages = forecast.packagePositions || []
+  // A package is assigned to a recovery group by its own name, never by a
+  // neighbouring block's activity. Do not average unweighted package progress.
+  const groupFor = (name: string): 'october' | 'december' | 'b13' | null => {
+    const tokens = (name.toUpperCase().match(/\b(?:A|B)\s*\d{1,2}\b/g) || []).map(token => token.replace(/\s+/g, ''))
+    if (tokens.includes('B13')) return 'b13'
+    if (!tokens.length) return null
+    const group = tokens.map(token => {
+      const block = token[0]
+      const number = Number(token.slice(1))
+      if (block === 'A' && number >= 1 && number <= 14) return 'october'
+      if (block === 'B' && number >= 1 && number <= 6) return 'october'
+      if (block === 'B' && ((number >= 9 && number <= 12) || number === 14)) return 'december'
+      return null
+    })
+    return group.every(value => value === group[0]) ? group[0] : null
+  }
+  const recoveryGroups = {
+    october: packages.filter(item => groupFor(item.packageName) === 'october'),
+    december: packages.filter(item => groupFor(item.packageName) === 'december'),
+    b13: packages.filter(item => groupFor(item.packageName) === 'b13'),
+  }
+  const groupSummary = (items: typeof packages) => {
+    if (!items.length) return 'No matching programme data'
+    const delayed = items.filter(item => item.delayDays > 0).length
+    const worst = Math.max(...items.map(item => item.delayDays))
+    return `${items.length} package${items.length === 1 ? '' : 's'} assessed · ${delayed} delayed${worst > 0 ? ` · up to ${worst} days late` : ''}`
+  }
   const shortSummary = forecast.delayDays > 0
     ? `Completion is forecast ${forecast.delayDays} days behind the current target. ${forecast.pressurePackage ? `${forecast.pressurePackage.packageName} needs particular attention.` : 'Review delivery constraints and recovery actions.'}`
     : 'Review the current forecast and delivery priorities.'
@@ -141,10 +168,24 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
       <section className="pmx-section-panel">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="pmx-eyebrow">Delivery performance</div><h2 className="mt-1 text-xl font-semibold">Delivery packages</h2></div><button className="pmx-btn-secondary" onClick={() => navigate('/app/schedule')}>Review programme →</button></div>
         {packages.length > 0 ? <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {isParkVillas && <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">October recovery · A1–A14, B1–B6</div><div className="mt-2 font-semibold">31 Oct 2026</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Management target</div></div>}
-          {isParkVillas && <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">December recovery · B9–B12, B14</div><div className="mt-2 font-semibold">31 Dec 2026</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Management target</div></div>}
-          <div className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">Highest delivery pressure</div><div className="mt-2 font-semibold">{forecast.pressurePackage?.packageName || 'Not identified'}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">Existing package programmes remain unchanged</div></div>
+          {isParkVillas ? <>
+            {([
+              ['october', 'October recovery · A1–A14, B1–B6', '31 Oct 2026'],
+              ['december', 'December recovery · B9–B12, B14', '31 Dec 2026'],
+              ['b13', 'Existing B13 programme', 'Original programme retained'],
+            ] as const).map(([key, label, target]) => <div key={key} className="rounded-xl border border-[var(--pmx-border)] p-4">
+              <div className="text-xs text-[var(--pmx-muted)]">{label}</div>
+              <div className="mt-2 font-semibold">{target}</div>
+              <div className="mt-1 text-xs text-[var(--pmx-muted)]">{key === 'b13' ? 'Approved package dates are unchanged' : 'Management recovery target, not an approved baseline'}</div>
+              <div className="mt-3 border-t border-[var(--pmx-border)] pt-3 text-sm">{groupSummary(recoveryGroups[key])}</div>
+            </div>)}
+          </> : <div className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <div className="text-xs text-[var(--pmx-muted)]">Highest delivery pressure</div>
+            <div className="mt-2 font-semibold">{forecast.pressurePackage?.packageName || 'Not identified'}</div>
+            <div className="mt-1 text-xs text-[var(--pmx-muted)]">{forecast.pressurePackage ? `${forecast.pressurePackage.delayDays} days behind programme` : 'Review detailed package performance'}</div>
+          </div>}
         </div> : <p className="mt-4 text-sm text-[var(--pmx-muted)]">No package programme has been recorded.</p>}
+        {isParkVillas && packages.length > 0 && <p className="mt-2 text-xs text-[var(--pmx-muted)]">Package counts reflect identifiable schedule groups only. Forecast completion and cost-weighted progress are not inferred from activity sequence.</p>}
         <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">View detailed package performance</summary><div className="mt-3"><PackagePerformancePanel packages={intelligence.deliveryTwin.packages} /></div></details>
       </section>
 
