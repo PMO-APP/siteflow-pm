@@ -45,6 +45,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   const [rows, setRows] = useState<Entry[]>([])
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([])
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
   const [costContracts, setCostContracts] = useState<ContractRecord[]>([])
   const [costVariations, setCostVariations] = useState<VariationRecord[]>([])
   const [exposureError, setExposureError] = useState<string | null>(null)
@@ -57,6 +58,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     setRows([])
     setPaymentRecords([])
     setPaymentError(null)
+    setPaymentLoading(false)
     setCostContracts([])
     setCostVariations([])
     setExposureError(null)
@@ -92,11 +94,13 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     })
     // The Costing payment register is a separate source. Do not add its amounts
     // to financial_items totals, as the same disbursement may exist in both.
+    setPaymentLoading(true)
     supabase.from('cost_payments').select('id,amount,payment_status,due_date,paid_date,payment_title')
       .eq('project_id', projectId).then(({ data, error: requestError }) => {
         if (!alive) return
         setPaymentRecords(requestError ? [] : (data || []) as PaymentRecord[])
         setPaymentError(requestError?.message || null)
+        setPaymentLoading(false)
       })
     return () => { alive = false }
   }, [projectId, permitted])
@@ -171,9 +175,21 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   if (!permitted) return null
   const progressKnown = Number.isFinite(physicalProgress) && physicalProgress >= 0
   const progress = progressKnown ? Math.min(100, physicalProgress) : 0
-  const cards: Array<[string, number | null]> = [
-    ['Approved budget', figures.budget], ['Payments made', figures.paid],
-    ['Certified work', figures.certified], ['Pending payments', figures.pending],
+  // Costing payments are a separate source. Use them only as clearly labelled
+  // provisional fallback values, never combine them with financial_items totals.
+  const costingPaymentTotals = useMemo(() => {
+    const usable = paymentRecords.every(r => r.amount !== null && r.amount !== '' && Number.isFinite(Number(r.amount)) && Number(r.amount) >= 0)
+    if (!usable || paymentRecords.length === 0) return { paid: null, pending: null }
+    const paid = paymentRecords.filter(r => normal(r.payment_status) === 'paid' || Boolean(r.paid_date))
+    const pending = paymentRecords.filter(r => !['paid', 'rejected'].includes(normal(r.payment_status)) && !r.paid_date)
+    return { paid: paid.reduce((sum, r) => sum + Number(r.amount), 0), pending: pending.reduce((sum, r) => sum + Number(r.amount), 0) }
+  }, [paymentRecords])
+  const costingFallback = !paymentLoading && !paymentError && rows.length === 0
+  const cards: Array<[string, number | null, string?]> = [
+    ['Approved budget', figures.budget],
+    ['Payments made', figures.paid ?? (costingFallback ? costingPaymentTotals.paid : null), figures.paid === null && costingFallback && costingPaymentTotals.paid !== null ? 'Costing payment register · unverified' : undefined],
+    ['Certified work', figures.certified],
+    ['Pending payments', figures.pending ?? (costingFallback ? costingPaymentTotals.pending : null), figures.pending === null && costingFallback && costingPaymentTotals.pending !== null ? 'Costing payment register · unverified' : undefined],
   ]
   const latestAge = figures.latest ? daysSince(figures.latest) : null
   return <section className="pmx-section-panel" aria-label="Financial health">
@@ -182,11 +198,12 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
       <button className="pmx-btn-secondary" type="button" onClick={() => navigate('/app/costing')}>Open Costing →</button>
     </div>
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
+      {rows.length === 0 && !paymentLoading && <p className="mt-3 text-xs text-amber-700">No financial register entries found for this project. Costing payment records, where available, are shown separately as unverified and cannot establish the approved budget or certified value. Confirm records and project access in Costing.</p>}
       <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
-      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div></div>)}</div>
+      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value, source]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div>{source && <div className="mt-1 text-xs text-amber-700">{source}</div>}</div>)}</div>
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--pmx-border)] p-3 text-sm" aria-label="Payment deadline snapshot">
         <span className="font-semibold">Payment deadlines</span>
-        {paymentError ? <span className="text-amber-700">Deadline records unavailable</span> : <>
+        {paymentError ? <span className="text-amber-700">Deadline records unavailable</span> : paymentLoading ? <span className="text-[var(--pmx-muted)]">Checking deadlines…</span> : paymentRecords.length === 0 ? <span className="text-[var(--pmx-muted)]">No payment deadline records available; overdue status cannot be assessed</span> : <>
           <span className={paymentAlerts.overdueCount > 0 ? 'font-semibold text-red-700' : 'text-[var(--pmx-muted)]'}>{paymentAlerts.overdueCount} overdue</span>
           <span className="text-[var(--pmx-muted)]">{paymentAlerts.upcomingCount} due within 7 days</span>
           {paymentAlerts.noDueDateCount > 0 && <span className="text-amber-700">{paymentAlerts.noDueDateCount} missing due dates</span>}
