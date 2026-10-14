@@ -270,7 +270,34 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
           <p className="mt-2 text-xs text-[var(--pmx-muted)]">{intelligence.metrics.pendingApprovals} pending approvals · {intelligence.metrics.overdueApprovals} overdue</p>
         </section>
       </div>
-      <details className="pmx-section-panel"><summary className="cursor-pointer font-semibold">Detailed intelligence and operational controls</summary><div className="mt-5 space-y-4"><RoleAwareCommandSections project={project} /><div className="grid gap-4 lg:grid-cols-2"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div><HealthTrend days={30} /><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div></details>
+      {/* Keep the executive dashboard scannable. Advanced controls are available on demand. */}
+      <section className="pmx-section-panel" aria-label="Advanced project analysis">
+        <div className="pmx-eyebrow">Explore further</div>
+        <h2 className="mt-1 text-lg font-semibold">Project analysis</h2>
+        <p className="mt-1 text-sm text-[var(--pmx-muted)]">Open only the analysis you need. Your project overview, financial position, delivery risks and management actions remain above.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Delivery diagnostics</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Readiness, production, root causes and recovery options.</p>
+            <div className="mt-4 space-y-4"><ReadinessPanel readiness={intelligence.readiness} /><ProductionPanel forecast={forecast} /><RootCausePanel rootCause={intelligence.rootCause} /><RecommendationsPanel recommendations={intelligence.recommendations} /></div>
+          </details>
+          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Digital twin & forecasts</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Package intelligence, scenarios and dependencies.</p>
+            <div className="mt-4"><DeliveryTwinPanel twin={intelligence.deliveryTwin} sharedForecast={forecast} currentHealth={intelligence.health.score} /></div>
+          </details>
+          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Management controls</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Role-specific operational information and decisions.</p>
+            <div className="mt-4"><RoleAwareCommandSections project={project} /></div>
+          </details>
+          <details className="rounded-xl border border-[var(--pmx-border)] p-4">
+            <summary className="cursor-pointer text-sm font-semibold">Historical trends</summary>
+            <p className="mt-2 text-xs text-[var(--pmx-muted)]">Project health over the last 30 days.</p>
+            <div className="mt-4"><HealthTrend days={30} /></div>
+          </details>
+        </div>
+      </section>
       {import.meta.env.DEV ? <V6IntelligenceComparison project={project} /> : null}
     </div>
   )
