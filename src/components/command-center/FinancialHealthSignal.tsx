@@ -12,10 +12,26 @@ export default function FinancialHealthSignal({ projectId, budget, currency, cur
     let active = true
     setForecastLoading(true); setForecastError(false); setForecasts([])
     if (!Number.isFinite(projectId) || projectId <= 0) { setForecastLoading(false); return () => { active = false } }
-    void supabase.from('project_cost_forecasts').select('id,currency,forecast_final_cost,reviewed_at')
-      .eq('project_id', projectId).eq('status', 'approved').order('reviewed_at', { ascending: false }).limit(2)
-      .then(({ data, error }) => { if (!active) return; setForecastError(Boolean(error)); setForecasts((data || []) as Forecast[]); setForecastLoading(false) })
-      .catch(() => { if (active) { setForecastError(true); setForecastLoading(false) } })
+    const loadForecasts = async () => {
+      try {
+        const { data, error } = await supabase.from('project_cost_forecasts')
+          .select('id,currency,forecast_final_cost,reviewed_at')
+          .eq('project_id', projectId)
+          .eq('status', 'approved')
+          .order('reviewed_at', { ascending: false })
+          .limit(2)
+        if (!active) return
+        setForecastError(Boolean(error))
+        setForecasts(error ? [] : (data || []) as Forecast[])
+      } catch {
+        if (!active) return
+        setForecastError(true)
+        setForecasts([])
+      } finally {
+        if (active) setForecastLoading(false)
+      }
+    }
+    void loadForecasts()
     return () => { active = false }
   }, [projectId])
   const assessment = useMemo(() => {
