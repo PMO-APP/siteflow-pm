@@ -190,6 +190,18 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
     const worst = Math.max(...items.map(item => item.delayDays))
     return `${items.length} package${items.length === 1 ? '' : 's'} assessed · ${delayed} delayed${worst > 0 ? ` · up to ${worst} days late` : ''}`
   }
+  // Presentation-only consistency check: do not override the forecast engine.
+  // Calendar dates are compared at UTC day precision to avoid DST/time-of-day drift.
+  const forecastDay = forecast.forecastDate instanceof Date && !Number.isNaN(forecast.forecastDate.getTime())
+    ? Date.UTC(forecast.forecastDate.getUTCFullYear(), forecast.forecastDate.getUTCMonth(), forecast.forecastDate.getUTCDate()) : null
+  const targetDay = forecast.targetDate instanceof Date && !Number.isNaN(forecast.targetDate.getTime())
+    ? Date.UTC(forecast.targetDate.getUTCFullYear(), forecast.targetDate.getUTCMonth(), forecast.targetDate.getUTCDate()) : null
+  const calendarDelay = forecastDay !== null && targetDay !== null
+    ? Math.max(0, Math.round((forecastDay - targetDay) / 86400000)) : null
+  const delayMismatch = calendarDelay !== null && Number.isFinite(forecast.delayDays)
+    && Math.abs(calendarDelay - forecast.delayDays) > 1
+  const validProgress = Number.isFinite(progress) && progress >= 0 && progress <= 100
+    && Number.isFinite(planned) && planned >= 0 && planned <= 100
   const shortSummary = forecast.delayDays > 0
     ? `Completion is forecast ${forecast.delayDays} days behind the current target. ${forecast.pressurePackage ? `${forecast.pressurePackage.packageName} needs particular attention.` : 'Review delivery constraints and recovery actions.'}`
     : 'Review the current forecast and delivery priorities.'
@@ -204,13 +216,18 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             ['Actual progress', `${progress}%`, `Planned ${planned}%`],
-            ['Forecast completion', formatDate(forecast.forecastDate), `Target ${formatDate(forecast.targetDate)}`],
-            ['Schedule delay', `${forecast.delayDays} days`, 'Against target'],
+            ['Forecast completion', formatDate(forecast.forecastDate), `Forecast engine target ${formatDate(forecast.targetDate)}`],
+            ['Schedule delay', `${forecast.delayDays} days`, 'Forecast engine vs target'],
             ['Project health', `${intelligence.health.score}/100`, intelligence.health.label],
           ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
         </div>
+        <div className="mt-3 text-xs text-[var(--pmx-muted)]">Completion dates and delay are supplied by the existing recovery forecast engine. Management recovery deadlines below are separate from the engine target; confirm the approved baseline in Schedule Revisions.</div>
+        {(delayMismatch || !validProgress) && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <strong>Data consistency review required.</strong>{delayMismatch ? ` Displayed dates imply ${calendarDelay} calendar days of delay, while the forecast engine reports ${forecast.delayDays} days. Confirm whether the engine uses working days or a different baseline.` : ''}{!validProgress ? ' Progress values are missing or outside the valid 0–100% range.' : ''}
+          <button className="ml-2 underline" onClick={() => navigate('/app/schedule')}>Review programme</button>
+        </div>}
         <div className="mt-5 rounded-xl bg-[var(--pmx-surface-2)] p-4">
-          <div className="mb-3 flex justify-between text-sm"><strong>Progress against programme</strong><span className={gap < 0 ? 'text-rose-600' : 'text-emerald-600'}>{gap > 0 ? '+' : ''}{gap.toFixed(1)} percentage points</span></div>
+          <div className="mb-3 flex justify-between text-sm"><strong>Progress against programme</strong><span className={gap < 0 ? 'text-rose-600' : 'text-emerald-600'}>{validProgress ? `${gap > 0 ? '+' : ''}${gap.toFixed(1)} percentage points` : 'Review progress data'}</span></div>
           {[['Actual', progress, 'bg-sky-700'], ['Planned', planned, 'bg-slate-400']].map(([label, value, color]) => <div key={String(label)} className="mb-3"><div className="mb-1 flex justify-between text-xs"><span>{label}</span><span>{value}%</span></div><div className="h-2 rounded-full bg-slate-200"><div className={`h-2 rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, Number(value)))}%` }} /></div></div>)}
         </div>
       </section>
