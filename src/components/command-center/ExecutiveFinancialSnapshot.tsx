@@ -184,14 +184,24 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
       <FinancialHealthSignal projectId={Number(projectId)} budget={figures.budget} currency={figures.currency} currencyConflict={figures.currencyConflict} overdueCount={paymentError ? null : paymentAlerts.overdueCount} paymentDataError={Boolean(paymentError)} financialDataError={Boolean(error)} invalidRecordCount={figures.invalid} lastUpdated={figures.latest} />
       <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-lg font-semibold">{money(value, figures.currency)}</div></div>)}</div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--pmx-border)] p-3 text-sm" aria-label="Payment deadline snapshot">
+        <span className="font-semibold">Payment deadlines</span>
+        {paymentError ? <span className="text-amber-700">Deadline records unavailable</span> : <>
+          <span className={paymentAlerts.overdueCount > 0 ? 'font-semibold text-red-700' : 'text-[var(--pmx-muted)]'}>{paymentAlerts.overdueCount} overdue</span>
+          <span className="text-[var(--pmx-muted)]">{paymentAlerts.upcomingCount} due within 7 days</span>
+          {paymentAlerts.noDueDateCount > 0 && <span className="text-amber-700">{paymentAlerts.noDueDateCount} missing due dates</span>}
+        </>}
+      </div>
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">{[
           { label: 'Physical progress', value: progressKnown ? progress : null },
           { label: 'Budget paid', value: figures.paymentPct },
           { label: 'Certified value / budget', value: figures.budget && figures.certified !== null ? 100 * figures.certified / figures.budget : null },
         ].map(item => <div key={item.label}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><strong>{item.value === null ? 'Awaiting data' : `${item.value.toFixed(1)}%`}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-[var(--pmx-surface-2)]"><div className="h-full rounded-full bg-sky-700" style={{ width: `${Math.min(100, Math.max(0, item.value ?? 0))}%` }} /></div></div>)}</div>
-        <div className="rounded-xl bg-[var(--pmx-surface-2)] p-4 text-sm">
-          <div className="font-semibold">Management attention</div>
+        <details className="rounded-xl border border-[var(--pmx-border)] bg-[var(--pmx-surface-2)] p-4 text-sm">
+          <summary className="cursor-pointer font-semibold">Financial details, payment pipeline & forecast management</summary>
+          <p className="mt-2 text-xs text-[var(--pmx-muted)]">Expand for reconciliation, contracts, variation exposure, and forecast submissions. Figures are not added across registers.</p>
+          <div className="mt-4 font-semibold">Management attention</div>
           <p className="mt-2">Paid less certified work: <strong>{money(figures.paidCertifiedGap, figures.currency)}</strong></p>
           {figures.paidCertifiedGap !== null && figures.paidCertifiedGap > 0 && <p className="mt-1 text-xs text-amber-700">Payments are ahead of recorded certification. Reconcile advances, materials, retention and incomplete certificates before classifying this as overpayment.</p>}
           {figures.paidOverBudget !== null && <p className="mt-2 text-xs text-red-700">Recorded payments exceed the approved budget by {money(figures.paidOverBudget, figures.currency)}.</p>}
@@ -227,7 +237,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
             </> : <p className="mt-1 text-xs text-[var(--pmx-muted)]">No complete, valid Costing contract data available. Exposure is withheld.</p>}
           </div>
           <ProjectCostForecast projectId={Number(projectId)} approvedBudget={figures.currencyConflict ? null : figures.budget} budgetCurrency={figures.currency} role={role || ''} />
-        </div>
+        </details>
       </div>
       <p className="mt-4 text-xs text-[var(--pmx-muted)]">Operational financial register, not an audited financial statement. {figures.latest ? `Last record update ${fmtDate(figures.latest)}.` : 'No financial records available.'} {figures.invalid ? `${figures.invalid} invalid-amount records excluded.` : ''} Financial totals require Costing verification.</p>
     </>}
