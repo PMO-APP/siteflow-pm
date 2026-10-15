@@ -18,6 +18,7 @@ import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
+import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
 
 type ProjectScope =
   | 'Carcass'
@@ -379,6 +380,10 @@ export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
   const { data: activeRevision } = useActiveScheduleRevision(projectId)
   const activeRevisionTarget = getRevisionTargetDate(activeRevision)
+  const { data: deliveryPackages = [], isLoading: packagesLoading, isError: packagesError } = useDeliveryPackages()
+  const packageTargets = useMemo(() => deliveryPackages
+    .filter(pkg => pkg.planned_finish && /^\d{4}-\d{2}-\d{2}/.test(pkg.planned_finish))
+    .sort((a, b) => (a.planned_finish || '').localeCompare(b.planned_finish || '')), [deliveryPackages])
   const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
@@ -976,6 +981,29 @@ export default function RecoveryForecastPage() {
               <p className="mt-1 text-xs text-[#7b8791]">
                 {engine.targetDateSource}
               </p>
+              <div className="mt-4 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3 text-sm" aria-label="Programme and package date distinctions">
+                <div className="font-semibold text-[#123a60]">Completion date references</div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div><span className="block text-xs text-[#65717c]">Original baseline (revision record)</span><strong>{formatDate(activeRevision?.baseline_finish || null)}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Active approved programme target</span><strong>{formatDate(activeRevisionTarget)}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Current comparison target</span><strong>{formatDate(engine.targetDate)}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Calculated project forecast</span><strong>{formatDate(engine.forecastDate)}</strong></div>
+                </div>
+                <p className="mt-2 text-xs text-[#65717c]">Package planned finishes are separate management dates, not automatically the master project forecast. An unavailable baseline or active target is not inferred.</p>
+                <details className="mt-3 border-t border-[#dfe3e7] pt-2">
+                  <summary className="cursor-pointer text-xs font-semibold">Package planned finishes ({packageTargets.length})</summary>
+                  {packagesLoading ? <p className="mt-2 text-xs">Loading package dates…</p>
+                    : packagesError ? <p className="mt-2 text-xs text-amber-700">Package dates unavailable. Check package access.</p>
+                    : packageTargets.length === 0 ? <p className="mt-2 text-xs">No dated delivery packages found.</p>
+                    : <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">{packageTargets.map(pkg => (
+                      <div key={pkg.id} className="flex items-center justify-between gap-3 border-b border-[#e7eaed] pb-2 text-xs">
+                        <span>{pkg.name} <span className="text-[#65717c]">({pkg.status})</span></span>
+                        <strong className="shrink-0">{formatDate(pkg.planned_finish || null)}</strong>
+                      </div>
+                    ))}</div>}
+                  <p className="mt-2 text-xs text-[#65717c]">These are delivery-package planned finish dates. Confirm separately whether each is an approved recovery commitment.</p>
+                </details>
+              </div>
               {engine.scheduleDataQualityNote && (
                 <p className="mt-1 text-xs text-[#7b8791]">
                   Data quality: {engine.scheduleDataQualityNote}
