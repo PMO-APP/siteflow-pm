@@ -397,6 +397,9 @@ export default function RecoveryForecastPage() {
       return finish !== null && finish.getTime() > approved.getTime()
     }) : []
   }, [packageTargets, activeRevisionTarget])
+  // B13 is an existing delivery package, not a separate programme-target row.
+  // Use the project handover date only when no dated B13 package is available.
+  const b13PackageRecorded = deliveryPackages.some(pkg => /^b\s*[- ]?13$/i.test(pkg.name.trim()))
   const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
@@ -923,6 +926,16 @@ export default function RecoveryForecastPage() {
     )
   }
 
+  const b13FallbackDate = !b13PackageRecorded ? safeDate(
+    context.project?.handover_date || context.project?.planned_finish ||
+    context.project?.finish_date || context.project?.target_date || context.project?.completion_date || null
+  ) : null
+  const visiblePackageHandovers = [
+    ...packageTargets.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: safeDate(pkg.planned_finish), status: pkg.status })),
+    ...(b13FallbackDate ? [{ id: 'existing-b13', name: 'B13', date: b13FallbackDate, status: 'Existing programme' }] : []),
+  ].filter((pkg): pkg is typeof pkg & { date: Date } => pkg.date !== null)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+
   return (
     <div className="-m-4 min-h-screen space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
       <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
@@ -959,16 +972,16 @@ export default function RecoveryForecastPage() {
       <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package handover dates">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#123a60]">Delivery package handovers</h2>
-          <span className="text-xs text-[#65717c]">{packageTargets.length} dated packages · planned targets, not independent forecasts</span>
+          <span className="text-xs text-[#65717c]">{visiblePackageHandovers.length} dated packages · planned targets, not independent forecasts</span>
         </div>
         {packagesLoading ? <p className="mt-3 text-sm">Loading package dates…</p>
           : packagesError ? <p className="mt-3 text-sm text-amber-700">Package dates unavailable.</p>
-          : packageTargets.length === 0 ? <p className="mt-3 text-sm text-[#65717c]">No package-specific handover dates recorded.</p>
+          : visiblePackageHandovers.length === 0 ? <p className="mt-3 text-sm text-[#65717c]">No package-specific handover dates recorded.</p>
           : <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {packageTargets.map(pkg => (
+              {visiblePackageHandovers.map(pkg => (
                 <div key={pkg.id} className="rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
                   <div className="text-sm font-semibold text-[#123a60]">{pkg.name}</div>
-                  <div className="mt-1 text-base font-bold">{formatDate(safeDate(pkg.planned_finish || null))}</div>
+                  <div className="mt-1 text-base font-bold">{formatDate(pkg.date)}</div>
                   <div className="mt-1 text-xs text-[#65717c]">{pkg.status} · package planned finish</div>
                 </div>
               ))}
