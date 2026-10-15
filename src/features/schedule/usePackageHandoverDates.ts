@@ -17,10 +17,12 @@ export function usePackageHandoverDates() {
       /(?:handover|hand[- ]?over|handing over)/i.test(task.name || ''))
     const byProgrammeOrder = (a: (typeof packageTasks)[number], b: (typeof packageTasks)[number]) =>
       (Number(a.task_number) || 0) - (Number(b.task_number) || 0)
+    const orderedHandoverTasks = [...handoverTasks].sort(byProgrammeOrder)
+    const orderedPackageTasks = [...packageTasks].sort(byProgrammeOrder)
     const last = handoverTasks.length
-      ? [...handoverTasks].sort(byProgrammeOrder).at(-1)!
+      ? orderedHandoverTasks[orderedHandoverTasks.length - 1]
       : packageTasks.some(task => Number(task.task_number) > 0)
-        ? [...packageTasks].sort(byProgrammeOrder).at(-1)!
+        ? orderedPackageTasks[orderedPackageTasks.length - 1]
         : packageTasks.reduce<(typeof packageTasks)[number] | null>((latest, task) =>
             !latest || Date.parse(task.finish_date!) > Date.parse(latest.finish_date!) ? task : latest, null)
     const scheduleFinish = last?.finish_date || null
