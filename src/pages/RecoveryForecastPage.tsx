@@ -380,6 +380,36 @@ function makeEmptyContext() {
   }
 }
 
+
+/** Derive package delay from Schedule dates and Project Controls progress.
+ * This is an indicative progress-based lag, not an approved schedule revision.
+ * Incomplete activities without valid start/finish dates cannot be assessed.
+ */
+function packageProgressDelayDays(packageId: string, tasks: Task[], today: Date): number | null {
+  const linked = tasks.filter(t => String(t.delivery_package_id || '') === packageId)
+  const unfinished = linked.filter(t => !t.actual_finish && Number(t.progress_pct || 0) < 100)
+  if (!linked.length) return null
+  if (!unfinished.length) return 0
+  const todayMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  const delays = unfinished.map(task => {
+    if (!task.start_date || !task.finish_date) return null
+    const start = Date.parse(task.start_date.slice(0, 10) + 'T00:00:00Z')
+    const finish = Date.parse(task.finish_date.slice(0, 10) + 'T00:00:00Z')
+    if (!Number.isFinite(start) || !Number.isFinite(finish) || finish < start) return null
+    const duration = Math.max(1, Math.round((finish - start) / 86400000) + 1)
+    const planned = Math.max(0, Math.min(1, (todayMs - start) / Math.max(86400000, finish - start)))
+    const actual = Math.max(0, Math.min(1, Number(task.progress_pct || 0) / 100))
+    return Math.max(0, Math.ceil((planned - actual) * duration))
+  })
+  if (delays.some(value => value === null)) return null
+  return Math.max(0, ...delays as number[])
+}
+function addCalendarDays(date: Date, days: number): Date {
+  const result = new Date(date.getTime())
+  result.setUTCDate(result.getUTCDate() + days)
+  return result
+}
+
 export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
   const { data: activeRevision } = useActiveScheduleRevision(projectId)
@@ -947,6 +977,12 @@ export default function RecoveryForecastPage() {
     ...pkg,
     forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks, new Date(), scenarioRate),
   }))
+  const deliveryOutlooks = visiblePackageHandovers.map(pkg => {
+    const delayDays = packageProgressDelayDays(pkg.id, projectTasks, new Date())
+    return { ...pkg, delayDays, forecastDate: delayDays === null ? null : addCalendarDays(pkg.date, delayDays) }
+  })
+  const masterForecast = deliveryOutlooks.every(pkg => pkg.forecastDate !== null) && deliveryOutlooks.length
+    ? new Date(Math.max(...deliveryOutlooks.map(pkg => pkg.forecastDate!.getTime()))) : null
   const availablePackageForecasts = packageForecasts.filter(pkg => pkg.forecastResult.forecast)
   // Indicative dates are not validated master forecasts. Keep the latest
   // management target visible without presenting it as a calculated finish.
@@ -995,11 +1031,11 @@ export default function RecoveryForecastPage() {
       {recoveryView === 'overview' && <div className="space-y-4">
         <section aria-label="Delivery at a glance" className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Delivery packages</p><p className="mt-2 text-3xl font-bold text-[#123a60]">{visiblePackageHandovers.length}</p><p className="mt-1 text-xs text-[#65717c]">Tracked independently</p></div>
-          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Latest management target</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(latestPackageTarget)}</p><p className="mt-1 text-xs text-[#65717c]">Not a calculated finish</p></div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="text-xs font-medium text-amber-900">Forecast readiness</p><p className="mt-2 text-xl font-bold text-amber-900">Awaiting verification</p><p className="mt-1 text-xs text-amber-800">Do not treat preliminary estimates as commitments</p></div>
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Target</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(latestPackageTarget)}</p><p className="mt-1 text-xs text-[#65717c]">Last scheduled package handover</p></div>
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Forecast</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(masterForecast)}</p><p className="mt-1 text-xs text-[#65717c]">Target + progress-based delay · {masterForecast ? 'Indicative' : 'Missing dated activity data'}</p></div>
         </section>
         <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold text-[#123a60]">Delivery groups</h2><p className="mt-1 text-xs text-[#65717c]">Groupings based on package target dates; not verified forecasts.</p></div><button type="button" onClick={() => setRecoveryView('packages')} className="rounded-lg border border-[#dfe3e7] px-3 py-2 text-xs font-semibold text-[#123a60]">View all packages →</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold text-[#123a60]">Delivery groups</h2><p className="mt-1 text-xs text-[#65717c]">Grouped by the final scheduled handover task.</p></div><button type="button" onClick={() => setRecoveryView('packages')} className="rounded-lg border border-[#dfe3e7] px-3 py-2 text-xs font-semibold text-[#123a60]">View all packages →</button></div>
           <div className="mt-4 divide-y divide-[#e8ecef]">
             {Array.from(new Map(visiblePackageHandovers.map(pkg => [pkg.date.toISOString().slice(0,10), pkg.date])).entries()).sort(([a],[b]) => a.localeCompare(b)).map(([key, date]) => {
               const group = visiblePackageHandovers.filter(pkg => pkg.date.toISOString().slice(0,10) === key)
@@ -1007,7 +1043,7 @@ export default function RecoveryForecastPage() {
             })}
           </div>
         </section>
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm"><div><h2 className="text-base font-semibold text-[#123a60]">What needs attention?</h2><p className="mt-1 max-w-2xl text-sm text-[#65717c]">Package dates are available, but independent completion forecasts still need verified production, remaining-work and resource evidence.</p></div><button type="button" onClick={() => setRecoveryView('analysis')} className="rounded-lg bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white">Review forecast evidence →</button></section>
+        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm"><div><h2 className="text-base font-semibold text-[#123a60]">What needs attention?</h2><p className="mt-1 max-w-2xl text-sm text-[#65717c]">Forecasts are calculated from each package’s schedule and activity progress. Review overdue work in Project Controls; progress-based delay is indicative.</p></div><button type="button" onClick={() => setRecoveryView('analysis')} className="rounded-lg bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white">Open detailed analysis →</button></section>
       </div>}
 
       {recoveryView === 'packages' && <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
@@ -1020,12 +1056,11 @@ export default function RecoveryForecastPage() {
             const pkg = packageForecasts.find(p => p.id === (selectedPackageId || visiblePackageHandovers[0]?.id))
             if (!pkg) return <p className="text-sm text-[#65717c]">No dated package selected.</p>
             const linked = projectTasks.filter(t => String(t.delivery_package_id || '') === pkg.id)
-            const comparison = packageProgrammeComparison.find(p => String(p.id) === pkg.id)
             const evidence = auditPackageEvidence(pkg.id, projectTasks)
-            return <div className="rounded-xl border border-[#e8ecef] p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs uppercase tracking-widest text-[#65717c]">Selected package</p><h3 className="mt-1 text-xl font-bold text-[#123a60]">{pkg.name}</h3></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Forecast unverified</span></div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Management target</p><p className="mt-1 font-semibold">{formatDate(pkg.date)}</p></div><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Linked programme finish</p><p className="mt-1 font-semibold">{formatDate(comparison?.programme || null)}</p></div></div>
+            return <div className="rounded-xl border border-[#e8ecef] p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs uppercase tracking-widest text-[#65717c]">Selected package</p><h3 className="mt-1 text-xl font-bold text-[#123a60]">{pkg.name}</h3></div><span className="rounded-full bg-[#eef3f6] px-3 py-1 text-xs font-semibold text-[#123a60]">Progress-based estimate</span></div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Target (last scheduled task)</p><p className="mt-1 font-semibold">{formatDate(pkg.date)}</p></div><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Forecast</p><p className="mt-1 font-semibold">{formatDate(deliveryOutlooks.find(item => item.id === pkg.id)?.forecastDate || null)}</p></div></div>
               <p className="mt-4 text-sm font-semibold text-[#123a60]">Activity evidence</p><div className="mt-2 grid grid-cols-3 gap-2 text-center"><div className="rounded-lg border p-3"><strong className="block text-lg">{linked.length}</strong><span className="text-xs text-[#65717c]">Activities</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualStarts}</strong><span className="text-xs text-[#65717c]">Actual starts</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualFinishes}</strong><span className="text-xs text-[#65717c]">Actual finishes</span></div></div>
-              <div className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Preliminary schedule estimate: {pkg.forecastResult.forecast ? formatDate(new Date(pkg.forecastResult.forecast)) : 'Unavailable'}. This is not an approved or verified handover forecast.</div>
+              <div className="mt-4 rounded-lg bg-[#f5f8fa] p-3 text-xs text-[#536170]">Calculated delay: {deliveryOutlooks.find(item => item.id === pkg.id)?.delayDays ?? 'Unavailable'} calendar days, based on planned versus actual activity progress in Project Controls. This is an indicative forecast, not an approved revised programme.</div>
               <button type="button" onClick={() => setRecoveryView('analysis')} className="mt-4 rounded-lg border border-[#dfe3e7] px-4 py-2 text-sm font-semibold text-[#123a60]">Open forecast analysis →</button>
             </div>
           })()}
