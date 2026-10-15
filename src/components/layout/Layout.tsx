@@ -223,6 +223,12 @@ export default function Layout() {
   const datedPackages = deliveryPackages
     .filter(pkg => pkg.status !== 'Completed' && pkg.planned_finish && !Number.isNaN(Date.parse(pkg.planned_finish)))
     .sort((a, b) => Date.parse(a.planned_finish!) - Date.parse(b.planned_finish!))
+  // B13 retains its existing project-programme handover date until a package-specific date is recorded.
+  const b13Recorded = deliveryPackages.some(pkg => /^b\s*[- ]?13$/i.test(pkg.name.trim()))
+  const allDatedHandovers = [...datedPackages.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: parseISO(pkg.planned_finish!) })),
+    ...(!b13Recorded && handoverDate ? [{ id: 'existing-b13', name: 'B13', date: handoverDate }] : [])]
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+  const nextHandover = allDatedHandovers.find(pkg => pkg.date.getTime() >= Date.now() - 86400000) || allDatedHandovers[0] || null
   const nextPackage = datedPackages.find(pkg => Date.parse(pkg.planned_finish!) >= Date.now() - 86400000) || datedPackages[0] || null
   const nextPackageDate = nextPackage ? parseISO(nextPackage.planned_finish!) : null
 
@@ -474,7 +480,7 @@ export default function Layout() {
     setOrganizationName(activeWorkspace?.name || '')
   }
 
-  const displayedHandoverDate = nextPackageDate || handoverDate
+  const displayedHandoverDate = nextHandover?.date || nextPackageDate || handoverDate
   const daysLeft = displayedHandoverDate
     ? differenceInDays(displayedHandoverDate, new Date())
     : null
@@ -581,11 +587,11 @@ export default function Layout() {
                     : 'text-[#5f7481]'
                 }`}
               >
-                {nextPackage ? 'NEXT PACKAGE HANDOVER' : 'DAYS LEFT'}
+                {nextHandover ? 'NEXT PACKAGE HANDOVER' : 'DAYS LEFT'}
               </div>
 
               <div className="sidebar-muted text-[9px]">
-                {nextPackage && <span className="block font-semibold">{nextPackage.name}</span>}
+                {nextHandover && <span className="block font-semibold">{nextHandover.name}</span>}
                 {displayedHandoverDate
                   ? displayedHandoverDate.toLocaleDateString('en-GB', {
                       day: '2-digit',
@@ -597,17 +603,16 @@ export default function Layout() {
               </div>
             </div>
           </div>
-          {datedPackages.length > 1 && (
+          {allDatedHandovers.length > 1 && (
             <details className="mt-2 rounded-lg border border-[#d7e1e4] px-2 py-2 text-xs">
-              <summary className="cursor-pointer font-semibold">All package handovers ({datedPackages.length})</summary>
+              <summary className="cursor-pointer font-semibold">All package handovers ({allDatedHandovers.length})</summary>
               <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
-                {datedPackages.map(pkg => (
+                {allDatedHandovers.map(pkg => (
                   <div key={pkg.id} className="flex items-start justify-between gap-2">
                     <span className="min-w-0 break-words">{pkg.name}</span>
-                    <span className="shrink-0 font-semibold">{parseISO(pkg.planned_finish!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    <span className="shrink-0 font-semibold">{pkg.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                   </div>
                 ))}
-                {handoverDate && <div className="border-t pt-2">Programme target: {handoverDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>}
               </div>
             </details>
           )}
