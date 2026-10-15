@@ -402,6 +402,7 @@ export default function RecoveryForecastPage() {
   const [contextLoading, setContextLoading] = useState(false)
   const [savingScope, setSavingScope] = useState(false)
   const [notice, setNotice] = useState('')
+  const [scenarioRate, setScenarioRate] = useState(1)
 
   const sharedIntelligence = useProjectIntelligence({
     project: context.project || undefined,
@@ -927,7 +928,7 @@ export default function RecoveryForecastPage() {
 
   const packageForecasts = visiblePackageHandovers.map(pkg => ({
     ...pkg,
-    forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks),
+    forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks, new Date(), scenarioRate),
   }))
   const availablePackageForecasts = packageForecasts.filter(pkg => pkg.forecastResult.forecast)
   // Indicative dates are not validated master forecasts. Keep the latest
@@ -990,7 +991,17 @@ export default function RecoveryForecastPage() {
           <h2 className="text-lg font-semibold text-[#123a60]">Package completion outlook</h2>
           <span className="text-xs text-[#65717c]">{availablePackageForecasts.length} of {packageForecasts.length} preliminary estimates · 0 validated</span>
         </div>
-        <p className="mt-2 text-sm text-[#65717c]">Latest package target: <strong>{latestPackageTarget ? formatDate(latestPackageTarget) : 'Unavailable'}</strong>. Validated master completion forecast: <strong>Pending validation</strong>. Preliminary dates below are not approved recovery programmes and cannot establish that a package is on time.</p>
+        <p className="mt-2 text-sm text-[#65717c]">Latest package target: <strong>{latestPackageTarget ? formatDate(latestPackageTarget) : 'Unavailable'}</strong>. Validated master completion forecast: <strong>Pending validation</strong>. Preliminary dates below account for recorded finish-to-start predecessor links only. They are not approved recovery programmes and cannot establish that a package is on time. Missing or invalid links prevent an estimate.</p>
+        <div className="mt-4 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+          <label htmlFor="scenario-productivity" className="block text-sm font-semibold text-[#123a60]">What-if productivity scenario (all packages)</label>
+          <p className="mt-1 text-xs text-[#65717c]">Adjust assumed work rate to test sensitivity, not to certify an achievable completion date. 100% is the schedule-duration assumption; 50% means twice as long for remaining work, 200% means half as long. Crew capacity, actual output and dependencies must still be verified.</p>
+          <div className="mt-3 flex items-center gap-3">
+            <input id="scenario-productivity" type="range" min="50" max="200" step="10" value={Math.round(scenarioRate * 100)} onChange={event => setScenarioRate(Number(event.target.value) / 100)} className="w-full max-w-sm" />
+            <strong className="min-w-[52px] text-sm">{Math.round(scenarioRate * 100)}%</strong>
+            <button type="button" onClick={() => setScenarioRate(1)} className="rounded-lg border px-3 py-1 text-xs">Reset</button>
+          </div>
+          <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b text-[#65717c]"><th className="py-2">Package</th><th>Target</th><th>Preliminary estimate</th><th>Variance</th><th>Schedule evidence</th></tr></thead>
