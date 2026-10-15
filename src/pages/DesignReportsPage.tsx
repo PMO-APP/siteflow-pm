@@ -1,6 +1,6 @@
 import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Printer, Trash2 } from 'lucide-react'
+import { Plus, Printer, Trash2, PenTool } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
