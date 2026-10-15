@@ -220,49 +220,65 @@ function buildDependencyIntelligence(state: ProjectState): DeliveryDependencyInt
     })
   })
 
-  const nodes = activities.map(activity => ({
-    id: activity.id,
-    name: activity.name,
-    packageId: activity.deliveryPackageId,
-    packageName: activity.deliveryPackageName || (activity.deliveryPackageId ? packageById.get(activity.deliveryPackageId) || null : null),
-    progress: activity.progress,
-    isCritical: activity.isCritical,
-    isMilestone: Boolean((activity as ScheduleActivity & { isMilestone?: boolean }).isMilestone),
-    plannedFinish: activity.plannedFinish,
-    health: dependencyHealth(activity, now),
-    predecessorIds: activity.predecessorIds.filter(id => byId.has(id)),
-    successorIds: successors.get(activity.id) || [],
-  }))
+  // Build link health once, then derive node health from those same links.
+  // This prevents the summary from reporting at-risk dependencies while the
+  // affected successor activities are still labelled healthy.
+  const edges = activities.flatMap(activity => activity.predecessorIds
+    .filter(predecessorId => byId.has(predecessorId))
+    .map(predecessorId => {
+      const predecessor = byId.get(predecessorId)!
+      const predecessorHealth = dependencyHealth(predecessor, now)
+      const health: DependencyHealth = predecessor.progress < 100 && activity.progress > 0
+        ? 'blocked'
+        : predecessorHealth === 'blocked'
+        ? 'blocked'
+        : predecessorHealth === 'at_risk' || (predecessor.isCritical && predecessor.progress < 100)
+        ? 'at_risk'
+        : 'healthy'
+      return {
+        id: `${predecessorId}-${activity.id}`,
+        from: predecessorId,
+        to: activity.id,
+        health,
+        reason: health === 'blocked'
+          ? `${predecessor.name} is preventing ${activity.name} from progressing.`
+          : health === 'at_risk'
+          ? `${predecessor.name} may delay ${activity.name}.`
+          : `${predecessor.name} is supporting ${activity.name} as planned.`,
+      }
+    }))
 
-  const edges = nodes.flatMap(node => node.predecessorIds.map(predecessorId => {
-    const predecessor = byId.get(predecessorId)!
-    const predecessorHealth = dependencyHealth(predecessor, now)
-    const health: DependencyHealth = predecessor.progress < 100 && node.progress > 0
+  const incoming = new Map<string, DependencyHealth[]>()
+  edges.forEach(edge => incoming.set(edge.to, [...(incoming.get(edge.to) || []), edge.health]))
+  const nodes = activities.map(activity => {
+    const ownHealth = dependencyHealth(activity, now)
+    const upstreamHealth = incoming.get(activity.id) || []
+    const health: DependencyHealth = ownHealth === 'blocked' || upstreamHealth.includes('blocked')
       ? 'blocked'
-      : predecessorHealth === 'blocked'
-      ? 'blocked'
-      : predecessorHealth === 'at_risk' || (predecessor.isCritical && predecessor.progress < 100)
+      : ownHealth === 'at_risk' || upstreamHealth.includes('at_risk')
       ? 'at_risk'
       : 'healthy'
     return {
-      id: `${predecessorId}-${node.id}`,
-      from: predecessorId,
-      to: node.id,
+      id: activity.id,
+      name: activity.name,
+      packageId: activity.deliveryPackageId,
+      packageName: activity.deliveryPackageName || (activity.deliveryPackageId ? packageById.get(activity.deliveryPackageId) || null : null),
+      progress: activity.progress,
+      isCritical: activity.isCritical,
+      isMilestone: Boolean((activity as ScheduleActivity & { isMilestone?: boolean }).isMilestone),
+      plannedFinish: activity.plannedFinish,
       health,
-      reason: health === 'blocked'
-        ? `${predecessor.name} is preventing ${node.name} from progressing.`
-        : health === 'at_risk'
-        ? `${predecessor.name} may delay ${node.name}.`
-        : `${predecessor.name} is supporting ${node.name} as planned.`,
+      predecessorIds: activity.predecessorIds.filter(id => byId.has(id)),
+      successorIds: successors.get(activity.id) || [],
     }
-  }))
+  })
 
   const downstream = (startId: string) => {
     const visited = new Set<string>()
     const stack = [...(successors.get(startId) || [])]
     while (stack.length) {
       const id = stack.pop()!
-      if (visited.has(id)) continue
+      if (id === startId || visited.has(id)) continue
       visited.add(id)
       stack.push(...(successors.get(id) || []))
     }
