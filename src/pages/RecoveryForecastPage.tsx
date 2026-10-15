@@ -417,6 +417,9 @@ export default function RecoveryForecastPage() {
   const [savingScope, setSavingScope] = useState(false)
   const [notice, setNotice] = useState('')
   const [scenarioRate, setScenarioRate] = useState(1)
+  const [recoveryView, setRecoveryView] = useState<'overview' | 'packages' | 'analysis'>('overview')
+  const [packageSearch, setPackageSearch] = useState('')
+  const [selectedPackageId, setSelectedPackageId] = useState('')
 
   const sharedIntelligence = useProjectIntelligence({
     project: context.project || undefined,
@@ -981,24 +984,56 @@ export default function RecoveryForecastPage() {
         )}
       </div>
 
-      <section className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm" aria-label="Delivery package summary">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[#123a60]">Delivery overview</h2>
-            <p className="mt-1 text-xs text-[#65717c]">{visiblePackageHandovers.length} packages · Latest planned handover: <strong>{formatDate(latestPackageTarget)}</strong> · Verified completion forecast: <strong>Pending validation</strong></p>
-          </div>
-          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Forecast not yet validated</span>
-        </div>
-        <details className="mt-3 rounded-lg border border-[#dfe3e7] bg-[#f8fafb] p-3">
-          <summary className="cursor-pointer text-sm font-semibold">View all package handover targets ({visiblePackageHandovers.length})</summary>
-          {packagesLoading ? <p className="mt-2 text-xs">Loading package dates…</p>
-          : packagesError ? <p className="mt-2 text-xs text-amber-700">Package dates unavailable.</p>
-          : <div className="mt-3 max-h-64 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b"><th className="py-2">Package</th><th>Target date</th><th>Source</th></tr></thead><tbody>
-            {visiblePackageHandovers.map(pkg => <tr key={pkg.id} className="border-b border-[#e7eaed]"><td className="py-2 font-semibold">{pkg.name}</td><td>{formatDate(pkg.date)}</td><td>{pkg.source}</td></tr>)}
-          </tbody></table></div>}
-        </details>
-      </section>
+      <nav aria-label="Recovery forecast views" className="flex flex-wrap gap-2 rounded-2xl border border-[#dfe3e7] bg-white p-2 shadow-sm">
+        {([['overview', 'Delivery overview'], ['packages', 'Package details'], ['analysis', 'Forecast analysis']] as const).map(([value, label]) => (
+          <button key={value} type="button" aria-current={recoveryView === value ? 'page' : undefined}
+            onClick={() => setRecoveryView(value)}
+            className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${recoveryView === value ? 'bg-[#123a60] text-white' : 'text-[#536170] hover:bg-[#f1f5f7]'}`}>{label}</button>
+        ))}
+      </nav>
 
+      {recoveryView === 'overview' && <div className="space-y-4">
+        <section aria-label="Delivery at a glance" className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Delivery packages</p><p className="mt-2 text-3xl font-bold text-[#123a60]">{visiblePackageHandovers.length}</p><p className="mt-1 text-xs text-[#65717c]">Tracked independently</p></div>
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Latest management target</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(latestPackageTarget)}</p><p className="mt-1 text-xs text-[#65717c]">Not a calculated finish</p></div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><p className="text-xs font-medium text-amber-900">Forecast readiness</p><p className="mt-2 text-xl font-bold text-amber-900">Awaiting verification</p><p className="mt-1 text-xs text-amber-800">Do not treat preliminary estimates as commitments</p></div>
+        </section>
+        <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold text-[#123a60]">Delivery groups</h2><p className="mt-1 text-xs text-[#65717c]">Groupings based on package target dates; not verified forecasts.</p></div><button type="button" onClick={() => setRecoveryView('packages')} className="rounded-lg border border-[#dfe3e7] px-3 py-2 text-xs font-semibold text-[#123a60]">View all packages →</button></div>
+          <div className="mt-4 divide-y divide-[#e8ecef]">
+            {Array.from(new Map(visiblePackageHandovers.map(pkg => [pkg.date.toISOString().slice(0,10), pkg.date])).entries()).sort(([a],[b]) => a.localeCompare(b)).map(([key, date]) => {
+              const group = visiblePackageHandovers.filter(pkg => pkg.date.toISOString().slice(0,10) === key)
+              return <div key={key} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold text-[#18212b]">{formatDate(date)}</p><p className="mt-1 text-xs text-[#65717c]">{group.map(p => p.name).join(', ')}</p></div><span className="rounded-full bg-[#eef3f6] px-3 py-1 text-xs font-semibold text-[#123a60]">{group.length} package{group.length === 1 ? '' : 's'}</span></div>
+            })}
+          </div>
+        </section>
+        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm"><div><h2 className="text-base font-semibold text-[#123a60]">What needs attention?</h2><p className="mt-1 max-w-2xl text-sm text-[#65717c]">Package dates are available, but independent completion forecasts still need verified production, remaining-work and resource evidence.</p></div><button type="button" onClick={() => setRecoveryView('analysis')} className="rounded-lg bg-[#123a60] px-4 py-2.5 text-sm font-semibold text-white">Review forecast evidence →</button></section>
+      </div>}
+
+      {recoveryView === 'packages' && <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-[#123a60]">Package delivery details</h2><p className="mt-1 text-xs text-[#65717c]">Choose a package to review its programme, target and activity evidence.</p></div><input aria-label="Search packages" value={packageSearch} onChange={e => setPackageSearch(e.target.value)} placeholder="Search package…" className="w-full rounded-lg border border-[#dfe3e7] px-3 py-2 text-sm sm:w-56" /></div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(230px,0.85fr)_minmax(0,1.5fr)]">
+          <div className="max-h-[420px] space-y-1 overflow-auto rounded-xl border border-[#e8ecef] p-2" role="list" aria-label="Delivery packages">
+            {visiblePackageHandovers.filter(pkg => pkg.name.toLowerCase().includes(packageSearch.trim().toLowerCase())).map(pkg => <button key={pkg.id} type="button" onClick={() => setSelectedPackageId(pkg.id)} className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left text-sm ${((selectedPackageId || visiblePackageHandovers[0]?.id) === pkg.id) ? 'bg-[#e8f4f5] text-[#075c67]' : 'hover:bg-[#f4f7f9]'}`}><strong>{pkg.name}</strong><span className="text-xs">{formatDate(pkg.date)}</span></button>)}
+          </div>
+          {(() => {
+            const pkg = packageForecasts.find(p => p.id === (selectedPackageId || visiblePackageHandovers[0]?.id))
+            if (!pkg) return <p className="text-sm text-[#65717c]">No dated package selected.</p>
+            const linked = projectTasks.filter(t => String(t.delivery_package_id || '') === pkg.id)
+            const comparison = packageProgrammeComparison.find(p => String(p.id) === pkg.id)
+            const evidence = auditPackageEvidence(pkg.id, projectTasks)
+            return <div className="rounded-xl border border-[#e8ecef] p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs uppercase tracking-widest text-[#65717c]">Selected package</p><h3 className="mt-1 text-xl font-bold text-[#123a60]">{pkg.name}</h3></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Forecast unverified</span></div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Management target</p><p className="mt-1 font-semibold">{formatDate(pkg.date)}</p></div><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Linked programme finish</p><p className="mt-1 font-semibold">{formatDate(comparison?.programme || null)}</p></div></div>
+              <p className="mt-4 text-sm font-semibold text-[#123a60]">Activity evidence</p><div className="mt-2 grid grid-cols-3 gap-2 text-center"><div className="rounded-lg border p-3"><strong className="block text-lg">{linked.length}</strong><span className="text-xs text-[#65717c]">Activities</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualStarts}</strong><span className="text-xs text-[#65717c]">Actual starts</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualFinishes}</strong><span className="text-xs text-[#65717c]">Actual finishes</span></div></div>
+              <div className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Preliminary schedule estimate: {pkg.forecastResult.forecast ? formatDate(new Date(pkg.forecastResult.forecast)) : 'Unavailable'}. This is not an approved or verified handover forecast.</div>
+              <button type="button" onClick={() => setRecoveryView('analysis')} className="mt-4 rounded-lg border border-[#dfe3e7] px-4 py-2 text-sm font-semibold text-[#123a60]">Open forecast analysis →</button>
+            </div>
+          })()}
+        </div>
+      </section>}
+
+      {recoveryView === 'analysis' && <div className="space-y-4">
+        <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><h2 className="text-lg font-semibold text-[#123a60]">Forecast analysis & evidence</h2><p className="mt-1 text-sm text-[#65717c]">Technical calculations, verification workflows and legacy diagnostics are available here. They do not automatically change approved programmes or handover dates.</p></div>
       <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package completion forecast">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#123a60]">Package completion outlook</h2>
@@ -1060,6 +1095,7 @@ export default function RecoveryForecastPage() {
         </div>
         </details>
       </section>
+
 
       <details className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm">
         <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Legacy project-wide analysis and detailed recovery diagnostics</summary>
@@ -1436,6 +1472,7 @@ export default function RecoveryForecastPage() {
         </div>
       </details>
       </details>
+      </div>}
     </div>
   )
 }
