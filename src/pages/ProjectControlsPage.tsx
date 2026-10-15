@@ -162,6 +162,19 @@ export default function ProjectControlsPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [edits, setEdits] = useState<Record<string, any>>({})
   const loadRequestRef = useRef(0)
+  const editsRef = useRef<Record<string, any>>({})
+  const taskRef = useRef<any[]>([])
+  const autosaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const savingTasks = useRef<Set<string>>(new Set())
+  const pendingSave = useRef<Set<string>>(new Set())
+  const editVersions = useRef<Record<string, number>>({})
+  const [autosaveState, setAutosaveState] = useState<Record<string, 'pending' | 'saved' | 'error'>>({})
+
+  useEffect(() => { taskRef.current = allTasks }, [allTasks])
+  useEffect(() => {
+    return () => Object.values(autosaveTimers.current).forEach(clearTimeout)
+  }, [])
+
 
   useEffect(() => {
     const requestId = ++loadRequestRef.current
@@ -316,13 +329,21 @@ export default function ProjectControlsPage() {
   function updateEdit(taskId: string, key: string, value: any) {
     if (!canEdit) return
 
-    setEdits(current => ({
-      ...current,
-      [taskId]: {
-        ...(current[taskId] || {}),
-        [key]: value,
-      },
-    }))
+    const next = {
+      ...editsRef.current,
+      [taskId]: { ...(editsRef.current[taskId] || {}), [key]: value },
+    }
+    editsRef.current = next
+    editVersions.current[taskId] = (editVersions.current[taskId] || 0) + 1
+    setEdits(next)
+    if (key === 'progress_pct') {
+      setAutosaveState(current => ({ ...current, [taskId]: 'pending' }))
+      clearTimeout(autosaveTimers.current[taskId])
+      autosaveTimers.current[taskId] = setTimeout(() => {
+        const latest = taskRef.current.find(t => String(t.id) === String(taskId))
+        if (latest) void saveTaskProgress(latest)
+      }, 850)
+    }
   }
 
   async function saveTaskProgress(task: any) {
@@ -333,13 +354,22 @@ export default function ProjectControlsPage() {
       return
     }
 
-    const taskId = task.id
-    const edit = edits[taskId] || {}
+    const taskId = String(task.id)
+    clearTimeout(autosaveTimers.current[taskId])
+    if (savingTasks.current.has(taskId)) {
+      pendingSave.current.add(taskId)
+      return
+    }
+    savingTasks.current.add(taskId)
+    const versionAtSave = editVersions.current[taskId] || 0
+    const edit = editsRef.current[taskId] || {}
     const previousProgress = getProgress(task)
     const newProgress = Number(edit.progress_pct ?? previousProgress)
 
-    if (newProgress < 0 || newProgress > 100) {
+    if (!Number.isFinite(newProgress) || newProgress < 0 || newProgress > 100) {
       setNotice('Progress must be between 0 and 100.')
+      setAutosaveState(current => ({ ...current, [taskId]: 'error' }))
+      savingTasks.current.delete(taskId)
       return
     }
 
@@ -380,19 +410,34 @@ export default function ProjectControlsPage() {
     if (error) {
       setNotice(error.message)
       setSavingId(null)
+      setAutosaveState(current => ({ ...current, [taskId]: 'error' }))
+      savingTasks.current.delete(taskId)
       return
     }
 
     // task_progress_logs is written automatically by the database trigger whenever progress_pct changes.
 
-    setEdits(current => {
-      const copy = { ...current }
+    // Preserve edits made while this request was in flight.
+    if ((editVersions.current[taskId] || 0) === versionAtSave) {
+      const copy = { ...editsRef.current }
       delete copy[taskId]
-      return copy
-    })
-
+      editsRef.current = copy
+      setEdits(copy)
+      setAutosaveState(current => ({ ...current, [taskId]: 'saved' }))
+    } else {
+      setAutosaveState(current => ({ ...current, [taskId]: 'pending' }))
+      pendingSave.current.add(taskId)
+    }
+    // Optimistically update the cached task so a second save compares against
+    // the last persisted progress, rather than a stale pre-save value.
+    taskRef.current = taskRef.current.map(t => String(t.id) === taskId ? { ...t, ...payload } : t)
+    setAllTasks(current => current.map(t => String(t.id) === taskId ? { ...t, ...payload } : t))
     setSavingId(null)
-    await loadData()
+    savingTasks.current.delete(taskId)
+    if (pendingSave.current.delete(taskId)) {
+      const latest = taskRef.current.find(t => String(t.id) === taskId)
+      if (latest) void saveTaskProgress(latest)
+    }
   }
 
   const metrics = useMemo(() => {
@@ -486,6 +531,7 @@ export default function ProjectControlsPage() {
               updateEdit={updateEdit}
               saveTaskProgress={saveTaskProgress}
               savingId={savingId}
+              autosaveState={autosaveState}
               canEdit={canEdit}
             />
           )}
@@ -531,6 +577,7 @@ function ExecutionTab({
   updateEdit,
   saveTaskProgress,
   savingId,
+  autosaveState,
   canEdit,
 }: any) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
@@ -649,6 +696,9 @@ function ExecutionTab({
                           />
                           <span className="text-xs text-[#82909c]">%</span>
                         </div>
+                        {canEdit && <span className="mt-1 block text-[10px] text-slate-500" aria-live="polite">
+                          {savingId === String(taskId) ? 'Saving…' : autosaveState?.[String(taskId)] === 'pending' ? 'Autosave pending' : autosaveState?.[String(taskId)] === 'saved' ? 'Saved' : autosaveState?.[String(taskId)] === 'error' ? 'Save failed; retry' : 'Autosaves on change'}
+                        </span>}
                       </td>
 
                       <td className="align-top">
