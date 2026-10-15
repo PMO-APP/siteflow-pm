@@ -956,6 +956,25 @@ export default function RecoveryForecastPage() {
         )}
       </div>
 
+      <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package handover dates">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[#123a60]">Delivery package handovers</h2>
+          <span className="text-xs text-[#65717c]">{packageTargets.length} dated packages · planned targets, not independent forecasts</span>
+        </div>
+        {packagesLoading ? <p className="mt-3 text-sm">Loading package dates…</p>
+          : packagesError ? <p className="mt-3 text-sm text-amber-700">Package dates unavailable.</p>
+          : packageTargets.length === 0 ? <p className="mt-3 text-sm text-[#65717c]">No package-specific handover dates recorded.</p>
+          : <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {packageTargets.map(pkg => (
+                <div key={pkg.id} className="rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
+                  <div className="text-sm font-semibold text-[#123a60]">{pkg.name}</div>
+                  <div className="mt-1 text-base font-bold">{formatDate(safeDate(pkg.planned_finish || null))}</div>
+                  <div className="mt-1 text-xs text-[#65717c]">{pkg.status} · package planned finish</div>
+                </div>
+              ))}
+            </div>}
+      </section>
+
       <div className="grid xl:grid-cols-[1.6fr_1fr] gap-5">
         <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
           <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
@@ -1158,6 +1177,12 @@ export default function RecoveryForecastPage() {
         <SmallCard title="Overdue Approvals" value={engine.overdueApprovals.length} />
       </div>
 
+      <details className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm">
+        <summary className="cursor-pointer text-base font-semibold text-[#123a60]">
+          Schedule diagnostics · {engine.blockers.length} blockers · {engine.dueButIncomplete.length} overdue activities
+        </summary>
+        <p className="mt-2 text-xs text-[#65717c]">Detailed workfront lists are available for investigation, not required for the executive overview.</p>
+        <div className="mt-4 space-y-5">
       <div className="grid xl:grid-cols-3 gap-5">
         <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 xl:col-span-2 shadow-sm">
           <SectionHeader
@@ -1275,8 +1300,8 @@ export default function RecoveryForecastPage() {
                           Recovery Needed
                         </span>
                       ) : (
-                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-                          Stable
+                        <span className={`rounded-full px-2 py-1 text-xs ${phase.progress === 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
+                          {phase.progress === 0 ? 'Not started / verify dates' : 'No blockers recorded'}
                         </span>
                       )}
                     </td>
@@ -1310,6 +1335,8 @@ export default function RecoveryForecastPage() {
           />
         </div>
       )}
+        </div>
+      </details>
     </div>
   )
 }
