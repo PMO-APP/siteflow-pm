@@ -981,23 +981,22 @@ export default function RecoveryForecastPage() {
         )}
       </div>
 
-      <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package handover dates">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-[#123a60]">Delivery package handovers</h2>
-          <span className="text-xs text-[#65717c]">{visiblePackageHandovers.length} dated packages · planned targets, not independent forecasts</span>
+      <section className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm" aria-label="Delivery package summary">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[#123a60]">Delivery overview</h2>
+            <p className="mt-1 text-xs text-[#65717c]">{visiblePackageHandovers.length} packages · Latest planned handover: <strong>{formatDate(latestPackageTarget)}</strong> · Verified completion forecast: <strong>Pending validation</strong></p>
+          </div>
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Forecast not yet validated</span>
         </div>
-        {packagesLoading ? <p className="mt-3 text-sm">Loading package dates…</p>
-          : packagesError ? <p className="mt-3 text-sm text-amber-700">Package dates unavailable.</p>
-          : visiblePackageHandovers.length === 0 ? <p className="mt-3 text-sm text-[#65717c]">No package-specific handover dates recorded.</p>
-          : <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {visiblePackageHandovers.map(pkg => (
-                <div key={pkg.id} className="rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
-                  <div className="text-sm font-semibold text-[#123a60]">{pkg.name}</div>
-                  <div className="mt-1 text-base font-bold">{formatDate(pkg.date)}</div>
-                  <div className="mt-1 text-xs text-[#65717c]">{pkg.status} · {pkg.source}</div>
-                </div>
-              ))}
-            </div>}
+        <details className="mt-3 rounded-lg border border-[#dfe3e7] bg-[#f8fafb] p-3">
+          <summary className="cursor-pointer text-sm font-semibold">View all package handover targets ({visiblePackageHandovers.length})</summary>
+          {packagesLoading ? <p className="mt-2 text-xs">Loading package dates…</p>
+          : packagesError ? <p className="mt-2 text-xs text-amber-700">Package dates unavailable.</p>
+          : <div className="mt-3 max-h-64 overflow-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b"><th className="py-2">Package</th><th>Target date</th><th>Source</th></tr></thead><tbody>
+            {visiblePackageHandovers.map(pkg => <tr key={pkg.id} className="border-b border-[#e7eaed]"><td className="py-2 font-semibold">{pkg.name}</td><td>{formatDate(pkg.date)}</td><td>{pkg.source}</td></tr>)}
+          </tbody></table></div>}
+        </details>
       </section>
 
       <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package completion forecast">
@@ -1006,7 +1005,9 @@ export default function RecoveryForecastPage() {
           <span className="text-xs text-[#65717c]">{availablePackageForecasts.length} of {packageForecasts.length} preliminary estimates · 0 validated</span>
         </div>
         <p className="mt-2 text-sm text-[#65717c]">Latest package target: <strong>{latestPackageTarget ? formatDate(latestPackageTarget) : 'Unavailable'}</strong>. Validated master completion forecast: <strong>Pending validation</strong>. Preliminary dates below account for recorded finish-to-start predecessor links only. They are not approved recovery programmes and cannot establish that a package is on time. Missing or invalid links prevent an estimate.</p>
-        <div className="mt-4 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-4">
+        <details className="mt-3 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Productivity what-if and site evidence tools</summary>
+          <div className="mt-3">
           <label htmlFor="scenario-productivity" className="block text-sm font-semibold text-[#123a60]">What-if productivity scenario (all packages)</label>
           <p className="mt-1 text-xs text-[#65717c]">Adjust assumed work rate to test sensitivity, not to certify an achievable completion date. 100% is the schedule-duration assumption; 50% means twice as long for remaining work, 200% means half as long. Crew capacity, actual output and dependencies must still be verified.</p>
           <div className="mt-3 flex items-center gap-3">
@@ -1016,10 +1017,14 @@ export default function RecoveryForecastPage() {
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
         </div>
+          </div>
         <div className="mt-4"><ProductionEvidenceReview projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4"><PackageProductionEvidence projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-3"><MeasuredProductionForecast projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        </details>
+        <details className="mt-3 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Site evidence audit (all packages)</summary>
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
           <h3 className="text-sm font-semibold text-amber-900">Site evidence readiness</h3>
           <p className="mt-1 text-xs text-amber-800">Activity timestamps are evidence of updates, not measured production rates. No crew capacity or quantity-based productivity has been verified; therefore none of these dates is a validated forecast.</p>
           <div className="mt-3 overflow-x-auto">
@@ -1038,7 +1043,10 @@ export default function RecoveryForecastPage() {
             </table>
           </div>
         </div>
-        <div className="mt-4 overflow-x-auto">
+        </details>
+        <details className="mt-3 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Detailed preliminary package calculations ({packageForecasts.length})</summary>
+        <div className="mt-3 max-h-80 overflow-auto">
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b text-[#65717c]"><th className="py-2">Package</th><th>Target</th><th>Preliminary estimate</th><th>Variance</th><th>Schedule evidence</th></tr></thead>
             <tbody>{packageForecasts.map(pkg => <tr key={pkg.id} className="border-b border-[#eef1f3]">
@@ -1050,9 +1058,12 @@ export default function RecoveryForecastPage() {
             </tr>)}</tbody>
           </table>
         </div>
+        </details>
       </section>
 
-      <div className="grid xl:grid-cols-[1.6fr_1fr] gap-5">
+      <details className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Legacy project-wide analysis and detailed recovery diagnostics</summary>
+      <div className="mt-4 grid xl:grid-cols-[1.6fr_1fr] gap-5">
         <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
           <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
             <div>
@@ -1423,6 +1434,7 @@ export default function RecoveryForecastPage() {
         </div>
       )}
         </div>
+      </details>
       </details>
     </div>
   )
