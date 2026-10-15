@@ -257,7 +257,10 @@ export default function CostingPage() {
   const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
   const canSubmitReport = canEdit && reportLock.isAllowed
 
-  const [activeTab, setActiveTab] = useState('report')
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section')
+    return requested && ["report", "overview", "weekly", "contracts", "payments", "variations", "procurement", "financial-register", "history"].includes(requested) ? requested : 'report'
+  })
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
@@ -1287,7 +1290,7 @@ export default function CostingPage() {
         {TABS.map(([value, label]) => (
           <button
             key={value}
-            onClick={() => setActiveTab(value)}
+            onClick={() => { setActiveTab(value); window.history.replaceState(null, '', `${window.location.pathname}?section=${value}`) }}
             className={`btn btn-sm ${
               activeTab === value ? 'btn-gold' : 'btn-ghost'
             }`}
