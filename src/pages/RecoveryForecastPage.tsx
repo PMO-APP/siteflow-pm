@@ -18,7 +18,7 @@ import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
-import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
+import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
 
 type ProjectScope =
   | 'Carcass'
@@ -380,10 +380,7 @@ export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
   const { data: activeRevision } = useActiveScheduleRevision(projectId)
   const activeRevisionTarget = getRevisionTargetDate(activeRevision)
-  const { data: deliveryPackages = [], isLoading: packagesLoading, isError: packagesError } = useDeliveryPackages()
-  const packageTargets = useMemo(() => deliveryPackages
-    .filter(pkg => pkg.planned_finish && /^\d{4}-\d{2}-\d{2}/.test(pkg.planned_finish))
-    .sort((a, b) => (a.planned_finish || '').localeCompare(b.planned_finish || '')), [deliveryPackages])
+  const { data: packageTargets = [], isLoading: packagesLoading, isError: packagesError } = usePackageHandoverDates()
   // Package dates are management targets, not independent completion forecasts.
   // Keep this outlook distinct from the schedule-driven engine.forecastDate.
   const latestPackageTarget = useMemo(() => {
@@ -397,9 +394,6 @@ export default function RecoveryForecastPage() {
       return finish !== null && finish.getTime() > approved.getTime()
     }) : []
   }, [packageTargets, activeRevisionTarget])
-  // B13 is an existing delivery package, not a separate programme-target row.
-  // Use the project handover date only when no dated B13 package is available.
-  const b13PackageRecorded = deliveryPackages.some(pkg => /^b\s*[- ]?13$/i.test(pkg.name.trim()))
   const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
@@ -926,15 +920,9 @@ export default function RecoveryForecastPage() {
     )
   }
 
-  const b13FallbackDate = !b13PackageRecorded ? safeDate(
-    context.project?.handover_date || context.project?.planned_finish ||
-    context.project?.finish_date || context.project?.target_date || context.project?.completion_date || null
-  ) : null
-  const visiblePackageHandovers = [
-    ...packageTargets.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: safeDate(pkg.planned_finish), status: pkg.status })),
-    ...(b13FallbackDate ? [{ id: 'existing-b13', name: 'B13', date: b13FallbackDate, status: 'Existing programme' }] : []),
-  ].filter((pkg): pkg is typeof pkg & { date: Date } => pkg.date !== null)
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
+  const visiblePackageHandovers = packageTargets.map(pkg => ({
+    id: String(pkg.id), name: pkg.name, date: safeDate(pkg.planned_finish), status: pkg.status, source: pkg.source,
+  })).filter((pkg): pkg is typeof pkg & { date: Date } => pkg.date !== null)
 
   return (
     <div className="-m-4 min-h-screen space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
@@ -982,7 +970,7 @@ export default function RecoveryForecastPage() {
                 <div key={pkg.id} className="rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3">
                   <div className="text-sm font-semibold text-[#123a60]">{pkg.name}</div>
                   <div className="mt-1 text-base font-bold">{formatDate(pkg.date)}</div>
-                  <div className="mt-1 text-xs text-[#65717c]">{pkg.status} · package planned finish</div>
+                  <div className="mt-1 text-xs text-[#65717c]">{pkg.status} · {pkg.source}</div>
                 </div>
               ))}
             </div>}
