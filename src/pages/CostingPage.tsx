@@ -53,6 +53,7 @@ const PAYMENT_CATEGORIES = [
 ]
 
 const PAYMENT_STATUSES = ['Pending', 'Approved', 'Paid', 'Rejected', 'On Hold']
+const PAYMENT_STAGES = ['Valuation Received', 'Under Costing Review', 'Awaiting Management Approval', 'Forwarded to Fincon', 'With Fincon', 'Payment Processing', 'Awaiting Fincon Confirmation', 'Partially Paid', 'Paid', 'Returned for Correction', 'On Hold']
 
 const VARIATION_TYPES = [
   'Client Change',
@@ -264,6 +265,8 @@ export default function CostingPage() {
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
+  const [paymentStages, setPaymentStages] = useState<Record<string, any>>({})
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([])
   const [variations, setVariations] = useState<any[]>([])
   const [procurements, setProcurements] = useState<any[]>([])
   const [financialItems, setFinancialItems] = useState<any[]>([])
@@ -423,6 +426,19 @@ export default function CostingPage() {
     }
 
     setPayments(data || [])
+    const ids = (data || []).map((p: any) => p.id)
+    if (ids.length) {
+      const [stagesResult, historyResult] = await Promise.all([
+        supabase.from('cost_payment_tracking').select('*').in('payment_id', ids),
+        supabase.from('cost_payment_tracking_history').select('*').in('payment_id', ids).order('created_at', { ascending: false }),
+      ])
+      if (stagesResult.error) setNotice(`Payment tracking: ${stagesResult.error.message}. Run the Phase 3 SQL migration.`)
+      setPaymentStages(Object.fromEntries((stagesResult.data || []).map((p: any) => [p.payment_id, p])))
+      setPaymentHistory(historyResult.data || [])
+    } else {
+      setPaymentStages({})
+      setPaymentHistory([])
+    }
     setPaymentsLoading(false)
   }
 
@@ -600,6 +616,22 @@ export default function CostingPage() {
     })
 
     await loadContracts()
+  }
+
+  async function updatePaymentStage(payment: any, stage: string, note: string) {
+    if (!canEdit || !user?.id) return
+    if (!note.trim()) { setNotice('Provide the source or explanation for this payment-stage update.'); return }
+    if (stage === 'Paid' && payment.payment_status !== 'Paid') {
+      setNotice('Confirm the payment in the existing payment record first. Stage updates alone cannot mark an unpaid record as Paid.')
+      return
+    }
+    const existing = paymentStages[payment.id]
+    const payload = { payment_id: payment.id, project_id: projectId, stage, note: note.trim(), updated_by: user.id, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('cost_payment_tracking').upsert(payload, { onConflict: 'payment_id' })
+    if (error) { setNotice(error.message); return }
+    const { error: historyError } = await supabase.from('cost_payment_tracking_history').insert({ payment_id: payment.id, project_id: projectId, previous_stage: existing?.stage || null, stage, note: note.trim(), updated_by: user.id })
+    if (historyError) setNotice(`Stage saved, but history could not be recorded: ${historyError.message}`)
+    await loadPayments()
   }
 
   async function addPayment() {
@@ -1424,6 +1456,9 @@ export default function CostingPage() {
 
           <PaymentsTab
             payments={payments}
+            stages={paymentStages}
+            history={paymentHistory}
+            onUpdateStage={updatePaymentStage}
             loading={paymentsLoading}
             form={paymentForm}
             setForm={setPaymentForm}
@@ -2518,8 +2553,38 @@ function ContractsTab({
   )
 }
 
+function PaymentStageRow({ payment, tracking, history, canEdit, onUpdate }: any) {
+  const [stage, setStage] = useState(tracking?.stage || 'Valuation Received')
+  const [note, setNote] = useState('')
+  useEffect(() => { setStage(tracking?.stage || 'Valuation Received') }, [tracking?.stage])
+  const ageDays = tracking?.updated_at ? Math.floor((Date.now() - new Date(tracking.updated_at).getTime()) / 86400000) : null
+  return (
+    <details className="rounded-xl border border-slate-200 p-3">
+      <summary className="cursor-pointer flex flex-wrap justify-between gap-2 text-sm">
+        <span className="font-semibold">{payment.vendor_name || payment.payment_title} · {formatCurrency(payment.amount)}</span>
+        <span>{tracking?.stage || 'Not yet tracked'}{ageDays !== null && ageDays >= 5 ? ` · ${ageDays} days since update` : ''}</span>
+      </summary>
+      <div className="mt-3 space-y-2">
+        <p className="text-xs text-slate-500">Last confirmed: {tracking?.updated_at ? new Date(tracking.updated_at).toLocaleString('en-GB') : 'Not recorded'}</p>
+        {tracking?.note && <p className="text-sm">Latest update: {tracking.note}</p>}
+        {canEdit && <div className="grid gap-2 md:grid-cols-2">
+          <label className="text-xs">Current payment stage<select className="form-control mt-1" value={stage} onChange={e => setStage(e.target.value)}>{PAYMENT_STAGES.map(x => <option key={x}>{x}</option>)}</select></label>
+          <label className="text-xs">Update source / Fincon feedback<input className="form-control mt-1" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Fincon email dated 15/10/2026" /></label>
+          <button className="btn btn-gold md:col-span-2" onClick={() => { onUpdate(payment, stage, note); setNote('') }}>Save stage update</button>
+        </div>}
+        <details><summary className="text-sm cursor-pointer">Status history ({history.length})</summary>
+          <div className="mt-2 space-y-2">{history.map((h: any) => <div key={h.id} className="text-xs border-b pb-2"><strong>{h.stage}</strong> · {new Date(h.created_at).toLocaleString('en-GB')}<p>{h.note}</p></div>)}</div>
+        </details>
+      </div>
+    </details>
+  )
+}
+
 function PaymentsTab({
   payments,
+  stages,
+  history,
+  onUpdateStage,
   loading,
   form,
   setForm,
@@ -2529,6 +2594,14 @@ function PaymentsTab({
 }: any) {
   return (
     <div className="space-y-5">
+      <div className="card p-5 space-y-3">
+        <h2 className="font-bold text-[#102943]">Payment Stage Tracker</h2>
+        <p className="text-sm text-[#65717c]">Costing maintains the latest confirmed status received from Management or Fincon. Stage changes require a source note and are recorded in history. Fincon remains responsible for payment execution.</p>
+        {payments.map((payment: any) => (
+          <PaymentStageRow key={payment.id} payment={payment} tracking={stages[payment.id]} history={history.filter((h: any) => h.payment_id === payment.id)} canEdit={canEdit} onUpdate={onUpdateStage} />
+        ))}
+        {!payments.length && <p className="text-sm text-[#65717c]">Add a payment request below to start tracking its stages.</p>}
+      </div>
       <div className="card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Plus size={17} className="text-[#df5f41]" />
