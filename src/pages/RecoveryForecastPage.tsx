@@ -19,6 +19,7 @@ import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
+import { calculatePackageForecast } from '@/features/schedule/packageForecast'
 
 type ProjectScope =
   | 'Carcass'
@@ -924,6 +925,16 @@ export default function RecoveryForecastPage() {
     id: String(pkg.id), name: pkg.name, date: safeDate(pkg.planned_finish), status: pkg.status, source: pkg.source,
   })).filter((pkg): pkg is typeof pkg & { date: Date } => pkg.date !== null)
 
+  const packageForecasts = visiblePackageHandovers.map(pkg => ({
+    ...pkg,
+    forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks),
+  }))
+  const availablePackageForecasts = packageForecasts.filter(pkg => pkg.forecastResult.forecast)
+  const allPackagesForecastable = packageForecasts.length > 0 && availablePackageForecasts.length === packageForecasts.length
+  const masterForecast = allPackagesForecastable
+    ? new Date(Math.max(...availablePackageForecasts.map(pkg => Date.parse(pkg.forecastResult.forecast!))))
+    : null
+
   return (
     <div className="-m-4 min-h-screen space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
       <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
@@ -976,12 +987,32 @@ export default function RecoveryForecastPage() {
             </div>}
       </section>
 
+      <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package completion forecast">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[#123a60]">Package completion outlook</h2>
+          <span className="text-xs text-[#65717c]">{availablePackageForecasts.length} of {packageForecasts.length} indicative forecasts</span>
+        </div>
+        <p className="mt-2 text-sm text-[#65717c]">Master finish outlook: <strong>{masterForecast ? formatDate(masterForecast) : 'Not yet reliable'}</strong>. All required packages must have usable schedules before an overall date can be published. Dates below are preliminary duration-based estimates, not approved recovery programmes.</p>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="border-b text-[#65717c]"><th className="py-2">Package</th><th>Target</th><th>Indicative forecast</th><th>Variance</th><th>Schedule evidence</th></tr></thead>
+            <tbody>{packageForecasts.map(pkg => <tr key={pkg.id} className="border-b border-[#eef1f3]">
+              <td className="py-3 font-semibold">{pkg.name}</td>
+              <td>{formatDate(pkg.date)}</td>
+              <td>{pkg.forecastResult.forecast ? formatDate(new Date(pkg.forecastResult.forecast)) : 'Unavailable'}</td>
+              <td>{pkg.forecastResult.varianceDays == null ? '—' : `${pkg.forecastResult.varianceDays > 0 ? '+' : ''}${pkg.forecastResult.varianceDays} days`}</td>
+              <td className="max-w-[290px] text-xs text-[#65717c]">{pkg.forecastResult.taskCount} tasks · {pkg.forecastResult.overdueCount} overdue · {pkg.forecastResult.reason}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="grid xl:grid-cols-[1.6fr_1fr] gap-5">
         <div className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 shadow-sm">
           <div className="grid lg:grid-cols-[1fr_1fr] gap-6">
             <div>
               <div className="text-[10px] uppercase tracking-[0.35em] text-[#7b8791]">
-                Forecast Completion
+                Legacy project-wide forecast (not package-aware)
               </div>
 
               <div className="mt-3 text-5xl font-black leading-none text-[#123a60] xl:text-6xl">
