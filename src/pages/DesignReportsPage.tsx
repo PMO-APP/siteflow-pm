@@ -1,6 +1,7 @@
 import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { PenTool, Plus, Printer, Trash2 } from 'lucide-react'
+import { Plus, Printer, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
@@ -489,7 +490,7 @@ export default function DesignReportsPage() {
         </h1>
 
         <p className="text-[#65717c] mt-3 max-w-2xl">
-          Weekly design reporting, consultant updates, drawing register, design issues and management attention items.
+          Prepare one weekly Design report with consultant updates, design reviews, issues, achievements and priorities.
         </p>
 
         <div className="text-xs text-[#74818d] mt-4">
@@ -580,16 +581,11 @@ export default function DesignReportsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => { setActiveTab(value); window.history.replaceState(null, '', `${window.location.pathname}?section=${value}`) }}
-            className={`btn btn-sm ${activeTab === value ? 'btn-gold' : 'btn-ghost'}`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link className="btn btn-sm btn-ghost" to="/app/design-management">← Design Management</Link>
+        <button className={`btn btn-sm ${activeTab === 'report' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('report')}>Weekly Report</button>
+        <button className={`btn btn-sm ${activeTab === 'history' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('history')}>Submitted History</button>
+        {activeTab !== 'report' && activeTab !== 'history' && <span className="text-xs text-[#65717c]">Design management record · {TABS.find(([key]) => key === activeTab)?.[1]}</span>}
       </div>
 
       {loading ? (
@@ -616,12 +612,34 @@ export default function DesignReportsPage() {
                 />
               </div>
             ) : (
-              <NoSubmittedDesignReport
-                reportWeek={reportWeek}
-                canEdit={canEdit}
-                canSubmitReport={canSubmitReport}
-                submissionLockMessage={reportLock.message}
-              />
+              <div className="space-y-5">
+                <div className="card p-5">
+                  <h2 className="text-lg font-bold text-[#102943]">Weekly Design Report · {fdate(reportWeek)}</h2>
+                  <p className="mt-2 text-sm text-[#65717c]">Complete the sections below. Saved entries are included in the weekly snapshot when you submit. You do not need to navigate between management folders to prepare this report.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-[#65717c]">
+                    <div>Drawing records: <strong>{drawings.length}</strong></div>
+                    <div>Pending drawings: <strong>{pendingDrawings.length}</strong></div>
+                    <div>Consultant updates: <strong>{consultantUpdates.length}</strong></div>
+                    <div>Design issues: <strong>{designIssues.length}</strong></div>
+                  </div>
+                </div>
+                <ReportSection title="1. Consultant Updates" description="Key consultant progress, outstanding deliverables and coordination updates.">
+                  <ManualTab title="Consultant Updates" category="Consultant Update" items={consultantUpdates} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                </ReportSection>
+                <ReportSection title="2. Design Reviews & Activities" description="Design reviews and achievements completed during the reporting period.">
+                  <ManualTab title="Design Activities & Reviews" category="Weekly Achievement" items={weeklyAchievements} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                </ReportSection>
+                <ReportSection title="3. Design Issues & Constraints" description="Unresolved design issues, blockers and coordination constraints.">
+                  <ManualTab title="Design Issues" category="Design Issue" items={designIssues} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                </ReportSection>
+                <ReportSection title="4. Challenges & Management Attention" description="Challenges requiring resolution, decisions or escalation.">
+                  <ManualTab title="Weekly Challenges" category="Weekly Challenge" items={weeklyChallenges} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                </ReportSection>
+                <ReportSection title="5. Next Week's Priorities & Commentary" description="Planned activities, priorities and design team commentary.">
+                  <ManualTab title="Next Week Focus" category="Next Week Focus" items={nextWeekFocus} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                </ReportSection>
+                <div className="card p-5 text-sm text-[#65717c]">When ready, use <strong>Submit Weekly Report</strong> at the top. {canSubmitReport ? 'The submission window is open.' : reportLock.message}</div>
+              </div>
             )
           )}
 
@@ -682,52 +700,12 @@ export default function DesignReportsPage() {
 }
 
 
-function NoSubmittedDesignReport({
-  reportWeek,
-  canEdit,
-  canSubmitReport,
-  submissionLockMessage,
-}: {
-  reportWeek: string
-  canEdit: boolean
-  canSubmitReport: boolean
-  submissionLockMessage: string
-}) {
-  return (
-    <div className="card p-8 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#ffd1c5] bg-[#ff7657]/10 text-[#df5f41]">
-        <PenTool size={22} />
-      </div>
-
-      <h3 className="text-lg font-semibold text-[#102943]">
-        No design report submitted for {fdate(reportWeek)}
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-xl text-sm text-[#74818d]">
-        This tab only displays locked weekly design report snapshots. Use the Drawing Register,
-        Consultants, Design Issues and Weekly Commentary tabs to update live records, then submit
-        the weekly report to generate the snapshot for this date.
-      </p>
-
-      {canEdit ? (
-        canSubmitReport ? (
-          <p className="mt-4 text-sm text-amber-300">
-            Click Submit Weekly Report when this week's design information is ready.
-          </p>
-        ) : (
-          <p className="mt-4 text-sm text-red-400">
-            {submissionLockMessage}
-          </p>
-        )
-      ) : (
-        <p className="mt-4 text-sm text-amber-300">
-          You can view submitted reports only. No report has been submitted for this week yet.
-        </p>
-      )}
-    </div>
-  )
+function ReportSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return <section className="space-y-2">
+    <div className="px-1"><h3 className="text-lg font-bold text-[#102943]">{title}</h3><p className="text-sm text-[#65717c]">{description}</p></div>
+    {children}
+  </section>
 }
-
 
 function DesignReportHistoryTab({
   submissions,
