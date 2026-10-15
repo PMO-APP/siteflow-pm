@@ -1,11 +1,9 @@
 import { Link } from 'react-router-dom'
-import { Building2, Calculator, HardHat, PenTool, FileBarChart, ChevronRight } from 'lucide-react'
+import { Building2, HardHat, FileBarChart, ChevronRight } from 'lucide-react'
 import { useProjectStore } from '@/store/project'
 
 const areas = [
   { title: 'IPD Reports', description: 'Housebuild, Infrastructure, Mechanical and Electrical weekly reports.', to: '/app/reports/ipd', icon: Building2 },
-  { title: 'Design Reports', description: 'Design coordination, drawings, consultants, issues and weekly design reporting.', to: '/app/design-reports', icon: PenTool },
-  { title: 'Costing Reports', description: 'Commercial, cost and financial reporting for this project.', to: '/app/costing', icon: Calculator },
   { title: 'HSE Reports', description: 'Health, safety and environment reporting for this project.', to: '/app/hse', icon: HardHat },
   { title: 'PMO / Executive Reports', description: 'Project-wide management and executive reporting.', to: '/app/reports/pmo', icon: FileBarChart },
 ]
