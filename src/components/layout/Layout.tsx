@@ -4,6 +4,7 @@ import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { PackageCheck } from 'lucide-react'
+import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useAccessSession } from '@/access/AccessSessionProvider'
@@ -218,6 +219,13 @@ export default function Layout() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
   const role = useMembershipStore(state => state.role)
+  const { data: deliveryPackages = [], isLoading: packageDatesLoading } = useDeliveryPackages()
+  const datedPackages = deliveryPackages
+    .filter(pkg => pkg.status !== 'Completed' && pkg.planned_finish && !Number.isNaN(Date.parse(pkg.planned_finish)))
+    .sort((a, b) => Date.parse(a.planned_finish!) - Date.parse(b.planned_finish!))
+  const nextPackage = datedPackages.find(pkg => Date.parse(pkg.planned_finish!) >= Date.now() - 86400000) || datedPackages[0] || null
+  const nextPackageDate = nextPackage ? parseISO(nextPackage.planned_finish!) : null
+
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -466,8 +474,9 @@ export default function Layout() {
     setOrganizationName(activeWorkspace?.name || '')
   }
 
-  const daysLeft = handoverDate
-    ? differenceInDays(handoverDate, new Date())
+  const displayedHandoverDate = nextPackageDate || handoverDate
+  const daysLeft = displayedHandoverDate
+    ? differenceInDays(displayedHandoverDate, new Date())
     : null
 
   // Navigation visibility is deliberately separate from edit permissions.
@@ -572,21 +581,37 @@ export default function Layout() {
                     : 'text-[#5f7481]'
                 }`}
               >
-                DAYS LEFT
+                {nextPackage ? 'NEXT PACKAGE HANDOVER' : 'DAYS LEFT'}
               </div>
 
               <div className="sidebar-muted text-[9px]">
-                {handoverDate
-                  ? handoverDate.toLocaleDateString('en-GB', {
+                {nextPackage && <span className="block font-semibold">{nextPackage.name}</span>}
+                {displayedHandoverDate
+                  ? displayedHandoverDate.toLocaleDateString('en-GB', {
                       day: '2-digit',
                       month: 'short',
                       year: 'numeric',
                     })
                   : 'No handover date'}
-                {handoverIsRevised ? <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[8px] font-bold uppercase text-blue-700">Revised</span> : null}
+                {!nextPackage && handoverIsRevised ? <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[8px] font-bold uppercase text-blue-700">Revised</span> : null}
               </div>
             </div>
           </div>
+          {datedPackages.length > 1 && (
+            <details className="mt-2 rounded-lg border border-[#d7e1e4] px-2 py-2 text-xs">
+              <summary className="cursor-pointer font-semibold">All package handovers ({datedPackages.length})</summary>
+              <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
+                {datedPackages.map(pkg => (
+                  <div key={pkg.id} className="flex items-start justify-between gap-2">
+                    <span className="min-w-0 break-words">{pkg.name}</span>
+                    <span className="shrink-0 font-semibold">{parseISO(pkg.planned_finish!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  </div>
+                ))}
+                {handoverDate && <div className="border-t pt-2">Programme target: {handoverDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>}
+              </div>
+            </details>
+          )}
+          {packageDatesLoading && <div className="mt-1 text-xs">Checking package dates…</div>}
         </div>
 
         <nav className="layout-nav flex-1 overflow-y-auto px-3 py-3" aria-label="Project modules">
