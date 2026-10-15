@@ -10,66 +10,110 @@ export interface PackageForecast {
   overdueCount: number
   confidence: 'Indicative' | 'Insufficient data'
   reason: string
+  dependencyCount?: number
+  dependencyIssues?: number
+  scenarioRate?: number
 }
 
 const DAY = 86_400_000
 const dateValue = (value?: string | null) => {
   if (!value) return null
   const time = Date.parse(value)
-  return Number.isFinite(time) ? time : null
+  return Number.isFinite(time) ? Date.UTC(new Date(time).getUTCFullYear(), new Date(time).getUTCMonth(), new Date(time).getUTCDate()) : null
 }
 const dateOnly = (time: number) => new Date(time).toISOString().slice(0, 10)
 const progress = (task: Task) => {
   if (['completed', 'complete', 'done'].includes(String(task.status).toLowerCase())) return 100
   return Math.min(100, Math.max(0, Number(task.progress_pct || 0)))
 }
+const plannedStart = (task: Task) => dateValue((task as Task & { planned_start?: string }).planned_start || task.start_date)
+const plannedFinish = (task: Task) => dateValue((task as Task & { planned_finish?: string }).planned_finish || task.finish_date)
 
 /**
- * First-stage, non-critical-path package projection. Does not infer task dependencies,
- * resources, or production rates. Never presents a missing programme as on-time.
+ * Preliminary, dependency-aware finish-to-start projection. Never represents an
+ * indicative calculation as an approved recovery programme or validated forecast.
+ * Dependencies must reference task IDs or unambiguous task numbers within the package.
+ * Unresolved or cyclic dependencies make the estimate unavailable rather than silently
+ * ignoring schedule logic. Crew capacity and actual productivity still require validation.
  */
 export function calculatePackageForecast(
   packageId: string,
   target: string | null,
   allTasks: Task[],
   now = new Date(),
+  scenarioRate = 1,
 ): PackageForecast {
   const tasks = allTasks.filter(task => String(task.delivery_package_id || '') === packageId)
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  const base = { packageId, target, taskCount: tasks.length, completedCount: tasks.filter(t => progress(t) >= 100).length }
+  const completedCount = tasks.filter(t => progress(t) >= 100).length
   const unfinished = tasks.filter(t => progress(t) < 100)
-  const overdueCount = unfinished.filter(t => {
-    const finish = dateValue((t as Task & { planned_finish?: string }).planned_finish || t.finish_date)
-    return finish !== null && finish < today
-  }).length
-  const unavailable = (reason: string): PackageForecast => ({ ...base, forecast: null, varianceDays: null, overdueCount, confidence: 'Insufficient data', reason })
-  if (!tasks.length) return unavailable('No schedule activities linked to this package')
-  if (!target || dateValue(target) === null) return unavailable('Package handover target is missing')
-  if (tasks.some(t => dateValue((t as Task & { planned_finish?: string }).planned_finish || t.finish_date) === null)) {
-    return unavailable('Some schedule activities have no valid finish date')
-  }
-  if (unfinished.some(t => !Number.isFinite(Number(t.duration_days)) || Number(t.duration_days) <= 0)) {
-    return unavailable('Remaining activity durations are missing')
-  }
-  // A duration-based lower-confidence projection; parallel work is permitted.
-  // Future tasks retain their planned start, overdue tasks restart remaining work today.
-  const projected = tasks.map(task => {
-    const finish = dateValue((task as Task & { planned_finish?: string }).planned_finish || task.finish_date)!
-    if (progress(task) >= 100) return dateValue(task.actual_finish) ?? finish
-    const start = dateValue((task as Task & { planned_start?: string }).planned_start || task.start_date)
-    // A missing start date cannot support a reliable duration projection.
-    // The task finish is not a substitute for its start.
-    if (start === null) return NaN
-    const remaining = Math.max(1, Math.ceil(Number(task.duration_days) * (100 - progress(task)) / 100))
-    return Math.max(today, start) + (remaining - 1) * DAY
+  const overdueCount = unfinished.filter(t => (plannedFinish(t) ?? Infinity) < today).length
+  const base = { packageId, target, taskCount: tasks.length, completedCount, overdueCount }
+  const unavailable = (reason: string, dependencyCount = 0, dependencyIssues = 0): PackageForecast => ({
+    ...base, forecast: null, varianceDays: null, confidence: 'Insufficient data', reason, dependencyCount, dependencyIssues,
   })
-  if (projected.some(value => !Number.isFinite(value))) return unavailable('Some unfinished activities have no valid planned start date')
-  const forecastTime = Math.max(...projected)
-  const targetTime = dateValue(target)!
+  if (!Number.isFinite(scenarioRate) || scenarioRate < 0.5 || scenarioRate > 2) return unavailable('Scenario productivity factor must be between 0.5 and 2')
+  if (!tasks.length) return unavailable('No schedule activities linked to this package')
+  if (dateValue(target) === null) return unavailable('Package handover target is missing')
+  if (tasks.some(t => plannedFinish(t) === null)) return unavailable('Some activities have no valid planned finish')
+  if (unfinished.some(t => plannedStart(t) === null)) return unavailable('Some unfinished activities have no valid planned start')
+  if (unfinished.some(t => !Number.isFinite(Number(t.duration_days)) || Number(t.duration_days) <= 0)) {
+    return unavailable('Some unfinished activities have no valid duration')
+  }
+
+  const byId = new Map(tasks.map(t => [String(t.id), t]))
+  const byNumber = new Map<string, Task | null>()
+  tasks.forEach(t => {
+    if (t.task_number == null) return
+    const key = String(t.task_number)
+    byNumber.set(key, byNumber.has(key) ? null : t)
+  })
+  const predecessors = new Map<string, Task[]>()
+  let dependencyCount = 0
+  let dependencyIssues = 0
+  for (const task of tasks) {
+    const raw = String(task.dependencies || '').trim()
+    if (!raw) { predecessors.set(task.id, []); continue }
+    // Only simple FS references are supported. Other relationship types and lags
+    // must be explicitly modelled before any forecast can be published.
+    const refs = raw.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean)
+    const resolved: Task[] = []
+    for (const ref of refs) {
+      dependencyCount++
+      const match = byId.get(ref) ?? byNumber.get(ref)
+      if (!match || match.id === task.id) { dependencyIssues++; continue }
+      resolved.push(match)
+    }
+    predecessors.set(task.id, resolved)
+  }
+  if (dependencyIssues) return unavailable(`${dependencyIssues} unresolved, ambiguous or self-referencing predecessor links; verify package schedule`, dependencyCount, dependencyIssues)
+
+  const projected = new Map<string, number>()
+  const visiting = new Set<string>()
+  let cyclic = false
+  const finishOf = (task: Task): number => {
+    if (projected.has(task.id)) return projected.get(task.id)!
+    if (visiting.has(task.id)) { cyclic = true; return NaN }
+    visiting.add(task.id)
+    const predecessorFinishes = (predecessors.get(task.id) || []).map(finishOf)
+    let finish: number
+    if (progress(task) >= 100) {
+      finish = dateValue(task.actual_finish) ?? plannedFinish(task)!
+    } else {
+      const remaining = Math.max(1, Math.ceil(Number(task.duration_days) * (100 - progress(task)) / (100 * scenarioRate)))
+      const earliest = Math.max(today, plannedStart(task)!, ...predecessorFinishes.map(value => value + DAY))
+      finish = earliest + (remaining - 1) * DAY
+    }
+    visiting.delete(task.id)
+    projected.set(task.id, finish)
+    return finish
+  }
+  const dates = tasks.map(finishOf)
+  if (cyclic || dates.some(value => !Number.isFinite(value))) return unavailable('Cyclic or invalid schedule dependencies; correct predecessor links', dependencyCount, 1)
+  const forecastTime = Math.max(...dates)
   return {
-    ...base, overdueCount, forecast: dateOnly(forecastTime),
-    varianceDays: Math.ceil((forecastTime - targetTime) / DAY),
-    confidence: 'Indicative',
-    reason: `Unvalidated duration estimate; ${overdueCount} overdue activities. A zero-day variance does not confirm on-time delivery; dependencies, crews and productivity are unverified`,
+    ...base, forecast: dateOnly(forecastTime), varianceDays: Math.round((forecastTime - dateValue(target)!) / DAY),
+    confidence: 'Indicative', dependencyCount, dependencyIssues: 0, scenarioRate,
+    reason: `${dependencyCount} predecessor links modelled; ${overdueCount} overdue activities. Scenario productivity factor ${scenarioRate.toFixed(2)}x (assumed, not verified). Preliminary finish-to-start estimate only: crew availability, overlaps, calendars and actual production rates remain unverified`,
   }
 }
