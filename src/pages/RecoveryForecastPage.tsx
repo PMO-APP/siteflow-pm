@@ -23,7 +23,6 @@ import { calculatePackageForecast, auditPackageEvidence } from '@/features/sched
 import PackageProductionEvidence from '@/features/schedule/PackageProductionEvidence'
 import ProductionEvidenceReview from '@/features/schedule/ProductionEvidenceReview'
 import MeasuredProductionForecast from '@/features/schedule/MeasuredProductionForecast'
-import VerifiedPackageOutlook from '@/features/schedule/VerifiedPackageOutlook'
 
 type ProjectScope =
   | 'Carcass'
@@ -392,6 +391,17 @@ export default function RecoveryForecastPage() {
     const dates = packageTargets.map(pkg => safeDate(pkg.planned_finish)).filter((date): date is Date => date !== null)
     return dates.length ? new Date(Math.max(...dates.map(date => date.getTime()))) : null
   }, [packageTargets])
+  // A project-wide active revision is optional and does not represent all
+  // package programmes. Compare each package against its OWN schedule activities.
+  const packageProgrammeComparison = useMemo(() => packageTargets.map(pkg => {
+    const target = safeDate(pkg.planned_finish)
+    const programme = safeDate(pkg.programme_finish)
+    const delta = target && programme
+      ? Math.round((programme.getTime() - target.getTime()) / 86_400_000)
+      : null
+    return { ...pkg, target, programme, delta }
+  }), [packageTargets])
+  const programmeCount = packageProgrammeComparison.filter(p => p.programme).length
   const packagesBeyondApprovedTarget = useMemo(() => {
     const approved = safeDate(activeRevisionTarget)
     return approved ? packageTargets.filter(pkg => {
@@ -1006,7 +1016,6 @@ export default function RecoveryForecastPage() {
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
         </div>
-        <VerifiedPackageOutlook projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name, date: p.date }))} tasks={projectTasks} />
         <div className="mt-4"><ProductionEvidenceReview projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4"><PackageProductionEvidence projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-3"><MeasuredProductionForecast projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
@@ -1085,7 +1094,7 @@ export default function RecoveryForecastPage() {
                 <div className="font-semibold text-[#123a60]">Completion date references</div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <div><span className="block text-xs text-[#65717c]">Original baseline (revision record)</span><strong>{formatDate(safeDate(activeRevision?.baseline_finish || null))}</strong></div>
-                  <div><span className="block text-xs text-[#65717c]">Active approved programme target</span><strong>{formatDate(safeDate(activeRevisionTarget))}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Active project-wide revision target</span><strong>{formatDate(safeDate(activeRevisionTarget))}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Current comparison target</span><strong>{formatDate(engine.targetDate)}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Calculated project forecast</span><strong>{formatDate(engine.forecastDate)}</strong></div>
                 </div>
@@ -1096,7 +1105,17 @@ export default function RecoveryForecastPage() {
                   {!packagesLoading && !packagesError && activeRevisionTarget && packagesBeyondApprovedTarget.length > 0 && (
                     <p role="status" className="mt-2 text-xs text-amber-700">{packagesBeyondApprovedTarget.length} package(s) have planned finishes later than the active programme target. Review schedule alignment; this does not establish a forecast delay.</p>
                   )}
-                  {!activeRevisionTarget && <p className="mt-2 text-xs text-[#65717c]">No active programme target available for a package-date comparison.</p>}
+                  {!activeRevisionTarget && <p className="mt-2 text-xs text-[#65717c]">No active project-wide revision is marked in Schedule Revisions. This does not mean package programmes are missing. {programmeCount} of {packageTargets.length} package(s) have dated programme activities available for comparison below.</p>}
+                  {programmeCount > 0 && <details className="mt-3 border-t pt-2">
+                    <summary className="cursor-pointer text-xs font-semibold">Compare package programmes with handover targets ({programmeCount})</summary>
+                    <div className="mt-2 max-h-64 space-y-2 overflow-y-auto text-xs">
+                      {packageProgrammeComparison.map(pkg => <div key={pkg.id} className="rounded border bg-white p-2">
+                        <div className="font-semibold">{pkg.name}</div>
+                        <div>Package target: {formatDate(pkg.target)} · Programme finish: {formatDate(pkg.programme)}</div>
+                        <div className="text-[#65717c]">{pkg.delta === null ? 'Programme finish not available' : pkg.delta > 0 ? `Programme ends ${pkg.delta} day(s) after target` : pkg.delta < 0 ? `Programme ends ${Math.abs(pkg.delta)} day(s) before target` : 'Programme aligns with target'}</div>
+                      </div>)}
+                    </div>
+                  </details>}
                 </div>
                 <p className="mt-2 text-xs text-[#65717c]">Package planned finishes are separate management dates, not automatically the master project forecast. An unavailable baseline or active target is not inferred.</p>
                 <details className="mt-3 border-t border-[#dfe3e7] pt-2">
