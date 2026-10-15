@@ -21,6 +21,7 @@ import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useAct
 import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
 import { calculatePackageForecast, auditPackageEvidence } from '@/features/schedule/packageForecast'
 import PackageProductionEvidence from '@/features/schedule/PackageProductionEvidence'
+import ProductionEvidenceReview from '@/features/schedule/ProductionEvidenceReview'
 import MeasuredProductionForecast from '@/features/schedule/MeasuredProductionForecast'
 
 type ProjectScope =
@@ -1004,6 +1005,7 @@ export default function RecoveryForecastPage() {
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
         </div>
+        <div className="mt-4"><ProductionEvidenceReview projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4"><PackageProductionEvidence projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-3"><MeasuredProductionForecast projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
