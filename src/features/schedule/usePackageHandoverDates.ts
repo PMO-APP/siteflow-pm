@@ -16,7 +16,7 @@ export function usePackageHandoverDates() {
       !latest || Date.parse(task.finish_date!) > Date.parse(latest) ? task.finish_date! : latest, null)
     const target = pkg.planned_finish && !Number.isNaN(Date.parse(pkg.planned_finish)) ? pkg.planned_finish : null
     const finish = target || scheduleFinish
-    return { id: pkg.id, name: pkg.name, status: pkg.status, planned_finish: finish,
+    return { id: pkg.id, name: pkg.name, status: pkg.status, planned_finish: finish, programme_finish: scheduleFinish,
       source: target ? 'Package target' : scheduleFinish ? 'Package schedule' : 'Missing date' }
   }).filter(pkg => pkg.planned_finish)
     .sort((a, b) => Date.parse(a.planned_finish!) - Date.parse(b.planned_finish!)), [packagesQuery.data, tasksQuery.data])
