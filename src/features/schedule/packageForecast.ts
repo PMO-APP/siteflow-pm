@@ -56,16 +56,20 @@ export function calculatePackageForecast(
   const projected = tasks.map(task => {
     const finish = dateValue((task as Task & { planned_finish?: string }).planned_finish || task.finish_date)!
     if (progress(task) >= 100) return dateValue(task.actual_finish) ?? finish
-    const start = dateValue((task as Task & { planned_start?: string }).planned_start || task.start_date) ?? finish
+    const start = dateValue((task as Task & { planned_start?: string }).planned_start || task.start_date)
+    // A missing start date cannot support a reliable duration projection.
+    // The task finish is not a substitute for its start.
+    if (start === null) return NaN
     const remaining = Math.max(1, Math.ceil(Number(task.duration_days) * (100 - progress(task)) / 100))
     return Math.max(today, start) + (remaining - 1) * DAY
   })
+  if (projected.some(value => !Number.isFinite(value))) return unavailable('Some unfinished activities have no valid planned start date')
   const forecastTime = Math.max(...projected)
   const targetTime = dateValue(target)!
   return {
     ...base, overdueCount, forecast: dateOnly(forecastTime),
     varianceDays: Math.ceil((forecastTime - targetTime) / DAY),
     confidence: 'Indicative',
-    reason: 'Duration-based estimate; dependencies, crew capacity and actual production rates are not validated',
+    reason: `Unvalidated duration estimate; ${overdueCount} overdue activities. A zero-day variance does not confirm on-time delivery; dependencies, crews and productivity are unverified`,
   }
 }
