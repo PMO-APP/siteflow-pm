@@ -19,7 +19,7 @@ import type { Task } from '@/types'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
-import { calculatePackageForecast } from '@/features/schedule/packageForecast'
+import { calculatePackageForecast, auditPackageEvidence } from '@/features/schedule/packageForecast'
 
 type ProjectScope =
   | 'Carcass'
@@ -1001,6 +1001,25 @@ export default function RecoveryForecastPage() {
             <button type="button" onClick={() => setScenarioRate(1)} className="rounded-lg border px-3 py-1 text-xs">Reset</button>
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
+        </div>
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h3 className="text-sm font-semibold text-amber-900">Site evidence readiness</h3>
+          <p className="mt-1 text-xs text-amber-800">Activity timestamps are evidence of updates, not measured production rates. No crew capacity or quantity-based productivity has been verified; therefore none of these dates is a validated forecast.</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead><tr className="border-b border-amber-200"><th className="py-2">Package</th><th>Actual starts</th><th>Actual finishes</th><th>Recently updated</th><th>Production / crew evidence</th></tr></thead>
+              <tbody>{visiblePackageHandovers.map(pkg => {
+                const evidence = auditPackageEvidence(pkg.id, projectTasks)
+                return <tr key={pkg.id} className="border-b border-amber-100">
+                  <td className="py-2 font-semibold">{pkg.name}</td>
+                  <td>{evidence.datedActualStarts}/{evidence.totalTasks}</td>
+                  <td>{evidence.datedActualFinishes}/{evidence.totalTasks}</td>
+                  <td>{evidence.updatedInLast14Days}/{evidence.totalTasks}</td>
+                  <td>Not verified</td>
+                </tr>
+              })}</tbody>
+            </table>
+          </div>
         </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
