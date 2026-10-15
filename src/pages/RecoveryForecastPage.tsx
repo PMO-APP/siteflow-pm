@@ -23,6 +23,7 @@ import { calculatePackageForecast, auditPackageEvidence } from '@/features/sched
 import PackageProductionEvidence from '@/features/schedule/PackageProductionEvidence'
 import ProductionEvidenceReview from '@/features/schedule/ProductionEvidenceReview'
 import MeasuredProductionForecast from '@/features/schedule/MeasuredProductionForecast'
+import VerifiedPackageOutlook from '@/features/schedule/VerifiedPackageOutlook'
 
 type ProjectScope =
   | 'Carcass'
@@ -1005,6 +1006,7 @@ export default function RecoveryForecastPage() {
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
         </div>
+        <VerifiedPackageOutlook projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name, date: p.date }))} tasks={projectTasks} />
         <div className="mt-4"><ProductionEvidenceReview projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4"><PackageProductionEvidence projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-3"><MeasuredProductionForecast projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
