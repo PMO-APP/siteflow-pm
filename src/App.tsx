@@ -24,6 +24,7 @@ const AuditPage = lazy(() => import('@/pages/AuditPage'))
 const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
 const CostingPage = lazy(() => import('@/pages/CostingPage'))
 const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
+const DepartmentHubPage = lazy(() => import('@/pages/DepartmentHubPage'))
 const PMOWeeklyReportPage = lazy(() => import('@/pages/PMOWeeklyReportPage'))
 const ProjectPackagesPage = lazy(() => import('@/pages/ProjectPackagesPage'))
 const HandoverPage = lazy(() => import('@/pages/HandoverPage'))
@@ -401,6 +402,8 @@ export default function App() {
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
+          <Route path="costing-management" element={<DepartmentHubPage department="costing" />} />
+          <Route path="design-management" element={<DepartmentHubPage department="design" />} />
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="quality" element={<QualityPage />} />
           <Route path="hse" element={<HSEPage />} />
