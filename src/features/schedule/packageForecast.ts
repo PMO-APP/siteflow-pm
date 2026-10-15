@@ -13,6 +13,37 @@ export interface PackageForecast {
   dependencyCount?: number
   dependencyIssues?: number
   scenarioRate?: number
+  evidence?: PackageEvidence
+}
+
+export interface PackageEvidence {
+  totalTasks: number
+  datedActualStarts: number
+  datedActualFinishes: number
+  updatedInLast14Days: number
+  verifiedProductionRates: number
+  verifiedCrewAllocations: number
+  issues: string[]
+}
+
+/** An evidence audit, not a substitute for measured production quantities. */
+export function auditPackageEvidence(packageId: string, allTasks: Task[], now = new Date()): PackageEvidence {
+  const tasks = allTasks.filter(task => String(task.delivery_package_id || '') === packageId)
+  const recentCutoff = now.getTime() - 14 * 86_400_000
+  const datedActualStarts = tasks.filter(task => dateValue(task.actual_start) !== null).length
+  const datedActualFinishes = tasks.filter(task => dateValue(task.actual_finish) !== null).length
+  const updatedInLast14Days = tasks.filter(task => {
+    const timestamp = Date.parse(task.updated_at || '')
+    return Number.isFinite(timestamp) && timestamp >= recentCutoff && timestamp <= now.getTime()
+  }).length
+  const issues: string[] = []
+  if (!tasks.length) issues.push('No linked package activities')
+  if (tasks.length && !datedActualStarts) issues.push('No dated actual starts')
+  if (tasks.length && !datedActualFinishes) issues.push('No dated actual finishes')
+  if (tasks.length && !updatedInLast14Days) issues.push('No activity updates in the past 14 days')
+  issues.push('Measured production quantities and crew allocations are not available in the task records')
+  return { totalTasks: tasks.length, datedActualStarts, datedActualFinishes, updatedInLast14Days,
+    verifiedProductionRates: 0, verifiedCrewAllocations: 0, issues }
 }
 
 const DAY = 86_400_000
@@ -48,7 +79,8 @@ export function calculatePackageForecast(
   const completedCount = tasks.filter(t => progress(t) >= 100).length
   const unfinished = tasks.filter(t => progress(t) < 100)
   const overdueCount = unfinished.filter(t => (plannedFinish(t) ?? Infinity) < today).length
-  const base = { packageId, target, taskCount: tasks.length, completedCount, overdueCount }
+  const evidence = auditPackageEvidence(packageId, allTasks, now)
+  const base = { packageId, target, taskCount: tasks.length, completedCount, overdueCount, evidence }
   const unavailable = (reason: string, dependencyCount = 0, dependencyIssues = 0): PackageForecast => ({
     ...base, forecast: null, varianceDays: null, confidence: 'Insufficient data', reason, dependencyCount, dependencyIssues,
   })
