@@ -90,7 +90,10 @@ export default function DesignReportsPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  const [activeTab, setActiveTab] = useState('report')
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('section')
+    return requested && ["report", "drawings", "consultants", "issues", "weekly", "history"].includes(requested) ? requested : 'report'
+  })
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
@@ -581,7 +584,7 @@ export default function DesignReportsPage() {
         {TABS.map(([value, label]) => (
           <button
             key={value}
-            onClick={() => setActiveTab(value)}
+            onClick={() => { setActiveTab(value); window.history.replaceState(null, '', `${window.location.pathname}?section=${value}`) }}
             className={`btn btn-sm ${activeTab === value ? 'btn-gold' : 'btn-ghost'}`}
           >
             {label}
