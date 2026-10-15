@@ -930,10 +930,8 @@ export default function RecoveryForecastPage() {
     forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks),
   }))
   const availablePackageForecasts = packageForecasts.filter(pkg => pkg.forecastResult.forecast)
-  const allPackagesForecastable = packageForecasts.length > 0 && availablePackageForecasts.length === packageForecasts.length
-  const masterForecast = allPackagesForecastable
-    ? new Date(Math.max(...availablePackageForecasts.map(pkg => Date.parse(pkg.forecastResult.forecast!))))
-    : null
+  // Indicative dates are not validated master forecasts. Keep the latest
+  // management target visible without presenting it as a calculated finish.
 
   return (
     <div className="-m-4 min-h-screen space-y-5 bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
@@ -990,17 +988,17 @@ export default function RecoveryForecastPage() {
       <section className="rounded-[24px] border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Package completion forecast">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#123a60]">Package completion outlook</h2>
-          <span className="text-xs text-[#65717c]">{availablePackageForecasts.length} of {packageForecasts.length} indicative forecasts</span>
+          <span className="text-xs text-[#65717c]">{availablePackageForecasts.length} of {packageForecasts.length} preliminary estimates · 0 validated</span>
         </div>
-        <p className="mt-2 text-sm text-[#65717c]">Master finish outlook: <strong>{masterForecast ? formatDate(masterForecast) : 'Not yet reliable'}</strong>. All required packages must have usable schedules before an overall date can be published. Dates below are preliminary duration-based estimates, not approved recovery programmes.</p>
+        <p className="mt-2 text-sm text-[#65717c]">Latest package target: <strong>{latestPackageTarget ? formatDate(latestPackageTarget) : 'Unavailable'}</strong>. Validated master completion forecast: <strong>Pending validation</strong>. Preliminary dates below are not approved recovery programmes and cannot establish that a package is on time.</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead><tr className="border-b text-[#65717c]"><th className="py-2">Package</th><th>Target</th><th>Indicative forecast</th><th>Variance</th><th>Schedule evidence</th></tr></thead>
+            <thead><tr className="border-b text-[#65717c]"><th className="py-2">Package</th><th>Target</th><th>Preliminary estimate</th><th>Variance</th><th>Schedule evidence</th></tr></thead>
             <tbody>{packageForecasts.map(pkg => <tr key={pkg.id} className="border-b border-[#eef1f3]">
               <td className="py-3 font-semibold">{pkg.name}</td>
               <td>{formatDate(pkg.date)}</td>
               <td>{pkg.forecastResult.forecast ? formatDate(new Date(pkg.forecastResult.forecast)) : 'Unavailable'}</td>
-              <td>{pkg.forecastResult.varianceDays == null ? '—' : `${pkg.forecastResult.varianceDays > 0 ? '+' : ''}${pkg.forecastResult.varianceDays} days`}</td>
+              <td>{pkg.forecastResult.varianceDays == null ? '—' : `${pkg.forecastResult.varianceDays > 0 ? '+' : ''}${pkg.forecastResult.varianceDays} days (indicative)`}</td>
               <td className="max-w-[290px] text-xs text-[#65717c]">{pkg.forecastResult.taskCount} tasks · {pkg.forecastResult.overdueCount} overdue · {pkg.forecastResult.reason}</td>
             </tr>)}</tbody>
           </table>
