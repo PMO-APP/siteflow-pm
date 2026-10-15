@@ -1,4 +1,5 @@
 import type { Task } from '@/types'
+import type { MeasuredDurationResult } from './measuredDurationEvidence'
 
 export interface PackageForecast {
   packageId: string
@@ -14,6 +15,8 @@ export interface PackageForecast {
   dependencyIssues?: number
   scenarioRate?: number
   evidence?: PackageEvidence
+  measuredDurationCount?: number
+  assumedDurationCount?: number
 }
 
 export interface PackageEvidence {
@@ -73,6 +76,7 @@ export function calculatePackageForecast(
   allTasks: Task[],
   now = new Date(),
   scenarioRate = 1,
+  measuredDurations: ReadonlyMap<string, MeasuredDurationResult> = new Map(),
 ): PackageForecast {
   const tasks = allTasks.filter(task => String(task.delivery_package_id || '') === packageId)
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
@@ -80,7 +84,11 @@ export function calculatePackageForecast(
   const unfinished = tasks.filter(t => progress(t) < 100)
   const overdueCount = unfinished.filter(t => (plannedFinish(t) ?? Infinity) < today).length
   const evidence = auditPackageEvidence(packageId, allTasks, now)
-  const base = { packageId, target, taskCount: tasks.length, completedCount, overdueCount, evidence }
+  // Keys are activity IDs; only results supplied for this package's activities are used.
+  // Callers must validate activity/package identity before supplying measurements.
+  const measuredDurationCount = unfinished.filter(task => measuredDurations.get(String(task.id))?.available === true).length
+  const assumedDurationCount = unfinished.length - measuredDurationCount
+  const base = { packageId, target, taskCount: tasks.length, completedCount, overdueCount, evidence, measuredDurationCount, assumedDurationCount }
   const unavailable = (reason: string, dependencyCount = 0, dependencyIssues = 0): PackageForecast => ({
     ...base, forecast: null, varianceDays: null, confidence: 'Insufficient data', reason, dependencyCount, dependencyIssues,
   })
@@ -89,7 +97,7 @@ export function calculatePackageForecast(
   if (dateValue(target) === null) return unavailable('Package handover target is missing')
   if (tasks.some(t => plannedFinish(t) === null)) return unavailable('Some activities have no valid planned finish')
   if (unfinished.some(t => plannedStart(t) === null)) return unavailable('Some unfinished activities have no valid planned start')
-  if (unfinished.some(t => !Number.isFinite(Number(t.duration_days)) || Number(t.duration_days) <= 0)) {
+  if (unfinished.some(t => measuredDurations.get(String(t.id))?.available !== true && (!Number.isFinite(Number(t.duration_days)) || Number(t.duration_days) <= 0))) {
     return unavailable('Some unfinished activities have no valid duration')
   }
 
@@ -132,7 +140,12 @@ export function calculatePackageForecast(
     if (progress(task) >= 100) {
       finish = dateValue(task.actual_finish) ?? plannedFinish(task)!
     } else {
-      const remaining = Math.max(1, Math.ceil(Number(task.duration_days) * (100 - progress(task)) / (100 * scenarioRate)))
+      const measured = measuredDurations.get(String(task.id))
+      // A measured result is ALREADY a remaining-work duration. Never multiply it
+      // by remaining progress or the hypothetical scenario slider a second time.
+      const remaining = measured?.available
+        ? Math.max(1, Math.ceil(measured.days))
+        : Math.max(1, Math.ceil(Number(task.duration_days) * (100 - progress(task)) / (100 * scenarioRate)))
       const earliest = Math.max(today, plannedStart(task)!, ...predecessorFinishes.map(value => value + DAY))
       finish = earliest + (remaining - 1) * DAY
     }
@@ -146,6 +159,6 @@ export function calculatePackageForecast(
   return {
     ...base, forecast: dateOnly(forecastTime), varianceDays: Math.round((forecastTime - dateValue(target)!) / DAY),
     confidence: 'Indicative', dependencyCount, dependencyIssues: 0, scenarioRate,
-    reason: `${dependencyCount} predecessor links modelled; ${overdueCount} overdue activities. Scenario productivity factor ${scenarioRate.toFixed(2)}x (assumed, not verified). Preliminary finish-to-start estimate only: crew availability, overlaps, calendars and actual production rates remain unverified`,
+    reason: `${dependencyCount} predecessor links modelled; ${overdueCount} overdue activities. ${measuredDurationCount} measured remaining durations, ${assumedDurationCount} schedule/scenario durations. Scenario factor ${scenarioRate.toFixed(2)}x applies only to unmeasured activities. Preliminary finish-to-start estimate only: crew availability, overlaps, calendars and actual production rates remain unverified`,
   }
 }
