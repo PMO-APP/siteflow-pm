@@ -15,6 +15,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
+import { useTasks } from '@/hooks/useTasks'
 
 import { pmoConfirm, pmoPrompt } from '@/lib/notifications'
 import { publishHandoverEvent } from '@/services/events/domainEventPublishers'
@@ -242,6 +244,10 @@ export default function HandoverPage() {
 
   const [activeTab, setActiveTab] = useState('dashboard')
   const [packages, setPackages] = useState<any[]>([])
+  const deliveryPackagesQuery = useDeliveryPackages()
+  const tasksQuery = useTasks()
+  const [selectedDeliveryPackageId, setSelectedDeliveryPackageId] = useState('')
+  const [creatingFromSchedule, setCreatingFromSchedule] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [checklist, setChecklist] = useState<any[]>([])
   const [certificates, setCertificates] = useState<any[]>([])
@@ -255,13 +261,7 @@ export default function HandoverPage() {
   const [loading, setLoading] = useState(true)
   const [uploadingId, setUploadingId] = useState('')
 
-  const [packageForm, setPackageForm] = useState({
-    package_name: '',
-    package_type: 'Unit',
-    block_name: '',
-    unit_name: '',
-    target_handover_date: '',
-  })
+
 
   useEffect(() => {
     loadPackages()
@@ -272,6 +272,15 @@ export default function HandoverPage() {
   }, [selectedPackageId])
 
   const selectedPackage = packages.find(item => item.id === selectedPackageId)
+  const schedulePackages = useMemo(() => (deliveryPackagesQuery.data || []).map(pkg => {
+    const tasks = (tasksQuery.data || []).filter(task => String(task.delivery_package_id || '') === String(pkg.id) && task.finish_date && !Number.isNaN(Date.parse(task.finish_date)))
+    const handovers = tasks.filter(task => /handover|demobili[sz]ation/i.test(task.name))
+    const finalTask = (handovers.length ? handovers : tasks).reduce<typeof tasks[number] | null>((last, task) => !last || Date.parse(task.finish_date!) > Date.parse(last.finish_date!) ? task : last, null)
+    return { id: String(pkg.id), name: pkg.name, date: finalTask?.finish_date || pkg.planned_finish || '' }
+  }), [deliveryPackagesQuery.data, tasksQuery.data])
+  const selectedSchedulePackage = schedulePackages.find(pkg => pkg.id === selectedDeliveryPackageId)
+  const linkedHandover = selectedSchedulePackage && packages.find(item => item.package_name.trim().toLowerCase() === selectedSchedulePackage.name.trim().toLowerCase())
+
 
   const stats = useMemo(() => {
     const requiredChecklist = checklist.filter(item => item.is_required)
@@ -542,64 +551,6 @@ export default function HandoverPage() {
     }
   }
 
-  async function createPackage() {
-    if (!canEdit) {
-      setNotice('View only. You cannot create handover packages.')
-      return
-    }
-
-    if (!projectId) {
-      setNotice('No project selected.')
-      return
-    }
-
-    if (!packageForm.package_name.trim()) {
-      setNotice('Package name is required.')
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('handover_packages')
-      .insert({
-        organization_id: organizationId,
-        portfolio_id: portfolioId,
-        project_id: projectId,
-        package_name: packageForm.package_name.trim(),
-        package_type: packageForm.package_type,
-        block_name: packageForm.block_name.trim() || null,
-        unit_name: packageForm.unit_name.trim() || null,
-        target_handover_date: packageForm.target_handover_date || null,
-        created_by: user?.id || null,
-        created_by_name: user?.full_name || user?.email || null,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      setNotice(error.message)
-      return
-    }
-
-    try {
-      await createDefaultRequirements(data.id)
-    } catch (seedError: any) {
-      setNotice(seedError.message || 'Package created, but default requirements were not generated.')
-    }
-
-    setPackageForm({
-      package_name: '',
-      package_type: 'Unit',
-      block_name: '',
-      unit_name: '',
-      target_handover_date: '',
-    })
-
-    await loadPackages()
-    setSelectedPackageId(data.id)
-    await loadPackageDetails(data.id)
-    setNotice('Handover package created with default requirements.')
-  }
-
   async function updateRow(
     table: string,
     id: string,
@@ -794,56 +745,47 @@ export default function HandoverPage() {
 
       {notice && <EnterpriseNotice>{notice}</EnterpriseNotice>}
 
-      <div className="card p-4 grid grid-cols-1 lg:grid-cols-6 gap-3 items-end">
-        <div className="lg:col-span-2">
-          <label className="form-label">Select Handover Package</label>
-          <select
-            className="form-control"
-            value={selectedPackageId}
-            onChange={e => setSelectedPackageId(e.target.value)}
-          >
-            <option value="">Select package</option>
-            {packages.map(item => (
-              <option key={item.id} value={item.id}>
-                {item.package_name} · {item.package_type}
-              </option>
-            ))}
-          </select>
+      <div className="card p-4 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex-1 min-w-[250px] text-sm font-medium">
+            Select delivery package from Schedule
+            <select className="form-control mt-2" value={selectedDeliveryPackageId} onChange={e => {
+              const id = e.target.value
+              setSelectedDeliveryPackageId(id)
+              const source = schedulePackages.find(pkg => pkg.id === id)
+              const existing = source && packages.find(item => item.package_name.trim().toLowerCase() === source.name.trim().toLowerCase())
+              setSelectedPackageId(existing?.id || '')
+              setNotice('')
+            }}>
+              <option value="">Select a scheduled package</option>
+              {schedulePackages.map(pkg => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+            </select>
+          </label>
+          {selectedSchedulePackage && !linkedHandover && canEdit && <button type="button" className="btn btn-gold" disabled={creatingFromSchedule} onClick={async () => {
+            if (!projectId || !selectedSchedulePackage) return
+            setCreatingFromSchedule(true)
+            const { data: existing, error: lookupError } = await supabase.from('handover_packages').select('id').eq('project_id', projectId).ilike('package_name', selectedSchedulePackage.name).limit(1)
+            if (lookupError) { setNotice(lookupError.message); setCreatingFromSchedule(false); return }
+            if (existing?.length) { await loadPackages(); setSelectedPackageId(existing[0].id); setCreatingFromSchedule(false); return }
+            const { data, error } = await supabase.from('handover_packages').insert({
+              organization_id: organizationId, portfolio_id: portfolioId, project_id: projectId,
+              package_name: selectedSchedulePackage.name, package_type: 'Block',
+              target_handover_date: selectedSchedulePackage.date || null,
+              created_by: user?.id || null, created_by_name: user?.full_name || user?.email || null,
+            }).select().single()
+            if (error) setNotice(error.message)
+            else {
+              try { await createDefaultRequirements(data.id) } catch (e: any) { setNotice(e?.message || 'Package created; generate requirements manually.') }
+              await loadPackages(); setSelectedPackageId(data.id)
+              setNotice('Handover started for ' + selectedSchedulePackage.name + '.')
+            }
+            setCreatingFromSchedule(false)
+          }}><Plus size={15} /> {creatingFromSchedule ? 'Starting…' : 'Start handover'}</button>}
         </div>
-
-        <input
-          className="form-control"
-          placeholder="Package name e.g. Block A - Unit 01"
-          value={packageForm.package_name}
-          disabled={!canEdit}
-          onChange={e => setPackageForm({ ...packageForm, package_name: e.target.value })}
-        />
-
-        <select
-          className="form-control"
-          value={packageForm.package_type}
-          disabled={!canEdit}
-          onChange={e => setPackageForm({ ...packageForm, package_type: e.target.value })}
-        >
-          <option>Unit</option>
-          <option>Block</option>
-          <option>Project</option>
-        </select>
-
-        <input
-          type="date"
-          className="form-control"
-          value={packageForm.target_handover_date}
-          disabled={!canEdit}
-          onChange={e =>
-            setPackageForm({ ...packageForm, target_handover_date: e.target.value })
-          }
-        />
-
-        <button className="btn btn-gold" disabled={!canEdit} onClick={createPackage}>
-          <Plus size={15} />
-          New Package
-        </button>
+        {selectedSchedulePackage && <div className="text-xs text-[#65717c]">
+          Scheduled handover: <strong>{selectedSchedulePackage.date || 'Not available'}</strong> · {linkedHandover ? 'Existing handover record opened' : 'Handover has not started'}
+        </div>}
+        {!schedulePackages.length && <p className="text-xs text-[#65717c]">{deliveryPackagesQuery.isLoading || tasksQuery.isLoading ? 'Loading packages from Schedule…' : 'No active delivery packages found for this project. Add packages in Schedule first.'}</p>}
       </div>
 
       {hasEmptyRequirements && (
