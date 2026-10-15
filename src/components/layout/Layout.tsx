@@ -4,7 +4,7 @@ import { parseISO, differenceInDays } from 'date-fns'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { PackageCheck } from 'lucide-react'
-import { useDeliveryPackages } from '@/features/schedule/deliveryPackages'
+import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useAccessSession } from '@/access/AccessSessionProvider'
@@ -219,15 +219,8 @@ export default function Layout() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
   const role = useMembershipStore(state => state.role)
-  const { data: deliveryPackages = [], isLoading: packageDatesLoading } = useDeliveryPackages()
-  const datedPackages = deliveryPackages
-    .filter(pkg => pkg.status !== 'Completed' && pkg.planned_finish && !Number.isNaN(Date.parse(pkg.planned_finish)))
-    .sort((a, b) => Date.parse(a.planned_finish!) - Date.parse(b.planned_finish!))
-  // B13 retains its existing project-programme handover date until a package-specific date is recorded.
-  const b13Recorded = deliveryPackages.some(pkg => /^b\s*[- ]?13$/i.test(pkg.name.trim()))
-  const allDatedHandovers = [...datedPackages.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: parseISO(pkg.planned_finish!) })),
-    ...(!b13Recorded && handoverDate ? [{ id: 'existing-b13', name: 'B13', date: handoverDate }] : [])]
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
+  const { data: datedPackages = [], isLoading: packageDatesLoading } = usePackageHandoverDates()
+  const allDatedHandovers = datedPackages.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: parseISO(pkg.planned_finish!) }))
   const nextHandover = allDatedHandovers.find(pkg => pkg.date.getTime() >= Date.now() - 86400000) || allDatedHandovers[0] || null
   const nextPackage = datedPackages.find(pkg => Date.parse(pkg.planned_finish!) >= Date.now() - 86400000) || datedPackages[0] || null
   const nextPackageDate = nextPackage ? parseISO(nextPackage.planned_finish!) : null
