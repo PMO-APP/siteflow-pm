@@ -74,6 +74,7 @@ export default function InternalAssignmentsPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -91,6 +92,7 @@ export default function InternalAssignmentsPage() {
 
   useEffect(() => {
     if (!canAssign || searchParams.get('action') !== 'new') return
+    setShowCreate(true)
 
     window.setTimeout(() => {
       document.getElementById('internal-task-title')?.focus()
@@ -261,6 +263,7 @@ export default function InternalAssignmentsPage() {
     setVisibility('Private')
     setSubmitting(false)
 
+    setShowCreate(false)
     await loadTasks()
   }
 
@@ -302,30 +305,34 @@ export default function InternalAssignmentsPage() {
 
   return (
     <div className="-m-4 min-h-screen bg-[#f6f5f1] p-4 text-[#18212b] sm:-m-6 sm:p-6 lg:p-8">
-      <section className="overflow-hidden rounded-[26px] border border-[#dfe3e7] bg-white p-7 sm:p-9">
-        <div className="inline-flex mb-4 px-3 py-1 rounded-full border border-[#ffb7a6] bg-[#fff2ec] text-[#df5f41] text-xs">
-          Internal Control
+      <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dfe3e7] bg-white p-5">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#102943]">Internal Assignments</h1>
+          <p className="mt-1 text-sm text-[#65717c]">Assign work, track ownership and follow up on deadlines.</p>
         </div>
-
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-[-.04em] text-[#102943]">
-          Internal Assignments
-        </h1>
-
-        <p className="text-[#65717c] mt-3 max-w-2xl">
-          Team leads can assign tasks, track progress, and reduce follow-up
-          emails through structured internal communication.
-        </p>
-      </section>
-
+        {canAssign && <button type="button" onClick={() => setShowCreate(v => !v)} className="inline-flex items-center gap-2 rounded-xl bg-[#123a60] px-4 py-3 text-sm font-semibold text-white">
+          <Plus size={16} /> {showCreate ? 'Close form' : 'New Assignment'}
+        </button>}
+      </header>
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          ['Open', tasks.filter(t => t.status === 'Open' || !t.status).length],
+          ['In progress', tasks.filter(t => t.status === 'In Progress').length],
+          ['Completed', tasks.filter(t => t.status === 'Completed').length],
+          ['Overdue', tasks.filter(t => t.due_date && t.due_date < new Date().toISOString().slice(0, 10) && t.status !== 'Completed').length],
+        ].map(([label, count]) => <div key={label} className="rounded-2xl border border-[#dfe3e7] bg-white p-4">
+          <div className="text-xs text-[#65717c]">{label}</div><div className="mt-1 text-2xl font-semibold text-[#102943]">{loading ? '—' : count}</div>
+        </div>)}
+      </div>
       {notice && (
         <div className="rounded-xl border border-[#cfdbe3] bg-white p-4 text-sm text-[#31526d]">
           {notice}
         </div>
       )}
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        {canAssign && (
-          <div id="create-internal-task" className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 xl:col-span-1">
+      <section className="grid grid-cols-1 gap-5">
+        {canAssign && showCreate && (
+          <div id="create-internal-task" className="rounded-[24px] border border-[#dfe3e7] bg-white p-6 max-w-3xl">
             <div className="flex items-center gap-2 mb-5">
               <Plus size={18} className="text-[#df5f41]" />
               <h2 className="text-lg font-semibold text-[#102943]">
@@ -333,22 +340,27 @@ export default function InternalAssignmentsPage() {
               </h2>
             </div>
 
-            <div className="space-y-3">
+            <p className="mb-5 text-sm text-[#65717c]">Define the work, choose the responsible team or role, and set a deadline. Fields marked * are required.</p>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-[#102943]">Assignment title *
               <input
                 id="internal-task-title"
                 className="form-control"
                 placeholder="Task title"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-              />
+              /></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Description / expected deliverable
               <textarea
                 className="form-control min-h-[100px]"
                 placeholder="Task description"
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-              />
+              /></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Assigned department
+                <span className="mb-1 block text-xs font-normal text-[#65717c]">Which department is responsible for this work?</span>
               <select
                 className="form-control"
                 value={assignedDepartment}
@@ -359,8 +371,10 @@ export default function InternalAssignmentsPage() {
                     {department}
                   </option>
                 ))}
-              </select>
+              </select></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Assigned team or role
+                <span className="mb-1 block text-xs font-normal text-[#65717c]">Choose the role that should receive the assignment.</span>
               <select
                 className="form-control"
                 value={assignedRole}
@@ -371,22 +385,27 @@ export default function InternalAssignmentsPage() {
                     {formatRole(item)}
                   </option>
                 ))}
-              </select>
+              </select></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Responsible person's name
               <input
                 className="form-control"
                 placeholder="Assigned person name"
                 value={assignedName}
                 onChange={e => setAssignedName(e.target.value)}
-              />
+              /></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Responsible person's email *
+                <span className="mb-1 block text-xs font-normal text-[#65717c]">Used to notify the assignee. Enter their registered work email.</span>
               <input
+                type="email"
                 className="form-control"
                 placeholder="Assigned person email"
                 value={assignedEmail}
                 onChange={e => setAssignedEmail(e.target.value)}
-              />
+              /></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Priority
               <select
                 className="form-control"
                 value={priority}
@@ -397,8 +416,10 @@ export default function InternalAssignmentsPage() {
                     {item}
                   </option>
                 ))}
-              </select>
+              </select></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Visibility
+                <span className="mb-1 block text-xs font-normal text-[#65717c]">Who should be able to see this assignment?</span>
               <select
                 className="form-control"
                 value={visibility}
@@ -413,14 +434,15 @@ export default function InternalAssignmentsPage() {
                       : 'Project Visible'}
                   </option>
                 ))}
-              </select>
+              </select></label>
 
+              <label className="block text-sm font-medium text-[#102943]">Due date
               <input
                 type="date"
                 className="form-control"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-              />
+              /></label>
 
               <button
                 onClick={createTask}
@@ -435,9 +457,10 @@ export default function InternalAssignmentsPage() {
 
         <div
           className={
-            canAssign ? 'xl:col-span-2 space-y-4' : 'xl:col-span-3 space-y-4'
+            'space-y-4'
           }
         >
+          <h2 className="text-lg font-semibold text-[#102943]">Assignments</h2>
           {loading ? (
             <div className="card p-6 text-[#65717c]">
               Loading internal assignments…
@@ -454,7 +477,7 @@ export default function InternalAssignmentsPage() {
 
               <p className="text-sm text-[#7b8791] mt-2">
                 {canAssign
-                  ? 'Tasks assigned by team leads will appear here.'
+                  ? 'No assignments yet. Use New Assignment to create the first one.'
                   : 'Tasks assigned to your role or email will appear here.'}
               </p>
             </div>
