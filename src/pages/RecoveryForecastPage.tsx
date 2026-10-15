@@ -384,6 +384,19 @@ export default function RecoveryForecastPage() {
   const packageTargets = useMemo(() => deliveryPackages
     .filter(pkg => pkg.planned_finish && /^\d{4}-\d{2}-\d{2}/.test(pkg.planned_finish))
     .sort((a, b) => (a.planned_finish || '').localeCompare(b.planned_finish || '')), [deliveryPackages])
+  // Package dates are management targets, not independent completion forecasts.
+  // Keep this outlook distinct from the schedule-driven engine.forecastDate.
+  const latestPackageTarget = useMemo(() => {
+    const dates = packageTargets.map(pkg => safeDate(pkg.planned_finish)).filter((date): date is Date => date !== null)
+    return dates.length ? new Date(Math.max(...dates.map(date => date.getTime()))) : null
+  }, [packageTargets])
+  const packagesBeyondApprovedTarget = useMemo(() => {
+    const approved = safeDate(activeRevisionTarget)
+    return approved ? packageTargets.filter(pkg => {
+      const finish = safeDate(pkg.planned_finish)
+      return finish !== null && finish.getTime() > approved.getTime()
+    }) : []
+  }, [packageTargets, activeRevisionTarget])
   const { data: tasksFromHook = [], isLoading: tasksLoading } = useTasks()
 
   const [context, setContext] = useState(makeEmptyContext())
@@ -988,6 +1001,15 @@ export default function RecoveryForecastPage() {
                   <div><span className="block text-xs text-[#65717c]">Active approved programme target</span><strong>{formatDate(safeDate(activeRevisionTarget))}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Current comparison target</span><strong>{formatDate(engine.targetDate)}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Calculated project forecast</span><strong>{formatDate(engine.forecastDate)}</strong></div>
+                </div>
+                <div className="mt-3 rounded-lg border border-[#dfe3e7] bg-white p-3" aria-label="Package target outlook">
+                  <div className="text-xs font-semibold text-[#123a60]">Latest package planned finish</div>
+                  <div className="mt-1 text-lg font-semibold">{packagesLoading ? 'Loading…' : packagesError ? 'Unavailable' : formatDate(latestPackageTarget)}</div>
+                  <p className="mt-1 text-xs text-[#65717c]">Latest recorded target across active packages, not a calculated forecast or approved master handover date.</p>
+                  {!packagesLoading && !packagesError && activeRevisionTarget && packagesBeyondApprovedTarget.length > 0 && (
+                    <p role="status" className="mt-2 text-xs text-amber-700">{packagesBeyondApprovedTarget.length} package(s) have planned finishes later than the active programme target. Review schedule alignment; this does not establish a forecast delay.</p>
+                  )}
+                  {!activeRevisionTarget && <p className="mt-2 text-xs text-[#65717c]">No active programme target available for a package-date comparison.</p>}
                 </div>
                 <p className="mt-2 text-xs text-[#65717c]">Package planned finishes are separate management dates, not automatically the master project forecast. An unavailable baseline or active target is not inferred.</p>
                 <details className="mt-3 border-t border-[#dfe3e7] pt-2">
