@@ -20,6 +20,7 @@ import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEn
 import { getRevisionTargetDate, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 import { usePackageHandoverDates } from '@/features/schedule/usePackageHandoverDates'
 import { calculatePackageForecast, auditPackageEvidence } from '@/features/schedule/packageForecast'
+import PackageProductionEvidence from '@/features/schedule/PackageProductionEvidence'
 
 type ProjectScope =
   | 'Carcass'
@@ -1002,6 +1003,7 @@ export default function RecoveryForecastPage() {
           </div>
           <p className="mt-2 text-xs text-amber-700">Illustrative scenario only. This control does not update approved programmes, baselines or saved package targets.</p>
         </div>
+        <div className="mt-4"><PackageProductionEvidence projectId={projectId} packages={visiblePackageHandovers.map(p => ({ id: p.id, name: p.name }))} tasks={projectTasks} /></div>
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h3 className="text-sm font-semibold text-amber-900">Site evidence readiness</h3>
           <p className="mt-1 text-xs text-amber-800">Activity timestamps are evidence of updates, not measured production rates. No crew capacity or quantity-based productivity has been verified; therefore none of these dates is a validated forecast.</p>
