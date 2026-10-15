@@ -984,8 +984,8 @@ export default function RecoveryForecastPage() {
               <div className="mt-4 rounded-xl border border-[#dfe3e7] bg-[#f8fafb] p-3 text-sm" aria-label="Programme and package date distinctions">
                 <div className="font-semibold text-[#123a60]">Completion date references</div>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <div><span className="block text-xs text-[#65717c]">Original baseline (revision record)</span><strong>{formatDate(activeRevision?.baseline_finish || null)}</strong></div>
-                  <div><span className="block text-xs text-[#65717c]">Active approved programme target</span><strong>{formatDate(activeRevisionTarget)}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Original baseline (revision record)</span><strong>{formatDate(safeDate(activeRevision?.baseline_finish || null))}</strong></div>
+                  <div><span className="block text-xs text-[#65717c]">Active approved programme target</span><strong>{formatDate(safeDate(activeRevisionTarget))}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Current comparison target</span><strong>{formatDate(engine.targetDate)}</strong></div>
                   <div><span className="block text-xs text-[#65717c]">Calculated project forecast</span><strong>{formatDate(engine.forecastDate)}</strong></div>
                 </div>
@@ -998,7 +998,7 @@ export default function RecoveryForecastPage() {
                     : <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">{packageTargets.map(pkg => (
                       <div key={pkg.id} className="flex items-center justify-between gap-3 border-b border-[#e7eaed] pb-2 text-xs">
                         <span>{pkg.name} <span className="text-[#65717c]">({pkg.status})</span></span>
-                        <strong className="shrink-0">{formatDate(pkg.planned_finish || null)}</strong>
+                        <strong className="shrink-0">{formatDate(safeDate(pkg.planned_finish || null))}</strong>
                       </div>
                     ))}</div>}
                   <p className="mt-2 text-xs text-[#65717c]">These are delivery-package planned finish dates. Confirm separately whether each is an approved recovery commitment.</p>
