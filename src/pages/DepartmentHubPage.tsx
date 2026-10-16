@@ -12,13 +12,13 @@ const design: Folder[] = [
   { title: 'Design Intelligence', description: 'Design risk analysis and drawing quality intelligence.', to: '/app/design-intelligence' },
 ]
 const costing: Folder[] = [
-  { title: 'Costing Reports', description: 'Weekly cost reporting and submission history.', to: '/app/costing?section=report' },
-  { title: 'Cost Overview', description: 'Project cost position and summary.', to: '/app/costing?section=overview' },
-  { title: 'Contracts & Commitments', description: 'Contracts, commitments and commercial records.', to: '/app/costing?section=contracts' },
-  { title: 'Valuations & Payment Tracker', description: 'Payment requests, statuses and outstanding actions.', to: '/app/costing?section=payments' },
-  { title: 'Variations', description: 'Commercial changes and variation status.', to: '/app/costing?section=variations' },
-  { title: 'Procurement', description: 'Procurement commitments and delivery status.', to: '/app/costing?section=procurement' },
-  { title: 'Financial Register', description: 'Project financial entries and records.', to: '/app/costing?section=financial-register' },
+  { title: 'Costing Reports', description: 'Weekly cost reporting and submission history.', to: '/app/costing/reports' },
+  { title: 'Cost Overview', description: 'Project cost position and summary.', to: '/app/costing/overview' },
+  { title: 'Contracts & Commitments', description: 'Contracts, commitments and commercial records.', to: '/app/costing/contracts' },
+  { title: 'Payment Tracker', description: 'Payment requests, statuses and outstanding actions.', to: '/app/costing/payments' },
+  { title: 'Variations', description: 'Commercial changes and variation status.', to: '/app/costing/variations' },
+  { title: 'Procurement', description: 'Procurement commitments and delivery status.', to: '/app/costing/procurement' },
+  { title: 'Financial Register', description: 'Project financial entries and records.', to: '/app/costing/financial-register' },
 ]
 export default function DepartmentHubPage({ department }: { department: 'design' | 'costing' }) {
   const { projectName } = useProjectStore()
