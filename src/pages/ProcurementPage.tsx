@@ -1,6 +1,6 @@
 import { useMembershipStore } from '@/store/membership'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Plus, X, Search } from 'lucide-react'
 import {
@@ -456,6 +456,44 @@ export default function ProcurementPage() {
   const role = useMembershipStore(state => state.role)
   const { can, session } = useAccessSession()
   const { projectId } = useProjectStore()
+  const queryClient = useQueryClient()
+  const [linkCostingId, setLinkCostingId] = useState('')
+  const [linkPaymentId, setLinkPaymentId] = useState('')
+  const [linkItemId, setLinkItemId] = useState('')
+  const [linkError, setLinkError] = useState('')
+  const [linkSuccess, setLinkSuccess] = useState('')
+  const { data: costingLinks = [] } = useQuery({
+    queryKey: ['procurement-costing-links', projectId], enabled: Boolean(projectId),
+    queryFn: async () => { const { data, error } = await supabase.from('procurement_costing_links').select('id,procurement_item_id,costing_procurement_id'); if (error) throw error; return data || [] },
+  })
+  const { data: paymentLinks = [] } = useQuery({
+    queryKey: ['procurement-payment-links', projectId], enabled: Boolean(projectId),
+    queryFn: async () => { const { data, error } = await supabase.from('procurement_payment_links').select('id,procurement_item_id,payment_id'); if (error) throw error; return data || [] },
+  })
+  const { data: projectPayments = [], error: paymentsError } = useQuery({
+    queryKey: ['procurement-project-payments', projectId], enabled: Boolean(projectId),
+    queryFn: async () => { const { data, error } = await supabase.from('cost_payments').select('id,payment_title,vendor_name,amount,payment_status,payment_category,paid_date').eq('project_id', projectId!).order('created_at', { ascending: false }); if (error) throw error; return data || [] },
+  })
+  const { data: paymentStages = [] } = useQuery({
+    queryKey: ['procurement-payment-stages', projectId], enabled: Boolean(projectId),
+    queryFn: async () => { const { data, error } = await supabase.from('cost_payment_tracking').select('payment_id,project_id,stage,updated_at').eq('project_id', projectId!); if (error) throw error; return data || [] },
+  })
+  const linkMutation = useMutation({
+    mutationFn: async (kind: 'costing' | 'payment') => {
+      if (!linkItemId) throw new Error('Select a central procurement item.')
+      const sourceId = kind === 'costing' ? linkCostingId : linkPaymentId
+      if (!sourceId) throw new Error('Select a record to link.')
+      const table = kind === 'costing' ? 'procurement_costing_links' : 'procurement_payment_links'
+      const field = kind === 'costing' ? 'costing_procurement_id' : 'payment_id'
+      const { error } = await supabase.from(table).insert({ procurement_item_id: linkItemId, [field]: sourceId })
+      if (error) throw error
+    },
+    onSuccess: async () => {
+      setLinkError(''); setLinkSuccess('Records linked successfully.'); setLinkCostingId(''); setLinkPaymentId('')
+      await Promise.all([queryClient.invalidateQueries({queryKey:['procurement-costing-links']}),queryClient.invalidateQueries({queryKey:['procurement-payment-links']})])
+    },
+    onError: (error: Error) => {setLinkSuccess(''); setLinkError(error.message)},
+  })
   // Legacy Costing procurement records are retained and displayed read-only.
   // Never silently copy these rows into procurement_items: records may overlap.
   const { data: legacyCostingItems = [], error: legacyCostingError, isLoading: legacyCostingLoading } = useQuery({
@@ -598,6 +636,49 @@ export default function ProcurementPage() {
           </div>
         )}
         <p className="text-xs text-slate-500">These entries are read-only until they are reconciled against the main register. They are not included in procurement readiness totals, preventing accidental double-counting.</p>
+      </section>
+
+      <section className="card p-4 space-y-4" aria-label="Procurement commercial and payment links">
+        <div>
+          <h2 className="font-semibold text-base">Commercial & payment connections</h2>
+          <p className="text-xs text-slate-500 mt-1">Link existing Costing and payment records to one central procurement item. Links do not copy records or change procurement readiness totals.</p>
+        </div>
+        {linkError && <p role="alert" className="text-sm text-red-500">{linkError}</p>}
+        {linkSuccess && <p role="status" className="text-sm text-emerald-600">{linkSuccess}</p>}
+        {canEdit && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label className="text-xs font-medium">Central procurement item
+              <select className="form-control mt-1" value={linkItemId} onChange={e=>{setLinkItemId(e.target.value);setLinkError('');setLinkSuccess('')}}>
+                <option value="">Select item</option>{items.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-medium">Historical Costing record
+              <select className="form-control mt-1" value={linkCostingId} onChange={e=>setLinkCostingId(e.target.value)}>
+                <option value="">Select record</option>{legacyCostingItems.filter(r=>!costingLinks.some(l=>l.costing_procurement_id===r.id)).map(r=><option key={r.id} value={r.id}>{r.item_name} · {r.vendor_name || 'No vendor'}</option>)}
+              </select>
+              <button className="btn btn-ghost btn-sm mt-2" disabled={!linkItemId || !linkCostingId || linkMutation.isPending} onClick={()=>linkMutation.mutate('costing')}>Link Costing record</button>
+            </label>
+            <label className="text-xs font-medium">Existing payment request
+              <select className="form-control mt-1" value={linkPaymentId} onChange={e=>setLinkPaymentId(e.target.value)}>
+                <option value="">Select payment</option>{projectPayments.filter(r=>!paymentLinks.some(l=>l.payment_id===r.id)).map(r=><option key={r.id} value={r.id}>{r.payment_title} · ₦{Number(r.amount||0).toLocaleString()}</option>)}
+              </select>
+              <button className="btn btn-ghost btn-sm mt-2" disabled={!linkItemId || !linkPaymentId || linkMutation.isPending} onClick={()=>linkMutation.mutate('payment')}>Link payment request</button>
+            </label>
+          </div>
+        )}
+        {paymentsError && <p className="text-xs text-amber-600">Payment records could not be loaded for this account. Existing links remain unchanged.</p>}
+        {items.length === 0 ? <p className="text-sm text-slate-500">Add a central procurement item before linking Costing or payment records.</p> : (
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b"><th className="p-2">Procurement item</th><th className="p-2">Costing record</th><th className="p-2">Linked payments & stages</th></tr></thead>
+          <tbody>{items.map(item=>{
+            const cl = costingLinks.filter(l=>l.procurement_item_id===item.id)
+            const pl = paymentLinks.filter(l=>l.procurement_item_id===item.id)
+            return <tr key={item.id} className="border-b border-slate-200/10 align-top"><td className="p-2 font-medium">{item.name}</td>
+              <td className="p-2">{cl.length ? cl.map(l=>{const r=legacyCostingItems.find(x=>x.id===l.costing_procurement_id);return <div key={l.id}>{r?.item_name || 'Linked Costing record'}{r && <span className="text-xs text-slate-500"> · Est. ₦{Number(r.estimated_cost||0).toLocaleString()} / Actual ₦{Number(r.actual_cost||0).toLocaleString()}</span>}</div>}) : <span className="text-slate-500">Not linked</span>}</td>
+              <td className="p-2">{pl.length ? pl.map(l=>{const r=projectPayments.find(x=>x.id===l.payment_id);const tracking=paymentStages.find((t:any)=>t.payment_id===l.payment_id);return <div key={l.id} className="mb-2">{r?.payment_title || 'Linked payment'} · ₦{Number(r?.amount||0).toLocaleString()}<div className="text-xs text-slate-500">Payment: {r?.payment_status || 'Not available'} · Stage: {(tracking as any)?.stage || (tracking as any)?.current_stage || 'Not yet confirmed by Costing'}</div></div>}) : <span className="text-slate-500">No linked payments</span>}</td>
+            </tr>
+          })}</tbody></table></div>
+        )}
+        <p className="text-xs text-slate-500">Payment stages are reported by Costing; Fincon executes payment. Linking does not confirm that a payment has been made. Only verified payment records should be treated as paid.</p>
       </section>
 
       {!canEdit && (
