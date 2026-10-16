@@ -19,6 +19,8 @@ export type PackageDeliveryPosition = {
   actualPosition: ProjectState['schedule']['activities'][number] | null
   activityGap: number
   delayDays: number
+  plannedFinish: Date | null
+  forecastFinish: Date | null
   status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
 }
 
@@ -40,6 +42,7 @@ export type ForecastV2Result = {
   primaryConstraint: string | null
   packagePositions: PackageDeliveryPosition[]
   pressurePackage: PackageDeliveryPosition | null
+  incompletePackageForecasts: number
 }
 
 type Activity = ProjectState['schedule']['activities'][number]
@@ -271,6 +274,9 @@ export function calculateForecastV2(
         ? Math.round(packageActivities.reduce((sum, item) => sum + item.progress, 0) / packageActivities.length)
         : 0
       const delayDays = packageSequence.delayDays
+      const finishes = packageActivities.map(item => toDate(item.plannedFinish)).filter((date): date is Date => date !== null)
+      const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
+      const forecastFinish = plannedFinish ? addDays(plannedFinish, Math.max(0, delayDays)) : null
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
           ? 'on_track'
@@ -293,6 +299,8 @@ export function calculateForecastV2(
         actualPosition: packageSequence.actualPosition?.source || null,
         activityGap: packageSequence.activityGap,
         delayDays,
+        plannedFinish,
+        forecastFinish,
         status,
       }
     })
@@ -327,32 +335,29 @@ export function calculateForecastV2(
       ? clamp((actualPerDay / requiredPerDay) * 100)
       : 100
 
-  const delayDays = isMultiPackage
-    ? pressurePackage?.delayDays || 0
-    : sequence.delayDays
-
-  // The approved project target defines the relevant scope completion. The
-  // imported programme finish is used only when no project target is available.
-  const targetDate =
+  const projectTarget =
     toDate(state.project.handoverDate) ||
     toDate(state.project.targetDate) ||
     toDate(state.schedule.finishDate)
-
-  // A multi-package master finishes when its last active package finishes.
-  // Do not apply the worst package delay to a different package's target date.
-  const packageForecastDates = Array.from(packageGroups.values()).map(group => {
-    const dated = group.map(activity => toDate(activity.plannedFinish)).filter((date): date is Date => date !== null)
-    if (!dated.length) return null
-    const packageFinish = new Date(Math.max(...dated.map(date => date.getTime())))
-    const position = packagePositions.find(item => group.some(activity => activity.deliveryPackageId === item.packageId))
-    return addDays(packageFinish, Math.max(0, position?.delayDays || 0))
-  }).filter((date): date is Date => date !== null)
-  const latestPackageForecast = packageForecastDates.length
-    ? new Date(Math.max(...packageForecastDates.map(date => date.getTime())))
-    : null
+  // Each package owns its own programme finish. A master date is valid only
+  // when every identified package has a dated programme.
+  const incompletePackageForecasts = isMultiPackage
+    ? Array.from(packageGroups.keys()).filter(id => !packagePositions.some(p => p.packageId === id && p.forecastFinish)).length
+    : 0
+  const datedPackages = packagePositions.filter(p => p.plannedFinish && p.forecastFinish)
+  const targetDate = isMultiPackage
+    ? (incompletePackageForecasts === 0 && datedPackages.length
+      ? new Date(Math.max(...datedPackages.map(p => p.plannedFinish!.getTime()))) : null)
+    : projectTarget
   const forecastDate = isMultiPackage
-    ? latestPackageForecast || targetDate
-    : targetDate && delayDays > 0 ? addDays(targetDate, delayDays) : targetDate
+    ? (incompletePackageForecasts === 0 && datedPackages.length
+      ? new Date(Math.max(...datedPackages.map(p => p.forecastFinish!.getTime()))) : null)
+    : projectTarget && sequence.delayDays > 0 ? addDays(projectTarget, sequence.delayDays) : projectTarget
+  // Compare master dates on the same calendar-day basis, never a pressure
+  // package's delay against another package's target.
+  const delayDays = isMultiPackage
+    ? (forecastDate && targetDate ? Math.max(0, differenceInCalendarDays(forecastDate, targetDate)) : 0)
+    : sequence.delayDays
 
   const blockedCritical = activities.filter(activity => {
     const plannedStart = toDate(activity.plannedStart)
@@ -406,5 +411,6 @@ export function calculateForecastV2(
     primaryConstraint,
     packagePositions,
     pressurePackage,
+    incompletePackageForecasts,
   }
 }
