@@ -296,7 +296,7 @@ export function canEditDesign(
   role?: string | null,
   isAssignedProjectOwner?: boolean
 ) {
-  return canEditAssignedProject(role, isAssignedProjectOwner)
+  return ['workspace_admin', 'admin', 'design'].includes(role || '') && Boolean(isAssignedProjectOwner)
 }
 
 export function canEditInfrastructure(
@@ -336,11 +336,11 @@ export function canEditReports(
 }
 
 export function canEditCosting(role?: string | null) {
-  return role === 'costing'
+  return ['workspace_admin', 'admin', 'costing'].includes(role || '')
 }
 
 export function canManageFinancials(role?: string | null) {
-  return role === 'costing'
+  return ['workspace_admin', 'admin', 'costing'].includes(role || '')
 }
 
 export function canApprove(
