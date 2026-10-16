@@ -74,7 +74,8 @@ export default function DesignReportsPage() {
   const { projectId, projectName, organizationId, portfolioId } = useProjectStore()
   const { can } = useAccessSession()
 
-  const canEdit = Boolean(projectId) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'design' })
+  const isDesignDepartment = ['design', 'admin', 'workspace_admin'].includes(String(role || '').toLowerCase())
+  const canEdit = Boolean(projectId) && isDesignDepartment && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'design' })
   const reportRef = useRef<HTMLDivElement>(null)
 
   const [reportWeek, setReportWeek] = useState(() => toLocalDateInput(getCurrentReportFriday()))
