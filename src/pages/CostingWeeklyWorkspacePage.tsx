@@ -39,6 +39,10 @@ export default function CostingWeeklyWorkspacePage() {
   const [status, setStatus] = useState('Open')
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('')
+  const [confirmingSource, setConfirmingSource] = useState<string | null>(null)
+  const [sourceNote, setSourceNote] = useState('')
+  const [sourceStatus, setSourceStatus] = useState('')
+  const [savingSource, setSavingSource] = useState(false)
   const [loading, setLoading] = useState(false)
   const canEdit = ['costing', 'admin', 'workspace_admin'].includes(role || '')
   async function refresh() {
@@ -101,14 +105,45 @@ export default function CostingWeeklyWorkspacePage() {
     if (error) { setMessage(error.message); return }
     setTitle(''); setDescription(''); setAmount(''); setMessage('Saved to the project Costing report.'); await refresh()
   }
+  // An explicit officer-confirmed weekly update is saved as a report entry.
+  // The operational register itself is not modified or silently duplicated.
+  function startSourceReview(item: SourceItem) {
+    setConfirmingSource(`${item.source}:${item.id}`)
+    setSourceNote('')
+    setSourceStatus(item.status === 'Not recorded' ? 'Pending' : item.status)
+  }
+  async function confirmSource(project: Project, item: SourceItem) {
+    if (!canEdit || !user || !organizationId || savingSource) return
+    if (!sourceNote.trim()) {
+      setMessage('Describe what happened this week, or explicitly write "No change confirmed".')
+      return
+    }
+    const entryTitle = `[${item.source}:${item.id}] ${item.title}`
+    if (items.some(i => i.project_id === project.id && i.report_week === week && i.item_title === entryTitle)) {
+      setMessage('This register item already has a confirmed entry for the selected week.')
+      return
+    }
+    setSavingSource(true)
+    const { error } = await supabase.from('cost_reports').insert({
+      organization_id: organizationId, portfolio_id: project.portfolio_id ?? null,
+      project_id: project.id, report_week: week, section: item.section,
+      item_title: entryTitle, description: sourceNote.trim(),
+      status: sourceStatus || 'Pending', amount: item.amount,
+      created_by: user.id, created_by_name: user.full_name || user.email || null,
+    })
+    setSavingSource(false)
+    if (error) { setMessage(error.message); return }
+    setConfirmingSource(null); setSourceNote(''); setMessage('Confirmed weekly update saved.')
+    await refresh()
+  }
   return <main className="p-6 space-y-5 max-w-[1500px] mx-auto">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-teal-700">Costing Management</p><h1 className="text-2xl font-bold">Consolidated weekly reporting workspace</h1><p className="text-sm text-slate-500">Review all projects in one place. Existing records are reused, not duplicated automatically.</p></div><Link className="border rounded-lg px-4 py-2" to="/app/costing/reports">Individual project report</Link></div>
     <div className="flex flex-wrap gap-3 items-end"><label className="text-sm">Week ending (Friday)<input className="block border rounded p-2" type="date" value={week} onChange={e => setWeek(fridayOf(e.target.value))}/></label><label className="text-sm">Find project<input className="block border rounded p-2" placeholder="Search projects" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="border rounded px-4 py-2" onClick={() => void refresh()}>Refresh</button></div>
     {message && <p role="status" className="rounded bg-slate-100 p-3 text-sm">{message}</p>}
     {loading ? <p>Loading Costing records…</p> : <p className="text-sm text-slate-600">{projects.length} projects · {items.length} weekly entries · {previous.length} unresolved prior entries · {sources.length} linked register records</p>}
     {sourceWarnings.length > 0 && <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm"><strong>Some register data could not be fully loaded.</strong>{sourceWarnings.map(w => <p key={w}>{w}</p>)}</div>}
-    <p className="text-xs text-slate-600">Register records below show the current recorded position, not verified activity for the selected reporting week. The officer must confirm what changed before including it in a submitted report.</p>
-    <div className="overflow-x-auto border rounded-xl"><table className="w-full min-w-[1100px] text-sm"><thead className="bg-slate-100"><tr><th className="text-left p-3">Project</th>{SECTIONS.map(s => <th key={s} className="text-left p-3">{s}</th>)}</tr></thead><tbody>{visible.map(p => <tr key={p.id} className="border-t align-top"><td className="p-3 font-semibold"><button className="text-left underline" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>{p.name} {expanded === p.id ? '−' : '+'}</button></td>{SECTIONS.map(s => { const current = items.filter(i => i.project_id === p.id && i.section === s); const carry = previousFor(p.id, s); const linked = sources.filter(i => i.project_id === p.id && i.section === s); return <td key={s} className="p-3"><button className="text-left" onClick={() => { setExpanded(p.id); setSection(s) }}><strong>{current.length}</strong> current{carry.length ? <span className="block text-amber-700">{carry.length} to review</span> : null}{linked.length ? <span className="block text-teal-700">{linked.length} in register</span> : null}</button>{expanded === p.id && section === s && <div className="mt-2 space-y-2 min-w-44">{current.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>{i.status}</p></div>)}{linked.map(i => <div key={`${i.source}:${i.id}`} className="border-t pt-1"><strong>{i.title}</strong><p>{i.status}{i.amount != null ? ` · ₦${i.amount.toLocaleString()}` : ''}</p>{i.details && <p className="text-xs text-slate-600">{i.details}</p>}<p className="text-[11px] text-slate-500">Live register: {i.source}. Confirm before reporting.</p></div>)}{carry.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>Last: {i.status} ({i.report_week})</p>{canEdit && <button className="underline text-teal-700" onClick={() => void add(p, i)}>Carry forward</button>}</div>)}{canEdit && <div className="space-y-1 border-t pt-2"><input className="w-full border p-1" placeholder="New activity" value={title} onChange={e => setTitle(e.target.value)}/><textarea className="w-full border p-1" placeholder="Update / remarks" value={description} onChange={e => setDescription(e.target.value)}/><select className="w-full border p-1" value={status} onChange={e => setStatus(e.target.value)}>{STATUS.map(v => <option key={v}>{v}</option>)}</select><input className="w-full border p-1" type="number" min="0" placeholder="Amount (optional)" value={amount} onChange={e => setAmount(e.target.value)}/><button className="rounded bg-teal-700 text-white px-2 py-1" onClick={() => void add(p)}>Save activity</button></div>}</div>}</td>})}</tr>)}</tbody></table></div>
+    <p className="text-xs text-slate-600">Register records below show the current recorded position, not verified activity for the selected reporting week. Select “Confirm weekly update” to record a dated, officer-verified note; this never changes the source register. The officer must confirm what changed before including it in a submitted report.</p>
+    <div className="overflow-x-auto border rounded-xl"><table className="w-full min-w-[1100px] text-sm"><thead className="bg-slate-100"><tr><th className="text-left p-3">Project</th>{SECTIONS.map(s => <th key={s} className="text-left p-3">{s}</th>)}</tr></thead><tbody>{visible.map(p => <tr key={p.id} className="border-t align-top"><td className="p-3 font-semibold"><button className="text-left underline" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>{p.name} {expanded === p.id ? '−' : '+'}</button></td>{SECTIONS.map(s => { const current = items.filter(i => i.project_id === p.id && i.section === s); const carry = previousFor(p.id, s); const linked = sources.filter(i => i.project_id === p.id && i.section === s); return <td key={s} className="p-3"><button className="text-left" onClick={() => { setExpanded(p.id); setSection(s) }}><strong>{current.length}</strong> current{carry.length ? <span className="block text-amber-700">{carry.length} to review</span> : null}{linked.length ? <span className="block text-teal-700">{linked.length} in register</span> : null}</button>{expanded === p.id && section === s && <div className="mt-2 space-y-2 min-w-44">{current.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>{i.status}</p></div>)}{linked.map(i => <div key={`${i.source}:${i.id}`} className="border-t pt-1"><strong>{i.title}</strong><p>{i.status}{i.amount != null ? ` · ₦${i.amount.toLocaleString()}` : ''}</p>{i.details && <p className="text-xs text-slate-600">{i.details}</p>}<p className="text-[11px] text-slate-500">Live register: {i.source}. Confirm before reporting.</p>{canEdit && !current.some(c => c.item_title === `[${i.source}:${i.id}] ${i.title}`) && <div className="mt-1">{confirmingSource === `${i.source}:${i.id}` ? <div className="space-y-1"><textarea className="w-full border p-1" aria-label={`Weekly update for ${i.title}`} placeholder="What changed this week? Or: No change confirmed." value={sourceNote} onChange={e => setSourceNote(e.target.value)}/><input className="w-full border p-1" aria-label="Confirmed status" value={sourceStatus} onChange={e => setSourceStatus(e.target.value)}/><button disabled={savingSource} className="rounded bg-teal-700 text-white px-2 py-1 disabled:opacity-50" onClick={() => void confirmSource(p, i)}>Save confirmed update</button><button className="ml-2 underline" onClick={() => setConfirmingSource(null)}>Cancel</button></div> : <button className="underline text-teal-700" onClick={() => startSourceReview(i)}>Confirm weekly update</button>}</div>}</div>)}{carry.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>Last: {i.status} ({i.report_week})</p>{canEdit && <button className="underline text-teal-700" onClick={() => void add(p, i)}>Carry forward</button>}</div>)}{canEdit && <div className="space-y-1 border-t pt-2"><input className="w-full border p-1" placeholder="New activity" value={title} onChange={e => setTitle(e.target.value)}/><textarea className="w-full border p-1" placeholder="Update / remarks" value={description} onChange={e => setDescription(e.target.value)}/><select className="w-full border p-1" value={status} onChange={e => setStatus(e.target.value)}>{STATUS.map(v => <option key={v}>{v}</option>)}</select><input className="w-full border p-1" type="number" min="0" placeholder="Amount (optional)" value={amount} onChange={e => setAmount(e.target.value)}/><button className="rounded bg-teal-700 text-white px-2 py-1" onClick={() => void add(p)}>Save activity</button></div>}</div>}</td>})}</tr>)}</tbody></table></div>
     <p className="text-xs text-slate-500">This is a consolidated preparation view. Submission and immutable weekly snapshots remain in the existing Costing Reports workflow. Carry-forward entries require explicit confirmation and do not claim a new status change.</p>
   </main>
 }
