@@ -1,5 +1,7 @@
 import { useMembershipStore } from '@/store/membership'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import { Plus, X, Search } from 'lucide-react'
 import {
   useProcurement,
@@ -454,6 +456,21 @@ export default function ProcurementPage() {
   const role = useMembershipStore(state => state.role)
   const { can, session } = useAccessSession()
   const { projectId } = useProjectStore()
+  // Legacy Costing procurement records are retained and displayed read-only.
+  // Never silently copy these rows into procurement_items: records may overlap.
+  const { data: legacyCostingItems = [], error: legacyCostingError, isLoading: legacyCostingLoading } = useQuery({
+    queryKey: ['legacy-costing-procurements', projectId],
+    enabled: Boolean(projectId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cost_procurements')
+        .select('id,item_name,vendor_name,procurement_category,estimated_cost,actual_cost,status,request_date,expected_delivery_date,actual_delivery_date,remarks')
+        .eq('project_id', projectId!)
+        .order('id', { ascending: false })
+      if (error) throw error
+      return data || []
+    },
+  })
   const canEdit = Boolean(projectId) && can('procurement.edit', { scopeType: 'project', scopeId: projectId, discipline: session.discipline })
 
   const [modal, setModal] = useState<ProcurementItem | null | 'new'>(null)
@@ -550,6 +567,38 @@ export default function ProcurementPage() {
           { label: 'Delivered', value: delivered },
         ]}
       />
+
+      <section className="card p-4 space-y-3" aria-label="Legacy Costing procurement records">
+        <div className="flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <h2 className="font-semibold text-base">Costing procurement records</h2>
+            <p className="text-xs text-slate-500 mt-1">Historical commercial records from Costing, shown here for visibility. New procurement items should be created in the main register below.</p>
+          </div>
+          <span className="badge badge-blue">{legacyCostingItems.length} legacy records</span>
+        </div>
+        {legacyCostingLoading ? <p className="text-sm">Loading Costing records…</p> : legacyCostingError ? (
+          <p className="text-sm text-red-500" role="alert">Unable to load Costing records. Your account may not have permission to view them. Existing records are unaffected.</p>
+        ) : legacyCostingItems.length === 0 ? (
+          <p className="text-sm text-slate-500">No historical Costing procurement records found for this project.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left border-b"><th className="p-2">Item</th><th className="p-2">Vendor</th><th className="p-2">Status</th><th className="p-2">Expected delivery</th><th className="p-2">Estimated cost</th><th className="p-2">Actual cost</th></tr></thead>
+              <tbody>{legacyCostingItems.map(item => (
+                <tr key={String(item.id)} className="border-b border-slate-200/10">
+                  <td className="p-2"><div className="font-medium">{item.item_name || 'Untitled item'}</div><div className="text-xs text-slate-500">{item.procurement_category || '—'} · Costing record</div>{item.remarks && <div className="text-xs text-slate-500 mt-1">{item.remarks}</div>}</td>
+                  <td className="p-2">{item.vendor_name || '—'}</td>
+                  <td className="p-2">{item.status || '—'}</td>
+                  <td className="p-2">{item.expected_delivery_date ? fdate(item.expected_delivery_date) : '—'}</td>
+                  <td className="p-2">₦{Number(item.estimated_cost || 0).toLocaleString()}</td>
+                  <td className="p-2">₦{Number(item.actual_cost || 0).toLocaleString()}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+        <p className="text-xs text-slate-500">These entries are read-only until they are reconciled against the main register. They are not included in procurement readiness totals, preventing accidental double-counting.</p>
+      </section>
 
       {!canEdit && (
         <div className="card p-3 text-[11px] text-amber-400 border border-amber-500/20">
