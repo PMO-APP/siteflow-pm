@@ -18,6 +18,7 @@ import {
 import { EnterpriseMetric, EnterpriseNotice, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 import {
   getDesignDrawingUrl,
   loadDesignIntelligence,
@@ -62,7 +63,8 @@ export default function DesignIntelligencePage() {
   const [searchParams] = useSearchParams()
   const focusedDocumentId = searchParams.get('document')
   const role = useMembershipStore(state => state.role)
-  const canManage = ['workspace_admin', 'admin', 'pmo', 'design'].includes(String(role || '').toLowerCase())
+  const { can } = useAccessSession()
+  const canManage = Boolean(projectId) && ['workspace_admin', 'admin', 'design'].includes(String(role || '').toLowerCase()) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'design' })
   const canGovernRules = ['workspace_admin', 'admin', 'pmo'].includes(String(role || '').toLowerCase())
 
   const [tab, setTab] = useState<Tab>('Drawing Register')
