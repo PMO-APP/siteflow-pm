@@ -417,7 +417,9 @@ export default function App() {
           <Route path="rfis/new" element={<CreateRFIPage />} />
           <Route path="rfis/:rfiId" element={<RFIDetailPage />} />
           <Route path="documents" element={<DocumentsPage />} />
-          <Route path="design-intelligence" element={<DesignIntelligencePage />} />
+          <Route path="design-intelligence" element={<Navigate to="/app/design-management/intelligence" replace />} />
+          <Route path="design-management/reviews" element={<DesignIntelligencePage section="reviews" />} />
+          <Route path="design-management/intelligence" element={<DesignIntelligencePage section="intelligence" />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
