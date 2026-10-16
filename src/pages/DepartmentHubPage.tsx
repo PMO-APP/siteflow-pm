@@ -7,9 +7,9 @@ const design: Folder[] = [
   { title: 'Design Reports', description: 'Weekly design reporting and submitted report history.', to: '/app/design-reports?section=report' },
   { title: 'Drawing Register', description: 'Project drawings, revisions and approval status from Document Control.', to: '/app/design-reports?section=drawings' },
   { title: 'Consultant Management', description: 'Consultant updates, responsibilities and outstanding deliverables.', to: '/app/design-reports?section=consultants' },
-  { title: 'Design Reviews', description: 'Drawing analysis and technical design review intelligence.', to: '/app/design-intelligence' },
+  { title: 'Design Reviews', description: 'Drawing analysis and technical design review intelligence.', to: '/app/design-management/reviews' },
   { title: 'Design Issues', description: 'Track open design constraints, blockers and required decisions.', to: '/app/design-reports?section=issues' },
-  { title: 'Design Intelligence', description: 'Design risk analysis and drawing quality intelligence.', to: '/app/design-intelligence' },
+  { title: 'Design Intelligence', description: 'Design risk analysis and drawing quality intelligence.', to: '/app/design-management/intelligence' },
 ]
 const costing: Folder[] = [
   { title: 'Costing Reports', description: 'Weekly cost reporting and submission history.', to: '/app/costing/reports' },
