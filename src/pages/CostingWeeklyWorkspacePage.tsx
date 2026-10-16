@@ -47,7 +47,7 @@ export default function CostingWeeklyWorkspacePage() {
   const [showPreview, setShowPreview] = useState(false)
   const canEdit = ['costing', 'admin', 'workspace_admin'].includes(role || '')
   async function refresh() {
-    if (!organizationId) { setMessage('Select a project within your organization to load its Costing workspace.'); return }
+    if (!organizationId) { setMessage('Select a workspace organization to load the Cost Reporting Centre.'); return }
     setLoading(true); setMessage('')
     setSources([]); setSourceWarnings([])
     const [p, r] = await Promise.all([
@@ -139,7 +139,7 @@ export default function CostingWeeklyWorkspacePage() {
     await refresh()
   }
   return <main className="p-6 space-y-5 max-w-[1500px] mx-auto">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-teal-700">Costing Management</p><h1 className="text-2xl font-bold">Consolidated weekly reporting workspace</h1><p className="text-sm text-slate-500">Review all projects in one place. Existing records are reused, not duplicated automatically.</p></div><Link className="border rounded-lg px-4 py-2" to="/app/costing/reports">Individual project report</Link></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-teal-700">Workspace reporting</p><h1 className="text-2xl font-bold">Cost Reporting Centre</h1><p className="text-sm text-slate-500">Review all projects in one place. Existing records are reused, not duplicated automatically.</p></div><Link className="border rounded-lg px-4 py-2" to="/projects">Back to Workspace Hub</Link></div>
     <div className="flex flex-wrap gap-3 items-end"><label className="text-sm">Week ending (Friday)<input className="block border rounded p-2" type="date" value={week} onChange={e => setWeek(fridayOf(e.target.value))}/></label><label className="text-sm">Find project<input className="block border rounded p-2" placeholder="Search projects" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="border rounded px-4 py-2" onClick={() => void refresh()}>Refresh</button></div>
     {message && <p role="status" className="rounded bg-slate-100 p-3 text-sm">{message}</p>}
     {loading ? <p>Loading Costing records…</p> : <p className="text-sm text-slate-600">{projects.length} projects · {items.length} weekly entries · {previous.length} unresolved prior entries · {sources.length} linked register records</p>}
