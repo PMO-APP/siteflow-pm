@@ -101,7 +101,6 @@ const NAV: NavItem[] = [
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List', group: 'delivery' },
   { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs', group: 'technical' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents', group: 'technical' },
-  { to: '/app/design-intelligence', icon: ScanSearch, label: 'Design Intelligence', group: 'technical' },
   { to: '/app/costing-management', icon: Wallet, label: 'Costing Management', group: 'commercial' },
   { to: '/app/design-management', icon: ScanSearch, label: 'Design Management', group: 'technical' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register', group: 'governance' },
