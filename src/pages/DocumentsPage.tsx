@@ -2,7 +2,7 @@ import { logAudit } from '@/lib/audit'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, X, Search, Upload, Download } from 'lucide-react'
 import { useDocuments, useUpsertDocument } from '@/hooks/useData'
 import { uploadFile, backupFileToGoogleDrive } from '@/lib/supabase'
@@ -568,7 +568,6 @@ function DocModal({
 export default function DocumentsPage() {
   const role = useMembershipStore(state => state.role)
   const { user } = useAuthStore()
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   const { can, session } = useAccessSession()
@@ -638,7 +637,7 @@ export default function DocumentsPage() {
       )}
 
       <div className="rounded-xl border border-[#b9ebe6] bg-[#E8F6F4] px-4 py-3 text-sm text-[#0B2A3C]">
-        <strong>Document Control is the source of truth.</strong> Drawing uploads, revisions, approvals and superseded records are managed here. Design Intelligence reads these drawing records automatically for revision comparison and coordination review.
+        <strong>Project Document Control:</strong> Access project drawings, specifications, reports, approvals and other controlled documents. Register documents, manage revisions and retrieve the latest approved versions.
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -660,12 +659,6 @@ export default function DocumentsPage() {
           Document Library
         </button>
 
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={() => navigate('/app/design-management/reviews')}
-        >
-          Design Intelligence
-        </button>
       </div>
 
       {viewMode === 'register' ? (
@@ -883,15 +876,6 @@ export default function DocumentsPage() {
                                 </a>
                               )}
 
-                              {document.type === 'Drawing' && (
-                                <button
-                                  className="tbl-action"
-                                  title="Open this drawing in Design Intelligence"
-                                  onClick={() => navigate(`/app/design-management/reviews?document=${document.id}`)}
-                                >
-                                  Design Intel
-                                </button>
-                              )}
 
                               {canEditThisDocument ? (
                                 <button
