@@ -2556,24 +2556,37 @@ function ContractsTab({
 function PaymentStageRow({ payment, tracking, history, canEdit, onUpdate }: any) {
   const [stage, setStage] = useState(tracking?.stage || 'Valuation Received')
   const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
   useEffect(() => { setStage(tracking?.stage || 'Valuation Received') }, [tracking?.stage])
-  const ageDays = tracking?.updated_at ? Math.floor((Date.now() - new Date(tracking.updated_at).getTime()) / 86400000) : null
+  const ageDays = tracking?.updated_at ? Math.max(0, Math.floor((Date.now() - new Date(tracking.updated_at).getTime()) / 86400000)) : null
+  const stale = ageDays !== null && ageDays >= 5 && tracking?.stage !== 'Paid'
+  const nextOwner = ['Forwarded to Fincon', 'With Fincon', 'Payment Processing', 'Awaiting Fincon Confirmation'].includes(tracking?.stage) ? 'Fincon (Costing to follow up)' : tracking?.stage === 'Awaiting Management Approval' ? 'Management (Costing to follow up)' : tracking?.stage === 'Paid' ? 'Completed' : 'Costing / responsible reviewer'
   return (
-    <details className="rounded-xl border border-slate-200 p-3">
-      <summary className="cursor-pointer flex flex-wrap justify-between gap-2 text-sm">
-        <span className="font-semibold">{payment.vendor_name || payment.payment_title} · {formatCurrency(payment.amount)}</span>
-        <span>{tracking?.stage || 'Not yet tracked'}{ageDays !== null && ageDays >= 5 ? ` · ${ageDays} days since update` : ''}</span>
+    <details className="rounded-xl border border-slate-200 bg-white overflow-hidden group">
+      <summary className="cursor-pointer list-none grid grid-cols-1 gap-2 p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.5fr)_auto] md:items-center hover:bg-slate-50">
+        <span className="min-w-0"><strong className="block text-sm text-slate-800 truncate">{payment.vendor_name || payment.payment_title || 'Unnamed payment request'}</strong><span className="text-xs text-slate-500">{payment.payment_title || 'Payment request'} · {formatCurrency(payment.amount)}</span></span>
+        <span className="text-xs font-semibold text-slate-700">{tracking?.stage || 'Not yet tracked'}</span>
+        <span className="text-xs text-slate-500">{tracking?.updated_at ? `Updated ${new Date(tracking.updated_at).toLocaleDateString('en-GB')}` : 'No status update'}{stale ? ` · Follow up (${ageDays} days)` : ''}</span>
+        <span className="text-xs text-slate-500 group-open:rotate-180">▼</span>
       </summary>
-      <div className="mt-3 space-y-2">
-        <p className="text-xs text-slate-500">Last confirmed: {tracking?.updated_at ? new Date(tracking.updated_at).toLocaleString('en-GB') : 'Not recorded'}</p>
-        {tracking?.note && <p className="text-sm">Latest update: {tracking.note}</p>}
-        {canEdit && <div className="grid gap-2 md:grid-cols-2">
-          <label className="text-xs">Current payment stage<select className="form-control mt-1" value={stage} onChange={e => setStage(e.target.value)}>{PAYMENT_STAGES.map(x => <option key={x}>{x}</option>)}</select></label>
-          <label className="text-xs">Update source / Fincon feedback<input className="form-control mt-1" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Fincon email dated 15/10/2026" /></label>
-          <button className="btn btn-gold md:col-span-2" onClick={() => { onUpdate(payment, stage, note); setNote('') }}>Save stage update</button>
+      <div className="border-t border-slate-100 p-4 space-y-4">
+        <div className="grid gap-3 md:grid-cols-3 text-sm">
+          <div><p className="text-xs text-slate-500">Next responsible party</p><p className="font-medium">{nextOwner}</p></div>
+          <div><p className="text-xs text-slate-500">Last confirmed update</p><p className="font-medium">{tracking?.updated_at ? new Date(tracking.updated_at).toLocaleString('en-GB') : 'Not recorded'}</p></div>
+          <div><p className="text-xs text-slate-500">Recorded financial status</p><p className="font-medium">{payment.payment_status || 'Not recorded'}</p></div>
+        </div>
+        {tracking?.note && <div className="rounded-lg bg-slate-50 p-3 text-sm"><p className="text-xs font-semibold text-slate-500 mb-1">Latest confirmed information</p>{tracking.note}</div>}
+        {canEdit && <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+          <h4 className="text-sm font-semibold">Record an update from Costing / Fincon</h4>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-xs">Current payment stage<select className="form-control mt-1" value={stage} onChange={e => setStage(e.target.value)}>{PAYMENT_STAGES.map(x => <option key={x}>{x}</option>)}</select></label>
+            <label className="text-xs">Source, date and update details<input className="form-control mt-1" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Fincon email 16/10/2026: processing" /></label>
+          </div>
+          <button type="button" className="btn btn-gold" disabled={saving || !note.trim()} onClick={async () => { setSaving(true); try { await onUpdate(payment, stage, note) } finally { setSaving(false) } }}>{saving ? 'Saving…' : 'Save status update'}</button>
+          <p className="text-xs text-slate-500">A stage update does not execute a payment or change the financial payment record.</p>
         </div>}
-        <details><summary className="text-sm cursor-pointer">Status history ({history.length})</summary>
-          <div className="mt-2 space-y-2">{history.map((h: any) => <div key={h.id} className="text-xs border-b pb-2"><strong>{h.stage}</strong> · {new Date(h.created_at).toLocaleString('en-GB')}<p>{h.note}</p></div>)}</div>
+        <details><summary className="text-sm font-semibold cursor-pointer">Status history ({history.length})</summary>
+          <div className="mt-2 space-y-2">{history.length ? history.map((h: any) => <div key={h.id} className="text-xs border-l-2 border-slate-200 pl-3 py-1"><strong>{h.previous_stage ? `${h.previous_stage} → ` : ''}{h.stage}</strong> · {new Date(h.created_at).toLocaleString('en-GB')}<p className="mt-1 text-slate-600">{h.note}</p></div>) : <p className="text-xs text-slate-500">No recorded history yet.</p>}</div>
         </details>
       </div>
     </details>
@@ -2592,17 +2605,42 @@ function PaymentsTab({
   onDelete,
   canEdit,
 }: any) {
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('All')
+  const [showNew, setShowNew] = useState(false)
+  const paymentList = Array.isArray(payments) ? payments : []
+  const stageFor = (p: any) => stages[p.id]?.stage || 'Not yet tracked'
+  const filteredPayments = paymentList.filter((p: any) => {
+    const matchesText = `${p.vendor_name || ''} ${p.payment_title || ''} ${p.payment_status || ''}`.toLowerCase().includes(search.toLowerCase())
+    const matchesStage = filter === 'All' || (filter === 'Needs follow-up' ? (() => {
+      const t = stages[p.id]; return Boolean(t?.updated_at && t.stage !== 'Paid' && Date.now() - new Date(t.updated_at).getTime() >= 5 * 86400000)
+    })() : stageFor(p) === filter)
+    return matchesText && matchesStage
+  })
+  const pendingFincon = paymentList.filter((p: any) => ['Forwarded to Fincon', 'With Fincon', 'Payment Processing', 'Awaiting Fincon Confirmation'].includes(stageFor(p))).length
+  const paidCount = paymentList.filter((p: any) => stageFor(p) === 'Paid').length
+  const untrackedCount = paymentList.filter((p: any) => !stages[p.id]).length
+  const followUpCount = paymentList.filter((p: any) => { const t = stages[p.id]; return Boolean(t?.updated_at && t.stage !== 'Paid' && Date.now() - new Date(t.updated_at).getTime() >= 5 * 86400000) }).length
   return (
     <div className="space-y-5">
-      <div className="card p-5 space-y-3">
-        <h2 className="font-bold text-[#102943]">Payment Stage Tracker</h2>
-        <p className="text-sm text-[#65717c]">Costing maintains the latest confirmed status received from Management or Fincon. Stage changes require a source note and are recorded in history. Fincon remains responsible for payment execution.</p>
-        {payments.map((payment: any) => (
-          <PaymentStageRow key={payment.id} payment={payment} tracking={stages[payment.id]} history={history.filter((h: any) => h.payment_id === payment.id)} canEdit={canEdit} onUpdate={onUpdateStage} />
-        ))}
-        {!payments.length && <p className="text-sm text-[#65717c]">Add a payment request below to start tracking its stages.</p>}
+      <div className="card p-5 space-y-4">
+        <div className="flex flex-wrap justify-between items-start gap-3">
+          <div><h2 className="font-bold text-[#102943] text-lg">Payment Status Register</h2><p className="text-sm text-[#65717c] mt-1">See every payment request, where it is in the approval and payment process, and the latest information from Costing.</p></div>
+          {canEdit && <button type="button" className="btn btn-gold" onClick={() => { setShowNew(!showNew); document.getElementById('costing-new-payment')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>{showNew ? 'Hide new request' : '+ New payment request'}</button>}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[['All requests', paymentList.length], ['With / awaiting Fincon', pendingFincon], ['Needs follow-up (5+ days)', followUpCount], ['Not yet tracked', untrackedCount]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 border border-slate-100 p-3"><div className="text-xl font-bold text-[#102943]">{value}</div><div className="text-xs text-slate-600">{label}</div></div>)}
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-medium">Search contractor or payment<input className="form-control mt-1" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search payment requests…" /></label>
+          <label className="text-xs font-medium">Payment stage<select className="form-control mt-1" value={filter} onChange={e => setFilter(e.target.value)}>{['All', 'Needs follow-up', 'Not yet tracked', ...PAYMENT_STAGES].map(x => <option key={x} value={x}>{x}</option>)}</select></label>
+        </div>
+        <div className="flex justify-between text-xs text-slate-500"><span>{filteredPayments.length} of {paymentList.length} requests</span><span>{paidCount} confirmed paid stages</span></div>
+        <div className="space-y-2">{filteredPayments.map((payment: any) => <PaymentStageRow key={payment.id} payment={payment} tracking={stages[payment.id]} history={history.filter((h: any) => h.payment_id === payment.id)} canEdit={canEdit} onUpdate={onUpdateStage} />)}</div>
+        {!filteredPayments.length && <p className="text-sm text-[#65717c] py-4 text-center">{paymentList.length ? 'No payment requests match your filters.' : 'No payment requests yet. Costing can add the first request below.'}</p>}
+        <p className="text-xs text-slate-500">Stages are manually confirmed by Costing. Fincon executes payments. “Paid” requires confirmation in the underlying payment record.</p>
       </div>
-      <div className="card p-5">
+      <div id="costing-new-payment" className={`card p-5 ${showNew ? "" : "hidden"}`}>
         <div className="flex items-center gap-2 mb-4">
           <Plus size={17} className="text-[#df5f41]" />
           <h2 className="font-bold text-[#102943]">Add Payment</h2>
