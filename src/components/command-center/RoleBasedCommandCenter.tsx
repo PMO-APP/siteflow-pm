@@ -163,6 +163,8 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
   const planned = intelligence.metrics.plannedProgress
   const gap = progress - planned
   const packages = forecast.packagePositions || []
+  const multiPackage = packages.length > 1
+  const incompleteForecast = multiPackage && forecast.incompletePackageForecasts > 0
   // A package is assigned to a recovery group by its own name, never by a
   // neighbouring block's activity. Do not average unweighted package progress.
   const groupFor = (name: string): 'october' | 'december' | 'b13' | null => {
@@ -202,7 +204,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
     && Math.abs(calendarDelay - forecast.delayDays) > 1
   const validProgress = Number.isFinite(progress) && progress >= 0 && progress <= 100
     && Number.isFinite(planned) && planned >= 0 && planned <= 100
-  const shortSummary = forecast.delayDays > 0
+  const shortSummary = incompleteForecast ? `Package forecasts are incomplete. ${forecast.incompletePackageForecasts} delivery package(s) need a dated programme before the master finish can be published.` : forecast.delayDays > 0
     ? `Completion is forecast ${forecast.delayDays} days behind the current target. ${forecast.pressurePackage ? `${forecast.pressurePackage.packageName} needs particular attention.` : 'Review delivery constraints and recovery actions.'}`
     : 'Review the current forecast and delivery priorities.'
 
@@ -216,12 +218,18 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             ['Actual progress', `${progress}%`, `Planned ${planned}%`],
-            ['Forecast completion', formatDate(forecast.forecastDate), `Forecast engine target ${formatDate(forecast.targetDate)}`],
-            ['Schedule delay', `${forecast.delayDays} days`, 'Forecast engine vs target'],
+            [multiPackage ? 'Master forecast finish' : 'Forecast completion', incompleteForecast ? 'Incomplete' : formatDate(forecast.forecastDate), multiPackage ? `Latest package target ${formatDate(forecast.targetDate)}` : `Forecast engine target ${formatDate(forecast.targetDate)}`],
+            ['Schedule delay', incompleteForecast ? 'Not available' : `${forecast.delayDays} calendar days`, multiPackage ? 'Master forecast vs latest package target' : 'Forecast engine vs target'],
             ['Project health', `${intelligence.health.score}/100`, intelligence.health.label],
           ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
         </div>
-        <div className="mt-3 text-xs text-[var(--pmx-muted)]">Completion dates and delay are supplied by the existing recovery forecast engine. Management recovery deadlines below are separate from the engine target; confirm the approved baseline in Schedule Revisions.</div>
+        <div className="mt-3 text-xs text-[var(--pmx-muted)]">{multiPackage ? 'Master dates are derived from package programmes. Each package retains its own target and forecast; management deadlines and approved revisions remain separate.' : 'Completion dates and delay are supplied by the recovery forecast engine. Confirm the approved baseline in Schedule Revisions.'}</div>
+        {multiPackage && <section className="mt-4 rounded-xl border border-[var(--pmx-border)] p-4" aria-label="Package forecast breakdown">
+          <div className="mb-3 font-semibold">Delivery package forecast breakdown</div>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-[var(--pmx-border)]"><th className="py-2 pr-3">Package</th><th className="py-2 pr-3">Programme finish</th><th className="py-2 pr-3">Forecast finish</th><th className="py-2">Delay</th></tr></thead><tbody>{packages.map(item => <tr key={item.packageId} className="border-b border-[var(--pmx-border)] last:border-0"><td className="py-2 pr-3">{item.packageName}</td><td className="py-2 pr-3">{formatDate(item.plannedFinish)}</td><td className="py-2 pr-3">{formatDate(item.forecastFinish)}</td><td className="py-2">{item.forecastFinish ? `${item.delayDays} days` : 'Unverified'}</td></tr>)}</tbody></table></div>
+          {incompleteForecast && <p role="alert" className="mt-3 text-sm text-amber-700">Master forecast withheld: {forecast.incompletePackageForecasts} package(s) lack a valid dated programme.</p>}
+          <button className="mt-3 text-sm font-semibold text-sky-700" onClick={() => navigate('/app/schedule')}>Inspect package schedules →</button>
+        </section>}
         {(delayMismatch || !validProgress) && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <strong>Data consistency review required.</strong>{delayMismatch ? ` Displayed dates imply ${calendarDelay} calendar days of delay, while the forecast engine reports ${forecast.delayDays} days. Confirm whether the engine uses working days or a different baseline.` : ''}{!validProgress ? ' Progress values are missing or outside the valid 0–100% range.' : ''}
           <button className="ml-2 underline" onClick={() => navigate('/app/schedule')}>Review programme</button>
