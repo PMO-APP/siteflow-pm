@@ -1,6 +1,7 @@
 import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Printer, Trash2, Wallet } from 'lucide-react'
+import { ArrowLeft, Plus, Printer, Trash2, Wallet } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
@@ -84,17 +85,15 @@ const PROCUREMENT_STATUSES = [
   'Cancelled',
 ]
 
-const TABS = [
-  ['report', 'Cost Report'],
-  ['overview', 'Overview'],
-  ['weekly', 'Weekly Updates'],
-  ['contracts', 'Contracts'],
-  ['payments', 'Payments'],
-  ['variations', 'Variations'],
-  ['procurement', 'Procurement'],
-  ['financial-register', 'Financial Register'],
-  ['history', 'History'],
-]
+const COSTING_MODULES: Record<string, { title: string; description: string }> = {
+  reports: { title: 'Costing Reports', description: 'Weekly costing updates, submitted reports and reporting history.' },
+  overview: { title: 'Cost Overview', description: 'Current cost position, commitments and financial outlook.' },
+  contracts: { title: 'Contracts & Commitments', description: 'Manage contracts and contractual commitments.' },
+  payments: { title: 'Payment Tracker', description: 'Track payment requests, approval stages and Fincon updates.' },
+  variations: { title: 'Variations', description: 'Track commercial changes and variation decisions.' },
+  procurement: { title: 'Procurement', description: 'Track procurement records and delivery progress.' },
+  'financial-register': { title: 'Financial Register', description: 'Review financial entries and cost records.' },
+}
 
 function formatCurrency(value: any) {
   return `₦${Number(value || 0).toLocaleString()}`
@@ -258,10 +257,15 @@ export default function CostingPage() {
   const reportLock = useMemo(() => getReportSubmissionLock(reportWeek), [reportWeek])
   const canSubmitReport = canEdit && reportLock.isAllowed
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const requested = new URLSearchParams(window.location.search).get('section')
-    return requested && ["report", "overview", "weekly", "contracts", "payments", "variations", "procurement", "financial-register", "history"].includes(requested) ? requested : 'report'
-  })
+  const { module: routeModule } = useParams<{ module?: string }>()
+  const location = useLocation()
+  // Old bookmarks remain functional, but folder routes are now independent pages.
+  const legacySection = new URLSearchParams(location.search).get('section')
+  const requestedModule = routeModule || (
+    legacySection === 'report' || legacySection === 'weekly' || legacySection === 'history' ? 'reports' : legacySection
+  ) || 'reports'
+  const moduleKey = COSTING_MODULES[requestedModule] ? requestedModule : 'reports'
+  const activeTab = moduleKey === 'reports' ? 'report' : moduleKey
   const [items, setItems] = useState<any[]>([])
   const [contracts, setContracts] = useState<any[]>([])
   const [payments, setPayments] = useState<any[]>([])
@@ -996,7 +1000,7 @@ export default function CostingPage() {
     }
 
     await loadSubmissions()
-    setActiveTab('report')
+    // Report remains within the Costing Reports folder.
     setNotice('Weekly cost report submitted successfully and saved to history.')
     } finally {
       submittingRef.current = false
@@ -1230,12 +1234,11 @@ export default function CostingPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-[#102943]">
-          Costing
+          {COSTING_MODULES[moduleKey].title}
         </h1>
 
         <p className="text-[#65717c] mt-3 max-w-2xl">
-          Weekly cost reports, payments, contracts, variations and procurement
-          updates for PMO executive reporting.
+          {COSTING_MODULES[moduleKey].description}
         </p>
 
         <div className="text-xs text-[#74818d] mt-4">
@@ -1252,13 +1255,17 @@ export default function CostingPage() {
         )}
       </section>
 
+      <Link to="/app/costing-management" className="inline-flex items-center gap-2 text-sm font-semibold text-[#36536b] hover:text-[#df5f41]">
+        <ArrowLeft size={16} /> Back to Costing Management
+      </Link>
+
       {notice && (
         <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           {notice}
         </div>
       )}
 
-      <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      {moduleKey === 'reports' && <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <label className="form-label">Report Week</label>
           <input
@@ -1310,27 +1317,13 @@ export default function CostingPage() {
           </button>
         </div>
       </div>
-
-      {selectedSubmission && (
+      }
+      {moduleKey === 'reports' && selectedSubmission && (
         <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
           Viewing historical cost report for {fdate(selectedSubmission.report_week)}.
           This report is a saved snapshot and will not change when new costing records are added.
         </div>
       )}
-
-      <div className="flex flex-wrap gap-2">
-        {TABS.map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => { setActiveTab(value); window.history.replaceState(null, '', `${window.location.pathname}?section=${value}`) }}
-            className={`btn btn-sm ${
-              activeTab === value ? 'btn-gold' : 'btn-ghost'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {activeTab === 'report' && (
         selectedSubmission ? (
@@ -1390,7 +1383,7 @@ export default function CostingPage() {
         />
       )}
 
-      {activeTab === 'weekly' && (
+      {moduleKey === 'reports' && !selectedSubmission && (
         <>
           <MetricGrid
             values={[
@@ -1495,15 +1488,18 @@ export default function CostingPage() {
         <FinancialRegisterTab financialItems={financialItems} />
       )}
 
-      {activeTab === 'history' && (
-        <CostReportHistoryTab
+      {moduleKey === 'reports' && (
+        <div className="space-y-3">
+          <h2 className="text-xl font-bold text-[#102943]">Submitted report history</h2>
+          <CostReportHistoryTab
           submissions={submissions}
           onOpenReport={(submission: any) => {
             setSelectedSubmission(submission)
             setReportWeek(submission.report_week)
-            setActiveTab('report')
+            // Report remains within the Costing Reports folder.
           }}
-        />
+          />
+        </div>
       )}
     </div>
   )
@@ -1529,9 +1525,9 @@ function NoSubmittedCostReport({
       </h3>
 
       <p className="mx-auto mt-2 max-w-xl text-sm text-[#74818d]">
-        This tab only displays locked weekly report snapshots. Use the Weekly Updates,
-        Contracts, Payments, Variations, Procurement and Financial Register tabs to update
-        the live records, then submit the weekly report to generate the snapshot for this date.
+        This section displays submitted weekly report snapshots. Complete the weekly update
+        below, then submit to generate a locked report for this date. Live operational records
+        are maintained in their own Costing Management folders.
       </p>
 
       {canEdit ? (
