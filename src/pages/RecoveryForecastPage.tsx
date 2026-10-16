@@ -414,7 +414,7 @@ export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
   const { data: activeRevision } = useActiveScheduleRevision(projectId)
   const activeRevisionTarget = getRevisionTargetDate(activeRevision)
-  const { data: packageTargets = [], isLoading: packagesLoading, isError: packagesError } = usePackageHandoverDates()
+  const { data: packageTargets = [], missingProgrammePackages, totalPackages, isLoading: packagesLoading, isError: packagesError } = usePackageHandoverDates()
   // Package dates are management targets, not independent completion forecasts.
   // Keep this outlook distinct from the schedule-driven engine.forecastDate.
   const latestPackageTarget = useMemo(() => {
@@ -981,7 +981,7 @@ export default function RecoveryForecastPage() {
     const delayDays = packageProgressDelayDays(pkg.id, projectTasks, new Date())
     return { ...pkg, delayDays, forecastDate: delayDays === null ? null : addCalendarDays(pkg.date, delayDays) }
   })
-  const masterForecast = deliveryOutlooks.every(pkg => pkg.forecastDate !== null) && deliveryOutlooks.length
+  const masterForecast = missingProgrammePackages.length === 0 && totalPackages > 0 && deliveryOutlooks.length === totalPackages && deliveryOutlooks.every(pkg => pkg.forecastDate !== null)
     ? new Date(Math.max(...deliveryOutlooks.map(pkg => pkg.forecastDate!.getTime()))) : null
   const availablePackageForecasts = packageForecasts.filter(pkg => pkg.forecastResult.forecast)
   // Indicative dates are not validated master forecasts. Keep the latest
@@ -1032,8 +1032,9 @@ export default function RecoveryForecastPage() {
         <section aria-label="Delivery at a glance" className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Delivery packages</p><p className="mt-2 text-3xl font-bold text-[#123a60]">{visiblePackageHandovers.length}</p><p className="mt-1 text-xs text-[#65717c]">Tracked independently</p></div>
           <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Target</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(latestPackageTarget)}</p><p className="mt-1 text-xs text-[#65717c]">Last scheduled package handover</p></div>
-          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Forecast</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(masterForecast)}</p><p className="mt-1 text-xs text-[#65717c]">Target + progress-based delay · {masterForecast ? 'Indicative' : 'Missing dated activity data'}</p></div>
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Forecast</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(masterForecast)}</p><p className="mt-1 text-xs text-[#65717c]">Package-level progress estimate · {masterForecast ? 'Indicative, not approved' : 'Incomplete package data'}</p></div>
         </section>
+        {missingProgrammePackages.length > 0 && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Master forecast withheld: {missingProgrammePackages.length} of {totalPackages} delivery packages lack a dated programme ({missingProgrammePackages.map(pkg => pkg.name).join(', ')}). Assign and verify their schedule before using a project completion forecast.</div>}
         <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold text-[#123a60]">Delivery groups</h2><p className="mt-1 text-xs text-[#65717c]">Grouped by the final scheduled handover task.</p></div><button type="button" onClick={() => setRecoveryView('packages')} className="rounded-lg border border-[#dfe3e7] px-3 py-2 text-xs font-semibold text-[#123a60]">View all packages →</button></div>
           <div className="mt-4 divide-y divide-[#e8ecef]">
