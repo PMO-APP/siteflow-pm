@@ -23,6 +23,7 @@ const WorkspaceAdminPage = lazy(() => import('@/pages/WorkspaceAdminPage'))
 const AuditPage = lazy(() => import('@/pages/AuditPage'))
 const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
 const CostingPage = lazy(() => import('@/pages/CostingPage'))
+const CostingWeeklyWorkspacePage = lazy(() => import('@/pages/CostingWeeklyWorkspacePage'))
 const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
 const DepartmentHubPage = lazy(() => import('@/pages/DepartmentHubPage'))
 const PMOWeeklyReportPage = lazy(() => import('@/pages/PMOWeeklyReportPage'))
@@ -402,6 +403,7 @@ export default function App() {
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
+          <Route path="costing/weekly-workspace" element={<CostingWeeklyWorkspacePage />} />
           <Route path="costing/procurement" element={<Navigate to="/app/procurement" replace />} />
           <Route path="costing/:module" element={<CostingPage />} />
           <Route path="costing-management" element={<DepartmentHubPage department="costing" />} />
@@ -417,9 +419,7 @@ export default function App() {
           <Route path="rfis/new" element={<CreateRFIPage />} />
           <Route path="rfis/:rfiId" element={<RFIDetailPage />} />
           <Route path="documents" element={<DocumentsPage />} />
-          <Route path="design-intelligence" element={<Navigate to="/app/design-management/intelligence" replace />} />
-          <Route path="design-management/reviews" element={<DesignIntelligencePage section="reviews" />} />
-          <Route path="design-management/intelligence" element={<DesignIntelligencePage section="intelligence" />} />
+          <Route path="design-intelligence" element={<DesignIntelligencePage />} />
           <Route path="risk" element={<RiskPage />} />
           <Route path="risk-trends" element={<RiskTrendPage />} />
           <Route path="design-reports" element={<DesignReportsPage />} />
