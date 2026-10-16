@@ -17,7 +17,6 @@ const costing: Folder[] = [
   { title: 'Contracts & Commitments', description: 'Contracts, commitments and commercial records.', to: '/app/costing/contracts' },
   { title: 'Payment Tracker', description: 'Payment requests, statuses and outstanding actions.', to: '/app/costing/payments' },
   { title: 'Variations', description: 'Commercial changes and variation status.', to: '/app/costing/variations' },
-  { title: 'Procurement', description: 'Procurement commitments and delivery status.', to: '/app/costing/procurement' },
   { title: 'Financial Register', description: 'Project financial entries and records.', to: '/app/costing/financial-register' },
 ]
 export default function DepartmentHubPage({ department }: { department: 'design' | 'costing' }) {
