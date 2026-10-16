@@ -662,7 +662,7 @@ export default function DocumentsPage() {
 
         <button
           className="btn btn-sm btn-ghost"
-          onClick={() => navigate('/app/design-intelligence')}
+          onClick={() => navigate('/app/design-management/reviews')}
         >
           Design Intelligence
         </button>
@@ -887,7 +887,7 @@ export default function DocumentsPage() {
                                 <button
                                   className="tbl-action"
                                   title="Open this drawing in Design Intelligence"
-                                  onClick={() => navigate(`/app/design-intelligence?document=${document.id}`)}
+                                  onClick={() => navigate(`/app/design-management/reviews?document=${document.id}`)}
                                 >
                                   Design Intel
                                 </button>
