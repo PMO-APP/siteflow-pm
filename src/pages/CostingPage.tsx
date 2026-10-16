@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
-import { useAccessSession } from '@/access/AccessSessionProvider'
 
 import { pmoConfirm } from '@/lib/notifications'
 const SECTIONS = [
@@ -248,8 +247,7 @@ export default function CostingPage() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
-  const { can } = useAccessSession()
-  const canEdit = Boolean(projectId) && canEditCosting(role) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'costing' })
+  const canEdit = canEditCosting(role)
   const reportRef = useRef<HTMLDivElement>(null)
 
   const [reportWeek, setReportWeek] = useState(
@@ -1262,6 +1260,12 @@ export default function CostingPage() {
         <p className="text-[#65717c] mt-3 max-w-2xl">
           {COSTING_MODULES[moduleKey].description}
         </p>
+
+        {moduleKey === 'reports' && (
+          <Link to="/app/costing/weekly-workspace" className="inline-flex mt-4 rounded-lg bg-[#102943] px-4 py-2 text-sm font-semibold text-white">
+            Open consolidated weekly workspace →
+          </Link>
+        )}
 
         <div className="text-xs text-[#74818d] mt-4">
           Project:{' '}
