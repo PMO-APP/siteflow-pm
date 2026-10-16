@@ -18,7 +18,6 @@ import {
 import { EnterpriseMetric, EnterpriseNotice, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
-import { useAccessSession } from '@/access/AccessSessionProvider'
 import {
   getDesignDrawingUrl,
   loadDesignIntelligence,
@@ -57,17 +56,19 @@ function modeLabel(mode: DesignAnalysisJob['mode']) {
   return 'Drawing review'
 }
 
-export default function DesignIntelligencePage() {
+export default function DesignIntelligencePage({ section = 'intelligence' }: { section?: 'reviews' | 'intelligence' }) {
   const { projectId, projectName } = useProjectStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const focusedDocumentId = searchParams.get('document')
+  const visibleTabs: readonly Tab[] = section === 'reviews'
+    ? ['Revision Compare', 'Coordination Review']
+    : ['Clash & Risk Register', 'Design Rules']
   const role = useMembershipStore(state => state.role)
-  const { can } = useAccessSession()
-  const canManage = Boolean(projectId) && ['workspace_admin', 'admin', 'design'].includes(String(role || '').toLowerCase()) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'design' })
-  const canGovernRules = ['workspace_admin', 'admin', 'pmo'].includes(String(role || '').toLowerCase())
+  const canManage = ['workspace_admin', 'admin', 'design'].includes(String(role || '').toLowerCase())
+  const canGovernRules = ['workspace_admin', 'admin'].includes(String(role || '').toLowerCase())
 
-  const [tab, setTab] = useState<Tab>('Drawing Register')
+  const [tab, setTab] = useState<Tab>(section === 'reviews' ? 'Coordination Review' : 'Clash & Risk Register')
   const [drawings, setDrawings] = useState<DesignDrawing[]>([])
   const [issues, setIssues] = useState<DesignIssue[]>([])
   const [rules, setRules] = useState<DesignRule[]>([])
@@ -216,8 +217,8 @@ export default function DesignIntelligencePage() {
     <div className="space-y-5 pb-10">
       <EnterprisePageHero
         eyebrow="Design coordination intelligence"
-        title="Design Intelligence"
-        description="Control drawing revisions from Documents, compare coordinated sets and surface constructability risks before they reach site."
+        title={section === 'reviews' ? 'Design Reviews' : 'Design Intelligence'}
+        description={section === 'reviews' ? 'Review coordinated drawings, revisions and technical findings before construction.' : 'Monitor design risks, constructability concerns and design quality rules.'}
         projectName={projectName}
         actions={<div className="flex flex-wrap gap-2">
           <button onClick={() => navigate('/app/documents?type=Drawing')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#0B2A3C]"><FileSearch size={16}/>Open Documents</button>
@@ -230,7 +231,7 @@ export default function DesignIntelligencePage() {
       {error && <EnterpriseNotice tone="error"><strong>Design Intelligence could not complete the request.</strong> {error}</EnterpriseNotice>}
       {notice && <EnterpriseNotice tone="success">{notice}</EnterpriseNotice>}
       <EnterpriseNotice tone="info"><strong>Single source of truth:</strong> drawings are uploaded, revised and superseded in Documents. Design Intelligence reads that controlled register and never keeps a separate drawing revision history.</EnterpriseNotice>
-      <EnterpriseNotice tone="info"><strong>AI Drawing Review — Coming Soon:</strong> automated multidisciplinary PDF review is prepared for a future release. Design rules, revision control, coordination issues and resolution tracking remain fully available now.</EnterpriseNotice>
+      {section === 'reviews' && <EnterpriseNotice tone="info"><strong>AI Drawing Review — Coming Soon:</strong> automated multidisciplinary PDF review is prepared for a future release. Design rules, revision control, coordination issues and resolution tracking remain fully available now.</EnterpriseNotice>}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <EnterpriseMetric label="Current drawings" value={stats.currentDrawings} helper="Registered current set" icon={FileSearch}/>
@@ -242,7 +243,7 @@ export default function DesignIntelligencePage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2">
-        {TABS.map(item => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${tab === item ? 'bg-[#0B2A3C] text-white' : 'text-[#0B2A3C] hover:bg-[#E8F6F4]'}`}>{item}</button>)}
+        {visibleTabs.map(item => <button key={item} onClick={() => setTab(item)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${tab === item ? 'bg-[#0B2A3C] text-white' : 'text-[#0B2A3C] hover:bg-[#E8F6F4]'}`}>{item}</button>)}
       </div>
 
       {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Loading Design Intelligence…</div> : <>
