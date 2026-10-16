@@ -6,7 +6,7 @@ import { useDeliveryPackages } from './deliveryPackages'
 export function usePackageHandoverDates() {
   const packagesQuery = useDeliveryPackages()
   const tasksQuery = useTasks()
-  const handovers = useMemo(() => (packagesQuery.data || []).map(pkg => {
+  const allPackageDates = useMemo(() => (packagesQuery.data || []).map(pkg => {
     const packageTasks = (tasksQuery.data || []).filter(task =>
       String(task.delivery_package_id || '') === String(pkg.id) &&
       task.finish_date && !Number.isNaN(Date.parse(task.finish_date)))
@@ -29,9 +29,14 @@ export function usePackageHandoverDates() {
     return { id: pkg.id, name: pkg.name, status: pkg.status,
       planned_finish: scheduleFinish, programme_finish: scheduleFinish,
       source: scheduleFinish ? (handoverTasks.length ? 'Scheduled handover task' : 'Final scheduled task (handover not named)') : 'Missing schedule finish' }
-  }).filter(pkg => pkg.planned_finish)
-    .sort((a,b) => Date.parse(a.planned_finish!) - Date.parse(b.planned_finish!)),
+  }).sort((a,b) => {
+      if (!a.planned_finish) return 1
+      if (!b.planned_finish) return -1
+      return Date.parse(a.planned_finish) - Date.parse(b.planned_finish)
+    }),
     [packagesQuery.data, tasksQuery.data])
-  return { data: handovers, isLoading: packagesQuery.isLoading || tasksQuery.isLoading,
+  const handovers = allPackageDates.filter(pkg => Boolean(pkg.planned_finish))
+  const missingProgrammePackages = allPackageDates.filter(pkg => !pkg.planned_finish)
+  return { data: handovers, missingProgrammePackages, totalPackages: allPackageDates.length, isLoading: packagesQuery.isLoading || tasksQuery.isLoading,
     isError: packagesQuery.isError || tasksQuery.isError }
 }
