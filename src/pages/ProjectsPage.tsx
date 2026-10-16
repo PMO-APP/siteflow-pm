@@ -11,6 +11,7 @@ import {
   ChevronRight,
   CircleDot,
   FolderKanban,
+  FileSpreadsheet,
   Pencil,
   Plus,
   Search,
@@ -956,6 +957,20 @@ export default function ProjectsPage() {
             </div>
           </button>
         </section>
+
+        {userRoles.some(role => ['costing', 'pmo', 'admin', 'workspace_admin', 'portfolio_manager'].includes(role)) && (
+          <section aria-label="Workspace reporting tools" className="rounded-[26px] border border-[#cfe3e1] bg-white p-6 shadow-[0_16px_50px_rgba(11,42,60,.08)] sm:p-7">
+            <div className="hub-eyebrow">Workspace tools</div>
+            <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">Reporting</h2>
+            <button type="button" onClick={() => navigate('/app/costing/weekly-workspace')}
+              className="mt-4 flex w-full max-w-xl items-start gap-4 rounded-2xl border border-[#cfe3e1] p-5 text-left transition hover:border-[#05969B] hover:bg-[#f7fcfb]">
+              <span className="rounded-xl bg-[#e8f6f4] p-3 text-[#05969B]"><FileSpreadsheet size={23} /></span>
+              <span className="flex-1"><span className="block font-bold text-[#0B2A3C]">Cost Reporting Centre</span>
+                <span className="mt-1 block text-sm leading-6 text-[#607580]">Prepare and review one consolidated weekly Costing report across projects. Project Costing Management stays inside each project.</span>
+              </span><ArrowRight size={18} className="mt-1 text-[#05969B]" />
+            </button>
+          </section>
+        )}
 
         <section data-tour="portfolio-overview">
           <div className="mb-5">
