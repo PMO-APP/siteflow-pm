@@ -147,6 +147,11 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
   }, [activity])
 
   const isExecutive = ['workspace_admin', 'admin', 'pmo', 'portfolio_manager'].includes(role || '')
+  // Keep each project's expansion preference for this browser session.
+  const [expandedByProject, setExpandedByProject] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(sessionStorage.getItem('pmocorex-package-forecast-expanded') || '{}') } catch { return {} }
+  })
+  const forecastProjectKey = String(projectId ?? 'unselected')
   const forecast = intelligence.forecastV2
   const recommendations = intelligence.recommendations.items.slice(0, 3)
 
@@ -224,12 +229,30 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
           ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
         </div>
         <div className="mt-3 text-xs text-[var(--pmx-muted)]">{multiPackage ? 'Master dates are derived from package programmes. Each package retains its own target and forecast; management deadlines and approved revisions remain separate.' : 'Completion dates and delay are supplied by the recovery forecast engine. Confirm the approved baseline in Schedule Revisions.'}</div>
-        {multiPackage && <section className="mt-4 rounded-xl border border-[var(--pmx-border)] p-4" aria-label="Package forecast breakdown">
-          <div className="mb-3 font-semibold">Delivery package forecast breakdown</div>
-          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-[var(--pmx-border)]"><th className="py-2 pr-3">Package</th><th className="py-2 pr-3">Programme finish</th><th className="py-2 pr-3">Forecast finish</th><th className="py-2">Delay</th></tr></thead><tbody>{packages.map(item => <tr key={item.packageId} className="border-b border-[var(--pmx-border)] last:border-0"><td className="py-2 pr-3">{item.packageName}</td><td className="py-2 pr-3">{formatDate(item.plannedFinish)}</td><td className="py-2 pr-3">{formatDate(item.forecastFinish)}</td><td className="py-2">{item.forecastFinish ? `${item.delayDays} days` : 'Unverified'}</td></tr>)}</tbody></table></div>
-          {incompleteForecast && <p role="alert" className="mt-3 text-sm text-amber-700">Master forecast withheld: {forecast.incompletePackageForecasts} package(s) lack a valid dated programme.</p>}
-          <button className="mt-3 text-sm font-semibold text-sky-700" onClick={() => navigate('/app/schedule')}>Inspect package schedules →</button>
-        </section>}
+        {multiPackage && (() => {
+          const expanded = expandedByProject[forecastProjectKey] ?? packages.length < 5
+          const toggle = () => {
+            const next = { ...expandedByProject, [forecastProjectKey]: !expanded }
+            setExpandedByProject(next)
+            try { sessionStorage.setItem('pmocorex-package-forecast-expanded', JSON.stringify(next)) } catch { /* storage unavailable */ }
+          }
+          return <section className="mt-4 rounded-xl border border-[var(--pmx-border)] p-4" aria-label="Package forecast breakdown">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">Delivery package forecast breakdown</h3>
+                <p className="mt-1 text-xs text-[var(--pmx-muted)]">{packages.length} delivery package{packages.length === 1 ? '' : 's'} · {expanded ? 'Detailed forecasts' : 'Expand to view individual dates and delays'}</p>
+              </div>
+              <button type="button" aria-expanded={expanded} aria-controls="package-forecast-details" onClick={toggle} className="rounded-lg border border-[var(--pmx-border)] px-3 py-2 text-sm font-semibold hover:bg-[var(--pmx-surface-2)]">
+                {expanded ? 'Collapse packages ▲' : `View ${packages.length} packages ▼`}
+              </button>
+            </div>
+            {incompleteForecast && <p role="alert" className="mt-3 text-sm text-amber-700">Master forecast withheld: {forecast.incompletePackageForecasts} package(s) lack a valid dated programme.</p>}
+            {expanded && <div id="package-forecast-details" className="mt-3">
+              <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-[var(--pmx-border)]"><th className="py-2 pr-3">Package</th><th className="py-2 pr-3">Programme finish</th><th className="py-2 pr-3">Forecast finish</th><th className="py-2">Delay</th></tr></thead><tbody>{packages.map(item => <tr key={item.packageId} className="border-b border-[var(--pmx-border)] last:border-0"><td className="py-2 pr-3">{item.packageName}</td><td className="py-2 pr-3">{formatDate(item.plannedFinish)}</td><td className="py-2 pr-3">{formatDate(item.forecastFinish)}</td><td className="py-2">{item.forecastFinish ? `${item.delayDays} days` : 'Unverified'}</td></tr>)}</tbody></table></div>
+              <button className="mt-3 text-sm font-semibold text-sky-700" onClick={() => navigate('/app/schedule')}>Inspect package schedules →</button>
+            </div>}
+          </section>
+        })()}
         {(delayMismatch || !validProgress) && <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <strong>Data consistency review required.</strong>{delayMismatch ? ` Displayed dates imply ${calendarDelay} calendar days of delay, while the forecast engine reports ${forecast.delayDays} days. Confirm whether the engine uses working days or a different baseline.` : ''}{!validProgress ? ' Progress values are missing or outside the valid 0–100% range.' : ''}
           <button className="ml-2 underline" onClick={() => navigate('/app/schedule')}>Review programme</button>
