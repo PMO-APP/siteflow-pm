@@ -308,6 +308,7 @@ export default function CostingPage() {
     payment_title: '',
     vendor_name: '',
     payment_category: 'Contract Payment',
+    variation_id: '',
     amount: '',
     payment_status: 'Pending',
     request_date: '',
@@ -656,6 +657,23 @@ export default function CostingPage() {
       return
     }
 
+    const linkedVariation = paymentForm.payment_category === 'Variation Payment'
+      ? variations.find((v: any) => String(v.id) === paymentForm.variation_id)
+      : null
+    if (paymentForm.payment_category === 'Variation Payment') {
+      if (!linkedVariation || !['Approved', 'Implemented'].includes(linkedVariation.status)) {
+        setNotice('Select an approved variation before requesting a variation payment.')
+        return
+      }
+      const alreadyRequested = payments
+        .filter((p: any) => String(p.variation_id || '') === String(linkedVariation.id) && p.payment_status !== 'Rejected')
+        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+      if (Number(paymentForm.amount) <= 0 || alreadyRequested + Number(paymentForm.amount) > Number(linkedVariation.amount || 0)) {
+        setNotice(`Payment exceeds the remaining approved variation balance (${formatCurrency(Math.max(0, Number(linkedVariation.amount || 0) - alreadyRequested))}).`)
+        return
+      }
+    }
+
     const { error } = await supabase.from('cost_payments').insert({
       organization_id: organizationId,
       portfolio_id: portfolioId,
@@ -663,6 +681,7 @@ export default function CostingPage() {
       payment_title: paymentForm.payment_title.trim(),
       vendor_name: paymentForm.vendor_name.trim() || null,
       payment_category: paymentForm.payment_category,
+      variation_id: linkedVariation?.id || null,
       amount: Number(paymentForm.amount || 0),
       payment_status: paymentForm.payment_status,
       request_date: paymentForm.request_date || null,
@@ -682,6 +701,7 @@ export default function CostingPage() {
       payment_title: '',
       vendor_name: '',
       payment_category: 'Contract Payment',
+      variation_id: '',
       amount: '',
       payment_status: 'Pending',
       request_date: '',
@@ -1449,6 +1469,7 @@ export default function CostingPage() {
 
           <PaymentsTab
             payments={payments}
+            variations={variations}
             stages={paymentStages}
             history={paymentHistory}
             onUpdateStage={updatePaymentStage}
@@ -2591,6 +2612,7 @@ function PaymentStageRow({ payment, tracking, history, canEdit, onUpdate }: any)
 
 function PaymentsTab({
   payments,
+  variations,
   stages,
   history,
   onUpdateStage,
@@ -2670,7 +2692,7 @@ function PaymentsTab({
             disabled={!canEdit}
             value={form.payment_category}
             onChange={e =>
-              setForm({ ...form, payment_category: e.target.value })
+              setForm({ ...form, payment_category: e.target.value, variation_id: '' })
             }
           >
             {PAYMENT_CATEGORIES.map(category => (
@@ -2678,6 +2700,17 @@ function PaymentsTab({
             ))}
           </select>
 
+          {form.payment_category === 'Variation Payment' && (
+            <label className="text-xs font-medium md:col-span-2">Approved variation
+              <select className="form-control mt-1" disabled={!canEdit} value={form.variation_id || ''}
+                onChange={e => { const v = variations.find((x: any) => String(x.id) === e.target.value); setForm({ ...form, variation_id: e.target.value, payment_title: v?.variation_title || '', vendor_name: v?.contractor_name || '' }) }}>
+                <option value="">Select an existing approved variation</option>
+                {variations.filter((v: any) => ['Approved', 'Implemented'].includes(v.status)).map((v: any) => (
+                  <option key={v.id} value={v.id}>{v.variation_title} · {formatCurrency(v.amount)}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <select
             className="form-control disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={!canEdit}
@@ -2725,6 +2758,12 @@ function PaymentsTab({
           />
         </div>
 
+        {form.payment_category === 'Variation Payment' && form.variation_id && (() => {
+          const v = variations.find((x: any) => String(x.id) === form.variation_id)
+          if (!v) return null
+          const requested = payments.filter((p: any) => String(p.variation_id || '') === String(v.id) && p.payment_status !== 'Rejected').reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+          return <p className="text-sm text-slate-600 mt-3">Approved: {formatCurrency(v.amount)} · Previously requested: {formatCurrency(requested)} · Available: {formatCurrency(Math.max(0, Number(v.amount || 0) - requested))}</p>
+        })()}
         <textarea
           className="form-control mt-3"
           rows={2}
