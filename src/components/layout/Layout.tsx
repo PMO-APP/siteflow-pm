@@ -101,6 +101,7 @@ const NAV: NavItem[] = [
   { to: '/app/snags', icon: AlertTriangle, label: 'Snag List', group: 'delivery' },
   { to: '/app/rfis', icon: MessageSquareText, label: 'RFIs', group: 'technical' },
   { to: '/app/documents', icon: FolderOpen, label: 'Documents', group: 'technical' },
+  { to: '/app/design-intelligence', icon: ScanSearch, label: 'Design Intelligence', group: 'technical' },
   { to: '/app/costing-management', icon: Wallet, label: 'Costing Management', group: 'commercial' },
   { to: '/app/design-management', icon: ScanSearch, label: 'Design Management', group: 'technical' },
   { to: '/app/risk', icon: Shield, label: 'Risk Register', group: 'governance' },
@@ -221,7 +222,7 @@ export default function Layout() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
   const role = useMembershipStore(state => state.role)
-  const { data: datedPackages = [], isLoading: packageDatesLoading } = usePackageHandoverDates()
+  const { data: datedPackages = [], missingProgrammePackages, isLoading: packageDatesLoading } = usePackageHandoverDates()
   const allDatedHandovers = datedPackages.map(pkg => ({ id: String(pkg.id), name: pkg.name, date: parseISO(pkg.planned_finish!) }))
   const nextHandover = allDatedHandovers.find(pkg => pkg.date.getTime() >= Date.now() - 86400000) || allDatedHandovers[0] || null
   const nextPackage = datedPackages.find(pkg => Date.parse(pkg.planned_finish!) >= Date.now() - 86400000) || datedPackages[0] || null
@@ -582,7 +583,7 @@ export default function Layout() {
                     : 'text-[#5f7481]'
                 }`}
               >
-                {nextHandover ? 'NEXT PACKAGE HANDOVER' : 'DAYS LEFT'}
+                {nextHandover ? 'NEXT PACKAGE TARGET' : 'PROJECT HANDOVER TARGET'}
               </div>
 
               <div className="sidebar-muted text-[9px]">
@@ -600,7 +601,7 @@ export default function Layout() {
           </div>
           {allDatedHandovers.length > 1 && (
             <details className="mt-2 rounded-lg border border-[#d7e1e4] px-2 py-2 text-xs">
-              <summary className="cursor-pointer font-semibold">All package handovers ({allDatedHandovers.length})</summary>
+              <summary className="cursor-pointer font-semibold">All package programme targets ({allDatedHandovers.length})</summary>
               <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">
                 {allDatedHandovers.map(pkg => (
                   <div key={pkg.id} className="flex items-start justify-between gap-2">
@@ -611,6 +612,7 @@ export default function Layout() {
               </div>
             </details>
           )}
+          {missingProgrammePackages.length > 0 && <div className="mt-2 text-[10px] text-amber-700">{missingProgrammePackages.length} package(s) missing a dated programme; project forecast is incomplete.</div>}
           {packageDatesLoading && <div className="mt-1 text-xs">Checking package dates…</div>}
         </div>
 
