@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
+import { useAccessSession } from '@/access/AccessSessionProvider'
 
 import { pmoConfirm } from '@/lib/notifications'
 const SECTIONS = [
@@ -247,7 +248,8 @@ export default function CostingPage() {
   const { projectId, projectName, organizationId, portfolioId } =
     useProjectStore()
 
-  const canEdit = canEditCosting(role)
+  const { can } = useAccessSession()
+  const canEdit = Boolean(projectId) && canEditCosting(role) && can('reports.edit', { scopeType: 'project', scopeId: projectId, discipline: 'costing' })
   const reportRef = useRef<HTMLDivElement>(null)
 
   const [reportWeek, setReportWeek] = useState(
