@@ -6,6 +6,8 @@ import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 
 type Project = {id:number; project_name:string; status?:string|null; handover_date?:string|null; organization_id?:number|null; portfolio_id?:number|null; overall_owner_email?:string|null; housebuild_owner_email?:string|null; mep_owner_email?:string|null; infrastructure_owner_email?:string|null}
+type Revision = {project_id:number; package_name?:string|null; block_id?:string|null; current_finish?:string|null; planned_finish?:string|null; forecast_finish?:string|null; baseline_finish?:string|null; revision_name?:string|null}
+type Payment = {project_id:number; payment_title?:string|null; amount?:number|null; payment_status?:string|null}
 type ReportRow = {project_id:number; discipline?:string|null; report_date?:string|null}
 const units = ['Housebuild','Mechanical','Electrical','Infrastructure']
 function lagosToday() {
@@ -27,6 +29,9 @@ export default function WorkspaceReportsPage() {
   const [projects,setProjects]=useState<Project[]>([])
   const [design,setDesign]=useState<ReportRow[]>([])
   const [ipd,setIpd]=useState<ReportRow[]>([])
+  const [revisions,setRevisions]=useState<Revision[]>([])
+  const [payments,setPayments]=useState<Payment[]>([])
+  const [sourceHealth,setSourceHealth]=useState({revisions:false,payments:false})
   const [week,setWeek]=useState(reportingWeek)
   const [loading,setLoading]=useState(false)
   const [errors,setErrors]=useState<string[]>([])
@@ -48,14 +53,18 @@ export default function WorkspaceReportsPage() {
         const ids=visible.map(p=>p.id)
         const monday=new Date(`${week}T12:00:00Z`);monday.setUTCDate(monday.getUTCDate()-4)
         const start=monday.toISOString().slice(0,10)
-        const [d,i]=await Promise.all([
+        const [d,i,r,pay]=await Promise.all([
           supabase.from('design_report_submissions').select('project_id').in('project_id',ids).eq('report_week',start),
           supabase.from('weekly_reports').select('project_id,discipline,report_date').in('project_id',ids).gte('report_date',start).lte('report_date',week),
+          supabase.from('schedule_revisions').select('project_id,package_name,block_id,current_finish,planned_finish,forecast_finish,baseline_finish,revision_name').in('project_id',ids).eq('is_active',true),
+          supabase.from('cost_payments').select('project_id,payment_title,amount,payment_status').in('project_id',ids),
         ])
         if(!active)return
         setDesign((d.data||[]) as ReportRow[]);setIpd((i.data||[]) as ReportRow[])
-        setErrors([d.error&&`Design: ${d.error.message}`,i.error&&`IPD: ${i.error.message}`].filter(Boolean) as string[])
-      } else {setDesign([]);setIpd([])}
+        setRevisions((r.data||[]) as Revision[]);setPayments((pay.data||[]) as Payment[])
+        setSourceHealth({revisions:!r.error,payments:!pay.error})
+        setErrors([d.error&&`Design: ${d.error.message}`,i.error&&`IPD: ${i.error.message}`,r.error&&`Active revisions: ${r.error.message}`,pay.error&&`Payment register: ${pay.error.message}`].filter(Boolean) as string[])
+      } else {setDesign([]);setIpd([]);setRevisions([]);setPayments([]);setSourceHealth({revisions:false,payments:false})}
       if(active){setUpdated(new Date().toLocaleString('en-NG',{timeZone:'Africa/Lagos'}));setLoading(false)}
     }
     void load();return ()=>{active=false}
@@ -92,6 +101,20 @@ export default function WorkspaceReportsPage() {
     const reasons=[overdue?`Recorded handover passed ${Math.abs(days!)} day(s) ago`:null,flagged?`Project status: ${p.status}`:null,imminent?`Recorded handover in ${days} day(s)`:null,soon?`Recorded handover in ${days} day(s)`:null].filter(Boolean) as string[]
     return {...p,days,band,reasons,closed,validDate}
   }).filter(p=>!p.closed).sort((a,b)=>a.band-b.band||(a.days??999999)-(b.days??999999)||a.project_name.localeCompare(b.project_name)),[projects,today])
+  // Active programme revisions can be package-specific. Never collapse package targets
+  // into a single project date or call a missed target a measured schedule delay.
+  const programmeAttention=projects.flatMap(p=>revisions.filter(r=>r.project_id===p.id).map(r=>{
+    const target=r.current_finish||r.planned_finish||null
+    const forecast=r.forecast_finish||null
+    const targetMs=target?Date.parse(target+'T12:00:00Z'):NaN
+    const forecastMs=forecast?Date.parse(forecast+'T12:00:00Z'):NaN
+    const daysToTarget=Number.isFinite(targetMs)?Math.round((targetMs-Date.parse(today+'T12:00:00Z'))/86400000):null
+    const forecastOverrunDays=Number.isFinite(targetMs)&&Number.isFinite(forecastMs)?Math.max(0,Math.round((forecastMs-targetMs)/86400000)):null
+    return {project:p.project_name,package:r.package_name||r.block_id||'Project programme',target,forecast,daysToTarget,forecastOverrunDays,revision:r.revision_name||'Active revision'}
+  }))).sort((a,b)=>(a.daysToTarget??999999)-(b.daysToTarget??999999))
+  const pendingPayments=payments.filter(p=>!['paid','rejected','cancelled','canceled'].includes((p.payment_status||'').toLowerCase().trim()))
+  const knownPending=pendingPayments.filter(p=>p.amount!=null&&Number.isFinite(Number(p.amount)))
+  const pendingTotal=knownPending.reduce((sum,p)=>sum+Number(p.amount),0)
   const priority=attention.filter(p=>p.reasons.length>0)
   const isPMO=section==='pmo'
   if(!isPMO && section!=='design' && section!=='ipd')return <div className="p-8">Unknown report section. <button onClick={()=>navigate('/projects')}>Back to workspace</button></div>
@@ -112,7 +135,9 @@ export default function WorkspaceReportsPage() {
       {priority.length===0?<p className="mt-4 text-sm">No handover/status flags identified. This does not mean projects are risk-free.</p>:<div className="mt-4 space-y-3">{priority.map((p,i)=><div key={p.id} className="rounded-xl border p-4"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold">{i+1}</span><AlertTriangle size={18} className="mt-1 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{p.project_name}</strong><span className="text-xs text-slate-600">{p.handover_date||'No handover date recorded'}</span></div><p className="mt-1 text-sm text-slate-700">{p.reasons.join(' · ')}</p><p className="mt-2 text-xs text-slate-500">Actual schedule variance: unavailable · Payment blockers: unverified · Recovery forecast: not connected</p></div></div></div>)}</div>}
       <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Priority order: passed recorded handover → flagged status with handover in 14 days → other flagged statuses → handover within 14 days → handover within 30 days. Ties use nearest date. Missing dates never count as zero days. This order must be replaced by the authoritative package-level schedule and verified blockers before being labelled a delivery-risk score.</div></section>
       <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Departmental reporting coverage</h2><p className="mt-1 text-sm text-slate-600">This shows visible Design and IPD source records only. Costing now has a workspace-wide report and must not be treated as a missing project-level submission. Absence of a record does not prove late submission.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-3">Project</th><th className="p-3">Design</th><th className="p-3">IPD disciplines received</th><th className="p-3">Project status</th></tr></thead><tbody>{missing.map(p=><tr key={p.id} className="border-b"><td className="p-3 font-semibold">{p.project_name}</td><td className="p-3">{design.some(r=>r.project_id===p.id)?'Recorded':'Not recorded'}</td><td className="p-3">{units.filter(u=>ipd.some(r=>r.project_id===p.id && (r.discipline||'').toLowerCase()===u.toLowerCase())).join(', ')||'None recorded'}</td><td className="p-3">{p.status||'Not available'}</td></tr>)}</tbody></table></div></section>
-      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Financial exposure and recovery intelligence</h2><p className="mt-2 text-sm text-slate-600">Pending payments, certified valuations, cost variations, approved schedule revisions, package-level progress and recovery forecasts require validated source integration. They are explicitly unavailable here; no amounts, delay-day estimates or project risk scores have been invented.</p></section>
+      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Approved programme targets and forecast exposure</h2><p className="mt-1 text-sm text-slate-600">Active schedule revisions by package. A passed target or forecast beyond target indicates exposure, not measured progress slippage. Original baselines and weighted actual progress must be validated separately.</p>{!sourceHealth.revisions?<p className="mt-3 text-amber-700">Schedule source unavailable or not loaded.</p>:programmeAttention.length===0?<p className="mt-3 text-slate-500">No accessible active schedule revisions.</p>:<div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Project / package</th><th className="p-2">Active target</th><th className="p-2">Forecast</th><th className="p-2">Exposure</th></tr></thead><tbody>{programmeAttention.map((r,i)=><tr className="border-b" key={`${r.project}-${r.package}-${i}`}><td className="p-2"><strong>{r.project}</strong><span className="block text-xs text-slate-500">{r.package} · {r.revision}</span></td><td className="p-2">{r.target||'Not recorded'}</td><td className="p-2">{r.forecast||'Not recorded'}</td><td className="p-2">{r.forecastOverrunDays!==null&&r.forecastOverrunDays>0?`Forecast ${r.forecastOverrunDays} days after target`:r.daysToTarget!==null&&r.daysToTarget<0?`Target passed ${Math.abs(r.daysToTarget)} days ago`:r.daysToTarget!==null?`${r.daysToTarget} days until target`:'Insufficient dates'}</td></tr>)}</tbody></table></div>}</section>
+      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Payment items requiring review</h2><p className="mt-1 text-sm text-slate-600">Read-only Costing payment register. A pending payment is not automatically a confirmed construction blocker or a bank-disbursement obligation. No amounts are counted when missing.</p>{!sourceHealth.payments?<p className="mt-3 text-amber-700">Payment register unavailable or not loaded.</p>:<><p className="mt-3 text-sm font-semibold">{pendingPayments.length} non-final payment records · ₦{pendingTotal.toLocaleString('en-NG')} in recorded amounts{knownPending.length!==pendingPayments.length?' (some amounts unavailable)':''}</p>{pendingPayments.length===0?<p className="mt-2 text-sm text-slate-500">No pending payment records found. This does not confirm that there are no payment obligations.</p>:<div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-2">Project</th><th className="p-2">Payment item</th><th className="p-2">Status</th><th className="p-2">Amount</th></tr></thead><tbody>{pendingPayments.slice(0,50).map((p,i)=><tr key={i} className="border-b"><td className="p-2">{projects.find(x=>x.id===p.project_id)?.project_name||'Unknown'}</td><td className="p-2">{p.payment_title||'Untitled'}</td><td className="p-2">{p.payment_status||'Unverified'}</td><td className="p-2">{p.amount==null?'Not recorded':`₦${Number(p.amount).toLocaleString('en-NG')}`}</td></tr>)}</tbody></table>{pendingPayments.length>50&&<p className="text-xs text-slate-500">Showing first 50 items; {pendingPayments.length} total.</p>}</div>}</>}</section>
+      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Intelligence still awaiting validated integration</h2><p className="mt-2 text-sm text-slate-600">Certified valuations, cost variations, departmental issue dependencies, actual weighted progress and Recovery Forecast are not yet connected. Payment items and programme dates above are separate source facts, not a combined delivery-risk score. No management decisions are inferred without verified blockers.</p></section>
       <p className="text-xs text-slate-500">Last refreshed: {updated||'Not yet loaded'}. Live, read-only view; not a frozen issued report.</p></>:
       <section className="rounded-2xl border bg-white p-5"><h2 className="mb-4 text-lg font-bold">Select project {section==='ipd'?`· ${discipline}`:''}</h2><div className="grid gap-3 sm:grid-cols-2">{filtered.map(p=><button key={p.id} onClick={()=>open(p)} className="flex items-center justify-between rounded-xl border p-4 text-left hover:border-teal-500 hover:bg-teal-50"><span><strong className="block">{p.project_name}</strong><span className="text-xs text-slate-500">{p.status||'Status unavailable'}</span></span><FileText size={20}/></button>)}</div>{!filtered.length&&<p>No accessible projects match your search.</p>}</section>}
     </main></div>
