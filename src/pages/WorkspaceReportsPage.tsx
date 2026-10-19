@@ -126,7 +126,7 @@ export default function WorkspaceReportsPage() {
     const daysToTarget=Number.isFinite(targetMs)?Math.round((targetMs-Date.parse(today+'T12:00:00Z'))/86400000):null
     const forecastOverrunDays=Number.isFinite(targetMs)&&Number.isFinite(forecastMs)?Math.max(0,Math.round((forecastMs-targetMs)/86400000)):null
     return {projectId:p.id,project:p.project_name,package:r.package_name||r.block_id||'Project programme',target,forecast,daysToTarget,forecastOverrunDays,revision:r.revision_name||'Active revision'}
-  }))).sort((a,b)=>(a.daysToTarget??999999)-(b.daysToTarget??999999))
+  })).sort((a,b)=>(a.daysToTarget??999999)-(b.daysToTarget??999999))
   const openRecord=(status?:string|null)=>!/(closed|completed|resolved|approved|delivered|cancelled|canceled|paid)/i.test(status||'')
   const pastDate=(date?:string|null)=>Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date<today)
   const attentionEvidence=projects.map(project=>{
