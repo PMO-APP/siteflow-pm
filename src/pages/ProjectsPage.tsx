@@ -962,7 +962,7 @@ export default function ProjectsPage() {
           <section aria-label="Workspace reporting tools" className="rounded-[26px] border border-[#cfe3e1] bg-white p-6 shadow-[0_16px_50px_rgba(11,42,60,.08)] sm:p-7">
             <div className="hub-eyebrow">Workspace tools</div>
             <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">Reporting</h2>
-            <button type="button" onClick={() => navigate('/app/costing/weekly-workspace')}
+            <button type="button" onClick={() => navigate('/cost-reporting')}
               className="mt-4 flex w-full max-w-xl items-start gap-4 rounded-2xl border border-[#cfe3e1] p-5 text-left transition hover:border-[#05969B] hover:bg-[#f7fcfb]">
               <span className="rounded-xl bg-[#e8f6f4] p-3 text-[#05969B]"><FileSpreadsheet size={23} /></span>
               <span className="flex-1"><span className="block font-bold text-[#0B2A3C]">Cost Reporting Centre</span>
