@@ -273,6 +273,9 @@ export default function App() {
           element={<Navigate to="/executive-dashboard" replace />}
         />
 
+        {/* Workspace-wide reporting: outside the project-scoped /app Layout. */}
+        <Route path="/cost-reporting" element={<RequireAuth><CostingWeeklyWorkspacePage /></RequireAuth>} />
+
         <Route
           path="/projects"
           element={
@@ -403,7 +406,7 @@ export default function App() {
           <Route path="recovery" element={<RecoveryForecastPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="costing" element={<CostingPage />} />
-          <Route path="costing/weekly-workspace" element={<CostingWeeklyWorkspacePage />} />
+          <Route path="costing/weekly-workspace" element={<Navigate to="/cost-reporting" replace />} />
           <Route path="costing/procurement" element={<Navigate to="/app/procurement" replace />} />
           <Route path="costing/:module" element={<CostingPage />} />
           <Route path="costing-management" element={<DepartmentHubPage department="costing" />} />
