@@ -1,3 +1,4 @@
+import DesignCollaboration from '@/components/design/DesignCollaboration'
 import RequestReportAmendment from './RequestReportAmendment'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Printer, Trash2, PenTool } from 'lucide-react'
@@ -99,6 +100,7 @@ export default function DesignReportsPage() {
   const isWeeklyReportView = activeTab === 'report' || activeTab === 'history'
   const designSectionTitle = activeTab === 'report' || activeTab === 'history' ? 'Design Reports' : activeTab === 'drawings' ? 'Drawing Register' : activeTab === 'consultants' ? 'Consultant Management' : activeTab === 'issues' ? 'Design Issues' : activeTab === 'weekly' ? 'Weekly Commentary' : TABS.find(([key]) => key === activeTab)?.[1] || 'Design Management'
   const [drawings, setDrawings] = useState<any[]>([])
+  const [weeklyEvidence, setWeeklyEvidence] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null)
@@ -163,6 +165,8 @@ export default function DesignReportsPage() {
       return
     }
 
+    const {data: evidenceData} = await supabase.from('design_collaboration_files').select('id,file_name,storage_path,caption,location,created_at').eq('project_id', Number(projectId)).eq('context_type','weekly').eq('context_id',reportWeek)
+    setWeeklyEvidence(evidenceData || [])
     setDrawings(drawingData || [])
     setItems(reportData || [])
     setLoading(false)
@@ -220,6 +224,7 @@ export default function DesignReportsPage() {
 
       drawings,
       items,
+      progressEvidence: weeklyEvidence,
 
       stats: {
         totalDrawings: drawings.length,
@@ -433,6 +438,7 @@ export default function DesignReportsPage() {
     snapshot?.preparedBy || selectedSubmission?.submitted_by_name || user?.full_name || user?.email || '—'
 
   const reportDrawings = snapshot?.drawings || drawings
+  const reportProgressEvidence = snapshot?.progressEvidence || weeklyEvidence
   const reportItems = snapshot?.items || items
 
   const reportApprovedDrawings = snapshot
@@ -611,6 +617,7 @@ export default function DesignReportsPage() {
                   weeklyChallenges={reportWeeklyChallenges}
                   nextWeekFocus={reportNextWeekFocus}
                   managementAttention={reportManagementAttention}
+                  progressEvidence={reportProgressEvidence}
                 />
               </div>
             ) : (
@@ -632,7 +639,7 @@ export default function DesignReportsPage() {
                   <ManualTab title="Design Activities & Reviews" category="Weekly Achievement" items={weeklyAchievements} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
                 </ReportSection>
                 <ReportSection title="3. Design Issues & Constraints" description="Unresolved design issues, blockers and coordination constraints.">
-                  <ManualTab title="Design Issues" category="Design Issue" items={designIssues} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
+                  <ManualTab title="Design Issues" category="Design Issue" items={designIssues} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit} projectId={projectId}/>
                 </ReportSection>
                 <ReportSection title="4. Challenges & Management Attention" description="Challenges requiring resolution, decisions or escalation.">
                   <ManualTab title="Weekly Challenges" category="Weekly Challenge" items={weeklyChallenges} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
@@ -640,6 +647,7 @@ export default function DesignReportsPage() {
                 <ReportSection title="5. Next Week's Priorities & Commentary" description="Planned activities, priorities and design team commentary.">
                   <ManualTab title="Next Week Focus" category="Next Week Focus" items={nextWeekFocus} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
                 </ReportSection>
+                <DesignCollaboration projectId={projectId} context="weekly" contextId={reportWeek} canEdit={canEdit} heading="6. Progress photographs and evidence" onChanged={() => void loadData()} />
                 <div className="card p-5 text-sm text-[#65717c]">When ready, use <strong>Submit Weekly Report</strong> at the top. {canSubmitReport ? 'The submission window is open.' : reportLock.message}</div>
               </div>
             )
@@ -669,6 +677,7 @@ export default function DesignReportsPage() {
               addItem={addItem}
               deleteItem={deleteItem}
               canEdit={canEdit}
+              projectId={projectId}
             />
           )}
 
@@ -789,6 +798,7 @@ function DesignReportDocument({
   weeklyChallenges,
   nextWeekFocus,
   managementAttention,
+  progressEvidence = [],
 }: any) {
   return (
     <div className="design-report-document">
@@ -853,6 +863,7 @@ function DesignReportDocument({
       <ReportTable title="Weekly Challenges" items={weeklyChallenges} />
       <ReportTable title="Next Week Focus" items={nextWeekFocus} />
       <ReportTable title="Items Requiring Management Attention" items={managementAttention} />
+      <Section title="Progress photographs and evidence">{progressEvidence.length ? progressEvidence.map((f: any) => <ReportEvidencePhoto key={f.id} evidence={f}/>) : <div className="dr-box">No progress evidence recorded.</div>}</Section>
 
       <Section title="Sign-off">
         <div className="dr-grid">
@@ -867,6 +878,20 @@ function DesignReportDocument({
       </div>
     </div>
   )
+}
+
+function ReportEvidencePhoto({evidence}:{evidence:any}) {
+  const [url,setUrl]=useState('')
+  useEffect(()=>{
+    let mounted=true
+    if(!/\.(jpe?g|png|webp)$/i.test(evidence.file_name || ''))return
+    void supabase.storage.from('design-collaboration').createSignedUrl(evidence.storage_path,300).then(({data})=>{if(mounted && data?.signedUrl)setUrl(data.signedUrl)})
+    return ()=>{mounted=false}
+  },[evidence.storage_path,evidence.file_name])
+  return <div className="dr-box" style={{breakInside:'avoid',marginBottom:12}}>
+    {url && <img src={url} alt={evidence.caption || evidence.file_name} style={{maxHeight:230,maxWidth:'100%',objectFit:'contain'}}/>}
+    <div><strong>{evidence.file_name}</strong> · {evidence.caption || 'No caption'} · {evidence.location || 'Location not recorded'}</div>
+  </div>
 }
 
 function ReportTable({ title, items }: { title: string; items: any[] }) {
@@ -1059,6 +1084,7 @@ function ManualTab({
   addItem,
   deleteItem,
   canEdit,
+  projectId,
 }: any) {
   return (
     <div className="space-y-5">
@@ -1183,6 +1209,7 @@ function ManualTab({
           </table>
         </div>
       )}
+      {category === 'Design Issue' && projectId && items.map((item: any) => <DesignCollaboration key={item.id} projectId={projectId} context="issue" contextId={String(item.id)} canEdit={canEdit} heading={`Evidence & discussion: ${item.title}`} />)}
     </div>
   )
 }
