@@ -569,7 +569,7 @@ export default function DesignReportsPage() {
             Print / Download Design Report
           </button>
         </div>
-      </div>
+      </div>}
 
       {selectedSubmission && (
         <div className="rounded-xl border border-[#ffd1c5] bg-[#ff7657]/10 p-3 text-sm text-[#102943]">
