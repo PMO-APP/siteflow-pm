@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
-import { useProjectStore } from '@/store/project'
 
 const SECTIONS = ['Pre-Contract', 'Tender', 'Contracts', 'Post Contract', 'Payments', 'Procurement'] as const
 const STATUS = ['Open', 'In Progress', 'Pending', 'Approved', 'Paid', 'Completed', 'Delayed']
@@ -25,7 +24,6 @@ export default function CostingWeeklyWorkspacePage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(s => s.role)
   const workspaceId = useMembershipStore(s => s.workspaceId)
-  const organizationId = useProjectStore(s => s.organizationId)
   const [week, setWeek] = useState(() => fridayOf(new Date().toISOString().slice(0, 10)))
   const [projects, setProjects] = useState<Project[]>([])
   const [items, setItems] = useState<ReportItem[]>([])
@@ -34,6 +32,9 @@ export default function CostingWeeklyWorkspacePage() {
   const [sourceWarnings, setSourceWarnings] = useState<string[]>([])
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [activeCarry, setActiveCarry] = useState<ReportItem | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [reportOrgId, setReportOrgId] = useState<number | null>(null)
   const [section, setSection] = useState<string>(SECTIONS[0])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -58,7 +59,8 @@ export default function CostingWeeklyWorkspacePage() {
     setSources([]); setSourceWarnings([])
     const { data: ws, error: wsError } = await supabase.from('workspaces').select('organization_id').eq('id', workspaceId).single()
     if (wsError || !ws?.organization_id) { setMessage(wsError?.message || 'Workspace organization unavailable'); setLoadError(true); setLoading(false); return }
-    const orgId = ws.organization_id
+    const orgId = Number(ws.organization_id)
+    setReportOrgId(orgId)
     const [p, r] = await Promise.all([
       supabase.from('projects').select('id,project_name,portfolio_id').eq('workspace_id', workspaceId).order('project_name'),
       supabase.from('cost_reports').select('id,project_id,report_week,section,item_title,description,status,amount').eq('organization_id', orgId).lte('report_week', week).order('report_week', { ascending: false }).limit(3000),
@@ -104,18 +106,20 @@ export default function CostingWeeklyWorkspacePage() {
   const missingProjects = useMemo(() => projects.filter(p => !items.some(i => i.project_id === p.id)), [projects, items])
   const previousFor = (id: number, cat: string) => previous.filter(i => i.project_id === id && i.section === cat && !items.some(current => current.project_id === id && current.section === cat && current.item_title.trim().toLowerCase() === i.item_title.trim().toLowerCase()))
   async function add(project: Project, carry?: ReportItem) {
-    if (!canEdit || !user || !organizationId) return
+    if (!canEdit || !user || !reportOrgId || saving) return
     const label = carry?.item_title || title.trim()
     if (!label) { setMessage('Enter an activity title.'); return }
+    setSaving(true)
     const { error } = await supabase.from('cost_reports').insert({
-      organization_id: organizationId, portfolio_id: project.portfolio_id ?? null,
+      organization_id: reportOrgId, portfolio_id: project.portfolio_id ?? null,
       project_id: project.id, report_week: week, section: carry?.section || section,
-      item_title: label, description: carry?.description ?? (description.trim() || null),
-      status: carry?.status || status, amount: carry?.amount ?? (amount ? Number(amount) : 0),
+      item_title: label, description: description.trim() || carry?.description || null,
+      status, amount: amount.trim() ? Number(amount) : (carry?.amount ?? null),
       created_by: user.id, created_by_name: user.full_name || user.email || null,
     })
+    setSaving(false)
     if (error) { setMessage(error.message); return }
-    setTitle(''); setDescription(''); setAmount(''); setMessage('Saved to the project Costing report.'); await refresh()
+    setTitle(''); setDescription(''); setAmount(''); setActiveCarry(null); setMessage('Weekly activity saved.'); await refresh()
   }
   // An explicit officer-confirmed weekly update is saved as a report entry.
   // The operational register itself is not modified or silently duplicated.
@@ -125,7 +129,7 @@ export default function CostingWeeklyWorkspacePage() {
     setSourceStatus(item.status === 'Not recorded' ? 'Pending' : item.status)
   }
   async function confirmSource(project: Project, item: SourceItem) {
-    if (!canEdit || !user || !organizationId || savingSource) return
+    if (!canEdit || !user || !reportOrgId || savingSource) return
     if (!sourceNote.trim()) {
       setMessage('Describe what happened this week, or explicitly write "No change confirmed".')
       return
@@ -137,7 +141,7 @@ export default function CostingWeeklyWorkspacePage() {
     }
     setSavingSource(true)
     const { error } = await supabase.from('cost_reports').insert({
-      organization_id: organizationId, portfolio_id: project.portfolio_id ?? null,
+      organization_id: reportOrgId, portfolio_id: project.portfolio_id ?? null,
       project_id: project.id, report_week: week, section: item.section,
       item_title: entryTitle, description: sourceNote.trim(),
       status: sourceStatus || 'Pending', amount: item.amount,
@@ -185,7 +189,12 @@ export default function CostingWeeklyWorkspacePage() {
     {loading ? <p>Loading Costing records…</p> : !loadError && <p className="text-sm text-slate-600">{projects.length} projects · {items.length} updates this week · {previous.length} outstanding activities · {sources.length} existing commercial records</p>}
     {sourceWarnings.length > 0 && <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm"><strong>Some register data could not be fully loaded.</strong>{sourceWarnings.map(w => <p key={w}>{w}</p>)}</div>}
     <p className="text-xs text-slate-600">Select a project and reporting category to add this week’s update, carry forward an outstanding item, or confirm information from an existing register. No changes are invented automatically.</p>
-    {!loadError && projects.length > 0 && <div className="overflow-x-auto border rounded-xl"><table className="w-full min-w-[1100px] text-sm"><thead className="bg-slate-100"><tr><th className="text-left p-3">Project</th>{SECTIONS.map(s => <th key={s} className="text-left p-3">{s}</th>)}</tr></thead><tbody>{visible.map(p => <tr key={p.id} className="border-t align-top"><td className="p-3 font-semibold"><button className="text-left underline" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>{p.name} {expanded === p.id ? '−' : '+'}</button></td>{SECTIONS.map(s => { const current = items.filter(i => i.project_id === p.id && i.section === s); const carry = previousFor(p.id, s); const linked = sources.filter(i => i.project_id === p.id && i.section === s); return <td key={s} className="p-3"><button className="text-left" onClick={() => { setExpanded(p.id); setSection(s) }}><strong>{current.length}</strong> current{carry.length ? <span className="block text-amber-700">{carry.length} to review</span> : null}{linked.length ? <span className="block text-teal-700">{linked.length} in register</span> : null}</button>{expanded === p.id && section === s && <div className="mt-2 space-y-2 min-w-44">{current.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>{i.status}</p></div>)}{linked.map(i => <div key={`${i.source}:${i.id}`} className="border-t pt-1"><strong>{i.title}</strong><p>{i.status}{i.amount != null ? ` · ₦${i.amount.toLocaleString()}` : ''}</p>{i.details && <p className="text-xs text-slate-600">{i.details}</p>}<p className="text-[11px] text-slate-500">Live register: {i.source}. Confirm before reporting.</p>{canEdit && !current.some(c => c.item_title === `[${i.source}:${i.id}] ${i.title}`) && <div className="mt-1">{confirmingSource === `${i.source}:${i.id}` ? <div className="space-y-1"><textarea className="w-full border p-1" aria-label={`Weekly update for ${i.title}`} placeholder="What changed this week? Or: No change confirmed." value={sourceNote} onChange={e => setSourceNote(e.target.value)}/><input className="w-full border p-1" aria-label="Confirmed status" value={sourceStatus} onChange={e => setSourceStatus(e.target.value)}/><button disabled={savingSource} className="rounded bg-teal-700 text-white px-2 py-1 disabled:opacity-50" onClick={() => void confirmSource(p, i)}>Save confirmed update</button><button className="ml-2 underline" onClick={() => setConfirmingSource(null)}>Cancel</button></div> : <button className="underline text-teal-700" onClick={() => startSourceReview(i)}>Confirm weekly update</button>}</div>}</div>)}{carry.map(i => <div key={i.id} className="border-t pt-1"><strong>{i.item_title}</strong><p>Last: {i.status} ({i.report_week})</p>{canEdit && <button className="underline text-teal-700" onClick={() => void add(p, i)}>Carry forward</button>}</div>)}{canEdit && <div className="space-y-1 border-t pt-2"><input className="w-full border p-1" placeholder="New activity" value={title} onChange={e => setTitle(e.target.value)}/><textarea className="w-full border p-1" placeholder="Update / remarks" value={description} onChange={e => setDescription(e.target.value)}/><select className="w-full border p-1" value={status} onChange={e => setStatus(e.target.value)}>{STATUS.map(v => <option key={v}>{v}</option>)}</select><input className="w-full border p-1" type="number" min="0" placeholder="Amount (optional)" value={amount} onChange={e => setAmount(e.target.value)}/><button className="rounded bg-teal-700 text-white px-2 py-1" onClick={() => void add(p)}>Save activity</button></div>}</div>}</td>})}</tr>)}</tbody></table></div>}
+    {!loadError && projects.length > 0 && <div className="overflow-x-auto border rounded-xl"><table className="w-full min-w-[1000px] text-sm"><thead className="bg-slate-100"><tr><th className="text-left p-3">Project</th>{SECTIONS.map(cat => <th className="text-left p-3" key={cat}>{cat}</th>)}</tr></thead><tbody>{visible.map(p => <tr key={p.id} className="border-t"><td className="p-3 font-medium">{p.name}</td>{SECTIONS.map(cat => { const current = items.filter(i => i.project_id === p.id && i.section === cat); const carry = previousFor(p.id, cat); return <td key={cat} className="p-3 align-top"><button className="rounded border px-2 py-2 w-full text-left hover:bg-teal-50" onClick={() => { setExpanded(p.id); setSection(cat); setActiveCarry(null); setTitle(''); setDescription(''); setStatus('Open'); setAmount('') }}><strong>{current.length} updated</strong>{carry.length > 0 && <span className="block text-amber-700">{carry.length} ongoing</span>}{!current.length && !carry.length && <span className="block text-slate-500">Add update</span>}</button></td>})}</tr>)}</tbody></table></div>}
+    {expanded !== null && projects.some(p => p.id === expanded) && <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setExpanded(null)}><aside role="dialog" aria-modal="true" aria-label="Edit Costing weekly activities" className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl p-5 space-y-4" onClick={e => e.stopPropagation()}><div className="flex justify-between items-start gap-3"><div><h2 className="text-lg font-semibold">{projects.find(p => p.id === expanded)?.name}</h2><p className="text-sm text-slate-600">{section} · Week ending {week}</p></div><button className="border rounded px-3 py-1" onClick={() => setExpanded(null)}>Close</button></div>
+    <div><h3 className="font-medium">This week's saved updates</h3>{items.filter(i => i.project_id === expanded && i.section === section).map(i => <div key={i.id} className="border rounded p-2 mt-2 text-sm"><strong>{i.item_title}</strong><p>{i.status}{i.amount != null ? ` · ₦${i.amount.toLocaleString()}` : ''}</p><p className="whitespace-pre-wrap">{i.description}</p></div>)}{!items.some(i => i.project_id === expanded && i.section === section) && <p className="text-sm text-slate-500">No updates saved this week.</p>}</div>
+    <div><h3 className="font-medium">Ongoing activities from previous weeks</h3><p className="text-xs text-slate-600">Outstanding activities remain visible automatically. They are not reported as verified this week until you confirm or update them.</p>{previousFor(expanded, section).map(i => <div key={i.id} className="border rounded p-3 mt-2 text-sm"><strong>{i.item_title}</strong><p>Last status: {i.status} · {i.report_week}</p>{i.amount != null && <p>₦{i.amount.toLocaleString()}</p>}{i.description && <p className="whitespace-pre-wrap">{i.description}</p>}{canEdit && <button className="mt-2 underline text-teal-700" onClick={() => { setActiveCarry(i); setTitle(i.item_title); setDescription(i.description || ''); setStatus(i.status); setAmount(i.amount == null ? '' : String(i.amount)) }}>Update or confirm no change</button>}</div>)}{previousFor(expanded, section).length === 0 && <p className="text-sm text-slate-500">No outstanding activities to carry forward.</p>}</div>
+    {canEdit && <div className="border-t pt-3 space-y-2"><h3 className="font-semibold">{activeCarry ? 'Update ongoing activity' : 'Add a new activity'}</h3>{activeCarry && <button className="text-xs underline" onClick={() => { setActiveCarry(null); setTitle(''); setDescription(''); setStatus('Open'); setAmount('') }}>Switch to new activity</button>}<label className="block text-xs">Activity<input className="w-full border rounded p-2 mt-1" value={title} disabled={!!activeCarry} onChange={e => setTitle(e.target.value)} placeholder="e.g. Tender evaluation for fittings"/></label><label className="block text-xs">This week's update / remarks<textarea className="w-full border rounded p-2 mt-1" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="What progressed? If unchanged, say 'No change confirmed'."/></label><div className="grid grid-cols-2 gap-2"><label className="block text-xs">Status<select className="w-full border rounded p-2 mt-1" value={status} onChange={e => setStatus(e.target.value)}>{STATUS.map(v => <option key={v}>{v}</option>)}</select></label><label className="block text-xs">Amount (₦, optional)<input type="number" min="0" className="w-full border rounded p-2 mt-1" value={amount} onChange={e => setAmount(e.target.value)}/></label></div><button disabled={saving || !title.trim() || !description.trim()} className="rounded bg-teal-700 text-white px-4 py-2 disabled:opacity-50" onClick={() => { const p = projects.find(p => p.id === expanded); if (p) void add(p, activeCarry || undefined) }}>{saving ? 'Saving…' : activeCarry ? 'Save weekly update' : 'Add activity'}</button><p className="text-xs text-slate-500">Completed and Paid activities will not appear as outstanding next week. Previous report entries remain in history.</p></div>}
+    <div><h3 className="font-medium">Existing register records</h3>{sources.filter(i => i.project_id === expanded && i.section === section).map(i => <div key={`${i.source}:${i.id}`} className="border rounded p-2 mt-2 text-sm"><strong>{i.title}</strong><p>{i.status}</p>{canEdit && <button className="underline text-teal-700" onClick={() => startSourceReview(i)}>Confirm source update</button>}{confirmingSource === `${i.source}:${i.id}` && <div className="space-y-2 mt-2"><textarea className="border rounded p-2 w-full" value={sourceNote} onChange={e => setSourceNote(e.target.value)} placeholder="This week's verified update"/><input className="border rounded p-2 w-full" value={sourceStatus} onChange={e => setSourceStatus(e.target.value)}/><button className="rounded bg-teal-700 text-white px-3 py-1" disabled={savingSource} onClick={() => { const p = projects.find(p => p.id === expanded); if (p) void confirmSource(p, i) }}>Save confirmed update</button></div>}</div>)}{!sources.some(i => i.project_id === expanded && i.section === section) && <p className="text-sm text-slate-500">No register records yet. You can still report activities above.</p>}</div></aside></div>}
     {!loading && !loadError && projects.length === 0 && <p className="rounded border p-4 text-sm">No projects were found in this workspace. Check your workspace selection before preparing the report.</p>}
     {!loadError && projects.length > 0 && <section className="border rounded-xl p-4 space-y-3" aria-label="Consolidated report review">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Generate weekly report</h2><p className="text-sm text-slate-600">Prepare updates in the table above. When ready, generate a draft to check the report before submitting.</p></div><button className="border rounded px-3 py-2" disabled={items.length === 0} onClick={() => setShowPreview(v => !v)}>{showPreview ? 'Hide draft report' : 'Generate draft report'}</button></div>
