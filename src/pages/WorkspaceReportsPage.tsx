@@ -27,7 +27,6 @@ export default function WorkspaceReportsPage() {
   const [projects,setProjects]=useState<Project[]>([])
   const [design,setDesign]=useState<ReportRow[]>([])
   const [ipd,setIpd]=useState<ReportRow[]>([])
-  const [costing,setCosting]=useState<ReportRow[]>([])
   const [week,setWeek]=useState(reportingWeek)
   const [loading,setLoading]=useState(false)
   const [errors,setErrors]=useState<string[]>([])
@@ -49,15 +48,14 @@ export default function WorkspaceReportsPage() {
         const ids=visible.map(p=>p.id)
         const monday=new Date(`${week}T12:00:00Z`);monday.setUTCDate(monday.getUTCDate()-4)
         const start=monday.toISOString().slice(0,10)
-        const [d,c,i]=await Promise.all([
+        const [d,i]=await Promise.all([
           supabase.from('design_report_submissions').select('project_id').in('project_id',ids).eq('report_week',start),
-          supabase.from('cost_report_submissions').select('project_id').in('project_id',ids).eq('report_week',start),
           supabase.from('weekly_reports').select('project_id,discipline,report_date').in('project_id',ids).gte('report_date',start).lte('report_date',week),
         ])
         if(!active)return
-        setDesign((d.data||[]) as ReportRow[]);setCosting((c.data||[]) as ReportRow[]);setIpd((i.data||[]) as ReportRow[])
-        setErrors([d.error&&`Design: ${d.error.message}`,c.error&&`Costing: ${c.error.message}`,i.error&&`IPD: ${i.error.message}`].filter(Boolean) as string[])
-      } else {setDesign([]);setCosting([]);setIpd([])}
+        setDesign((d.data||[]) as ReportRow[]);setIpd((i.data||[]) as ReportRow[])
+        setErrors([d.error&&`Design: ${d.error.message}`,i.error&&`IPD: ${i.error.message}`].filter(Boolean) as string[])
+      } else {setDesign([]);setIpd([])}
       if(active){setUpdated(new Date().toLocaleString('en-NG',{timeZone:'Africa/Lagos'}));setLoading(false)}
     }
     void load();return ()=>{active=false}
@@ -74,11 +72,27 @@ export default function WorkspaceReportsPage() {
   const missing=projects.map(p=>{
     const missingUnits=[
       !design.some(r=>r.project_id===p.id)&&'Design',
-      !costing.some(r=>r.project_id===p.id)&&'Costing (project submission)',
       ...units.filter(u=>!ipd.some(r=>r.project_id===p.id && (r.discipline||'').toLowerCase()===u.toLowerCase())),
     ].filter(Boolean)
     return {...p,missingUnits}
   })
+  // Transparent attention ordering based only on verified project metadata.
+  // This is NOT a schedule variance or forecast-risk model: those require approved
+  // baseline/revision dates, progress records and verified departmental submissions.
+  const attention=useMemo(()=>projects.map(p=>{
+    const status=(p.status||'').toLowerCase().trim()
+    const flagged=['stuck','delayed','on hold','at risk','critical'].includes(status)
+    const closed=['completed','cancelled','canceled','archived'].includes(status)
+    const validDate=Boolean(p.handover_date && /^\d{4}-\d{2}-\d{2}$/.test(p.handover_date) && !Number.isNaN(Date.parse(p.handover_date+'T12:00:00Z')))
+    const days=validDate ? Math.round((Date.parse(p.handover_date+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000):null
+    const overdue=!closed && days!==null && days<0
+    const imminent=!closed && days!==null && days>=0 && days<=14
+    const soon=!closed && days!==null && days>14 && days<=30
+    const band=overdue?0:(flagged&&imminent)?1:flagged?2:imminent?3:soon?4:5
+    const reasons=[overdue?`Recorded handover passed ${Math.abs(days!)} day(s) ago`:null,flagged?`Project status: ${p.status}`:null,imminent?`Recorded handover in ${days} day(s)`:null,soon?`Recorded handover in ${days} day(s)`:null].filter(Boolean) as string[]
+    return {...p,days,band,reasons,closed,validDate}
+  }).filter(p=>!p.closed).sort((a,b)=>a.band-b.band||(a.days??999999)-(b.days??999999)||a.project_name.localeCompare(b.project_name)),[projects,today])
+  const priority=attention.filter(p=>p.reasons.length>0)
   const isPMO=section==='pmo'
   if(!isPMO && section!=='design' && section!=='ipd')return <div className="p-8">Unknown report section. <button onClick={()=>navigate('/projects')}>Back to workspace</button></div>
   return <div className="min-h-screen bg-[#f7f8f6] text-[#173f5f]">
@@ -94,11 +108,11 @@ export default function WorkspaceReportsPage() {
         ['Handover date passed',overdue.length],
         ['Due within 30 days',dueSoon.length],
       ].map(([label,value])=><div key={String(label)} className="rounded-2xl border bg-white p-5"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-black">{value}</p></div>)}</div>
-      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Management attention</h2><p className="mt-1 text-sm text-slate-600">Prioritised indicators available from project status and handover dates. This is not yet the approved schedule-variance risk ranking.</p>
-      {[...new Map([...overdue,...atRisk,...dueSoon].map(p=>[p.id,p])).values()].length===0?<p className="mt-4 text-sm">No attention flags from these fields. This does not establish that the portfolio is risk-free.</p>:
-      <div className="mt-4 space-y-2">{[...new Map([...overdue,...atRisk,...dueSoon].map(p=>[p.id,p])).values()].map(p=><div key={p.id} className="flex items-start gap-3 rounded-xl border p-3"><AlertTriangle size={18} className="mt-1 text-amber-600"/><div><strong>{p.project_name}</strong><p className="text-sm text-slate-600">{overdue.some(x=>x.id===p.id)?'Handover date has passed':atRisk.some(x=>x.id===p.id)?`Project status: ${p.status}`:'Handover due within 30 days'} · Handover: {p.handover_date||'Not available'}</p></div></div>)}</div>}</section>
-      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Departmental reporting coverage</h2><p className="mt-1 text-sm text-slate-600">Project-level Costing submission status is shown separately from the new consolidated Costing report. Absence of a record does not prove late submission.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-3">Project</th><th className="p-3">Design</th><th className="p-3">Costing (legacy)</th><th className="p-3">IPD disciplines received</th><th className="p-3">Project status</th></tr></thead><tbody>{missing.map(p=><tr key={p.id} className="border-b"><td className="p-3 font-semibold">{p.project_name}</td><td className="p-3">{design.some(r=>r.project_id===p.id)?'Recorded':'Not recorded'}</td><td className="p-3">{costing.some(r=>r.project_id===p.id)?'Recorded':'Not recorded'}</td><td className="p-3">{units.filter(u=>ipd.some(r=>r.project_id===p.id && (r.discipline||'').toLowerCase()===u.toLowerCase())).join(', ')||'None recorded'}</td><td className="p-3">{p.status||'Not available'}</td></tr>)}</tbody></table></div></section>
-      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Financial exposure and recovery intelligence</h2><p className="mt-2 text-sm text-slate-600">Pending payments, certified valuations, cost variations, planned-versus-actual progress, forecast handovers and ranked delivery risk require validated source integration. No financial totals or delay-day estimates are fabricated in this first phase.</p></section>
+      <section className="rounded-2xl border bg-white p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold">Management attention · priority watchlist</h2><p className="mt-1 text-sm text-slate-600">Ordered by recorded handover proximity and flagged project status. Not a calculated schedule-delay ranking; actual slippage and delivery feasibility are not available from these fields alone.</p></div><span className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Provisional metadata-based prioritisation</span></div>
+      {priority.length===0?<p className="mt-4 text-sm">No handover/status flags identified. This does not mean projects are risk-free.</p>:<div className="mt-4 space-y-3">{priority.map((p,i)=><div key={p.id} className="rounded-xl border p-4"><div className="flex items-start gap-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold">{i+1}</span><AlertTriangle size={18} className="mt-1 shrink-0 text-amber-600"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><strong>{p.project_name}</strong><span className="text-xs text-slate-600">{p.handover_date||'No handover date recorded'}</span></div><p className="mt-1 text-sm text-slate-700">{p.reasons.join(' · ')}</p><p className="mt-2 text-xs text-slate-500">Actual schedule variance: unavailable · Payment blockers: unverified · Recovery forecast: not connected</p></div></div></div>)}</div>}
+      <div className="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">Priority order: passed recorded handover → flagged status with handover in 14 days → other flagged statuses → handover within 14 days → handover within 30 days. Ties use nearest date. Missing dates never count as zero days. This order must be replaced by the authoritative package-level schedule and verified blockers before being labelled a delivery-risk score.</div></section>
+      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Departmental reporting coverage</h2><p className="mt-1 text-sm text-slate-600">This shows visible Design and IPD source records only. Costing now has a workspace-wide report and must not be treated as a missing project-level submission. Absence of a record does not prove late submission.</p><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-3">Project</th><th className="p-3">Design</th><th className="p-3">IPD disciplines received</th><th className="p-3">Project status</th></tr></thead><tbody>{missing.map(p=><tr key={p.id} className="border-b"><td className="p-3 font-semibold">{p.project_name}</td><td className="p-3">{design.some(r=>r.project_id===p.id)?'Recorded':'Not recorded'}</td><td className="p-3">{units.filter(u=>ipd.some(r=>r.project_id===p.id && (r.discipline||'').toLowerCase()===u.toLowerCase())).join(', ')||'None recorded'}</td><td className="p-3">{p.status||'Not available'}</td></tr>)}</tbody></table></div></section>
+      <section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Financial exposure and recovery intelligence</h2><p className="mt-2 text-sm text-slate-600">Pending payments, certified valuations, cost variations, approved schedule revisions, package-level progress and recovery forecasts require validated source integration. They are explicitly unavailable here; no amounts, delay-day estimates or project risk scores have been invented.</p></section>
       <p className="text-xs text-slate-500">Last refreshed: {updated||'Not yet loaded'}. Live, read-only view; not a frozen issued report.</p></>:
       <section className="rounded-2xl border bg-white p-5"><h2 className="mb-4 text-lg font-bold">Select project {section==='ipd'?`· ${discipline}`:''}</h2><div className="grid gap-3 sm:grid-cols-2">{filtered.map(p=><button key={p.id} onClick={()=>open(p)} className="flex items-center justify-between rounded-xl border p-4 text-left hover:border-teal-500 hover:bg-teal-50"><span><strong className="block">{p.project_name}</strong><span className="text-xs text-slate-500">{p.status||'Status unavailable'}</span></span><FileText size={20}/></button>)}</div>{!filtered.length&&<p>No accessible projects match your search.</p>}</section>}
     </main></div>
