@@ -1,3 +1,4 @@
+import DesignCollaboration from '@/components/design/DesignCollaboration'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -70,6 +71,7 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
 
   const [tab, setTab] = useState<Tab>(section === 'reviews' ? 'Coordination Review' : 'Clash & Risk Register')
   const [drawings, setDrawings] = useState<DesignDrawing[]>([])
+  const [selectedDrawingId, setSelectedDrawingId] = useState('project-coordination')
   const [issues, setIssues] = useState<DesignIssue[]>([])
   const [rules, setRules] = useState<DesignRule[]>([])
   const [jobs, setJobs] = useState<DesignAnalysisJob[]>([])
@@ -261,7 +263,9 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
           <div className="mt-6 space-y-3">{issues.filter(item => ['Rule','Revision','Clash','AI'].includes(item.source_type) && !['Resolved','Closed','Rejected'].includes(item.status)).map(issue => <IssueCard key={issue.id} issue={issue} canManage={canManage} onChange={async patch => { await updateDesignIssue(projectId, issue.id, patch); await load() }}/>)}</div>
         </EnterpriseSection>}
 
-        {tab === 'Clash & Risk Register' && <EnterpriseSection title="Clash & Risk Register" description="Confirmed, probable and inferred design risks are recorded here with ownership and resolution evidence." action={canManage ? <button onClick={() => setShowIssue(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#08B5A6] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/>Raise design issue</button> : undefined}>
+        {section === 'reviews' && <div className="space-y-3"><label className="block text-sm font-semibold text-[#102943]">Review against controlled drawing (optional)<select className="form-control mt-2" value={selectedDrawingId} onChange={e=>setSelectedDrawingId(e.target.value)}><option value="project-coordination">General coordination / upload draft for review</option>{drawings.map(d=><option key={d.id} value={String(d.id)}>{String((d as any).title || (d as any).name || d.id)}</option>)}</select></label><DesignCollaboration projectId={projectId} context="review" contextId={selectedDrawingId} canEdit={canManage} heading="Shared drawings, revisions and review discussion" /></div>}
+
+      {tab === 'Clash & Risk Register' && <EnterpriseSection title="Clash & Risk Register" description="Confirmed, probable and inferred design risks are recorded here with ownership and resolution evidence." action={canManage ? <button onClick={() => setShowIssue(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#08B5A6] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/>Raise design issue</button> : undefined}>
           <div className="space-y-3">{issues.map(issue => <IssueCard key={issue.id} issue={issue} canManage={canManage} onChange={async patch => { await updateDesignIssue(projectId, issue.id, patch); await load() }}/>)}{!issues.length && <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No design coordination issues recorded yet.</div>}</div>
         </EnterpriseSection>}
 
