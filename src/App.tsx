@@ -24,6 +24,7 @@ const AuditPage = lazy(() => import('@/pages/AuditPage'))
 const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
 const CostingPage = lazy(() => import('@/pages/CostingPage'))
 const CostingWeeklyWorkspacePage = lazy(() => import('@/pages/CostingWeeklyWorkspacePage'))
+const WorkspaceReportsPage = lazy(() => import('@/pages/WorkspaceReportsPage'))
 const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
 const DepartmentHubPage = lazy(() => import('@/pages/DepartmentHubPage'))
 const PMOWeeklyReportPage = lazy(() => import('@/pages/PMOWeeklyReportPage'))
@@ -274,6 +275,7 @@ export default function App() {
         />
 
         {/* Workspace-wide reporting: outside the project-scoped /app Layout. */}
+        <Route path="/reports/:section" element={<RequireAuth><WorkspaceReportsPage /></RequireAuth>} />
         <Route path="/cost-reporting" element={<RequireAuth><CostingWeeklyWorkspacePage /></RequireAuth>} />
 
         <Route
