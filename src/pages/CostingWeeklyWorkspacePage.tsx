@@ -24,6 +24,7 @@ function fridayOf(date: string) {
 export default function CostingWeeklyWorkspacePage() {
   const { user } = useAuthStore()
   const role = useMembershipStore(s => s.role)
+  const workspaceId = useMembershipStore(s => s.workspaceId)
   const organizationId = useProjectStore(s => s.organizationId)
   const [week, setWeek] = useState(() => fridayOf(new Date().toISOString().slice(0, 10)))
   const [projects, setProjects] = useState<Project[]>([])
@@ -45,16 +46,24 @@ export default function CostingWeeklyWorkspacePage() {
   const [savingSource, setSavingSource] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [reviewed, setReviewed] = useState<Record<string, boolean>>({})
+  const [attested, setAttested] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittedId, setSubmittedId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
   const canEdit = ['costing', 'admin', 'workspace_admin'].includes(role || '')
   async function refresh() {
-    if (!organizationId) { setMessage('Select a workspace organization to load the Cost Reporting Centre.'); return }
-    setLoading(true); setMessage('')
+    if (!workspaceId) { setMessage('Select a workspace to load the Cost Reporting Centre.'); return }
+    setLoading(true); setMessage(''); setLoadError(false); setReviewed({}); setAttested(false); setSubmittedId(null)
     setSources([]); setSourceWarnings([])
+    const { data: ws, error: wsError } = await supabase.from('workspaces').select('organization_id').eq('id', workspaceId).single()
+    if (wsError || !ws?.organization_id) { setMessage(wsError?.message || 'Workspace organization unavailable'); setLoadError(true); setLoading(false); return }
+    const orgId = ws.organization_id
     const [p, r] = await Promise.all([
-      supabase.from('projects').select('id,name,portfolio_id').eq('organization_id', organizationId).order('name'),
-      supabase.from('cost_reports').select('id,project_id,report_week,section,item_title,description,status,amount').eq('organization_id', organizationId).lte('report_week', week).order('report_week', { ascending: false }).limit(3000),
+      supabase.from('projects').select('id,name,portfolio_id').eq('workspace_id', workspaceId).order('name'),
+      supabase.from('cost_reports').select('id,project_id,report_week,section,item_title,description,status,amount').eq('organization_id', orgId).lte('report_week', week).order('report_week', { ascending: false }).limit(3000),
     ])
-    if (p.error || r.error) setMessage(p.error?.message || r.error?.message || 'Unable to load reports')
+    if (p.error || r.error) { setMessage(p.error?.message || r.error?.message || 'Unable to load reports'); setLoadError(true) }
     setProjects((p.data || []) as Project[])
     const all = (r.data || []) as ReportItem[]
     setItems(all.filter(i => i.report_week === week))
@@ -67,7 +76,7 @@ export default function CostingWeeklyWorkspacePage() {
     // Read existing operational registers as live reference data. Do not manufacture
     // weekly activity or copy these rows into immutable report snapshots.
     const sourceResults = await Promise.all(SOURCE_TABLES.map(async config => {
-      const { data, error } = await supabase.from(config.table).select('*').eq('organization_id', organizationId).limit(1000)
+      const { data, error } = await supabase.from(config.table).select('*').eq('organization_id', orgId).limit(1000)
       return { config, data: (data || []) as Record<string, unknown>[], error }
     }))
     const warnings: string[] = []
@@ -87,6 +96,7 @@ export default function CostingWeeklyWorkspacePage() {
     }
     setSources(collected)
     setSourceWarnings(warnings)
+    if (warnings.length) setLoadError(true)
     setLoading(false)
   }
   useEffect(() => { void refresh() }, [organizationId, week])
@@ -138,6 +148,36 @@ export default function CostingWeeklyWorkspacePage() {
     setConfirmingSource(null); setSourceNote(''); setMessage('Confirmed weekly update saved.')
     await refresh()
   }
+
+  const reviewKey = (id: number, cat: string) => `${id}:${cat}`
+  const pendingReview = projects.flatMap(p => SECTIONS.filter(cat => !reviewed[reviewKey(p.id, cat)]).map(cat => `${p.name}: ${cat}`))
+  const readyToSubmit = Boolean(workspaceId && canEdit && !loading && !loadError && !sourceWarnings.length && projects.length && pendingReview.length === 0 && attested && !submitting && !submittedId)
+  async function submitConsolidated() {
+    if (!readyToSubmit || !workspaceId) return
+    // The RPC controls the week and validates access, project membership and uniqueness.
+    // Only reviewed weekly entries are included; live registers are not silently submitted.
+    const snapshot = {
+      report_type: 'consolidated_costing',
+      review_basis: 'officer_confirmed_weekly_entries',
+      projects: projects.map(p => ({
+        id: p.id, name: p.name,
+        categories: Object.fromEntries(SECTIONS.map((cat, index) => [
+          ['pre_contract','tender_action','contracts','post_contract','payments','client_procured_items'][index],
+          items.filter(i => i.project_id === p.id && i.section === cat).map(i => ({
+            id: i.id, title: i.item_title, description: i.description,
+            status: i.status, amount: i.amount, report_week: i.report_week,
+          })),
+        ])),
+      })),
+    }
+    setSubmitting(true); setMessage('')
+    const { data, error } = await supabase.rpc('submit_consolidated_cost_report', {
+      p_workspace_id: workspaceId, p_snapshot_data: snapshot,
+    })
+    setSubmitting(false)
+    if (error) { setMessage(`Submission not completed: ${error.message}`); return }
+    setSubmittedId(String(data)); setMessage('Consolidated Costing report submitted successfully.')
+  }
   return <main className="p-6 space-y-5 max-w-[1500px] mx-auto">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-teal-700">Workspace reporting</p><h1 className="text-2xl font-bold">Cost Reporting Centre</h1><p className="text-sm text-slate-500">Review all projects in one place. Existing records are reused, not duplicated automatically.</p></div><Link className="border rounded-lg px-4 py-2" to="/projects">Back to Workspace Hub</Link></div>
     <div className="flex flex-wrap gap-3 items-end"><label className="text-sm">Week ending (Friday)<input className="block border rounded p-2" type="date" value={week} onChange={e => setWeek(fridayOf(e.target.value))}/></label><label className="text-sm">Find project<input className="block border rounded p-2" placeholder="Search projects" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="border rounded px-4 py-2" onClick={() => void refresh()}>Refresh</button></div>
@@ -156,8 +196,19 @@ export default function CostingWeeklyWorkspacePage() {
         {projects.map(project => <section key={project.id} className="border-t pt-3"><h4 className="font-semibold">{project.name}</h4><div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">{SECTIONS.map(cat => { const entries = items.filter(i => i.project_id === project.id && i.section === cat); return <div key={cat} className="rounded border p-3"><h5 className="font-medium">{cat}</h5>{entries.length ? <ul className="list-disc pl-4 mt-1">{entries.map(i => <li key={i.id} className="text-sm"><strong>{i.item_title}</strong> · {i.status}{i.amount != null ? ` · ₦${i.amount.toLocaleString()}` : ''}{i.description ? <p className="whitespace-pre-wrap">{i.description}</p> : null}</li>)}</ul> : <p className="text-xs text-amber-700">Not confirmed this week</p>}</div> })}</div></section>)}
         <p className="text-xs text-slate-600">Preview only. It excludes unconfirmed live register records and does not create an immutable submission.</p>
       </div>}
-      <p className="text-xs text-slate-600">One-click consolidated submission is intentionally disabled until the existing submission RPC, snapshot schema and amendment rules are verified. Continue to use the authorized Costing Reports submission process.</p>
+      <div className="rounded-lg border p-3 space-y-3">
+        <h3 className="font-semibold">Officer review and submission</h3>
+        <p className="text-sm">Confirm every project/category, including those with no activity. An empty category is reported as reviewed with no weekly entries, not as an invented update.</p>
+        <p className="text-sm">{projects.length * SECTIONS.length - pendingReview.length} of {projects.length * SECTIONS.length} project/category checks completed.</p>
+        <div className="max-h-72 overflow-y-auto space-y-2">{projects.map(p => <div key={p.id} className="border-t pt-2"><strong className="text-sm">{p.name}</strong><div className="flex flex-wrap gap-3 mt-1">{SECTIONS.map(cat => <label key={cat} className="flex items-center gap-1 text-xs"><input type="checkbox" disabled={!canEdit || loading || !!submittedId} checked={!!reviewed[reviewKey(p.id, cat)]} onChange={e => setReviewed(prev => ({...prev,[reviewKey(p.id, cat)]:e.target.checked}))}/>{cat}</label>)}</div></div>)}</div>
+        {loadError && <p className="text-sm text-red-700">Submission blocked: incomplete or failed data loading. Refresh after resolving the warnings.</p>}
+        {pendingReview.length > 0 && <p className="text-sm text-amber-700">{pendingReview.length} project/category checks remain.</p>}
+        <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={attested} disabled={!canEdit || !!submittedId} onChange={e => setAttested(e.target.checked)}/><span>I have reviewed the six categories for every project and verified the amounts and statuses against the available source records. I understand the report will be immutable after submission.</span></label>
+        <button className="rounded bg-teal-700 text-white px-4 py-2 disabled:opacity-50" disabled={!readyToSubmit} onClick={() => void submitConsolidated()}>{submitting ? 'Submitting…' : submittedId ? 'Submitted' : 'Submit consolidated Costing report'}</button>
+        {submittedId && <p className="text-sm text-teal-700">Submission ID: {submittedId}</p>}
+        <p className="text-xs text-slate-600">Submission is enforced by the server-side RPC, including the Lagos reporting window. This interface does not implement audited amendments; submitted snapshots cannot be edited here.</p>
+      </div>
     </section>
-    <p className="text-xs text-slate-500">This is a consolidated preparation view. Submission and immutable weekly snapshots remain in the existing Costing Reports workflow. Carry-forward entries require explicit confirmation and do not claim a new status change.</p>
+    <p className="text-xs text-slate-500">This is a consolidated preparation view. Consolidated submission uses the workspace-scoped RPC and does not alter project-level submissions. Carry-forward entries require explicit confirmation and do not claim a new status change.</p>
   </main>
 }
