@@ -96,6 +96,8 @@ export default function DesignReportsPage() {
     const requested = new URLSearchParams(window.location.search).get('section')
     return requested && ["report", "drawings", "consultants", "issues", "weekly", "history"].includes(requested) ? requested : 'report'
   })
+  const isWeeklyReportView = activeTab === 'report' || activeTab === 'history'
+  const designSectionTitle = TABS.find(([key]) => key === activeTab)?.[1] || 'Design Reports'
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
@@ -491,7 +493,7 @@ export default function DesignReportsPage() {
         </h1>
 
         <p className="text-[#65717c] mt-3 max-w-2xl">
-          Prepare one weekly Design report with consultant updates, design reviews, issues, achievements and priorities.
+          {isWeeklyReportView ? 'Prepare one weekly Design report with consultant updates, design reviews, issues, achievements and priorities.' : 'Manage project design records. Weekly report submission and printing are available in Design Reports.'}
         </p>
 
         <div className="text-xs text-[#74818d] mt-4">
@@ -511,7 +513,7 @@ export default function DesignReportsPage() {
         </div>
       )}
 
-      <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+       {isWeeklyReportView && <div className="card p-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <label className="form-label">Report Week</label>
           <div className="form-control max-w-xs bg-[#f7f9fb] text-[#102943] cursor-not-allowed">
