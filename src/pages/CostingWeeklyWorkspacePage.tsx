@@ -65,7 +65,8 @@ export default function CostingWeeklyWorkspacePage() {
     ])
     if (p.error || r.error) { setMessage(p.error?.message || r.error?.message || 'Unable to load reports'); setLoadError(true) }
     setProjects((p.data || []) as Project[])
-    const all = (r.data || []) as ReportItem[]
+    const allowedIds = new Set((p.data || []).map(project => Number(project.id)))
+    const all = ((r.data || []) as ReportItem[]).filter(item => allowedIds.has(Number(item.project_id)))
     setItems(all.filter(i => i.report_week === week))
     const latest = new Map<string, ReportItem>()
     for (const i of all.filter(i => i.report_week < week)) {
@@ -85,7 +86,7 @@ export default function CostingWeeklyWorkspacePage() {
       if (error) { warnings.push(`${config.table}: ${error.message}`); continue }
       if (data.length === 1000) warnings.push(`${config.table}: first 1000 records shown; pagination needed for a complete view`)
       for (const row of data) {
-        if (!row.id || !row.project_id) continue
+        if (!row.id || !row.project_id || !allowedIds.has(Number(row.project_id))) continue
         collected.push({
           id: String(row.id), project_id: Number(row.project_id), section: config.section,
           title: String(row[config.title] || '(Untitled)'), status: String(row[config.status] || 'Not recorded'),
@@ -99,7 +100,7 @@ export default function CostingWeeklyWorkspacePage() {
     if (warnings.length) setLoadError(true)
     setLoading(false)
   }
-  useEffect(() => { void refresh() }, [organizationId, week])
+  useEffect(() => { void refresh() }, [workspaceId, week])
   const visible = useMemo(() => projects.filter(p => p.name.toLowerCase().includes(filter.toLowerCase())), [projects, filter])
   const missingProjects = useMemo(() => projects.filter(p => !items.some(i => i.project_id === p.id)), [projects, items])
   const previousFor = (id: number, cat: string) => previous.filter(i => i.project_id === id && i.section === cat && !items.some(current => current.project_id === id && current.section === cat && current.item_title.trim().toLowerCase() === i.item_title.trim().toLowerCase()))
@@ -178,7 +179,9 @@ export default function CostingWeeklyWorkspacePage() {
     if (error) { setMessage(`Submission not completed: ${error.message}`); return }
     setSubmittedId(String(data)); setMessage('Consolidated Costing report submitted successfully.')
   }
-  return <main className="p-6 space-y-5 max-w-[1500px] mx-auto">
+  return <div className="min-h-screen bg-slate-50 text-slate-900">
+    <header className="border-b bg-white px-6 py-4"><div className="mx-auto max-w-[1500px] flex items-center justify-between"><Link to="/projects" className="font-bold text-teal-700">PMOCorex · Workspace Hub</Link><span className="text-sm text-slate-500">Workspace reporting</span></div></header>
+    <main className="p-6 space-y-5 max-w-[1500px] mx-auto">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-wider text-teal-700">Workspace reporting</p><h1 className="text-2xl font-bold">Cost Reporting Centre</h1><p className="text-sm text-slate-500">Review all projects in one place. Existing records are reused, not duplicated automatically.</p></div><Link className="border rounded-lg px-4 py-2" to="/projects">Back to Workspace Hub</Link></div>
     <div className="flex flex-wrap gap-3 items-end"><label className="text-sm">Week ending (Friday)<input className="block border rounded p-2" type="date" value={week} onChange={e => setWeek(fridayOf(e.target.value))}/></label><label className="text-sm">Find project<input className="block border rounded p-2" placeholder="Search projects" value={filter} onChange={e => setFilter(e.target.value)}/></label><button className="border rounded px-4 py-2" onClick={() => void refresh()}>Refresh</button></div>
     {message && <p role="status" className="rounded bg-slate-100 p-3 text-sm">{message}</p>}
@@ -210,5 +213,5 @@ export default function CostingWeeklyWorkspacePage() {
       </div>
     </section>
     <p className="text-xs text-slate-500">This is a consolidated preparation view. Consolidated submission uses the workspace-scoped RPC and does not alter project-level submissions. Carry-forward entries require explicit confirmation and do not claim a new status change.</p>
-  </main>
+  </main></div>
 }
