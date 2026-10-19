@@ -12,6 +12,8 @@ import {
   CircleDot,
   FolderKanban,
   FileSpreadsheet,
+  FileText,
+  ChevronDown,
   Pencil,
   Plus,
   Search,
@@ -99,6 +101,7 @@ const INTERNAL_ROLE_LABELS: Record<string, string> = {
 export default function ProjectsPage() {
   const { session: accessSession, can } = useAccessSession()
   const [projects, setProjects] = useState<any[]>([])
+  const [reportsOpen, setReportsOpen] = useState(false)
   const [projectTasks, setProjectTasks] = useState<any[]>([])
   const [projectHealthById, setProjectHealthById] = useState<Map<string, PortfolioProjectHealth>>(new Map())
   const [archivedProjects, setArchivedProjects] = useState<any[]>([])
@@ -841,6 +844,28 @@ export default function ProjectsPage() {
               <UserCircle size={19} />
             </button>
 
+            <div className="relative">
+              <button type="button" aria-haspopup="menu" aria-expanded={reportsOpen}
+                onClick={() => setReportsOpen(open => !open)}
+                className="inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-bold text-[#173f5f] transition hover:bg-white hover:shadow-sm">
+                <FileText size={17} /> Reports <ChevronDown size={15}/>
+              </button>
+              {reportsOpen && <>
+                <button type="button" className="fixed inset-0 z-40 cursor-default" aria-label="Close reports menu" onClick={() => setReportsOpen(false)}/>
+                <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-[#d8e4ee] bg-white p-2 shadow-xl">
+                  {[
+                    {label:'PMO Executive Report',to:'/reports/pmo',hint:'Workspace-wide management intelligence'},
+                    {label:'Costing Report',to:'/cost-reporting',hint:'Consolidated weekly commercial report'},
+                    {label:'Design Reports',to:'/reports/design',hint:'Choose a project'},
+                    {label:'IPD Reports',to:'/reports/ipd',hint:'Choose a project and discipline'},
+                  ].filter(item => item.to !== '/cost-reporting' || userRoles.some(role => ['costing','pmo','admin','workspace_admin','portfolio_manager'].includes(role))).map(item =>
+                    <button role="menuitem" type="button" key={item.to} onClick={() => {setReportsOpen(false);navigate(item.to)}} className="block w-full rounded-xl p-3 text-left hover:bg-[#e8f6f4]">
+                      <span className="block font-semibold text-[#173f5f]">{item.label}</span>
+                      <span className="block text-xs text-[#607580]">{item.hint}</span>
+                    </button>)}
+                </div>
+              </>}
+            </div>
             {canAccessAdmin && (
               <>
                 <span className="mx-1 hidden h-6 w-px bg-[#d8e4ee] sm:block" aria-hidden="true" />
@@ -957,20 +982,6 @@ export default function ProjectsPage() {
             </div>
           </button>
         </section>
-
-        {userRoles.some(role => ['costing', 'pmo', 'admin', 'workspace_admin', 'portfolio_manager'].includes(role)) && (
-          <section aria-label="Workspace reporting tools" className="rounded-[26px] border border-[#cfe3e1] bg-white p-6 shadow-[0_16px_50px_rgba(11,42,60,.08)] sm:p-7">
-            <div className="hub-eyebrow">Workspace tools</div>
-            <h2 className="mt-1 text-xl font-extrabold text-[#173f5f]">Reporting</h2>
-            <button type="button" onClick={() => navigate('/cost-reporting')}
-              className="mt-4 flex w-full max-w-xl items-start gap-4 rounded-2xl border border-[#cfe3e1] p-5 text-left transition hover:border-[#05969B] hover:bg-[#f7fcfb]">
-              <span className="rounded-xl bg-[#e8f6f4] p-3 text-[#05969B]"><FileSpreadsheet size={23} /></span>
-              <span className="flex-1"><span className="block font-bold text-[#0B2A3C]">Cost Reporting Centre</span>
-                <span className="mt-1 block text-sm leading-6 text-[#607580]">Prepare and review one consolidated weekly Costing report across projects. Project Costing Management stays inside each project.</span>
-              </span><ArrowRight size={18} className="mt-1 text-[#05969B]" />
-            </button>
-          </section>
-        )}
 
         <section data-tour="portfolio-overview">
           <div className="mb-5">
