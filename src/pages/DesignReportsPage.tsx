@@ -97,7 +97,7 @@ export default function DesignReportsPage() {
     return requested && ["report", "drawings", "consultants", "issues", "weekly", "history"].includes(requested) ? requested : 'report'
   })
   const isWeeklyReportView = activeTab === 'report' || activeTab === 'history'
-  const designSectionTitle = TABS.find(([key]) => key === activeTab)?.[1] || 'Design Reports'
+  const designSectionTitle = activeTab === 'report' || activeTab === 'history' ? 'Design Reports' : activeTab === 'drawings' ? 'Drawing Register' : activeTab === 'consultants' ? 'Consultant Management' : activeTab === 'issues' ? 'Design Issues' : activeTab === 'weekly' ? 'Weekly Commentary' : TABS.find(([key]) => key === activeTab)?.[1] || 'Design Management'
   const [drawings, setDrawings] = useState<any[]>([])
   const [items, setItems] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
@@ -489,11 +489,11 @@ export default function DesignReportsPage() {
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-[#102943]">
-          Design Reports
+          {designSectionTitle}
         </h1>
 
         <p className="text-[#65717c] mt-3 max-w-2xl">
-          {isWeeklyReportView ? 'Prepare one weekly Design report with consultant updates, design reviews, issues, achievements and priorities.' : 'Manage project design records. Weekly report submission and printing are available in Design Reports.'}
+          {isWeeklyReportView ? 'Prepare one weekly Design report with consultant updates, design reviews, issues, achievements and priorities.' : activeTab === 'drawings' ? 'Manage project drawings, revisions and approval records from Document Control.' : activeTab === 'consultants' ? 'Track design consultants, responsibilities and outstanding deliverables.' : activeTab === 'issues' ? 'Track design issues, constraints and resolutions.' : 'Manage design records and weekly commentary.'}
         </p>
 
         <div className="text-xs text-[#74818d] mt-4">
@@ -530,7 +530,7 @@ export default function DesignReportsPage() {
         </div>
 
         <div className="flex gap-2 items-center">
-          {selectedSubmission && (
+          {isWeeklyReportView && selectedSubmission && (
             <button
               className="btn btn-ghost"
               onClick={() => {
@@ -578,7 +578,7 @@ export default function DesignReportsPage() {
         </div>
       )}
 
-      {!selectedSubmission && canEdit && !reportLock.isAllowed && (
+      {isWeeklyReportView && !selectedSubmission && canEdit && !reportLock.isAllowed && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
           {reportLock.message}
         </div>
@@ -586,8 +586,7 @@ export default function DesignReportsPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <Link className="btn btn-sm btn-ghost" to="/app/design-management">← Design Management</Link>
-        <button className={`btn btn-sm ${activeTab === 'report' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('report')}>Weekly Report</button>
-        <button className={`btn btn-sm ${activeTab === 'history' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('history')}>Submitted History</button>
+        {isWeeklyReportView && <><button className={`btn btn-sm ${activeTab === 'report' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('report')}>Weekly Report</button><button className={`btn btn-sm ${activeTab === 'history' ? 'btn-gold' : 'btn-ghost'}`} onClick={() => setActiveTab('history')}>Submitted History</button></>}
         {activeTab !== 'report' && activeTab !== 'history' && <span className="text-xs text-[#65717c]">Design management record · {TABS.find(([key]) => key === activeTab)?.[1]}</span>}
       </div>
 
