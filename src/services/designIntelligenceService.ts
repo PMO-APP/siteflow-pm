@@ -71,6 +71,7 @@ export type DesignIssue = {
   severity: 'Low' | 'Medium' | 'High' | 'Critical'
   confidence: 'Confirmed' | 'High' | 'Medium' | 'Low'
   status: 'Open' | 'Under Review' | 'Accepted' | 'Resolved' | 'Closed' | 'Rejected'
+  review_state?: 'pending' | 'confirmed' | 'ready_to_verify' | 'dismissed' | null
   source_type: 'Manual' | 'Rule' | 'Revision' | 'Clash' | 'AI'
   disciplines: string[]
   location?: string | null
@@ -359,62 +360,50 @@ export async function runRegisterCoordinationReview(projectId: number, drawings:
     }
   })
 
-  const existing = await supabase
+  // Automated checks are review candidates, never confirmed design issues.
+  // Preserve the original issue ID, comments and evidence across repeat checks.
+  const { data: existing, error: lookupError } = await supabase
     .from('design_coordination_issues')
-    .select('title,status')
+    .select('id,title,status,review_state,source_type')
     .eq('project_id', projectId)
     .in('source_type', ['Rule', 'Revision'])
+  if (lookupError) throw lookupError
 
-  if (existing.error) throw existing.error
-  const openTitles = new Set(
-    (existing.data || [])
-      .filter((item: any) => !['Resolved', 'Closed', 'Rejected'].includes(item.status))
-      .map((item: any) => item.title)
-  )
-
-  // Refresh deterministic findings that are already open so ownership and
-  // workflow corrections are reflected immediately instead of being frozen in
-  // the first version that created the issue.
-  const existingOpen = findings.filter(item => openTitles.has(item.title))
-  for (const item of existingOpen) {
-    const { error } = await supabase
-      .from('design_coordination_issues')
-      .update({
-        category: item.category,
-        severity: item.severity,
-        confidence: item.confidence || 'High',
-        disciplines: item.disciplines || [],
-        drawing_ids: item.drawing_ids || [],
-        description: item.description,
-        consequence: item.consequence || null,
-        recommendation: item.recommendation || null,
-        responsible_team: item.responsible_team || 'Design',
-        document_custodian: 'Design',
-        technical_owner: item.technical_owner || 'Cross-Discipline',
-        action_owner: item.action_owner || item.responsible_team || 'Design',
-      })
-      .eq('project_id', projectId)
-      .eq('title', item.title)
-      .in('source_type', ['Rule', 'Revision'])
-      .not('status', 'in', '(Resolved,Closed,Rejected)')
+  const candidates = (existing || []) as Array<{id:string;title:string;status:string;review_state:string|null;source_type:string}>
+  const byTitle = new Map(candidates.map(row => [row.title, row]))
+  const detectedTitles = new Set(findings.map(row => row.title))
+  let newCount = 0
+  let readyCount = 0
+  for (const finding of findings) {
+    const prior = byTitle.get(finding.title)
+    if (prior) {
+      // Never overwrite a human-confirmed issue or revive a dismissed finding.
+      if (prior.review_state === 'pending' || prior.review_state === 'ready_to_verify') {
+        const { error } = await supabase.from('design_coordination_issues')
+          .update({ review_state: 'pending', description: finding.description,
+            recommendation: finding.recommendation, consequence: finding.consequence,
+            drawing_ids: finding.drawing_ids || [], technical_owner: finding.technical_owner,
+            updated_at: new Date().toISOString() })
+          .eq('id', prior.id).eq('project_id', projectId)
+        if (error) throw error
+      }
+      continue
+    }
+    const { error } = await supabase.from('design_coordination_issues').insert({
+      ...finding, project_id: projectId, status: 'Under Review', review_state: 'pending',
+      source_type: finding.source_type || 'Rule', confidence: finding.confidence || 'High',
+      disciplines: finding.disciplines || [], drawing_ids: finding.drawing_ids || [],
+    })
     if (error) throw error
+    newCount++
   }
-
-  const newFindings = findings.filter(item => !openTitles.has(item.title))
-  if (newFindings.length) {
-    const { error } = await supabase.from('design_coordination_issues').insert(
-      newFindings.map(item => ({
-        confidence: 'High',
-        status: 'Open',
-        source_type: 'Rule',
-        disciplines: [],
-        drawing_ids: [],
-        ...item,
-        project_id: projectId,
-      }))
-    )
+  for (const prior of candidates) {
+    if (prior.review_state !== 'pending' || detectedTitles.has(prior.title)) continue
+    const { error } = await supabase.from('design_coordination_issues')
+      .update({ review_state: 'ready_to_verify', updated_at: new Date().toISOString() })
+      .eq('id', prior.id).eq('project_id', projectId)
     if (error) throw error
+    readyCount++
   }
-
-  return { totalFindings: findings.length, newFindings: newFindings.length }
+  return { totalFindings: findings.length, newFindings: newCount, readyToVerify: readyCount }
 }
