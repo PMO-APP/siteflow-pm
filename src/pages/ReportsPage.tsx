@@ -5,7 +5,7 @@ import { useProjectStore } from '@/store/project'
 const areas = [
   { title: 'IPD Reports', description: 'Housebuild, Infrastructure, Mechanical and Electrical weekly reports.', to: '/app/reports/ipd', icon: Building2 },
   { title: 'HSE Reports', description: 'Health, safety and environment reporting for this project.', to: '/app/hse', icon: HardHat },
-  { title: 'PMO / Executive Reports', description: 'Project-wide management and executive reporting.', to: '/app/reports/pmo', icon: FileBarChart },
+  { title: 'Reporting Compliance & Approvals', description: 'Weekly submission tracking, report tools and amendment audit history.', to: '/app/reports/pmo', icon: FileBarChart },
 ]
 
 export default function ReportsHubPage() {
