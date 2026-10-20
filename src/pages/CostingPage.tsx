@@ -160,13 +160,13 @@ function getReportSubmissionLock(reportWeek: string) {
   const currentFriday = getReportWeekFridayDeadline(toLagosDateInput(lagos))
   const isCurrentWeek = Boolean(deadline && currentFriday &&
     toLagosDateInput(deadline) === toLagosDateInput(currentFriday))
-  const isAllowed = isCurrentWeek && ((day === 4 && hour >= 12) || (day === 5 && hour < 16))
+  const isAllowed = isCurrentWeek && ((day >= 2 && day <= 4) || (day === 5 && hour < 23))
   return {
     deadline, isAllowed,
-    deadlineLabel: 'Friday 4:00 PM (Lagos time)',
+    deadlineLabel: 'Friday 11:00 PM (Lagos time)',
     message: isAllowed
       ? 'Submissions close Friday at 4:00 PM (Lagos time).'
-      : 'Only the current reporting week can be submitted, Thursday 12:00 PM to Friday 4:00 PM (Lagos time).',
+      : 'Only the current reporting week can be submitted, Tuesday 12:00 AM to Friday 11:00 PM (Lagos time).',
   }
 }
 
