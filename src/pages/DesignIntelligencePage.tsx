@@ -34,7 +34,7 @@ import {
   type DesignRule,
 } from '@/services/designIntelligenceService'
 
-const TABS = ['Drawing Register', 'Revision Compare', 'Coordination Review', 'Clash & Risk Register', 'Design Rules', 'Resolution Tracker'] as const
+const TABS = ['Drawing Register', 'Revision Compare', 'Coordination Review', 'Design Issues', 'Design Rules', 'Resolution Tracker'] as const
 type Tab = (typeof TABS)[number]
 
 const RESPONSIBLE_TEAMS = ['Design', 'Architecture', 'Structural', 'Mechanical', 'Electrical', 'Plumbing', 'MEP', 'Fire', 'Infrastructure', 'Civil', 'Landscaping', 'Costing', 'Housebuild', 'HSE', 'PMO', 'Contractor', 'Consultant', 'Cross-Discipline']
@@ -65,12 +65,12 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
   const focusedDocumentId = searchParams.get('document')
   const visibleTabs: readonly Tab[] = section === 'reviews'
     ? ['Revision Compare', 'Coordination Review']
-    : ['Clash & Risk Register', 'Design Rules']
+    : ['Design Issues', 'Design Rules']
   const role = useMembershipStore(state => state.role)
   const canManage = ['workspace_admin', 'admin', 'design'].includes(String(role || '').toLowerCase())
   const canGovernRules = ['workspace_admin', 'admin'].includes(String(role || '').toLowerCase())
 
-  const [tab, setTab] = useState<Tab>(section === 'reviews' ? 'Coordination Review' : 'Clash & Risk Register')
+  const [tab, setTab] = useState<Tab>(section === 'reviews' ? 'Coordination Review' : 'Design Issues')
   const [drawings, setDrawings] = useState<DesignDrawing[]>([])
   const [selectedDrawingId, setSelectedDrawingId] = useState('project-coordination')
   const [issues, setIssues] = useState<DesignIssue[]>([])
@@ -111,7 +111,7 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
     setNewIssueError('')
   }
   async function changeIssueStatus(issue: DesignIssue, status: DesignIssue['status']) {
-    if (!canManage || statusBusy || projectId == null) return
+    if (!canManage || statusBusy) return
     const isClosing = archivedStatuses.includes(status)
     const note = window.prompt(isClosing ? 'Resolution / closure reason (required for audit history):' : 'Reason for status change / reopening:', '')
     if (note === null) return
@@ -330,9 +330,9 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
         <EnterpriseMetric label="Current drawings" value={stats.currentDrawings} helper="Registered current set" icon={FileSearch}/>
         <EnterpriseMetric label="Drawing records" value={stats.revisions} helper="All revisions" icon={FileDiff}/>
         <EnterpriseMetric label="Awaiting distribution" value={stats.pendingDistribution} helper="Design action" icon={RefreshCw} tone={stats.pendingDistribution ? 'red' : 'green'}/>
-        <EnterpriseMetric label="Open coordination" value={stats.openIssues} helper="Require review" icon={AlertTriangle} tone={stats.openIssues ? 'red' : 'green'}/>
+        <EnterpriseMetric label="Open Design Issues" value={stats.openIssues} helper="Require review" icon={AlertTriangle} tone={stats.openIssues ? 'red' : 'green'}/>
         <EnterpriseMetric label="High / critical" value={stats.critical} helper="Management attention" icon={ShieldCheck} tone={stats.critical ? 'red' : 'green'}/>
-        <EnterpriseMetric label="Resolved" value={stats.resolved} helper="Closed design risks" icon={CheckCircle2} tone="green"/>
+        <EnterpriseMetric label="Resolved" value={stats.resolved} helper="Closed design issues" icon={CheckCircle2} tone="green"/>
       </div>
 
       <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2">
@@ -356,8 +356,8 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
 
         {section === 'reviews' && <div className="space-y-3"><label className="block text-sm font-semibold text-[#102943]">Review against controlled drawing (optional)<select className="form-control mt-2" value={selectedDrawingId} onChange={e=>setSelectedDrawingId(e.target.value)}><option value="project-coordination">General coordination / upload draft for review</option>{drawings.map(d=><option key={d.id} value={String(d.id)}>{String((d as any).title || (d as any).name || d.id)}</option>)}</select></label><DesignCollaboration projectId={projectId} context="review" contextId={selectedDrawingId} canEdit={canManage} heading="Shared drawings, revisions and review discussion" /></div>}
 
-      {tab === 'Clash & Risk Register' && <EnterpriseSection title="Clash & Risk Register" description="Confirmed, probable and inferred design risks are recorded here with ownership and resolution evidence." action={canManage ? <button onClick={() => setShowIssue(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#08B5A6] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/>Raise design issue</button> : undefined}>
-          <div className="mb-4 flex flex-wrap gap-2">{([['active','Active issues'],['history','Issue history'],['gallery','Gallery & evidence']] as const).map(([key,label]) => <button key={key} onClick={() => setIssueView(key)} className={`rounded-xl px-4 py-2 text-sm font-bold ${issueView === key ? 'bg-[#0B2A3C] text-white' : 'border border-slate-200 bg-white text-[#0B2A3C]'}`}>{label}</button>)}</div>
+      {tab === 'Design Issues' && <EnterpriseSection title="Design Issues & Coordination" description="Track design issues, coordination clashes and constructability concerns, with assigned owners and resolution evidence." action={canManage ? <button onClick={() => setShowIssue(true)} className="inline-flex items-center gap-2 rounded-xl bg-[#08B5A6] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/>Raise design issue</button> : undefined}>
+          <div className="mb-4 flex flex-wrap gap-2">{([['active','Active Issues'],['history','Resolution History'],['gallery','Evidence Gallery']] as const).map(([key,label]) => <button key={key} onClick={() => setIssueView(key)} className={`rounded-xl px-4 py-2 text-sm font-bold ${issueView === key ? 'bg-[#0B2A3C] text-white' : 'border border-slate-200 bg-white text-[#0B2A3C]'}`}>{label}</button>)}</div>
           {issueView === 'gallery' && <div className="space-y-3"><p className="text-sm text-slate-500">Private project evidence from Design Issues, Reviews and Weekly Reports. Drawings here are not automatically approved construction documents.</p><div className="flex gap-2"><input className="w-full rounded-xl border border-slate-200 px-3 py-2" value={gallerySearch} onChange={e => setGallerySearch(e.target.value)} placeholder="Search file name, caption, location or source"/><button className="rounded-xl border px-3 py-2" onClick={() => void loadGallery()}>Refresh</button></div>{galleryError && <p role="alert" className="text-sm text-red-700">{galleryError}</p>}<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{galleryFiles.filter(f => [f.file_name,f.caption,f.location,f.context_type].join(' ').toLowerCase().includes(gallerySearch.toLowerCase())).map(f => <article key={f.id} className="rounded-xl border border-slate-200 bg-white p-4"><div className="break-all font-semibold">{f.file_name}</div><div className="mt-1 text-xs text-slate-500">{f.context_type} · {new Date(f.created_at).toLocaleString()} · {f.location || 'No location'}</div><p className="mt-2 text-sm">{f.caption || 'No caption'}</p><button onClick={() => void openGalleryFile(f)} className="mt-3 text-sm font-bold text-teal-700 underline">Open secure file</button></article>)}</div>{!galleryFiles.length && <p className="text-sm text-slate-500">No accessible collaboration files found for this project.</p>}</div>}
           {issueView !== 'gallery' && <div className="space-y-3">{issues.filter(item => issueView === 'history' ? archivedStatuses.includes(item.status) : !archivedStatuses.includes(item.status)).map(issue => <div key={issue.id} className="space-y-2"><IssueCard issue={issue} canManage={canManage} onChange={async patch => { if (patch.status) await changeIssueStatus(issue, patch.status); else { await updateDesignIssue(projectId, issue.id, patch); await load() } }}/><DesignCollaboration projectId={projectId} context="issue" contextId={String(issue.id)} canEdit={canManage} heading={`Supporting drawings, photographs and discussion: ${issue.title}`} />{issueView === 'history' && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><h4 className="text-sm font-bold">Status audit history</h4>{(auditByIssue[String(issue.id)] || []).map((a,i) => <p key={i} className="mt-1 text-xs text-slate-600">{new Date(a.changed_at).toLocaleString()}: {a.old_status || 'Created'} → {a.new_status}</p>)}{!(auditByIssue[String(issue.id)] || []).length && <p className="mt-1 text-xs text-slate-500">No audit events available yet. Existing comments and evidence are retained above.</p>}</div>}</div>)}</div>}
 
