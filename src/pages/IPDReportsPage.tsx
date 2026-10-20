@@ -38,12 +38,12 @@ import { projectedTaskDiscipline } from '@/features/schedule/disciplineProjectio
 
 const IPD_DISCIPLINES = ['Housebuild', 'Mechanical', 'Electrical', 'Infrastructure']
 
-// UTC+1 year-round: Thursday 12:00 through Friday 16:00 Lagos time.
+// UTC+1 year-round: Tuesday 00:00 through Friday 23:00 Lagos time.
 function isIpdSubmissionOpen(at = new Date()) {
   const lagos = new Date(at.getTime() + 60 * 60 * 1000)
   const day = lagos.getUTCDay()
   const minutes = lagos.getUTCHours() * 60 + lagos.getUTCMinutes()
-  return (day === 4 && minutes >= 12 * 60) || (day === 5 && minutes < 16 * 60)
+  return (day >= 2 && day <= 4) || (day === 5 && minutes < 23 * 60)
 }
 
 function workflowBadge(status?: string | null) {
@@ -973,7 +973,7 @@ export default function ReportsPage() {
   async function updateWorkflow(status: string, comment?: string | null) {
     if (!selectedReport?.id) return
     if ((status === 'Submitted' || status === 'Resubmitted') && !isIpdSubmissionOpen()) {
-      notify('error', 'IPD submissions open Thursday at 12:00 PM and close Friday at 4:00 PM (Lagos time). Your draft remains saved.')
+      notify('error', 'IPD submissions open Tuesday at 12:00 AM and close Friday at 11:00 PM (Lagos time). Your draft remains saved.')
       return
     }
     if ((status === 'Submitted' || status === 'Resubmitted') && String((selectedReport as any).workflow_status || 'Draft') !== 'Draft') {
@@ -1571,7 +1571,7 @@ export default function ReportsPage() {
             </div>
 
             {!submissionOpen && (
-              <p className="text-sm text-amber-700" role="status">Drafts can be saved at any time. Final submission opens Thursday at 12:00 PM and closes Friday at 4:00 PM (Lagos time).</p>
+              <p className="text-sm text-amber-700" role="status">Drafts can be saved at any time. Final submission opens Tuesday at 12:00 AM and closes Friday at 11:00 PM (Lagos time).</p>
             )}
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
