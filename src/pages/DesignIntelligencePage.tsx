@@ -1,3 +1,4 @@
+import { supabase } from '@/lib/supabase'
 import DesignCollaboration from '@/components/design/DesignCollaboration'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -79,6 +80,10 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showIssue, setShowIssue] = useState(false)
+  const [newIssueFiles, setNewIssueFiles] = useState<File[]>([])
+  const [newIssueCaption, setNewIssueCaption] = useState('')
+  const [newIssueError, setNewIssueError] = useState('')
+  const [savingIssue, setSavingIssue] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [analysingKey, setAnalysingKey] = useState<string | null>(null)
   const [ruleSearch, setRuleSearch] = useState('')
@@ -144,22 +149,51 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
   }, [drawings])
 
   async function addIssue() {
-    if (!projectId || !issueForm.title.trim() || !issueForm.description.trim()) return
+    if (!projectId || !issueForm.title.trim() || !issueForm.description.trim() || savingIssue) return
+    setNewIssueError('')
+    const permitted = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (newIssueFiles.some(file => !permitted.includes(file.type) || file.size > 15 * 1024 * 1024)) {
+      setNewIssueError('Only PDF, JPG, PNG or WebP files up to 15 MB each are allowed.')
+      return
+    }
+    setSavingIssue(true)
+    let created: DesignIssue | null = null
     try {
-      await saveDesignIssue(projectId, {
+      const { data: authData, error: authError } = await supabase.auth.getUser()
+      if (authError || !authData.user) throw new Error('Sign in again before creating an issue.')
+      created = await saveDesignIssue(projectId, {
         ...issueForm,
-        disciplines: [],
-        drawing_ids: [],
-        confidence: 'Confirmed',
-        source_type: 'Manual',
-        document_custodian: 'Design',
-        action_owner: issueForm.responsible_team,
-        status: 'Open',
+        disciplines: [], drawing_ids: [], confidence: 'Confirmed', source_type: 'Manual',
+        document_custodian: 'Design', action_owner: issueForm.responsible_team, status: 'Open',
       })
+      for (const file of newIssueFiles) {
+        const path = `${projectId}/issue/${crypto.randomUUID()}/${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const { error: uploadError } = await supabase.storage.from('design-collaboration').upload(path, file, { upsert: false, contentType: file.type })
+        if (uploadError) throw uploadError
+        const { error: recordError } = await supabase.from('design_collaboration_files').insert({
+          project_id: Number(projectId), context_type: 'issue', context_id: String(created.id),
+          storage_path: path, file_name: file.name, mime_type: file.type,
+          caption: newIssueCaption.trim() || null, location: issueForm.location.trim() || null,
+          uploaded_by: authData.user.id,
+        })
+        if (recordError) {
+          await supabase.storage.from('design-collaboration').remove([path])
+          throw recordError
+        }
+      }
       setShowIssue(false)
+      setNewIssueFiles([])
+      setNewIssueCaption('')
       setIssueForm({ title: '', category: 'Constructability', severity: 'High', description: '', consequence: '', recommendation: '', responsible_team: 'Design', technical_owner: 'Cross-Discipline', location: '' })
       await load()
-    } catch (err: any) { setError(err?.message || 'Could not create coordination issue.') }
+    } catch (err: any) {
+      setNewIssueError(created
+        ? `Issue created, but one or more attachments could not be uploaded: ${err?.message || 'Unknown error'}. Close this form and add any missing files under the saved issue.`
+        : err?.message || 'Could not create coordination issue.')
+      if (created) await load()
+    } finally {
+      setSavingIssue(false)
+    }
   }
 
   async function runReview() {
@@ -287,7 +321,7 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
       </>}
 
 
-      {showIssue && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"><div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><div className="text-xs font-bold uppercase tracking-wider text-[#05969B]">Coordination finding</div><h2 className="mt-1 text-2xl font-bold text-[#0B2A3C]">Raise design issue</h2></div><button onClick={() => setShowIssue(false)} className="rounded-lg border border-slate-200 p-2"><X size={17}/></button></div><div className="mt-5 grid gap-4 md:grid-cols-2"><div className="md:col-span-2"><Field label="Issue title"><input value={issueForm.title} onChange={e=>setIssueForm({...issueForm,title:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5" placeholder="Terrace level / internal FFL flood risk"/></Field></div><Field label="Category"><select value={issueForm.category} onChange={e=>setIssueForm({...issueForm,category:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{['Constructability','Clash','Missing Element','Revision Control','Water Ingress','Drainage','Access / Clearance','Discipline Coverage','Other'].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Severity"><select value={issueForm.severity} onChange={e=>setIssueForm({...issueForm,severity:e.target.value as DesignIssue['severity']})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{['Low','Medium','High','Critical'].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Action owner"><select value={issueForm.responsible_team} onChange={e=>setIssueForm({...issueForm,responsible_team:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{RESPONSIBLE_TEAMS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Technical owner"><select value={issueForm.technical_owner} onChange={e=>setIssueForm({...issueForm,technical_owner:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{TECHNICAL_OWNERS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Location"><input value={issueForm.location} onChange={e=>setIssueForm({...issueForm,location:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5" placeholder="Living room terrace / Ground floor"/></Field><div className="md:col-span-2"><Field label="Finding"><textarea value={issueForm.description} onChange={e=>setIssueForm({...issueForm,description:e.target.value})} className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field></div><Field label="Possible consequence"><textarea value={issueForm.consequence} onChange={e=>setIssueForm({...issueForm,consequence:e.target.value})} className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field><Field label="Recommended review/action"><textarea value={issueForm.recommendation} onChange={e=>setIssueForm({...issueForm,recommendation:e.target.value})} className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field></div><p className="mt-3 text-sm text-slate-600">After raising the issue, attach drawings, photographs and supporting documents in its evidence panel below the issue card. Team members can also view and discuss those files there.</p><div className="mt-6 flex justify-end gap-2"><button onClick={() => setShowIssue(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold">Cancel</button><button onClick={() => void addIssue()} className="rounded-xl bg-[#08B5A6] px-4 py-2.5 font-bold text-white">Raise issue</button></div></div></div>}
+      {showIssue && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"><div className="w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><div className="text-xs font-bold uppercase tracking-wider text-[#05969B]">Coordination finding</div><h2 className="mt-1 text-2xl font-bold text-[#0B2A3C]">Raise design issue</h2></div><button onClick={() => !savingIssue && setShowIssue(false)} className="rounded-lg border border-slate-200 p-2"><X size={17}/></button></div><div className="mt-5 grid gap-4 md:grid-cols-2"><div className="md:col-span-2"><Field label="Issue title"><input value={issueForm.title} onChange={e=>setIssueForm({...issueForm,title:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5" placeholder="Terrace level / internal FFL flood risk"/></Field></div><Field label="Category"><select value={issueForm.category} onChange={e=>setIssueForm({...issueForm,category:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{['Constructability','Clash','Missing Element','Revision Control','Water Ingress','Drainage','Access / Clearance','Discipline Coverage','Other'].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Severity"><select value={issueForm.severity} onChange={e=>setIssueForm({...issueForm,severity:e.target.value as DesignIssue['severity']})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{['Low','Medium','High','Critical'].map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Action owner"><select value={issueForm.responsible_team} onChange={e=>setIssueForm({...issueForm,responsible_team:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{RESPONSIBLE_TEAMS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Technical owner"><select value={issueForm.technical_owner} onChange={e=>setIssueForm({...issueForm,technical_owner:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5">{TECHNICAL_OWNERS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Location"><input value={issueForm.location} onChange={e=>setIssueForm({...issueForm,location:e.target.value})} className="w-full rounded-xl border border-slate-200 px-3 py-2.5" placeholder="Living room terrace / Ground floor"/></Field><div className="md:col-span-2"><Field label="Finding"><textarea value={issueForm.description} onChange={e=>setIssueForm({...issueForm,description:e.target.value})} className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field></div><Field label="Possible consequence"><textarea value={issueForm.consequence} onChange={e=>setIssueForm({...issueForm,consequence:e.target.value})} className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field><Field label="Recommended review/action"><textarea value={issueForm.recommendation} onChange={e=>setIssueForm({...issueForm,recommendation:e.target.value})} className="min-h-20 w-full rounded-xl border border-slate-200 px-3 py-2.5"/></Field></div><div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-3"><label className="block text-sm font-semibold text-[#102943]">Supporting drawings, photographs or PDFs (optional)<input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="mt-2 block w-full text-sm" onChange={e => setNewIssueFiles(Array.from(e.target.files || []))} disabled={savingIssue}/></label><input className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Evidence caption / drawing reference (optional)" value={newIssueCaption} onChange={e => setNewIssueCaption(e.target.value)} disabled={savingIssue}/><p className="text-xs text-slate-500">{newIssueFiles.length} selected. PDF, JPG, PNG or WebP, up to 15 MB each. Files are linked to the issue after it is created and remain private.</p></div>{newIssueError && <p role="alert" className="mt-3 text-sm text-red-700">{newIssueError}</p>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => !savingIssue && setShowIssue(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 font-bold">Cancel</button><button onClick={() => void addIssue()} disabled={savingIssue || !issueForm.title.trim() || !issueForm.description.trim()} className="rounded-xl bg-[#08B5A6] px-4 py-2.5 font-bold text-white">{savingIssue ? 'Saving issue and evidence…' : 'Raise issue'}</button></div></div></div>}
     </div>
   )
 }
