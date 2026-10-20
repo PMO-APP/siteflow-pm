@@ -44,14 +44,14 @@ function getReportSubmissionLock(now = new Date()) {
   const lagos = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }))
   const day = lagos.getDay()
   const hour = lagos.getHours() + lagos.getMinutes() / 60
-  const isAllowed = (day === 4 && hour >= 12) || (day === 5 && hour < 16)
+  const isAllowed = (day >= 2 && day <= 4) || (day === 5 && hour < 23)
   const deadline = getCurrentReportFriday(lagos)
   return {
     deadline, isAllowed,
-    deadlineLabel: 'Friday 4:00 PM (Lagos time)',
+    deadlineLabel: 'Friday 11:00 PM (Lagos time)',
     message: isAllowed
       ? 'Submissions close Friday at 4:00 PM (Lagos time).'
-      : 'Submissions open Thursday at 12:00 PM and close Friday at 4:00 PM (Lagos time).',
+      : 'Submissions open Tuesday at 12:00 AM and close Friday at 4:00 PM (Lagos time).',
   }
 }
 
@@ -647,7 +647,7 @@ export default function DesignReportsPage() {
                 <ReportSection title="5. Next Week's Priorities & Commentary" description="Planned activities, priorities and design team commentary.">
                   <ManualTab title="Next Week Focus" category="Next Week Focus" items={nextWeekFocus} form={form} setForm={setForm} addItem={addItem} deleteItem={deleteItem} canEdit={canEdit}/>
                 </ReportSection>
-                <DesignCollaboration projectId={projectId} context="weekly" contextId={reportWeek} canEdit={canEdit} heading="6. Progress photographs and evidence" onChanged={() => void loadData()} />
+                <DesignCollaboration projectId={projectId} context="weekly" contextId={reportWeek} canEdit={canEdit} heading="6. Progress photographs and evidence" onChanged={() => void loadData()} showDiscussion={false} />
                 <div className="card p-5 text-sm text-[#65717c]">When ready, use <strong>Submit Weekly Report</strong> at the top. {canSubmitReport ? 'The submission window is open.' : reportLock.message}</div>
               </div>
             )
