@@ -111,7 +111,7 @@ export default function DesignIntelligencePage({ section = 'intelligence' }: { s
     setNewIssueError('')
   }
   async function changeIssueStatus(issue: DesignIssue, status: DesignIssue['status']) {
-    if (!canManage || statusBusy) return
+    if (!canManage || statusBusy || projectId == null) return
     const isClosing = archivedStatuses.includes(status)
     const note = window.prompt(isClosing ? 'Resolution / closure reason (required for audit history):' : 'Reason for status change / reopening:', '')
     if (note === null) return
