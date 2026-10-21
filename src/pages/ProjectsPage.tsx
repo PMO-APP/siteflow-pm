@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import WorkspaceMemberPicker from '@/components/WorkspaceMemberPicker'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
@@ -1283,7 +1284,7 @@ export default function ProjectsPage() {
             <div><FieldLabel>Status</FieldLabel><select className="hub-input mb-4" value={newProjectStatus} onChange={e => setNewProjectStatus(e.target.value)}>{PROJECT_STATUSES.map(s => <option key={s}>{s}</option>)}</select></div>
             <div><FieldLabel>Phase</FieldLabel><select className="hub-input mb-4" value={newProjectPhase} onChange={e => setNewProjectPhase(e.target.value)}>{PROJECT_PHASES.map(p => <option key={p}>{p}</option>)}</select></div>
           </div>
-          <OwnerFields values={[newOverallOwnerEmail, newHousebuildOwnerEmail, newMepOwnerEmail, newInfrastructureOwnerEmail]} setters={[setNewOverallOwnerEmail, setNewHousebuildOwnerEmail, setNewMepOwnerEmail, setNewInfrastructureOwnerEmail]} />
+          <OwnerFields workspaceId={accessSession.workspaceId} values={[newOverallOwnerEmail, newHousebuildOwnerEmail, newMepOwnerEmail, newInfrastructureOwnerEmail]} setters={[setNewOverallOwnerEmail, setNewHousebuildOwnerEmail, setNewMepOwnerEmail, setNewInfrastructureOwnerEmail]} />
           <button className="hub-primary-button mt-5 w-full justify-center" onClick={createProject}>Create Project</button>
         </Modal>
       )}
@@ -1327,7 +1328,7 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
-          <OwnerFields values={[editOverallOwnerEmail, editHousebuildOwnerEmail, editMepOwnerEmail, editInfrastructureOwnerEmail]} setters={[setEditOverallOwnerEmail, setEditHousebuildOwnerEmail, setEditMepOwnerEmail, setEditInfrastructureOwnerEmail]} />
+          <OwnerFields workspaceId={accessSession.workspaceId} values={[editOverallOwnerEmail, editHousebuildOwnerEmail, editMepOwnerEmail, editInfrastructureOwnerEmail]} setters={[setEditOverallOwnerEmail, setEditHousebuildOwnerEmail, setEditMepOwnerEmail, setEditInfrastructureOwnerEmail]} />
           <button className="hub-primary-button mt-5 w-full justify-center" onClick={updateProject}>Save Project Changes</button>
         </Modal>
       )}
@@ -1482,14 +1483,14 @@ function ProjectRow({ project, attentionInfo, portfolioName, capacity, canEdit, 
   )
 }
 
-function OwnerFields({ values, setters }: any) {
+function OwnerFields({ workspaceId, values, setters }: any) {
   const labels = ['Overall Project Owner', 'Housebuild Owner', 'MEP Owner', 'Infrastructure Owner']
   return (
     <div className="rounded-2xl border border-[#dfe7e6] bg-[#f9fbfb] p-4">
       <div className="mb-3 text-sm font-bold text-[#405b69]">Project ownership</div>
       <div className="space-y-3">
         {labels.map((label, index) => (
-          <div key={label}><FieldLabel>{label}</FieldLabel><input className="hub-input" type="email" placeholder={`${label} email`} value={values[index]} onChange={e => setters[index](e.target.value)} /></div>
+          <div key={label}><FieldLabel>{label}</FieldLabel><WorkspaceMemberPicker workspaceId={workspaceId} className="hub-input" placeholder={`${label}: search name or email`} value={values[index]} onChange={setters[index]} /></div>
         ))}
       </div>
     </div>
