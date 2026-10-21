@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 import { useMembershipStore } from '@/store/membership'
 import { useProjectStore } from '@/store/project'
+import { useAccessSession } from '@/access/AccessSessionProvider'
+import WorkspaceMemberPicker from '@/components/WorkspaceMemberPicker'
 
 const TASK_ASSIGNER_ROLES = [
   'workspace_admin',
@@ -64,6 +66,7 @@ const VISIBILITY_OPTIONS = ['Private', 'Team', 'Project']
 
 export default function InternalAssignmentsPage() {
   const { user } = useAuthStore()
+  const { session: accessSession } = useAccessSession()
   const role = useMembershipStore(state => state.role)
   const { projectId, projectName } = useProjectStore()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -211,6 +214,11 @@ export default function InternalAssignmentsPage() {
     const cleanDescription = description.trim()
     const cleanEmail = assignedEmail.trim().toLowerCase()
     const cleanName = assignedName.trim()
+    if (!cleanName) {
+      setNotice('Select a registered workspace member from the suggestions before creating an assignment.')
+      setSubmitting(false)
+      return
+    }
 
     const taskPayload = {
       project_id: projectId,
@@ -387,23 +395,13 @@ export default function InternalAssignmentsPage() {
                 ))}
               </select></label>
 
-              <label className="block text-sm font-medium text-[#102943]">Responsible person's name
-              <input
-                className="form-control"
-                placeholder="Assigned person name"
-                value={assignedName}
-                onChange={e => setAssignedName(e.target.value)}
-              /></label>
-
-              <label className="block text-sm font-medium text-[#102943]">Responsible person's email *
-                <span className="mb-1 block text-xs font-normal text-[#65717c]">Used to notify the assignee. Enter their registered work email.</span>
-              <input
-                type="email"
-                className="form-control"
-                placeholder="Assigned person email"
-                value={assignedEmail}
-                onChange={e => setAssignedEmail(e.target.value)}
-              /></label>
+              <label className="block text-sm font-medium text-[#102943]">Responsible person *
+                <span className="mb-1 block text-xs font-normal text-[#65717c]">Search by name or email and select a registered workspace member.</span>
+                <WorkspaceMemberPicker workspaceId={accessSession.workspaceId} value={assignedEmail}
+                  onChange={email => { setAssignedEmail(email); setAssignedName('') }}
+                  onSelect={member => setAssignedName(member.name)}
+                  placeholder="Search team member" required />
+              </label>
 
               <label className="block text-sm font-medium text-[#102943]">Priority
               <select
