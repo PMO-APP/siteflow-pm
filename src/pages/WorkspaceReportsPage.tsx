@@ -91,10 +91,11 @@ export default function WorkspaceReportsPage() {
     navigate(section==='design'?'/app/design-reports':`/app/reports/ipd`)
   }
   const today=lagosToday()
+  const validISODate=(value:string|null|undefined):value is string=>Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value+'T12:00:00Z')) && new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value)
   const effectiveHandover=(p:Project)=>{
     const active=revisions.filter(r=>r.project_id===p.id && !r.block_id && (!r.package_name || /^(master|project programme|overall)$/i.test(r.package_name.trim())))
-    const approved=active.map(r=>r.current_finish||r.planned_finish).filter((v):v is string=>Boolean(v)).sort()
-    return approved.length ? approved[approved.length-1] : p.handover_date||null
+    const approved=active.map(r=>r.current_finish||r.planned_finish).filter(validISODate).sort()
+    return approved.length ? approved[approved.length-1] : validISODate(p.handover_date) ? p.handover_date : null
   }
   const atRisk=projects.filter(p=>['Stuck','Delayed','On Hold'].includes(p.status||''))
   const dueSoon=projects.filter(p=>effectiveHandover(p) && effectiveHandover(p)!>=today && effectiveHandover(p)!<=new Date(Date.parse(today+'T12:00:00Z')+30*86400000).toISOString().slice(0,10))
@@ -113,7 +114,7 @@ export default function WorkspaceReportsPage() {
     const status=(p.status||'').toLowerCase().trim()
     const flagged=['stuck','delayed','on hold','at risk','critical'].includes(status)
     const closed=['completed','cancelled','canceled','archived'].includes(status)
-    const validDate=Boolean(effectiveHandover(p) && /^\d{4}-\d{2}-\d{2}$/.test(effectiveHandover(p)!) && !Number.isNaN(Date.parse(effectiveHandover(p)!+'T12:00:00Z')))
+    const validDate=validISODate(effectiveHandover(p))
     const days=validDate ? Math.round((Date.parse(effectiveHandover(p)!+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000):null
     const overdue=!closed && days!==null && days<0
     const imminent=!closed && days!==null && days>=0 && days<=14
