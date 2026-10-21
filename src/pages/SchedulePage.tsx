@@ -67,6 +67,8 @@ export default function SchedulePage() {
   const [editingPackage, setEditingPackage] = useState<DeliveryPackage | null>(null)
   const [showArchivedPackages, setShowArchivedPackages] = useState(false)
   const [packageError, setPackageError] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [importNotice, setImportNotice] = useState('')
   const [packageForm, setPackageForm] = useState({ name: '', code: '', discipline: 'Housebuild' as ScheduleDiscipline, package_type: 'Block' as 'Block' | 'Shared' | 'Other', contractor_name: '', weight_pct: 0 })
 
   const { importExcel, importXml, uploadBackup } = useScheduleImport()
@@ -406,25 +408,33 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
+    if (importBusy) { event.target.value = ''; return }
+    setImportBusy(true); setImportNotice('Importing programme…')
     try {
       const count = await importExcel(file, activeDiscipline, selectedPackageId)
+      setImportNotice(`Imported ${count} activities from ${file.name} successfully.`)
       pmoToast({ title: 'Excel schedule imported', message: `${count} ${activeDiscipline} Excel tasks imported successfully.`, tone: 'success' })
     } catch (error) {
+      setImportNotice(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       pmoToast({ title: 'Excel import failed', message: error instanceof Error ? error.message : 'Unable to import Excel schedule.', tone: 'error' })
     }
-    finally { event.target.value = '' }
+    finally { setImportBusy(false); event.target.value = '' }
   }
   const handleXmlScheduleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
+    if (importBusy) { event.target.value = ''; return }
+    setImportBusy(true); setImportNotice('Importing programme…')
     try {
       const count = await importXml(file, activeDiscipline, selectedPackageId)
+      setImportNotice(`Imported ${count} activities from ${file.name} successfully.`)
       pmoToast({ title: 'MS Project schedule imported', message: `${count} ${activeDiscipline} MS Project XML tasks imported successfully.`, tone: 'success' })
     } catch (error) {
+      setImportNotice(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       pmoToast({ title: 'XML import failed', message: error instanceof Error ? error.message : 'Unable to import MS Project XML.', tone: 'error' })
     }
-    finally { event.target.value = '' }
+    finally { setImportBusy(false); event.target.value = '' }
   }
 
   const packageSummaries = useMemo(() => deliveryPackages.map(pkg => {
@@ -650,8 +660,8 @@ export default function SchedulePage() {
               <select className="rounded-xl border border-[#dfe3e7] bg-white px-3 py-2.5 text-xs text-[#536170]" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="">All status</option>{['Not Started','In Progress','Completed','On Hold','Blocked'].map(status => <option key={status}>{status}</option>)}</select>
               <SlidersHorizontal size={16} className="text-[#8b97a1]" />
               {canManageScheduleUpload && <div className="ml-auto flex flex-wrap gap-2">
-                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Excel<input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleScheduleUpload} /></label>
-                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />XML<input type="file" hidden accept=".xml" onChange={handleXmlScheduleUpload} /></label>
+                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Excel<input type="file" hidden accept=".xlsx,.xls,.csv" disabled={importBusy} onChange={handleScheduleUpload} /></label>
+                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />{importBusy ? "Importing…" : "XML"}<input type="file" hidden accept=".xml" disabled={importBusy} onChange={handleXmlScheduleUpload} /></label>{importNotice && <span role="status" aria-live="polite" className="max-w-sm text-xs text-slate-600">{importNotice}</span>}
                 <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Backup<input type="file" hidden accept=".pdf,.mpp" onChange={handleBackupUpload} /></label>
                 <button className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0d2e4d]" onClick={() => openTaskModal('new')}><Plus size={14} className="mr-1.5 inline" />Add task</button>
               </div>}
