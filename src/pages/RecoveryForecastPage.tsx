@@ -381,35 +381,6 @@ function makeEmptyContext() {
 }
 
 
-/** Derive package delay from Schedule dates and Project Controls progress.
- * This is an indicative progress-based lag, not an approved schedule revision.
- * Incomplete activities without valid start/finish dates cannot be assessed.
- */
-function packageProgressDelayDays(packageId: string, tasks: Task[], today: Date): number | null {
-  const linked = tasks.filter(t => String(t.delivery_package_id || '') === packageId)
-  const unfinished = linked.filter(t => !t.actual_finish && Number(t.progress_pct || 0) < 100)
-  if (!linked.length) return null
-  if (!unfinished.length) return 0
-  const todayMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-  const delays = unfinished.map(task => {
-    if (!task.start_date || !task.finish_date) return null
-    const start = Date.parse(task.start_date.slice(0, 10) + 'T00:00:00Z')
-    const finish = Date.parse(task.finish_date.slice(0, 10) + 'T00:00:00Z')
-    if (!Number.isFinite(start) || !Number.isFinite(finish) || finish < start) return null
-    const duration = Math.max(1, Math.round((finish - start) / 86400000) + 1)
-    const planned = Math.max(0, Math.min(1, (todayMs - start) / Math.max(86400000, finish - start)))
-    const actual = Math.max(0, Math.min(1, Number(task.progress_pct || 0) / 100))
-    return Math.max(0, Math.ceil((planned - actual) * duration))
-  })
-  if (delays.some(value => value === null)) return null
-  return Math.max(0, ...delays as number[])
-}
-function addCalendarDays(date: Date, days: number): Date {
-  const result = new Date(date.getTime())
-  result.setUTCDate(result.getUTCDate() + days)
-  return result
-}
-
 export default function RecoveryForecastPage() {
   const { projectId, projectName } = useProjectStore()
   const { data: activeRevision } = useActiveScheduleRevision(projectId)
@@ -977,9 +948,19 @@ export default function RecoveryForecastPage() {
     ...pkg,
     forecastResult: calculatePackageForecast(pkg.id, pkg.date.toISOString(), projectTasks, new Date(), scenarioRate),
   }))
+  // Use the SAME package sequence forecast as the Dashboard. Do not independently
+  // estimate package delay from a maximum per-task progress shortfall here.
+  // Missing engine positions remain unavailable rather than becoming zero delay.
+  const enginePackagePositions = new Map(
+    (sharedIntelligence.forecastV2.packagePositions || []).map(position => [String(position.packageId), position])
+  )
   const deliveryOutlooks = visiblePackageHandovers.map(pkg => {
-    const delayDays = packageProgressDelayDays(pkg.id, projectTasks, new Date())
-    return { ...pkg, delayDays, forecastDate: delayDays === null ? null : addCalendarDays(pkg.date, delayDays) }
+    const position = enginePackagePositions.get(pkg.id)
+    return {
+      ...pkg,
+      delayDays: position?.forecastFinish ? position.delayDays : null,
+      forecastDate: position?.forecastFinish || null,
+    }
   })
   const masterForecast = missingProgrammePackages.length === 0 && totalPackages > 0 && deliveryOutlooks.length === totalPackages && deliveryOutlooks.every(pkg => pkg.forecastDate !== null)
     ? new Date(Math.max(...deliveryOutlooks.map(pkg => pkg.forecastDate!.getTime()))) : null
@@ -1032,7 +1013,7 @@ export default function RecoveryForecastPage() {
         <section aria-label="Delivery at a glance" className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Delivery packages</p><p className="mt-2 text-3xl font-bold text-[#123a60]">{visiblePackageHandovers.length}</p><p className="mt-1 text-xs text-[#65717c]">Tracked independently</p></div>
           <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Target</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(latestPackageTarget)}</p><p className="mt-1 text-xs text-[#65717c]">Last scheduled package handover</p></div>
-          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Forecast</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(masterForecast)}</p><p className="mt-1 text-xs text-[#65717c]">Package-level progress estimate · {masterForecast ? 'Indicative, not approved' : 'Incomplete package data'}</p></div>
+          <div className="rounded-2xl border border-[#dfe3e7] bg-white p-5"><p className="text-xs font-medium text-[#65717c]">Forecast</p><p className="mt-2 text-2xl font-bold text-[#123a60]">{formatDate(masterForecast)}</p><p className="mt-1 text-xs text-[#65717c]">Shared schedule-sequence forecast · {masterForecast ? 'Indicative, not approved' : 'Incomplete package data'}</p></div>
         </section>
         {missingProgrammePackages.length > 0 && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">Master forecast withheld: {missingProgrammePackages.length} of {totalPackages} delivery packages lack a dated programme ({missingProgrammePackages.map(pkg => pkg.name).join(', ')}). Assign and verify their schedule before using a project completion forecast.</div>}
         <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm">
@@ -1061,7 +1042,7 @@ export default function RecoveryForecastPage() {
             return <div className="rounded-xl border border-[#e8ecef] p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs uppercase tracking-widest text-[#65717c]">Selected package</p><h3 className="mt-1 text-xl font-bold text-[#123a60]">{pkg.name}</h3></div><span className="rounded-full bg-[#eef3f6] px-3 py-1 text-xs font-semibold text-[#123a60]">Progress-based estimate</span></div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Target (last scheduled task)</p><p className="mt-1 font-semibold">{formatDate(pkg.date)}</p></div><div className="rounded-lg bg-[#f5f8fa] p-3"><p className="text-xs text-[#65717c]">Forecast</p><p className="mt-1 font-semibold">{formatDate(deliveryOutlooks.find(item => item.id === pkg.id)?.forecastDate || null)}</p></div></div>
               <p className="mt-4 text-sm font-semibold text-[#123a60]">Activity evidence</p><div className="mt-2 grid grid-cols-3 gap-2 text-center"><div className="rounded-lg border p-3"><strong className="block text-lg">{linked.length}</strong><span className="text-xs text-[#65717c]">Activities</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualStarts}</strong><span className="text-xs text-[#65717c]">Actual starts</span></div><div className="rounded-lg border p-3"><strong className="block text-lg">{evidence.datedActualFinishes}</strong><span className="text-xs text-[#65717c]">Actual finishes</span></div></div>
-              <div className="mt-4 rounded-lg bg-[#f5f8fa] p-3 text-xs text-[#536170]">Calculated delay: {deliveryOutlooks.find(item => item.id === pkg.id)?.delayDays ?? 'Unavailable'} calendar days, based on planned versus actual activity progress in Project Controls. This is an indicative forecast, not an approved revised programme.</div>
+              <div className="mt-4 rounded-lg bg-[#f5f8fa] p-3 text-xs text-[#536170]">Calculated delay: {deliveryOutlooks.find(item => item.id === pkg.id)?.delayDays ?? 'Unavailable'} calendar days, from the shared schedule-sequence engine used by the Dashboard. This is an indicative forecast, not an approved revised programme.</div>
               <button type="button" onClick={() => setRecoveryView('analysis')} className="mt-4 rounded-lg border border-[#dfe3e7] px-4 py-2 text-sm font-semibold text-[#123a60]">Open forecast analysis →</button>
             </div>
           })()}
