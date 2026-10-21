@@ -19,6 +19,31 @@ function mondayInLagos() {
   d.setUTCDate(d.getUTCDate()-offset)
   return d.toISOString().slice(0,10)
 }
+function ConsolidatedCostingStatus({projectId,week}:{projectId:number|null;week:string}) {
+  const [state,setState]=useState<'loading'|'submitted'|'missing'|'unverified'>('loading')
+  const [message,setMessage]=useState('')
+  useEffect(()=>{
+    let active=true
+    setState('loading')
+    setMessage('')
+    if(!projectId){setState('unverified');setMessage('No project selected');return}
+    const check=async()=>{
+      // Resolve workspace from the selected project; never treat a workspace submission as project-specific.
+      const project=await supabase.from('projects').select('workspace_id').eq('id',projectId).maybeSingle()
+      if(project.error || !project.data?.workspace_id){if(active){setState('unverified');setMessage(project.error?.message||'Project workspace unavailable')}return}
+      const result=await supabase.from('cost_consolidated_report_submissions').select('id,report_week').eq('workspace_id',project.data.workspace_id).eq('report_week',week).limit(1)
+      if(!active)return
+      if(result.error){setState('unverified');setMessage(result.error.message)}
+      else setState(result.data?.length?'submitted':'missing')
+    }
+    void check()
+    return ()=>{active=false}
+  },[projectId,week])
+  return <div className="rounded-xl border border-[#dfe5ea] bg-[#f8fafc] p-4 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2"><strong>Consolidated Costing · Workspace-wide</strong><Link to="/cost-reporting" className="text-[#087f83] underline">Open Cost Reporting Centre</Link></div>
+    <p className="mt-1 text-[#65717c]">{state==='loading'?'Checking consolidated submission…':state==='submitted'?'A workspace-wide Costing submission is recorded for this reporting week. This does not independently verify each project’s coverage.':state==='missing'?'No consolidated Costing submission is recorded for this reporting week. This is not automatically an overdue finding.':`Unable to verify consolidated Costing: ${message}`}</p>
+  </div>
+}
 function SubmissionTracker({projectId}:{projectId:number|null}) {
   const [week,setWeek] = useState(mondayInLagos)
   const [records,setRecords] = useState<Record<string,any[]>>({})
@@ -44,11 +69,12 @@ function SubmissionTracker({projectId}:{projectId:number|null}) {
   ]
   return <section className="rounded-2xl border border-[#dfe5ea] bg-white p-5 space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-xl">Weekly submission tracker</h2><p className="text-sm text-[#65717c]">Current project · submitted records only. Missing records require follow-up.</p></div><label className="text-sm">Week commencing <input aria-label="Week commencing" type="date" value={week} onChange={e=>setWeek(e.target.value)} className="ml-2 rounded border p-2"/></label></div>
+    <ConsolidatedCostingStatus projectId={projectId} week={week} />
     {!projectId&&<p>Select a project to see its reporting status.</p>}
     {loading&&<p>Loading submissions…</p>}
     {errors.length>0&&<p role="alert" className="text-sm text-red-700">Unable to verify all departments: {errors.join(' · ')}</p>}
     {!loading&&!!projectId&&<div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left border-b"><th className="py-2">Department</th><th>Status</th><th>Submitted at</th><th>Records</th></tr></thead><tbody>{rows.map(row=><tr key={row.name} className="border-b"><td className="py-3 font-medium">{row.name}</td><td>{row.items.length?'Submitted':'Not recorded'}</td><td>{row.items[0]?.submitted_at?new Date(row.items[0].submitted_at).toLocaleString('en-NG',{timeZone:'Africa/Lagos'}):'—'}</td><td>{row.items.length}</td></tr>)}</tbody></table></div>}
-    <p className="text-xs text-[#65717c]">Costing submits a workspace-wide consolidated report and is not assessed as a separate project submission here. View its status in the workspace Costing Report. </p>
+    <p className="text-xs text-[#65717c]">Costing is tracked at workspace level above, not counted as a separate project submission. </p>
     <p className="text-xs text-[#65717c]">This view does not yet determine which departments were required to submit or send notifications. “Not recorded” is not automatically an overdue finding.</p>
   </section>
 }
