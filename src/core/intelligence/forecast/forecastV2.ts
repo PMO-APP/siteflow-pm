@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays } from 'date-fns'
+import { differenceInCalendarDays } from 'date-fns'
 import { analyseScheduleSequence } from '@/core/intelligence/sequence/sequenceEngine'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { toDate } from '@/core/intelligence/normalizers/dateUtils'
@@ -206,31 +206,67 @@ function getWorkfrontDelayDays(activity: Activity | null, today: Date) {
   )
 }
 
-/** Provisional schedule-envelope forecast. No actual-entry timestamps or
- * predecessor links are required. Parallel planned activities remain parallel.
- * A late unfinished workfront consumes its remaining planned duration from
- * today; downstream planned work is not blindly made sequential.
- * The maximum projected finish is an estimate, not a verified critical path.
+/**
+ * Progress-driven, inferred-sequence forecast for programmes without usable links.
+ *
+ * Each incomplete work item is rescheduled from the as-of date if its planned
+ * start has passed. Later activities retain their planned overlaps. Where a
+ * successor was planned to begin within three days AFTER a predecessor was
+ * planned to finish, the successor is moved only if that predecessor is now
+ * projected to finish later. This is a heuristic, not a critical-path result.
+ *
+ * Historical completed work is ignored; no actual date is inferred from when
+ * someone updated the task in PMOCorex.
  */
 function estimatePackageFinish(all: Activity[], target: Date, today: Date) {
   const detailed = getDetailedActivities(all)
-  const remaining = detailed.filter(a => a.progress < 100)
+  const remaining = detailed
+    .filter(a => a.progress < 100)
+    .map(a => ({
+      activity: a,
+      start: toDate(a.plannedStart),
+      finish: toDate(a.plannedFinish),
+    }))
+    .filter((a): a is { activity: Activity; start: Date; finish: Date } =>
+      a.start !== null && a.finish !== null && a.finish >= a.start
+    )
+    .sort((a, b) => a.start.getTime() - b.start.getTime() || a.finish.getTime() - b.finish.getTime())
+
   if (!remaining.length) return { finish: target, delay: 0 }
-  let forecast = target.getTime()
-  for (const activity of remaining) {
-    const start = toDate(activity.plannedStart)
-    const finish = toDate(activity.plannedFinish)
-    if (!start || !finish) continue
-    const duration = Math.max(1, differenceInCalendarDays(finish, start) + 1)
-    const remainingDays = Math.max(1, Math.ceil(duration * (100 - clamp(activity.progress)) / 100))
-    // A future activity follows its own planned dates; an overdue or ongoing
-    // activity can only use its remaining duration from the as-of date.
-    const projected = start > today
-      ? finish
-      : addDays(today, remainingDays - 1)
-    forecast = Math.max(forecast, projected.getTime())
+
+  const projected = new Map<string, Date>()
+  const DAY = 86400000
+  let latest = target.getTime()
+
+  for (const item of remaining) {
+    const duration = Math.max(1, differenceInCalendarDays(item.finish, item.start) + 1)
+    const remainingDays = Math.max(1, Math.ceil(duration * (100 - clamp(item.activity.progress)) / 100))
+    const baseStart = item.start > today ? item.start : today
+    let inferredStart = baseStart.getTime()
+
+    // Use only a close planned finish-to-start handoff. Tasks planned to
+    // overlap are not forced into a sequential chain.
+    for (const prior of remaining) {
+      if (prior === item || prior.start >= item.start) continue
+      const gap = differenceInCalendarDays(item.start, prior.finish)
+      if (gap < 0 || gap > 3) continue
+      const priorProjected = projected.get(prior.activity.id)
+      if (!priorProjected) continue
+      const earliest = priorProjected.getTime() + Math.max(0, gap) * DAY
+      inferredStart = Math.max(inferredStart, earliest)
+    }
+
+    // Respect the planned finish when the activity is still in the future;
+    // otherwise use its progress-based remaining duration.
+    const finish = new Date(Math.max(
+      item.start > today ? item.finish.getTime() : 0,
+      inferredStart + (remainingDays - 1) * DAY
+    ))
+    projected.set(item.activity.id, finish)
+    latest = Math.max(latest, finish.getTime())
   }
-  const finish = new Date(forecast)
+
+  const finish = new Date(latest)
   return { finish, delay: Math.max(0, differenceInCalendarDays(finish, target)) }
 }
 
