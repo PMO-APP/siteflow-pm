@@ -273,10 +273,31 @@ export function calculateForecastV2(
       const packageProgress = packageActivities.length
         ? Math.round(packageActivities.reduce((sum, item) => sum + item.progress, 0) / packageActivities.length)
         : 0
-      const delayDays = packageSequence.delayDays
+      // Revised programmes include historical completed activities. Their position
+      // in the imported task list is not a measure of remaining project delay.
+      // Estimate each outstanding workfront independently, preserving planned
+      // overlaps rather than stacking the entire historical sequence.
+      const detailed = getDetailedActivities(packageActivities)
+      const outstanding = detailed.filter(item => item.progress < 100)
+      const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const projectedOutstandingFinishes = outstanding.map(item => {
+        const start = toDate(item.plannedStart)
+        const finish = toDate(item.plannedFinish)
+        if (!start || !finish) return null
+        const duration = Math.max(1, differenceInCalendarDays(finish, start) + 1)
+        const remaining = Math.max(1, Math.ceil(duration * (100 - clamp(item.progress)) / 100))
+        const earliest = start > todayDate ? start : todayDate
+        return addDays(earliest, remaining - 1)
+      })
+      const missingOutstandingDates = projectedOutstandingFinishes.some(date => !date)
       const finishes = packageActivities.map(item => toDate(item.plannedFinish)).filter((date): date is Date => date !== null)
       const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
-      const forecastFinish = plannedFinish ? addDays(plannedFinish, Math.max(0, delayDays)) : null
+      // No invented precision when the revised programme lacks dates.
+      const forecastFinish = plannedFinish && !missingOutstandingDates
+        ? new Date(Math.max(plannedFinish.getTime(), ...projectedOutstandingFinishes.filter((date): date is Date => date !== null).map(date => date.getTime())))
+        : null
+      const delayDays = plannedFinish && forecastFinish
+        ? Math.max(0, differenceInCalendarDays(forecastFinish, plannedFinish)) : 0
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
           ? 'on_track'
