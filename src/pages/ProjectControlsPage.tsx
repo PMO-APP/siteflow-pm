@@ -394,11 +394,17 @@ export default function ProjectControlsPage() {
       updated_at: new Date().toISOString(),
     }
 
-    if (previousProgress <= 0 && newProgress > 0 && !task.actual_start) {
+    // Historical work may be recorded after a revised programme is imported.
+    // The date of data entry is not the physical start/finish date.
+    // Only auto-date activities already scheduled to start on or after today.
+    const isHistoricalImportedTask = String(task.schedule_source || '').toLowerCase() === 'imported' &&
+      !!(task.planned_start || task.start_date) &&
+      String(task.planned_start || task.start_date).slice(0, 10) < today
+    if (!isHistoricalImportedTask && previousProgress <= 0 && newProgress > 0 && !task.actual_start) {
       payload.actual_start = today
     }
 
-    if (previousProgress < 100 && newProgress >= 100 && !task.actual_finish) {
+    if (!isHistoricalImportedTask && previousProgress < 100 && newProgress >= 100 && !task.actual_finish) {
       payload.actual_finish = today
     }
 
