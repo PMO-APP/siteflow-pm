@@ -206,6 +206,34 @@ function getWorkfrontDelayDays(activity: Activity | null, today: Date) {
   )
 }
 
+/** Provisional schedule-envelope forecast. No actual-entry timestamps or
+ * predecessor links are required. Parallel planned activities remain parallel.
+ * A late unfinished workfront consumes its remaining planned duration from
+ * today; downstream planned work is not blindly made sequential.
+ * The maximum projected finish is an estimate, not a verified critical path.
+ */
+function estimatePackageFinish(all: Activity[], target: Date, today: Date) {
+  const detailed = getDetailedActivities(all)
+  const remaining = detailed.filter(a => a.progress < 100)
+  if (!remaining.length) return { finish: target, delay: 0 }
+  let forecast = target.getTime()
+  for (const activity of remaining) {
+    const start = toDate(activity.plannedStart)
+    const finish = toDate(activity.plannedFinish)
+    if (!start || !finish) continue
+    const duration = Math.max(1, differenceInCalendarDays(finish, start) + 1)
+    const remainingDays = Math.max(1, Math.ceil(duration * (100 - clamp(activity.progress)) / 100))
+    // A future activity follows its own planned dates; an overdue or ongoing
+    // activity can only use its remaining duration from the as-of date.
+    const projected = start > today
+      ? finish
+      : addDays(today, remainingDays - 1)
+    forecast = Math.max(forecast, projected.getTime())
+  }
+  const finish = new Date(forecast)
+  return { finish, delay: Math.max(0, differenceInCalendarDays(finish, target)) }
+}
+
 function getElapsedDays(state: ProjectState, today: Date) {
   const start = toDate(state.schedule.startDate)
   if (!start) return 0
@@ -273,31 +301,11 @@ export function calculateForecastV2(
       const packageProgress = packageActivities.length
         ? Math.round(packageActivities.reduce((sum, item) => sum + item.progress, 0) / packageActivities.length)
         : 0
-      // Revised programmes include historical completed activities. Their position
-      // in the imported task list is not a measure of remaining project delay.
-      // Estimate each outstanding workfront independently, preserving planned
-      // overlaps rather than stacking the entire historical sequence.
-      const detailed = getDetailedActivities(packageActivities)
-      const outstanding = detailed.filter(item => item.progress < 100)
-      const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-      const projectedOutstandingFinishes = outstanding.map(item => {
-        const start = toDate(item.plannedStart)
-        const finish = toDate(item.plannedFinish)
-        if (!start || !finish) return null
-        const duration = Math.max(1, differenceInCalendarDays(finish, start) + 1)
-        const remaining = Math.max(1, Math.ceil(duration * (100 - clamp(item.progress)) / 100))
-        const earliest = start > todayDate ? start : todayDate
-        return addDays(earliest, remaining - 1)
-      })
-      const missingOutstandingDates = projectedOutstandingFinishes.some(date => !date)
       const finishes = packageActivities.map(item => toDate(item.plannedFinish)).filter((date): date is Date => date !== null)
       const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
-      // No invented precision when the revised programme lacks dates.
-      const forecastFinish = plannedFinish && !missingOutstandingDates
-        ? new Date(Math.max(plannedFinish.getTime(), ...projectedOutstandingFinishes.filter((date): date is Date => date !== null).map(date => date.getTime())))
-        : null
-      const delayDays = plannedFinish && forecastFinish
-        ? Math.max(0, differenceInCalendarDays(forecastFinish, plannedFinish)) : 0
+      const estimate = plannedFinish ? estimatePackageFinish(packageActivities, plannedFinish, today) : null
+      const delayDays = estimate?.delay ?? 0
+      const forecastFinish = estimate?.finish ?? null
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
           ? 'on_track'
@@ -373,12 +381,12 @@ export function calculateForecastV2(
   const forecastDate = isMultiPackage
     ? (incompletePackageForecasts === 0 && datedPackages.length
       ? new Date(Math.max(...datedPackages.map(p => p.forecastFinish!.getTime()))) : null)
-    : projectTarget && sequence.delayDays > 0 ? addDays(projectTarget, sequence.delayDays) : projectTarget
+    : projectTarget ? estimatePackageFinish(state.schedule.activities, projectTarget, today).finish : null
   // Compare master dates on the same calendar-day basis, never a pressure
   // package's delay against another package's target.
   const delayDays = isMultiPackage
     ? (forecastDate && targetDate ? Math.max(0, differenceInCalendarDays(forecastDate, targetDate)) : 0)
-    : sequence.delayDays
+    : (forecastDate && targetDate ? Math.max(0, differenceInCalendarDays(forecastDate, targetDate)) : 0)
 
   const blockedCritical = activities.filter(activity => {
     const plannedStart = toDate(activity.plannedStart)
