@@ -120,6 +120,10 @@ export function calculatePackageForecast(
     const resolved: Task[] = []
     for (const ref of refs) {
       dependencyCount++
+      // Preserve non-FS/lagged links in the register, but never project them as FS.
+      if (!/^\d+$/.test(ref) && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(ref)) {
+        return unavailable('MS Project SS/FF/SF or lead/lag links require a relationship-aware forecast engine', dependencyCount, 1)
+      }
       const match = byId.get(ref) ?? byNumber.get(ref)
       if (!match || match.id === task.id) { dependencyIssues++; continue }
       resolved.push(match)
