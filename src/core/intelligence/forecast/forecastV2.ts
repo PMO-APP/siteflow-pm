@@ -19,7 +19,6 @@ export type PackageDeliveryPosition = {
   actualPosition: ProjectState['schedule']['activities'][number] | null
   activityGap: number
   delayDays: number
-  overdueActivities: number
   plannedFinish: Date | null
   forecastFinish: Date | null
   status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
@@ -220,53 +219,74 @@ function getWorkfrontDelayDays(activity: Activity | null, today: Date) {
  * someone updated the task in PMOCorex.
  */
 function estimatePackageFinish(all: Activity[], target: Date, today: Date) {
+  const DAY = 86400000
   const detailed = getDetailedActivities(all)
   const remaining = detailed
-    .filter(a => a.progress < 100)
-    .map(a => ({
-      activity: a,
-      start: toDate(a.plannedStart),
-      finish: toDate(a.plannedFinish),
+    .filter(activity => activity.progress < 100)
+    .map(activity => ({
+      activity,
+      start: toDate(activity.plannedStart),
+      finish: toDate(activity.plannedFinish),
     }))
-    .filter((a): a is { activity: Activity; start: Date; finish: Date } =>
-      a.start !== null && a.finish !== null && a.finish >= a.start
+    .filter((item): item is { activity: Activity; start: Date; finish: Date } =>
+      item.start !== null && item.finish !== null && item.finish >= item.start
     )
     .sort((a, b) => a.start.getTime() - b.start.getTime() || a.finish.getTime() - b.finish.getTime())
 
   if (!remaining.length) return { finish: target, delay: 0 }
 
+  const byId = new Map(remaining.map(item => [item.activity.id, item]))
   const projected = new Map<string, Date>()
-  const DAY = 86400000
-  let latest = target.getTime()
+  const visiting = new Set<string>()
 
-  for (const item of remaining) {
+  // Predecessor links, when available, are authoritative. Otherwise infer only
+  // close finish-to-start handoffs. Never convert overlapping activities into
+  // sequential dependencies merely because they share a phase or task order.
+  function project(item: (typeof remaining)[number]): Date {
+    const cached = projected.get(item.activity.id)
+    if (cached) return cached
+    if (visiting.has(item.activity.id)) {
+      // Invalid/cyclic source links cannot justify inventing a delay.
+      return item.finish
+    }
+    visiting.add(item.activity.id)
     const duration = Math.max(1, differenceInCalendarDays(item.finish, item.start) + 1)
     const remainingDays = Math.max(1, Math.ceil(duration * (100 - clamp(item.activity.progress)) / 100))
-    const baseStart = item.start > today ? item.start : today
-    let inferredStart = baseStart.getTime()
+    let earliestStart = Math.max(item.start.getTime(), today.getTime())
 
-    // Use only a close planned finish-to-start handoff. Tasks planned to
-    // overlap are not forced into a sequential chain.
-    for (const prior of remaining) {
-      if (prior === item || prior.start >= item.start) continue
+    const explicit = (item.activity.predecessorIds || [])
+      .map(id => byId.get(id))
+      .filter((candidate): candidate is (typeof remaining)[number] => Boolean(candidate))
+    const inferredCandidates = explicit.length ? [] : remaining.filter(prior => {
+      if (prior.activity.id === item.activity.id || prior.start >= item.start) return false
       const gap = differenceInCalendarDays(item.start, prior.finish)
-      if (gap < 0 || gap > 3) continue
-      const priorProjected = projected.get(prior.activity.id)
-      if (!priorProjected) continue
-      const earliest = priorProjected.getTime() + Math.max(0, gap) * DAY
-      inferredStart = Math.max(inferredStart, earliest)
+      // A short planned handoff indicates potential sequential work; a
+      // negative gap indicates parallel work and must remain parallel.
+      return gap >= 0 && gap <= 7
+    })
+    // Use the nearest planned predecessor, not every nearby task.
+    const inferred = inferredCandidates.sort((a, b) => b.finish.getTime() - a.finish.getTime()).slice(0, 1)
+
+    for (const prior of [...explicit, ...inferred]) {
+      if (visiting.has(prior.activity.id)) continue
+      const projectedPriorFinish = project(prior)
+      const plannedGap = explicit.length ? 1 : Math.max(0, differenceInCalendarDays(item.start, prior.finish))
+      earliestStart = Math.max(earliestStart, projectedPriorFinish.getTime() + plannedGap * DAY)
     }
 
-    // Respect the planned finish when the activity is still in the future;
-    // otherwise use its progress-based remaining duration.
+    // Work not yet due retains its planned finish unless predecessors push it.
+    // For started work, progress determines the remaining duration as of today.
     const finish = new Date(Math.max(
       item.start > today ? item.finish.getTime() : 0,
-      inferredStart + (remainingDays - 1) * DAY
+      earliestStart + (remainingDays - 1) * DAY
     ))
+    visiting.delete(item.activity.id)
     projected.set(item.activity.id, finish)
-    latest = Math.max(latest, finish.getTime())
+    return finish
   }
 
+  let latest = target.getTime()
+  for (const item of remaining) latest = Math.max(latest, project(item).getTime())
   const finish = new Date(latest)
   return { finish, delay: Math.max(0, differenceInCalendarDays(finish, target)) }
 }
@@ -342,16 +362,10 @@ export function calculateForecastV2(
       const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
       const estimate = plannedFinish ? estimatePackageFinish(packageActivities, plannedFinish, today) : null
       const delayDays = estimate?.delay ?? 0
-      // An activity that is past its planned finish and remains incomplete is
-      // schedule pressure even when available float absorbs the handover delay.
-      const overdueActivities = getDetailedActivities(packageActivities).filter(activity => {
-        const finish = toDate(activity.plannedFinish)
-        return activity.progress < 100 && !!finish && finish < today
-      }).length
       const forecastFinish = estimate?.finish ?? null
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
-          ? (overdueActivities > 0 ? 'watch' : 'on_track')
+          ? 'on_track'
           : delayDays <= 7
             ? 'watch'
             : delayDays <= 30
@@ -371,7 +385,6 @@ export function calculateForecastV2(
         actualPosition: packageSequence.actualPosition?.source || null,
         activityGap: packageSequence.activityGap,
         delayDays,
-        overdueActivities,
         plannedFinish,
         forecastFinish,
         status,
@@ -459,7 +472,7 @@ export function calculateForecastV2(
   const recoverable = recoveryConfidence >= 55 && delayDays <= 60
   const status =
     delayDays === 0
-      ? (packagePositions.some(p => p.overdueActivities > 0) ? 'watch' : 'on_track')
+      ? 'on_track'
       : delayDays <= 7
         ? 'watch'
         : delayDays <= 30
