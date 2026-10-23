@@ -150,8 +150,8 @@ export default function SchedulePage() {
   // Master schedule is a UNION of package activities, not a consolidation by name.
   // Identical work in separate packages must retain its own ID, progress and dates.
   const overallTasks = useMemo(() => [...projectTasks].sort((a, b) => {
-    const aDate = a.start_date || a.planned_start || ''
-    const bDate = b.start_date || b.planned_start || ''
+    const aDate = a.start_date || ''
+    const bDate = b.start_date || ''
     return aDate.localeCompare(bDate) || Number(a.task_number || 0) - Number(b.task_number || 0)
   }), [projectTasks])
 
