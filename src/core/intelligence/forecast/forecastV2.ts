@@ -19,6 +19,7 @@ export type PackageDeliveryPosition = {
   actualPosition: ProjectState['schedule']['activities'][number] | null
   activityGap: number
   delayDays: number
+  overdueActivities: number
   plannedFinish: Date | null
   forecastFinish: Date | null
   status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
@@ -362,10 +363,14 @@ export function calculateForecastV2(
       const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
       const estimate = plannedFinish ? estimatePackageFinish(packageActivities, plannedFinish, today) : null
       const delayDays = estimate?.delay ?? 0
+      const overdueActivities = getDetailedActivities(packageActivities).filter(activity => {
+        const finish = toDate(activity.plannedFinish)
+        return activity.progress < 100 && !!finish && finish < today
+      }).length
       const forecastFinish = estimate?.finish ?? null
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
-          ? 'on_track'
+          ? (overdueActivities > 0 ? 'watch' : 'on_track')
           : delayDays <= 7
             ? 'watch'
             : delayDays <= 30
@@ -385,6 +390,7 @@ export function calculateForecastV2(
         actualPosition: packageSequence.actualPosition?.source || null,
         activityGap: packageSequence.activityGap,
         delayDays,
+        overdueActivities,
         plannedFinish,
         forecastFinish,
         status,
