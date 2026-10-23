@@ -959,6 +959,7 @@ export default function RecoveryForecastPage() {
     return {
       ...pkg,
       delayDays: position?.forecastFinish ? position.delayDays : null,
+      overdueActivities: position?.overdueActivities ?? 0,
       forecastDate: position?.forecastFinish || null,
     }
   })
@@ -1010,13 +1011,13 @@ export default function RecoveryForecastPage() {
         <h2 className="text-lg font-semibold text-[#123a60]">Package completion outlook</h2>
         <p className="mt-1 text-sm text-[#65717c]">Updated from the latest activity progress in Project Controls. Planned overlaps are retained when dependencies are unavailable.</p>
         <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-[#65717c]"><th className="py-3">Package</th><th>Target</th><th>Forecast</th><th>Variance</th><th>Status</th></tr></thead><tbody>
-          {deliveryOutlooks.map(pkg => <tr key={pkg.id} className="border-b last:border-0"><td className="py-3 font-semibold">{pkg.name}</td><td>{formatDate(pkg.date)}</td><td>{formatDate(pkg.forecastDate)}</td><td>{pkg.delayDays === null ? '—' : `${pkg.delayDays} days`}</td><td>{pkg.forecastDate ? (pkg.delayDays && pkg.delayDays > 0 ? 'At risk' : 'On target*') : 'Unavailable'}</td></tr>)}
+          {deliveryOutlooks.map(pkg => <tr key={pkg.id} className="border-b last:border-0"><td className="py-3 font-semibold">{pkg.name}</td><td>{formatDate(pkg.date)}</td><td>{formatDate(pkg.forecastDate)}</td><td>{pkg.delayDays === null ? '—' : `${pkg.delayDays} days`}</td><td>{pkg.forecastDate ? (pkg.delayDays && pkg.delayDays > 0 ? 'Forecast delay' : pkg.overdueActivities > 0 ? 'Watch*' : 'On target*') : 'Unavailable'}</td></tr>)}
         </tbody></table></div>
         <p className="mt-3 text-xs text-[#65717c]">*Provisional estimate, not a verified critical-path assessment.</p>
       </section>
       <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5">
         <h2 className="text-base font-semibold text-[#123a60]">What needs attention?</h2>
-        <p className="mt-2 text-sm text-[#65717c]">{deliveryOutlooks.some(pkg => (pkg.delayDays || 0) > 0) ? 'Review overdue unfinished activities and update progress or recovery actions in Project Controls.' : 'No package completion variance is currently projected. Keep activity progress up to date.'}</p>
+        <p className="mt-2 text-sm text-[#65717c]">{deliveryOutlooks.some(pkg => (pkg.delayDays || 0) > 0 || pkg.overdueActivities > 0) ? `${deliveryOutlooks.reduce((sum, pkg) => sum + pkg.overdueActivities, 0)} overdue unfinished activities across the packages. Review the affected workfronts and recovery actions in Project Controls. An on-time estimated handover does not remove this schedule risk.` : 'No overdue unfinished activities or package completion variance currently detected. Keep activity progress up to date.'}</p>
       </section>
       <button type="button" onClick={() => setRecoveryView(recoveryView === 'analysis' ? 'overview' : 'analysis')} className="rounded-xl border border-[#dfe3e7] bg-white px-4 py-3 text-sm font-semibold text-[#123a60]">{recoveryView === 'analysis' ? 'Hide technical analysis' : 'Show technical analysis (optional)'}</button>
       {recoveryView === 'analysis' && <div className="space-y-4">
