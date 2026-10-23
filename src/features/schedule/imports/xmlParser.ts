@@ -58,27 +58,24 @@ export async function parseMsProjectXmlFile({
       const percentComplete = Number(childText(taskNode, 'PercentComplete') || 0)
       if (!name) return null
 
-      const predecessors: number[] = []
-      const unsupported: string[] = []
+      const predecessors: string[] = []
       for (const link of childElements(taskNode, 'PredecessorLink')) {
         const predecessorUid = childText(link, 'PredecessorUID')
-        const type = childText(link, 'Type')
-        const lag = Number(childText(link, 'LinkLag') || 0)
         const predecessorNumber = uidToNumber.get(predecessorUid)
-        // MS Project XML relationship Type=1 is Finish-to-Start.
-        // The existing forecast supports FS without lag only. Never
-        // silently convert SS/FF/SF or lagged links to plain FS.
-        if (!predecessorNumber || (type && type !== '1') || lag !== 0) {
-          unsupported.push(`UID ${predecessorUid || '?'} (type ${type || 'unspecified'}, lag ${lag})`)
-          continue
-        }
-        if (predecessorNumber !== Number(id || uid || index + 1)) predecessors.push(predecessorNumber)
-      }
-      // Fail closed: partial dependency networks create misleading forecasts.
-      // The caller must explicitly handle unsupported relationships instead
-      // of importing an apparently valid but incomplete dependency graph.
-      if (unsupported.length) {
-        throw new Error(`MS Project task "${name}" has unsupported/unresolved predecessor links: ${unsupported.join('; ')}. Import cancelled to protect forecast accuracy.`)
+        if (!predecessorNumber) throw new Error(`Task "${name}" references missing predecessor UID ${predecessorUid || '?'}. Import cancelled.`)
+        if (predecessorNumber === Number(id || uid || index + 1)) throw new Error(`Task "${name}" references itself. Import cancelled.`)
+        // MS Project XML Type: 0=FF, 1=FS, 2=SF, 3=SS.
+        const type = childText(link, 'Type') || '1'
+        const relation = ({ '0': 'FF', '1': 'FS', '2': 'SF', '3': 'SS' } as Record<string, string>)[type]
+        if (!relation) throw new Error(`Unknown relationship type ${type} in "${name}".`)
+        // LinkLag is tenths of a minute: 4800 = one eight-hour working day.
+        const lag = Number(childText(link, 'LinkLag') || '0')
+        if (!Number.isFinite(lag)) throw new Error(`Invalid lag in "${name}".`)
+        const lagDays = lag / 4800
+        const lagLabel = lag === 0 ? '' : `${lag > 0 ? '+' : '-'}${Number(Math.abs(lagDays).toFixed(5))}d`
+        predecessors.push(relation === 'FS' && lag === 0
+          ? String(predecessorNumber)
+          : `${predecessorNumber}${relation}${lagLabel}`)
       }
 
       return {
