@@ -38,7 +38,7 @@ export type ForecastV2Result = {
   overdueActivities: number
   scheduleSeverity: ScheduleSeverity
   completionVarianceDays: number | null
-  dependencyAssessment: 'Indicative only — verify links, float and capacity' | 'Unavailable — insufficient schedule evidence'
+  dependencyAssessment: string
 
   targetDate: Date | null
   forecastDate: Date | null
@@ -360,6 +360,17 @@ export function calculateForecastV2(
   const maximumActivityDelayDays = Math.max(0, ...detailedActivities.map(activityDelayDays))
   const scheduleSeverity = getScheduleSeverity(maximumActivityDelayDays)
 
+  // A zero-slippage estimate is not proof of target achievability when overdue
+  // work has no recorded dependency network. Never publish an unqualified zero.
+  const unfinished = detailedActivities.filter(activity => activity.progress < 100)
+  const missingDates = unfinished.some(activity =>
+    !toDate(activity.plannedStart) || !toDate(activity.plannedFinish)
+  )
+  const hasDependencyEvidence = unfinished.some(activity => activity.predecessorIds.length > 0)
+  const unverifiableTarget = missingDates ||
+    (overdueActivities > 0 && !hasDependencyEvidence)
+
+
   const packageMetadata = new Map(
     state.schedule.packages.map(pkg => [pkg.id, pkg])
   )
@@ -474,10 +485,13 @@ export function calculateForecastV2(
     ? (incompletePackageForecasts === 0 && datedPackages.length
       ? new Date(Math.max(...datedPackages.map(p => p.plannedFinish!.getTime()))) : null)
     : projectTarget
-  const forecastDate = isMultiPackage
+  const preliminaryForecastDate = isMultiPackage
     ? (incompletePackageForecasts === 0 && datedPackages.length
       ? new Date(Math.max(...datedPackages.map(p => p.forecastFinish!.getTime()))) : null)
     : projectTarget ? estimatePackageFinish(state.schedule.activities, projectTarget, today).finish : null
+  const forecastDate = unverifiableTarget && preliminaryForecastDate && targetDate &&
+    preliminaryForecastDate.getTime() <= targetDate.getTime()
+    ? null : preliminaryForecastDate
   // Compare master dates on the same calendar-day basis, never a pressure
   // package's delay against another package's target.
   const delayDays = isMultiPackage
@@ -523,7 +537,7 @@ export function calculateForecastV2(
     overdueActivities,
     scheduleSeverity,
     completionVarianceDays: forecastDate && targetDate ? differenceInCalendarDays(forecastDate, targetDate) : null,
-    dependencyAssessment: forecastDate ? 'Indicative only — verify links, float and capacity' : 'Unavailable — insufficient schedule evidence',
+    dependencyAssessment: !forecastDate ? (missingDates ? 'Forecast unverified — unfinished activities have missing programme dates' : 'Forecast unverified — overdue work lacks recorded dependency links; target achievability cannot be established') : 'Indicative only — verify links, float and capacity',
     targetDate,
     forecastDate,
     delayDays,
