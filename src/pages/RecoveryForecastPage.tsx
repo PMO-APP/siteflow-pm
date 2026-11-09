@@ -611,8 +611,7 @@ export default function RecoveryForecastPage() {
     const daysBehind = sharedIntelligence.forecastV2.delayDays
 
     const forecastDate =
-      sharedIntelligence.forecastV2.forecastDate ||
-      (targetDate && daysBehind > 0 ? addDays(targetDate, daysBehind) : targetDate)
+      sharedIntelligence.forecastV2.forecastDate
 
     const dueButIncomplete = workingTasks.filter(task => {
       const finish = safeDate(getTaskFinish(task))
