@@ -218,14 +218,14 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
       <section className="pmx-section-panel">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><div className="pmx-eyebrow">Project overview</div><h1 className="mt-1 text-3xl font-bold">{project?.project_name || project?.name || 'Selected Project'}</h1><p className="mt-2 max-w-3xl text-sm text-[var(--pmx-muted)]">{shortSummary}</p></div>
-          <StatusPill label={intelligence.health.label} tone={healthTone(intelligence.health.score)} dot />
+          <StatusPill label={forecast.maximumActivityDelayDays > 30 ? "Critical schedule risk" : intelligence.health.label} tone={forecast.maximumActivityDelayDays > 30 ? "danger" : healthTone(intelligence.health.score)} dot />
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             ['Actual progress', `${progress}%`, `Planned ${planned}%`],
             [multiPackage ? 'Master forecast finish' : 'Forecast completion', incompleteForecast ? 'Incomplete' : formatDate(forecast.forecastDate), multiPackage ? `Latest package target ${formatDate(forecast.targetDate)}` : `Forecast engine target ${formatDate(forecast.targetDate)}`],
-            ['Schedule delay', incompleteForecast ? 'Not available' : `${forecast.delayDays} calendar days`, multiPackage ? 'Master forecast vs latest package target' : 'Forecast engine vs target'],
-            ['Project health', `${intelligence.health.score}/100`, intelligence.health.label],
+            ['Maximum activity delay', `${forecast.maximumActivityDelayDays} calendar days`, `${forecast.overdueActivities} overdue unfinished activities · ${forecast.scheduleSeverity}`],
+            ['Completion variance', incompleteForecast ? 'Unverified' : `${forecast.completionVarianceDays ?? 0} calendar days`, 'Forecast completion vs approved target'],
           ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
         </div>
         <div className="mt-3 text-xs text-[var(--pmx-muted)]">{multiPackage ? 'Master dates are derived from package programmes. Each package retains its own target and forecast; management deadlines and approved revisions remain separate.' : 'Completion dates and delay are supplied by the recovery forecast engine. Confirm the approved baseline in Schedule Revisions.'}</div>
