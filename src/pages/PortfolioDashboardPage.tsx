@@ -349,7 +349,7 @@ export default function PortfolioDashboardPage() {
         },
       })
       const sharedIntelligence = buildProjectIntelligenceV4(normalizedState)
-      const delayDays = sharedIntelligence.forecastV2.delayDays
+      const delayDays = sharedIntelligence.forecastV2.maximumActivityDelayDays
       const projectRecoveryConfidence = sharedIntelligence.forecastV2.recoveryConfidence
 
       const failedQualityGates = projectQualityGates.filter(
