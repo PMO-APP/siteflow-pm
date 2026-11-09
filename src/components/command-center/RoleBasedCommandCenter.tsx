@@ -209,7 +209,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
     && Math.abs(calendarDelay - forecast.delayDays) > 1
   const validProgress = Number.isFinite(progress) && progress >= 0 && progress <= 100
     && Number.isFinite(planned) && planned >= 0 && planned <= 100
-  const shortSummary = incompleteForecast ? `Package forecasts are incomplete. ${forecast.incompletePackageForecasts} delivery package(s) need a dated programme before the master finish can be published.` : forecast.delayDays > 0
+  const shortSummary = !forecast.forecastDate ? 'Completion forecast unverified. Review activity dependencies, programme dates and remaining work in Recovery Forecast.' : incompleteForecast ? `Package forecasts are incomplete. ${forecast.incompletePackageForecasts} delivery package(s) need a dated programme before the master finish can be published.` : forecast.delayDays > 0
     ? `Completion is forecast ${forecast.delayDays} days behind the current target. ${forecast.pressurePackage ? `${forecast.pressurePackage.packageName} needs particular attention.` : 'Review delivery constraints and recovery actions.'}`
     : 'Review the current forecast and delivery priorities.'
 
@@ -223,9 +223,9 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             ['Actual progress', `${progress}%`, `Planned ${planned}%`],
-            [multiPackage ? 'Master forecast finish' : 'Forecast completion', incompleteForecast ? 'Incomplete' : formatDate(forecast.forecastDate), multiPackage ? `Latest package target ${formatDate(forecast.targetDate)}` : `Forecast engine target ${formatDate(forecast.targetDate)}`],
+            [multiPackage ? 'Master forecast finish' : 'Forecast completion', !forecast.forecastDate ? 'Unverified' : incompleteForecast ? 'Incomplete' : formatDate(forecast.forecastDate), multiPackage ? `Latest package target ${formatDate(forecast.targetDate)}` : `Forecast engine target ${formatDate(forecast.targetDate)}`],
             ['Maximum activity delay', `${forecast.maximumActivityDelayDays} calendar days`, `${forecast.overdueActivities} overdue unfinished activities · ${forecast.scheduleSeverity}`],
-            ['Completion variance', incompleteForecast ? 'Unverified' : `${forecast.completionVarianceDays ?? 0} calendar days`, 'Forecast completion vs approved target'],
+            ['Completion variance', forecast.completionVarianceDays == null ? 'Unverified' : `${forecast.completionVarianceDays} calendar days`, 'Forecast completion vs approved target'],
           ].map(([label, value, detail]) => <div key={label} className="rounded-xl border border-[var(--pmx-border)] p-4"><div className="text-xs text-[var(--pmx-muted)]">{label}</div><div className="mt-2 text-xl font-bold">{value}</div><div className="mt-1 text-xs text-[var(--pmx-muted)]">{detail}</div></div>)}
         </div>
         <div className="mt-3 text-xs text-[var(--pmx-muted)]">{multiPackage ? 'Master dates are derived from package programmes. Each package retains its own target and forecast; management deadlines and approved revisions remain separate.' : 'Completion dates and delay are supplied by the recovery forecast engine. Confirm the approved baseline in Schedule Revisions.'}</div>
