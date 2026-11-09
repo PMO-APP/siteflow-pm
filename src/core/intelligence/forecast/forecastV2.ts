@@ -238,68 +238,75 @@ function estimatePackageFinish(all: Activity[], target: Date, today: Date) {
   const detailed = getDetailedActivities(all)
   const remaining = detailed
     .filter(activity => activity.progress < 100)
-    .map(activity => ({
-      activity,
-      start: toDate(activity.plannedStart),
-      finish: toDate(activity.plannedFinish),
-    }))
+    .map(activity => ({ activity, start: toDate(activity.plannedStart), finish: toDate(activity.plannedFinish) }))
     .filter((item): item is { activity: Activity; start: Date; finish: Date } =>
       item.start !== null && item.finish !== null && item.finish >= item.start
     )
     .sort((a, b) => a.start.getTime() - b.start.getTime() || a.finish.getTime() - b.finish.getTime())
 
+  // A completed programme does not acquire artificial lateness merely because
+  // the dashboard is viewed after the target date.
   if (!remaining.length) return { finish: target, delay: 0 }
 
   const byId = new Map(remaining.map(item => [item.activity.id, item]))
+  const completedById = new Map(detailed.filter(item => item.progress >= 100).map(item => [item.id, item]))
   const projected = new Map<string, Date>()
   const visiting = new Set<string>()
 
-  // Predecessor links, when available, are authoritative. Otherwise infer only
-  // close finish-to-start handoffs. Never convert overlapping activities into
-  // sequential dependencies merely because they share a phase or task order.
+  // Dates are projected at calendar-day granularity. Never serialize tasks
+  // that were intentionally planned to overlap. A real predecessor link is
+  // stronger evidence than a guessed handoff.
   function project(item: (typeof remaining)[number]): Date {
     const cached = projected.get(item.activity.id)
     if (cached) return cached
-    if (visiting.has(item.activity.id)) {
-      // Invalid/cyclic source links cannot justify inventing a delay.
-      return item.finish
-    }
+    if (visiting.has(item.activity.id)) return item.finish
     visiting.add(item.activity.id)
+
     const duration = Math.max(1, differenceInCalendarDays(item.finish, item.start) + 1)
     const remainingDays = Math.max(1, Math.ceil(duration * (100 - clamp(item.activity.progress)) / 100))
+    const hasStarted = item.activity.progress > 0 || Boolean(toDate(item.activity.actualStart))
     let earliestStart = Math.max(item.start.getTime(), today.getTime())
 
-    const explicit = (item.activity.predecessorIds || [])
-      .map(id => byId.get(id))
+    const explicitIds = item.activity.predecessorIds || []
+    const explicit = explicitIds.map(id => byId.get(id))
       .filter((candidate): candidate is (typeof remaining)[number] => Boolean(candidate))
-    const inferredCandidates = explicit.length ? [] : remaining.filter(prior => {
+    const inferredCandidates = explicitIds.length ? [] : remaining.filter(prior => {
       if (prior.activity.id === item.activity.id || prior.start >= item.start) return false
       const gap = differenceInCalendarDays(item.start, prior.finish)
-      // A short planned handoff indicates potential sequential work; a
-      // negative gap indicates parallel work and must remain parallel.
       return gap >= 0 && gap <= 7
     })
-    // Use the nearest planned predecessor, not every nearby task.
     const inferred = inferredCandidates.sort((a, b) => b.finish.getTime() - a.finish.getTime()).slice(0, 1)
 
     for (const prior of [...explicit, ...inferred]) {
       if (visiting.has(prior.activity.id)) continue
-      const projectedPriorFinish = project(prior)
-      const plannedGap = explicit.length ? 1 : Math.max(0, differenceInCalendarDays(item.start, prior.finish))
-      earliestStart = Math.max(earliestStart, projectedPriorFinish.getTime() + plannedGap * DAY)
+      const predecessorFinish = project(prior)
+      // Imported predecessor IDs represent finish-to-start unless the source
+      // provides richer link metadata (which this normalized model lacks).
+      const gap = explicitIds.length ? 1 : Math.max(0, differenceInCalendarDays(item.start, prior.finish))
+      if (!hasStarted) earliestStart = Math.max(earliestStart, predecessorFinish.getTime() + gap * DAY)
+    }
+    // Completed predecessors with actual finish dates can still constrain a
+    // successor that has not started; otherwise the baseline finish is used.
+    if (!hasStarted) for (const id of explicitIds) {
+      const completed = completedById.get(id)
+      if (!completed) continue
+      const finished = toDate(completed.actualFinish) || toDate(completed.plannedFinish)
+      if (finished) earliestStart = Math.max(earliestStart, finished.getTime() + DAY)
     }
 
-    // Work not yet due retains its planned finish unless predecessors push it.
-    // For started work, progress determines the remaining duration as of today.
-    const finish = new Date(Math.max(
-      item.start > today ? item.finish.getTime() : 0,
-      earliestStart + (remainingDays - 1) * DAY
-    ))
+    // For future tasks use the full original duration. For started tasks use
+    // the remaining fraction. An overdue activity therefore pushes its finish
+    // forward unless actual float or parallel paths absorb the impact.
+    const workDays = hasStarted ? remainingDays : duration
+    const finish = new Date(earliestStart + (workDays - 1) * DAY)
     visiting.delete(item.activity.id)
     projected.set(item.activity.id, finish)
     return finish
   }
 
+  // Project completion is the latest remaining path, NOT the sum of all late
+  // activities. Keep the approved target as the lower bound for this
+  // non-accelerated forecast; it remains separately visible in the UI.
   let latest = target.getTime()
   for (const item of remaining) latest = Math.max(latest, project(item).getTime())
   const finish = new Date(latest)
