@@ -20,12 +20,26 @@ export type PackageDeliveryPosition = {
   activityGap: number
   delayDays: number
   overdueActivities: number
+  maximumActivityDelayDays: number
+  scheduleSeverity: ScheduleSeverity
   plannedFinish: Date | null
   forecastFinish: Date | null
   status: 'on_track' | 'watch' | 'recovery_required' | 'critical'
 }
 
+export type ScheduleSeverity = 'On Track' | 'Manageable' | 'Watch' | 'At Risk' | 'Critical'
+
+export function getScheduleSeverity(days: number): ScheduleSeverity {
+  return days === 0 ? 'On Track' : days <= 7 ? 'Manageable' : days <= 14 ? 'Watch' : days <= 30 ? 'At Risk' : 'Critical'
+}
+
 export type ForecastV2Result = {
+  maximumActivityDelayDays: number
+  overdueActivities: number
+  scheduleSeverity: ScheduleSeverity
+  completionVarianceDays: number | null
+  dependencyAssessment: 'Indicative only — verify links, float and capacity' | 'Unavailable — insufficient schedule evidence'
+
   targetDate: Date | null
   forecastDate: Date | null
   delayDays: number
@@ -328,6 +342,17 @@ export function calculateForecastV2(
 
   const activities = sequence.activities.map(activity => activity.source)
 
+  // Activity lateness is independent of forecast completion variance. Calendar-day
+  // comparison avoids marking activities overdue during their planned finish day.
+  const detailedActivities = getDetailedActivities(state.schedule.activities)
+  const activityDelayDays = (activity: Activity) => {
+    const finish = toDate(activity.plannedFinish)
+    return activity.progress >= 100 || !finish ? 0 : Math.max(0, differenceInCalendarDays(today, finish))
+  }
+  const overdueActivities = detailedActivities.filter(activity => activityDelayDays(activity) > 0).length
+  const maximumActivityDelayDays = Math.max(0, ...detailedActivities.map(activityDelayDays))
+  const scheduleSeverity = getScheduleSeverity(maximumActivityDelayDays)
+
   const packageMetadata = new Map(
     state.schedule.packages.map(pkg => [pkg.id, pkg])
   )
@@ -363,10 +388,9 @@ export function calculateForecastV2(
       const plannedFinish = finishes.length ? new Date(Math.max(...finishes.map(date => date.getTime()))) : null
       const estimate = plannedFinish ? estimatePackageFinish(packageActivities, plannedFinish, today) : null
       const delayDays = estimate?.delay ?? 0
-      const overdueActivities = getDetailedActivities(packageActivities).filter(activity => {
-        const finish = toDate(activity.plannedFinish)
-        return activity.progress < 100 && !!finish && finish < today
-      }).length
+      const detailedPackageActivities = getDetailedActivities(packageActivities)
+      const overdueActivities = detailedPackageActivities.filter(activity => activityDelayDays(activity) > 0).length
+      const maximumActivityDelayDays = Math.max(0, ...detailedPackageActivities.map(activityDelayDays))
       const forecastFinish = estimate?.finish ?? null
       const status: PackageDeliveryPosition['status'] =
         delayDays <= 0
@@ -391,6 +415,8 @@ export function calculateForecastV2(
         activityGap: packageSequence.activityGap,
         delayDays,
         overdueActivities,
+        maximumActivityDelayDays,
+        scheduleSeverity: getScheduleSeverity(maximumActivityDelayDays),
         plannedFinish,
         forecastFinish,
         status,
@@ -486,6 +512,11 @@ export function calculateForecastV2(
           : 'critical'
 
   return {
+    maximumActivityDelayDays,
+    overdueActivities,
+    scheduleSeverity,
+    completionVarianceDays: forecastDate && targetDate ? differenceInCalendarDays(forecastDate, targetDate) : null,
+    dependencyAssessment: forecastDate ? 'Indicative only — verify links, float and capacity' : 'Unavailable — insufficient schedule evidence',
     targetDate,
     forecastDate,
     delayDays,
