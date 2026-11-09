@@ -1084,6 +1084,17 @@ export default function RecoveryForecastPage() {
       </section>
 
 
+      <section className="rounded-2xl border border-[#dfe3e7] bg-white p-5 shadow-sm" aria-label="Shared schedule intelligence">
+        <h2 className="text-lg font-semibold text-[#123a60]">Schedule delay and completion outlook</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <SmallCard title="Maximum activity delay" value={`${sharedIntelligence.forecastV2.maximumActivityDelayDays} days`} />
+          <SmallCard title="Overdue unfinished activities" value={sharedIntelligence.forecastV2.overdueActivities} />
+          <SmallCard title="Schedule severity" value={sharedIntelligence.forecastV2.scheduleSeverity} />
+          <SmallCard title="Completion variance" value={sharedIntelligence.forecastV2.completionVarianceDays == null ? 'Unavailable' : `${sharedIntelligence.forecastV2.completionVarianceDays} days`} />
+        </div>
+        <p className="mt-3 text-sm text-[#65717c]">Activity lateness does not automatically move the target completion date. {sharedIntelligence.forecastV2.dependencyAssessment}. Forecast dates remain indicative until dependencies, float, overlap and remaining production capacity are verified.</p>
+      </section>
+
       <details className="rounded-2xl border border-[#dfe3e7] bg-white p-4 shadow-sm">
         <summary className="cursor-pointer text-sm font-semibold text-[#123a60]">Legacy project-wide analysis and detailed recovery diagnostics</summary>
       <div className="mt-4 grid xl:grid-cols-[1.6fr_1fr] gap-5">
