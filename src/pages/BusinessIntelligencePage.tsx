@@ -1,6 +1,7 @@
 import { Activity, AlertTriangle, ArrowUpRight, BarChart3, Brain, FileText, Gauge, LineChart, ShieldCheck, Target, TrendingUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTasks } from '@/hooks/useTasks'
+import { useProjectIntelligence } from '@/hooks/useProjectIntelligence'
 import { useProjectStore } from '@/store/project'
 import { EnterpriseMetric, EnterpriseNotice, EnterprisePageHero, EnterpriseSection } from '@/components/ui/enterprise/EnterprisePage'
 
@@ -8,9 +9,11 @@ export default function BusinessIntelligencePage() {
   const navigate = useNavigate()
   const { projectId, projectName } = useProjectStore()
   const { data: allTasks = [] } = useTasks()
+  const intelligence = useProjectIntelligence()
+  const schedule = intelligence.forecastV2
   const tasks = allTasks.filter((task: any) => task.project_id === projectId)
   const completed = tasks.filter((task: any) => task.status === 'Completed').length
-  const delayed = tasks.filter((task: any) => task.status !== 'Completed' && task.finish_date && new Date(task.finish_date) < new Date()).length
+  const delayed = schedule.overdueActivities
   const progress = tasks.length ? Math.round(tasks.reduce((sum: number, task: any) => sum + (task.status === 'Completed' ? 100 : Number(task.progress_pct || 0)), 0) / tasks.length) : 0
   const remaining = Math.max(0, tasks.length - completed)
 
@@ -33,22 +36,22 @@ export default function BusinessIntelligencePage() {
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <span className="pmx-status pmx-status-primary">{progress}% overall progress</span>
             <span className={`pmx-status ${delayed ? 'pmx-status-danger' : 'pmx-status-success'}`}>
-              {delayed ? `${delayed} delayed activities` : 'No overdue activity detected'}
+              {`${schedule.scheduleSeverity} · ${schedule.maximumActivityDelayDays} days maximum overdue`}
             </span>
           </div>
         </EnterprisePageHero>
 
         {delayed > 0 && (
           <EnterpriseNotice tone="warning">
-            {delayed} activities are past their planned finish dates. Recovery Intelligence should be reviewed before the next management update.
+            {delayed} unfinished activities are overdue; the longest is {schedule.maximumActivityDelayDays} days ({schedule.scheduleSeverity}). This is activity delay, not handover slippage. {schedule.dependencyAssessment}.
           </EnterpriseNotice>
         )}
 
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <EnterpriseMetric icon={Activity} label="Activities" value={tasks.length} helper="Total programme activities" />
           <EnterpriseMetric icon={Target} label="Completed" value={completed} helper="Activities closed" tone="green" />
-          <EnterpriseMetric icon={AlertTriangle} label="Delayed" value={delayed} helper={delayed ? 'Requires intervention' : 'No current delay'} tone={delayed ? 'red' : 'navy'} />
-          <EnterpriseMetric icon={Gauge} label="Remaining" value={remaining} helper="Activities still open" tone="coral" />
+          <EnterpriseMetric icon={AlertTriangle} label="Maximum activity delay" value={`${schedule.maximumActivityDelayDays} days`} helper={`${delayed} overdue · ${schedule.scheduleSeverity}`} tone={delayed ? 'red' : 'navy'} />
+          <EnterpriseMetric icon={Gauge} label="Forecast completion" value={schedule.forecastDate ? schedule.forecastDate.toLocaleDateString() : 'Unavailable'} helper="Indicative; separate from activity delay" tone="coral" />
         </section>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -71,7 +74,7 @@ export default function BusinessIntelligencePage() {
             <EnterpriseSection title="Management interpretation" description="Current delivery signal from available schedule data.">
               <div className="flex items-center gap-2 text-sm font-semibold text-[var(--pmx-heading)]"><Brain size={17} className="text-[var(--pmx-accent-600)]" />{delayed ? 'Delivery requires attention' : 'Delivery remains controlled'}</div>
               <p className="mt-3 text-sm leading-7 text-[var(--pmx-text-muted)]">
-                {delayed ? `${delayed} activities are past their planned finish dates. Open Recovery Intelligence to identify the immediate sequence constraint.` : 'No overdue activity is currently detected from the available programme data. Continue protecting upcoming approvals and milestones.'}
+                {delayed ? `${delayed} activities overdue, with maximum delay of ${schedule.maximumActivityDelayDays} days (${schedule.scheduleSeverity}). Forecast completion variance: ${schedule.completionVarianceDays == null ? 'unavailable' : `${schedule.completionVarianceDays} days`}. Open Recovery Intelligence to review dependencies and float.` : 'No overdue activity is currently detected from the available programme data. Continue protecting upcoming approvals and milestones.'}
               </p>
               <button onClick={() => navigate('/app/recovery')} className="btn btn-primary mt-5">Open recovery view</button>
             </EnterpriseSection>
