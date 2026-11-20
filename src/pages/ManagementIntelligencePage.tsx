@@ -12,8 +12,19 @@ import './ManagementIntelligencePage.css'
 const tone = {
   'Off track': 'red', Watch: 'amber', 'On track / done': 'green', Unrated: 'slate', Withdrawn: 'slate',
 }
-const bands = ['All projects', ...ratings, 'Stalled'] as const
+const deliveryBands = ['Behind programme', 'Past completion date', 'Stalled'] as const
+const bands = ['All projects', ...ratings, ...deliveryBands] as const
 type Band = typeof bands[number]
+const reasonColumns = ['Behind', 'Past date', 'Stalled']
+const matchesBand = (row: ProjectPosition, band: Band) => {
+  switch (band) {
+    case 'All projects': return true
+    case 'Behind programme': return row.behind
+    case 'Past completion date': return row.overdue
+    case 'Stalled': return row.stalled
+    default: return row.rating === band
+  }
+}
 const formatters = new Map<string, Intl.NumberFormat>()
 const cash = (value: number | null, currency: string) => {
   if (value === null) return '—'
@@ -31,6 +42,8 @@ const date = (value?: string | null) => isoDay(value)
 
 function Status({ row }: { row: ProjectPosition }) {
   return <span className="mi-status-list"><span className={`mi-tag ${tone[row.rating]}`}>{row.rating}</span>
+    {row.behind && <span className="mi-tag amber">Behind programme</span>}
+    {row.overdue && <span className="mi-tag red">Past completion date</span>}
     {row.stalled && <span className="mi-tag red"><PauseCircle size={13} aria-hidden />Stalled</span>}</span>
 }
 
@@ -42,20 +55,27 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
   const scope = useMemo(() => data.rows
     .filter(row => (!portfolio || String(row.project.portfolio_id ?? 'none') === portfolio) && (!project || String(row.project.id) === project))
     .sort((a, b) => ratings.indexOf(a.rating) - ratings.indexOf(b.rating) || Number(b.stalled) - Number(a.stalled) || (a.project.project_name || '').localeCompare(b.project.project_name || '')), [data.rows, portfolio, project])
-  const rows = useMemo(() => scope.filter(row => band === 'All projects' || (band === 'Stalled' ? row.stalled : row.rating === band)), [scope, band])
-  const counts = Object.fromEntries(bands.map(name => [name, scope.filter(row => name === 'All projects' || (name === 'Stalled' ? row.stalled : row.rating === name)).length])) as Record<Band, number>
-  const categories = new Map<string, number>()
-  for (const row of scope.filter(row => row.stalled)) {
-    const key = row.primary?.category || 'Cause unrecorded'
-    categories.set(key, (categories.get(key) || 0) + 1)
+  const rows = useMemo(() => scope.filter(row => matchesBand(row, band)), [scope, band])
+  const counts = Object.fromEntries(bands.map(name => [name, scope.filter(row => matchesBand(row, name)).length])) as Record<Band, number>
+  const categories = new Map<string, number[]>()
+  for (const row of scope) {
+    const key = row.primary?.category || 'Reason unrecorded'
+    deliveryBands.forEach((name, index) => {
+      if (!matchesBand(row, name)) return
+      const totals = categories.get(key) ?? deliveryBands.map(() => 0)
+      totals[index] += 1
+      categories.set(key, totals)
+    })
   }
-  const reasonCounts = [...categories].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  const attention = rows.filter(row => row.stalled || row.rating === 'Off track' || row.constraints.length > 0)
+  const reasonCounts = [...categories].sort(([a], [b]) => a.localeCompare(b))
+  const attention = rows.filter(row => row.behind || row.overdue || row.stalled || row.rating === 'Off track' || row.constraints.length > 0)
   const tiles: { label: string; key: Band; css: string }[] = [
     { label: 'Projects', key: 'All projects', css: 'navy' },
     { label: 'Off track', key: 'Off track', css: 'red' },
     { label: 'Watch', key: 'Watch', css: 'amber' },
     { label: 'On track / done', key: 'On track / done', css: 'green' },
+    { label: 'Behind programme', key: 'Behind programme', css: 'amber' },
+    { label: 'Past completion date', key: 'Past completion date', css: 'red' },
     { label: 'Stalled', key: 'Stalled', css: 'red' },
   ]
   function open(row: ProjectPosition, destination = '/app') {
@@ -90,7 +110,7 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
       <div>
         <h2>Portfolio overview</h2>
         {scope.length ? <>
-          <p className="mi-headline">{counts['Off track']} of {scope.length} projects are off track. {counts.Stalled} {counts.Stalled === 1 ? 'project is' : 'projects are'} stalled.</p>
+          <p className="mi-headline">{counts['Off track']} of {scope.length} projects off track.</p>
           <div className="mi-health-bar" role="img" aria-label={ratings.map(rating => `${counts[rating]} ${rating.toLowerCase()}`).join(', ')}>
             {ratings.map(rating => counts[rating] > 0 && <span key={rating} className={tone[rating]} style={{ flexGrow: counts[rating] }} />)}
           </div>
@@ -98,37 +118,53 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
         </> : <p className="mi-empty">No projects in this selection.</p>}
       </div>
       <div>
-        <h2>Why projects are stalled</h2>
-        {reasonCounts.length ? <dl className="mi-breakdown">
-          {reasonCounts.map(([reason, count]) => <div key={reason}><dt>{reason}</dt><dd>{count}</dd></div>)}
-        </dl> : <p className="mi-empty">No stalled projects recorded in this selection.</p>}
+        <h2>Recorded delivery reasons</h2>
+        {reasonCounts.length ? <>
+          <table className="mi-table mi-reason-table">
+            <thead><tr><th scope="col">Primary reason</th>{reasonColumns.map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+            <tbody>{reasonCounts.map(([reason, totals]) => <tr key={reason}>
+              <th scope="row">{reason}</th>
+              {totals.map((count, i) => <td key={deliveryBands[i]}>{count}</td>)}
+            </tr>)}</tbody>
+          </table>
+          <p className="mi-footnote">A project can appear in more than one column.</p>
+        </> : <p className="mi-empty">No behind, past-due or stalled projects in this selection.</p>}
       </div>
     </section>
     <section id="constraints" className="mi-panel scroll-mt-6" aria-labelledby="constraints-heading">
       <div className="mi-section-heading">
-        <div><h2 id="constraints-heading">Management attention</h2><p>What is holding up delivery and who can move it forward.</p></div>
+        <div><h2 id="constraints-heading">Management attention</h2><p>Delivery delays, recorded reasons and related open issues.</p></div>
         <AlertCircle aria-hidden />
       </div>
       {attention.length ? <div className="mi-attention">
-        {attention.map(row => <details key={row.project.id}>
-          <summary>
-            <span><strong>{row.project.project_name}</strong><Status row={row} /></span>
-            <span>{row.primary?.text || (row.stalled ? 'Stall reason unrecorded' : row.constraints[0]?.text || (row.overdue ? 'Handover target has passed' : 'Review delivery forecast'))}</span>
-          </summary>
-          <div className="mi-attention-detail">
-            {row.primary && <p className="mi-attention-primary"><strong>{row.primary.category}</strong> · {row.primary.text}</p>}
-            {row.constraints.filter(item => item !== row.primary).length > 0 && <ul>
-              {row.constraints.filter(item => item !== row.primary).map(item => <li key={`${item.category}:${item.text}`}>
-                <strong>{item.category}</strong> · {item.text}
-                {(item.due || item.owner || item.action) && <small>{[item.owner, item.due && `Due ${date(item.due)}`, item.action].filter(Boolean).join(' · ')}</small>}
-              </li>)}
-            </ul>}
-            {(row.primary?.owner || row.project.overall_owner_email) && <p>Contact {row.primary?.owner || row.project.overall_owner_email}</p>}
-            {row.primary?.due && <p>Due {date(row.primary.due)}</p>}
-            {row.primary?.action && <p><strong>Next action</strong> · {row.primary.action}</p>}
-            <button className="mi-text-button" onClick={() => open(row)}>Open project <ArrowUpRight size={16} /></button>
-          </div>
-        </details>)}
+        {attention.map(row => {
+          const reasons = row.constraints.filter(item => item.reason)
+          const related = row.constraints.filter(item => !item.reason)
+          const deliveryAlert = row.behind || row.overdue || row.stalled
+          const facts = [
+            row.overdueDays !== null && `${row.overdueDays} ${row.overdueDays === 1 ? 'day' : 'days'} past ${date(row.target)}`,
+            row.behind && (row.actual !== null && row.planned !== null && (row.progressGap ?? 0) < 0
+              ? `${row.actual}% actual vs ${row.planned}% planned` : 'Reported behind programme'),
+            row.primary?.text || (deliveryAlert ? 'Reason unrecorded' : related[0]?.text || 'Review delivery forecast'),
+          ].filter(Boolean)
+          const describe = (item: ProjectPosition['constraints'][number]) => <li key={`${item.category}:${item.text}`}>
+            <strong>{item.category}</strong> · {item.text}
+            {(item.source || item.recordedOn) && <small>{[item.source, item.recordedOn && date(item.recordedOn)].filter(Boolean).join(' · ')}</small>}
+            {(item.owner || item.due || item.action) && <small>{[item.owner, isoDay(item.due) && `Due ${date(item.due)}`, item.action].filter(Boolean).join(' · ')}</small>}
+          </li>
+          return <details key={row.project.id}>
+            <summary>
+              <span><strong>{row.project.project_name}</strong><Status row={row} /></span>
+              <span>{facts.join(' · ')}</span>
+            </summary>
+            <div className="mi-attention-detail">
+              {reasons.length > 0 && <div><h3>Recorded reasons</h3><ul>{reasons.map(describe)}</ul></div>}
+              {related.length > 0 && <div><h3>Related open issues</h3><ul>{related.map(describe)}</ul></div>}
+              {!row.primary?.owner && row.project.overall_owner_email && <p>Project contact {row.project.overall_owner_email}</p>}
+              <button className="mi-text-button" onClick={() => open(row)}>Open project <ArrowUpRight size={16} /></button>
+            </div>
+          </details>
+        })}
       </div> : <p className="mi-empty">No intervention items recorded for these projects.</p>}
     </section>
     <section id="delivery" className="mi-panel scroll-mt-6" aria-labelledby="delivery-heading">
@@ -155,7 +191,7 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
               </details>}
             </td>
             <td><strong>{percent(row.actual)}</strong> / {percent(row.planned)}{row.progressGap !== null && <small className={row.progressGap < 0 ? 'mi-negative' : ''}>{signed(row.progressGap, ' pp')}</small>}</td>
-            <td>{date(row.target)}{row.overdue && <span className="mi-negative"> · Passed</span>}<small>
+            <td>{date(row.target)}{row.overdueDays !== null && <span className="mi-negative"> · {row.overdueDays}d past</span>}<small>
               {row.forecast ? <>{date(row.forecast)} {row.variance !== null ? `(${signed(row.variance, 'd')})` : ''}</>
                 : <button className="mi-text-button" onClick={() => open(row, '/app/recovery')}>Forecast unverified <ArrowUpRight size={13} /></button>}
             </small></td>
