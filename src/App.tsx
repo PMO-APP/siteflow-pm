@@ -24,6 +24,7 @@ const AuditPage = lazy(() => import('@/pages/AuditPage'))
 const PlannerPage = lazy(() => import('@/pages/PlannerPage'))
 const CostingPage = lazy(() => import('@/pages/CostingPage'))
 const CostingWeeklyWorkspacePage = lazy(() => import('@/pages/CostingWeeklyWorkspacePage'))
+const ManagementIntelligencePage = lazy(() => import('@/pages/ManagementIntelligencePage'))
 const WorkspaceReportsPage = lazy(() => import('@/pages/WorkspaceReportsPage'))
 const DesignReportsPage = lazy(() => import('@/pages/DesignReportsPage'))
 const DepartmentHubPage = lazy(() => import('@/pages/DepartmentHubPage'))
@@ -273,6 +274,9 @@ export default function App() {
           path="/portfolio-dashboard"
           element={<Navigate to="/executive-dashboard" replace />}
         />
+
+        <Route path="/management-intelligence" element={<RequireAuth><ManagementIntelligencePage /></RequireAuth>} />
+        <Route path="/reports/pmo" element={<Navigate to="/management-intelligence" replace />} />
 
         {/* Workspace-wide reporting: outside the project-scoped /app Layout. */}
         <Route path="/reports/:section" element={<RequireAuth><WorkspaceReportsPage /></RequireAuth>} />
