@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import ManagementIntelligenceCard from '@/features/management/ManagementIntelligenceCard'
 import WorkspaceMemberPicker from '@/components/WorkspaceMemberPicker'
 import { supabase } from '@/lib/supabase'
 import { useProjectStore } from '@/store/project'
@@ -855,7 +856,6 @@ export default function ProjectsPage() {
                 <button type="button" className="fixed inset-0 z-40 cursor-default" aria-label="Close reports menu" onClick={() => setReportsOpen(false)}/>
                 <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-[#d8e4ee] bg-white p-2 shadow-xl">
                   {[
-                    {label:'PMO Executive Report',to:'/reports/pmo',hint:'Workspace-wide management intelligence'},
                     {label:'Costing Report',to:'/cost-reporting',hint:'Consolidated weekly commercial report'},
                     {label:'Design Reports',to:'/reports/design',hint:'Choose a project'},
                     {label:'IPD Reports',to:'/reports/ipd',hint:'Choose a project and discipline'},
@@ -917,6 +917,8 @@ export default function ProjectsPage() {
             </div>
           </div>
         </section>
+
+        <ManagementIntelligenceCard />
 
         <PersonalWorkspacePanel />
 
