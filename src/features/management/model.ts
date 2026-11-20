@@ -9,6 +9,8 @@ export type Project = {
   status?: string | null
   phase?: string | null
   handover_date?: string | null
+  planned_completion_date?: string | null
+  actual_completion_date?: string | null
   initial_budget?: Amount
   original_budget?: Amount
   current_approved_budget?: Amount
@@ -18,7 +20,15 @@ export type Project = {
   overall_owner_email?: string | null
   updated_at?: string | null
 }
-export type TaskRow = RecordRow & ProgressTask & { name?: string; delay_reason?: string | null; recovery_action?: string | null; is_summary?: boolean; is_blocked?: boolean }
+export type TaskRow = RecordRow & ProgressTask & {
+  name?: string
+  delay_reason?: string | null
+  recovery_action?: string | null
+  responsible?: string | null
+  is_summary?: boolean
+  is_blocked?: boolean
+  is_on_hold?: boolean
+}
 export type Report = RecordRow & {
   report_date: string
   discipline?: string
@@ -69,7 +79,16 @@ export type Data = {
 export const ratings = ['Off track', 'Watch', 'On track / done', 'Unrated', 'Withdrawn'] as const
 type Rating = typeof ratings[number]
 export type ConstraintCategory = 'Funding / payment' | 'Procurement' | 'Approvals' | 'Design / drawings' | 'Mobilisation' | 'Other'
-type Constraint = { category: ConstraintCategory; text: string; reason?: boolean; action?: string; owner?: string; due?: string }
+type Constraint = {
+  category: ConstraintCategory
+  text: string
+  reason?: boolean
+  action?: string
+  owner?: string
+  due?: string
+  source?: string
+  recordedOn?: string | null
+}
 
 const normal = (value?: string | null) => (value ?? '').trim().toLowerCase().replace(/_/g, ' ')
 const open = (value?: string | null) => !['closed', 'completed', 'resolved', 'approved', 'delivered', 'installed', 'cancelled', 'canceled', 'rejected', 'paid', 'void', 'superseded'].includes(normal(value))
@@ -98,7 +117,7 @@ export function dayDifference(a: string, b: string) {
 }
 const shortText = (value?: string | null) => {
   const text = value?.trim()
-  return text && !/^(?:none(?: reported)?|nil|n\/?a|no (?:issues?|blockers?|delays?|updates?)(?: recorded| reported)?)[.\s]*$/i.test(text) ? text : ''
+  return text && !/^(?:none(?: reported)?|nil|n\/?a|no (?:issues?|blockers?|delays?|updates?)(?: recorded| reported)?|[-—–]+)[.\s]*$/i.test(text) ? text : ''
 }
 
 function category(text: string): ConstraintCategory {
@@ -111,8 +130,10 @@ function category(text: string): ConstraintCategory {
 }
 
 function explicitConstraint(text: string) {
-  return !/\b(no|not|neither|without|previously|was|were|now resolved)\b/i.test(text)
-    && /\b(due to|because of|awaiting|waiting (?:for|on)|blocked by|held up by|pending release|stalled for|on hold pending|causing (?:the )?delay|preventing (?:work|progress|mobilisation))\b/i.test(text)
+  return text.split(/[.;\n]/).some(line =>
+    !/\b(?:no (?:delays?|issues?|impact)|not (?:due to|because of|blocked|delayed|holding up)|previously|resolved|cleared)\b/i.test(line)
+    && /\b(due to|because of|awaiting|waiting (?:for|on)|blocked by|held up by|pending release|stalled for|on hold pending|causing (?:the )?delay|preventing (?:work|progress|mobilisation))\b/i.test(line)
+  )
 }
 
 function latestBy<T>(rows: T[], key: (row: T) => string, date: (row: T) => string) {
@@ -197,62 +218,83 @@ function constraintsFor(data: Data, reports: Report[], today: string, includeFin
     const content = shortText(text)
     if (content) constraints.push({ category, text: content, ...details })
   }
+  // Prioritise reasons attached to blocked or overdue work.
+  const activityPriority = (task: TaskRow) => {
+    if (task.is_blocked || task.is_on_hold || normal(task.status) === 'blocked' || hold(task.status)) return 2
+    const finish = isoDay(task.planned_finish || task.finish_date)
+    return finish && finish < today ? 1 : 0
+  }
+  const activitiesWithReasons = (data.tasks ?? [])
+    .filter(task => !task.is_summary && taskProgress(task) < 100 && shortText(task.delay_reason)
+      && !['cancelled', 'canceled'].includes(normal(task.status)))
+    .sort((a, b) => activityPriority(b) - activityPriority(a) || (b.updated_at || '').localeCompare(a.updated_at || ''))
+  for (const task of activitiesWithReasons) {
+    const reason = shortText(task.delay_reason)
+    const kind = category(reason)
+    if (kind !== 'Funding / payment' || includeFinance) {
+      add(kind, reason, {
+        reason: true,
+        source: task.name ? `Project Controls · ${task.name}` : 'Project Controls',
+        recordedOn: isoDay(task.updated_at),
+        owner: task.responsible || undefined,
+        action: shortText(task.recovery_action) || undefined,
+      })
+    }
+  }
   for (const report of reports) {
+    const scope = [report.discipline, report.package_name].filter(Boolean).join(' · ')
+    const evidence = {
+      source: scope ? `Weekly report · ${scope}` : 'Weekly report',
+      recordedOn: isoDay(report.report_date),
+    }
     for (const text of [report.pending_issues, report.matters_arising, hold(report.status) || explicitConstraint(report.status_summary || '') ? report.status_summary : null]) {
       const content = shortText(text)
       const kind = category(content)
       if (kind !== 'Funding / payment' || includeFinance) {
-        add(kind, content, { reason: explicitConstraint(content), action: shortText(report.look_ahead) || undefined })
+        add(kind, content, { ...evidence, reason: explicitConstraint(content), action: shortText(report.look_ahead) || undefined })
       }
     }
-    if (includeFinance) add('Funding / payment', report.payment_issues, { reason: explicitConstraint(shortText(report.payment_issues)) })
+    if (includeFinance) add('Funding / payment', report.payment_issues, { ...evidence, reason: explicitConstraint(shortText(report.payment_issues)) })
     const procurement = shortText(report.procurement_tracking)
     if (explicitConstraint(procurement) || /\b(delayed|overdue|stalled|pending)\b/i.test(procurement)) {
-      add('Procurement', procurement, { reason: explicitConstraint(procurement) })
-    }
-  }
-  for (const task of data.tasks ?? []) {
-    if (taskProgress(task) >= 100 || !shortText(task.delay_reason) || ['cancelled', 'canceled'].includes(normal(task.status))) continue
-    const kind = category(task.delay_reason!)
-    if (kind !== 'Funding / payment' || includeFinance) {
-      add(kind, task.delay_reason, { reason: Boolean(task.is_blocked || hold(task.status)), action: shortText(task.recovery_action) || undefined })
+      add('Procurement', procurement, { ...evidence, reason: explicitConstraint(procurement) })
     }
   }
   const design = latestBy(data.design ?? [], r => `${normal(r.category)}:${normal(r.title)}`, r => `${r.report_week}:${r.updated_at || r.created_at || ''}`)
   for (const item of design.filter(r => open(r.status) && (r.management_attention || ['design issue', 'weekly challenge'].includes(normal(r.category))))) {
     const detail = shortText(item.description)
-    add('Design / drawings', [item.title, detail].filter(Boolean).join(' · '), { reason: explicitConstraint(detail), owner: item.consultant_name, due: item.due_date })
+    add('Design / drawings', [item.title, detail].filter(Boolean).join(' · '), { reason: explicitConstraint(detail), source: 'Design report', recordedOn: isoDay(item.report_week), owner: item.consultant_name, due: item.due_date })
   }
   for (const item of latestDocuments((data.documents ?? []).filter(r => normal(r.type) === 'drawing'))) {
     if (['void', 'superseded', 'approved', 'current'].some(status => [item.status, item.approval_status].some(value => normal(value) === status))) continue
     if (['pending review', 'for review', 'rejected'].some(s => [item.status, item.review_status, item.approval_status].some(v => normal(v) === s)) || normal(item.issued_for) === 'approval') {
-      add('Design / drawings', item.title, { action: 'Review outstanding drawing' })
+      add('Design / drawings', item.title, { source: 'Drawing register', action: 'Review outstanding drawing' })
     }
   }
   for (const item of data.procurement ?? []) {
     const due = isoDay(item.required_on_site)
-    if (open(item.status) && (!item.delivery_date || item.delivery_date > today) && ((due && due < today) || ['delayed', 'on hold'].includes(normal(item.status)))) add('Procurement', item.name, { due: due ?? undefined, owner: item.supplier })
+    if (open(item.status) && (!item.delivery_date || item.delivery_date > today) && ((due && due < today) || ['delayed', 'on hold'].includes(normal(item.status)))) add('Procurement', item.name, { source: 'Procurement register', due: due ?? undefined, owner: item.supplier })
   }
   for (const item of data.approvals ?? []) {
     const due = isoDay(item.deadline)
-    if (open(item.status) && ((due && due < today) || ['delayed', 'on hold'].includes(normal(item.status)))) add('Approvals', item.title, { due: due ?? undefined, owner: item.approver })
+    if (open(item.status) && ((due && due < today) || ['delayed', 'on hold'].includes(normal(item.status)))) add('Approvals', item.title, { source: 'Approvals register', due: due ?? undefined, owner: item.approver })
   }
   if (includeFinance) {
     for (const item of data.payments ?? []) {
       const due = isoDay(item.due_date)
-      if (!['paid', 'rejected', 'cancelled', 'canceled'].includes(normal(item.payment_status)) && !item.paid_date && ((due && due < today) || hold(item.payment_status))) add('Funding / payment', item.payment_title, { due: due ?? undefined, action: 'Review outstanding payment' })
+      if (!['paid', 'rejected', 'cancelled', 'canceled'].includes(normal(item.payment_status)) && !item.paid_date && ((due && due < today) || hold(item.payment_status))) add('Funding / payment', item.payment_title, { source: 'Costing payments', due: due ?? undefined, action: 'Review outstanding payment' })
     }
     const costing = latestBy(data.costNotes ?? [], r => `${normal(r.section)}:${normal(r.item_title)}`, r => `${r.report_week}:${r.updated_at || r.created_at || ''}`)
     for (const item of costing.filter(r => ['delayed', 'on hold', 'stalled'].includes(normal(r.status)))) {
       const detail = shortText(item.description)
       add(normal(item.section) === 'payments' ? 'Funding / payment' : category(`${item.section} ${item.item_title}`),
-        [item.item_title, detail].filter(Boolean).join(' · '), { reason: explicitConstraint(detail) })
+        [item.item_title, detail].filter(Boolean).join(' · '), { reason: explicitConstraint(detail), source: 'Costing report', recordedOn: isoDay(item.report_week) })
     }
   }
   for (const item of data.risks ?? []) {
     if (open(item.status) && (Number(item.risk_score) >= 12 || ['high', 'critical'].includes(normal(item.severity)))) {
       const kind = category(item.title || '')
-      if (kind !== 'Funding / payment' || includeFinance) add(kind, item.title, { action: item.mitigation_action, owner: item.owner })
+      if (kind !== 'Funding / payment' || includeFinance) add(kind, item.title, { source: 'Risk register', action: item.mitigation_action, owner: item.owner })
     }
   }
   const result = new Map<string, Constraint>()
@@ -282,7 +324,8 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const actual = useTaskProgress ? calculateProjectProgress(tasks) : percent(snapshot?.snapshot_actual_progress)
   const isMaster = (r: Revision) => !r.block_id && !r.delivery_package_id && (!r.package_name || /^(master|project programme|overall)$/i.test(r.package_name.trim()))
   const master = (data.revisions ?? []).find(isMaster)
-  const target = isoDay(master?.current_finish || master?.planned_finish) ?? isoDay(project.handover_date)
+  const target = isoDay(master?.current_finish) ?? isoDay(master?.planned_finish)
+    ?? isoDay(project.handover_date) ?? isoDay(project.planned_completion_date)
   const planned = useTaskProgress
     ? dated && (!master || !target || tasks.some(t => isoDay(t.planned_finish || t.finish_date) === target))
       ? calculateProjectPlannedProgress(tasks, new Date(`${today}T12:00:00+01:00`)) : null
@@ -298,14 +341,21 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     const date = isoDay(r.report_date)
     return date && dayDifference(today, date) >= 0 && dayDifference(today, date) <= 14
   })
-  const active = !withdrawn(project.status) && !done(project.status)
+  const complete = done(project.status) || Boolean(isoDay(project.actual_completion_date))
+    || (useTaskProgress ? tasks.every(task => taskProgress(task) >= 100) : actual === 100)
+  const active = !withdrawn(project.status) && !complete
   const stalled = active && (hold(project.status) || activeReports.some(r => (hold(r.status) || /\b(?:work|site|project) (?:is |remains )?(?:stalled|on hold|suspended)\b/i.test(r.status_summary || '')) && (!lastTaskUpdate || reportTime(r) >= lastTaskUpdate)))
-  const overdue = active && !!target && target < today && actual !== 100
+  const overdueDays = active && target && target < today ? dayDifference(today, target) : null
+  const overdue = overdueDays !== null
   const progressGap = actual !== null && planned !== null ? actual - planned : null
+  const reportsBehind = activeReports.some(r => masterReport(r) && ['behind', 'behind programme', 'behind schedule', 'delayed'].includes(normal(r.status)))
+  const behind = active && (progressGap !== null
+    ? progressGap < 0
+    : ['behind', 'behind programme', 'behind schedule', 'delayed'].includes(normal(project.status)) || reportsBehind)
   const constraints = active ? constraintsFor(data, activeReports, today, includeFinance) : []
-  const rating: Rating = withdrawn(project.status) ? 'Withdrawn' : done(project.status) ? 'On track / done' :
+  const rating: Rating = withdrawn(project.status) ? 'Withdrawn' : complete ? 'On track / done' :
     stalled || overdue || (variance ?? 0) > 0 || overduePackage || ['off track', 'critical'].includes(normal(project.status)) ? 'Off track' :
-    constraints.length || (progressGap ?? 0) < 0 || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
+    constraints.length || behind || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
     (actual !== null && progressGap !== null) || activeReports.some(r => ['on track', 'ahead'].includes(normal(r.status))) ? 'On track / done' : 'Unrated'
   const documents = latestDocuments((data.documents ?? []).filter(r => normal(r.type) === 'report' && !['draft', 'void', 'superseded', 'rejected'].includes(normal(r.status))))
   const updates = [
@@ -318,7 +368,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   ].filter(update => update.date && update.date <= today && update.text).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
   const photosScope = reports.map(r => String(r.id))
   return {
-    project, rating, stalled, actual, planned, progressGap, target, forecast, variance, overdue, constraints,
+    project, rating, stalled, behind, actual, planned, progressGap, target, forecast, variance, overdue, overdueDays, constraints,
     primary: constraints.find(item => item.reason),
     updates, photosScope, documents,
     commercial: includeFinance ? commercialPosition(project, data, actual) : null,
