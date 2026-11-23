@@ -79,8 +79,9 @@ export async function createManagementAction(input:{
   }).select('*').single()
   if(error) throw error
 
+  let notificationError = false
   if(recipientUserIds.length){
-    const {error:notificationError}=await supabase.from('notifications').insert(recipientUserIds.map(userId=>({
+    const {error:notifyError}=await supabase.from('notifications').insert(recipientUserIds.map(userId=>({
       workspace_id:input.workspaceId,
       project_id:input.projectId||null,
       user_id:userId,
@@ -93,9 +94,9 @@ export async function createManagementAction(input:{
       source_module:'management_action',
       is_read:false,
     })))
-    if(notificationError) throw notificationError
+    notificationError = Boolean(notifyError)
   }
-  return mapRow(data)
+  return { ...mapRow(data), notificationError }
 }
 
 export async function updateManagementActionStatus(id:string,status:string){
