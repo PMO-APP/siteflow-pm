@@ -1,3 +1,6 @@
+import { calculateForecastV2 } from '@/core/intelligence/forecast/forecastV2'
+import { normalizeProjectState } from '@/core/intelligence/normalizers/projectStateNormalizer'
+import { applyControlledProgramme, latestControlledRevisions, type ControlledRevision } from '@/features/schedule/controlledProgramme'
 import { calculateProjectPlannedProgress, calculateProjectProgress, taskProgress, type ProgressTask } from '@/core/metrics/progressMetrics'
 
 type Amount = number | string | null
@@ -6,6 +9,7 @@ export type Project = {
   id: number
   project_name: string
   portfolio_id?: number | null
+  organization_id?: number | null
   status?: string | null
   phase?: string | null
   handover_date?: string | null
@@ -22,9 +26,12 @@ export type Project = {
 }
 export type TaskRow = RecordRow & ProgressTask & {
   name?: string
+  task_number?: number | null
+  delivery_package_id?: string | number | null
   delay_reason?: string | null
   recovery_action?: string | null
   responsible?: string | null
+  is_milestone?: boolean
   is_summary?: boolean
   is_blocked?: boolean
   is_on_hold?: boolean
@@ -46,16 +53,20 @@ export type Report = RecordRow & {
   snapshot_planned_progress?: Amount
   sent_to_pmo_at?: string
 }
-export type Revision = RecordRow & { package_name?: string; block_id?: string; delivery_package_id?: string; current_finish?: string; planned_finish?: string; forecast_finish?: string; approval_status?: string; status?: string }
+export type Revision = RecordRow & ControlledRevision & { package_name?: string; current_finish?: string; planned_finish?: string; forecast_finish?: string; approval_status?: string; status?: string }
+export type Package = RecordRow & { archived_at?: string | null }
+export type Milestone = RecordRow & { title?: string; name?: string; milestone_name?: string; planned_date?: string; target_date?: string; due_date?: string; status?: string }
+export type Decision = { id: string; project_id: number | null; portfolio_id?: number | null; decision: string; rationale?: string; owner_name?: string; due_date?: string; status?: string }
+export type TimelineEvent = { id: string; title: string; date: string; module: string; kind: string }
 export type Finance = RecordRow & { type: string; amount: Amount; currency?: string | null; direction?: string; status?: string; certified_date?: string; payment_date?: string }
 export type Payment = RecordRow & { payment_title?: string; amount: Amount; payment_status?: string; due_date?: string; paid_date?: string; remarks?: string }
 export type Contract = RecordRow & { contract_value: Amount; status?: string; contract_type?: string }
 export type Variation = RecordRow & { amount: Amount; status?: string }
 export type Design = RecordRow & { report_week: string; title: string; description?: string; category?: string; consultant_name?: string; status?: string; management_attention?: boolean; due_date?: string }
 export type CostNote = RecordRow & { report_week: string; item_title: string; description?: string; section?: string; status?: string }
-export type Approval = RecordRow & { title?: string; status?: string; deadline?: string; approver?: string }
-export type Procurement = RecordRow & { name?: string; status?: string; required_on_site?: string; delivery_date?: string; supplier?: string }
-export type Risk = RecordRow & { title?: string; status?: string; risk_score?: number; severity?: string; owner?: string; mitigation_action?: string }
+export type Approval = RecordRow & { title?: string; status?: string; deadline?: string; due_date?: string; required_date?: string; approver?: string }
+export type Procurement = RecordRow & { name?: string; status?: string; required_on_site?: string; delivery_date?: string; expected_delivery_date?: string; required_date?: string; supplier?: string }
+export type Risk = RecordRow & { title?: string; status?: string; risk_score?: number; score?: number; severity?: string; rating?: string; owner?: string; mitigation_action?: string }
 export type DocumentRow = RecordRow & { title: string; type: string; storage_path?: string; file_type?: string; file_size_kb?: number; revision_date?: string; status?: string; approval_status?: string; review_status?: string; issued_for?: string; drawing_number?: string; document_number?: string; discipline?: string; description?: string }
 export type ReportPhoto = { id: string | number; report_id: string | number; photo_url?: string; photo_name?: string; caption?: string; created_at?: string; report_type?: string | null }
 export type DesignPhoto = RecordRow & { file_name: string; storage_path: string; caption?: string; location?: string; context_id?: string }
@@ -63,6 +74,8 @@ export type Photo = { id: string; projectId: number; title: string; date: string
 export type ReportDocument = { excerpt: string | null; photos: Photo[] }
 export type Data = {
   tasks: TaskRow[] | null
+  packages?: Package[] | null
+  milestones?: Milestone[] | null
   reports: Report[] | null
   revisions: Revision[] | null
   finance: Finance[] | null
@@ -145,6 +158,60 @@ const masterReport = (r: Report) => !r.delivery_package_id && !r.block_id && (!r
 const latestReports = (reports: Report[]) => latestBy(reports,
   r => [normal(r.discipline), r.delivery_package_id ?? '', r.block_id ?? '', normal(r.package_name)].join(':'),
   r => `${r.report_date}:${reportTime(r)}`)
+// Pair actual and plan from the same dated, project-wide report. Newer
+// revisions of a report replace its older figures for that reporting date.
+function reportedProgress(reports: Report[], today: string) {
+  return latestBy(reports.filter(r => masterReport(r) && !!isoDay(r.report_date) && r.report_date <= today
+    && percent(r.snapshot_actual_progress) !== null && percent(r.snapshot_planned_progress) !== null),
+  r => r.report_date, reportTime).map(r => ({
+    date: r.report_date,
+    actual: percent(r.snapshot_actual_progress)!,
+    planned: percent(r.snapshot_planned_progress)!,
+  }))
+}
+
+export function portfolioProgress(rows: ProjectPosition[]) {
+  // Keep the comparison cohort consistent over time. Still show coverage so
+  // management can see how many of the selected projects have paired reports.
+  const reporting = rows.filter(row => row.progressHistory.length > 0)
+  if (!reporting.length) return []
+  const indexed = reporting.map(row => new Map(row.progressHistory.map(point => [point.date, point])))
+  return reporting[0].progressHistory.flatMap(({ date }) => {
+    const points = indexed.flatMap(history => history.get(date) ?? [])
+    if (points.length !== reporting.length) return []
+    const average = (key: 'actual' | 'planned') =>
+      Math.round(points.reduce((total, point) => total + point[key], 0) / points.length * 10) / 10
+    return [{ date, actual: average('actual'), planned: average('planned'), coverage: points.length }]
+  }).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+function highRisk(item: Risk) {
+  return open(item.status) && !['mitigated', 'transferred'].includes(normal(item.status)) &&
+    ((number(item.risk_score ?? item.score) ?? 0) >= 12 ||
+      ['high', 'critical'].includes(normal(item.severity || item.rating)))
+}
+
+function upcomingEvents(data: Data, tasks: TaskRow[], target: string | null, today: string) {
+  const events: TimelineEvent[] = []
+  const add = (id: string, title: string, value: string | null | undefined, module: string, kind: string) => {
+    const date = isoDay(value)
+    if (date && date >= today) events.push({ id, title, date, module, kind })
+  }
+  add('target', 'Target completion', target, '/app/recovery', 'Target')
+  for (const task of tasks) {
+    if (task.is_milestone && taskProgress(task) < 100) add(`task:${task.id}`, task.name || 'Programme milestone', task.planned_finish || task.finish_date, '/app/schedule', 'Milestone')
+  }
+  for (const item of data.milestones ?? []) {
+    if (open(item.status)) add(`milestone:${item.id}`, item.title || item.name || item.milestone_name || 'Project milestone', item.due_date || item.target_date || item.planned_date, '/app/schedule', 'Milestone')
+  }
+  for (const item of data.approvals ?? []) {
+    if (open(item.status)) add(`approval:${item.id}`, item.title || 'Approval due', item.deadline || item.due_date || item.required_date, '/app/approvals', 'Approval')
+  }
+  for (const item of data.procurement ?? []) {
+    if (open(item.status)) add(`procurement:${item.id}`, item.name || 'Procurement delivery', item.required_on_site || item.expected_delivery_date || item.required_date, '/app/procurement', 'Procurement')
+  }
+  return [...new Map(events.map(item => [`${item.kind}:${item.date}:${normal(item.title)}`, item])).values()]
+}
 const latestDocuments = (documents: DocumentRow[]) => latestBy(documents,
   r => [normal(r.discipline), normal(r.drawing_number || r.document_number || r.title)].join(':'),
   r => `${r.revision_date || ''}:${r.updated_at || r.created_at || ''}`)
@@ -188,9 +255,9 @@ export function commercialPosition(project: Project, data: Data, progress: numbe
   const paymentRows = byType('payment')
   const costingPaymentRows = data.payments ?? []
   const paid = conflict ? null : paymentRows.length
-    ? sum(moneyValues(paymentRows.filter(row => normal(row.status) === 'paid')))
+    ? recordedTotal(moneyValues(paymentRows.filter(row => normal(row.status) === 'paid')))
     : currency === 'NGN' && costingPaymentRows.length
-      ? sum(moneyValues(costingPaymentRows.filter(row => normal(row.payment_status) === 'paid')))
+      ? recordedTotal(moneyValues(costingPaymentRows.filter(row => normal(row.payment_status) === 'paid')))
       : null
   const certified = conflict ? null : recordedTotal(moneyValues(register.filter(row =>
     !['payment', 'contract sum', 'variation', 'retention', 'contingency', 'provisional sum', 'pc sum'].includes(normal(row.type)) &&
@@ -292,7 +359,7 @@ function constraintsFor(data: Data, reports: Report[], today: string, includeFin
     }
   }
   for (const item of data.risks ?? []) {
-    if (open(item.status) && (Number(item.risk_score) >= 12 || ['high', 'critical'].includes(normal(item.severity)))) {
+    if (highRisk(item)) {
       const kind = category(item.title || '')
       if (kind !== 'Funding / payment' || includeFinance) add(kind, item.title, { source: 'Risk register', action: item.mitigation_action, owner: item.owner })
     }
@@ -309,7 +376,9 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const reports = latestReports(data.reports ?? [])
   const projectReports = reports.filter(masterReport)
   const snapshot = projectReports.find(r => percent(r.snapshot_actual_progress) !== null)
-  const tasks = (data.tasks ?? []).filter(t => !t.is_summary && !['cancelled', 'canceled'].includes(normal(t.status)))
+  const revisions = latestControlledRevisions(data.revisions ?? [])
+  const tasks = applyControlledProgramme(data.tasks ?? [], revisions)
+    .filter(t => !t.is_summary && !['cancelled', 'canceled'].includes(normal(t.status)))
   const measured = tasks.length > 0 && tasks.every(t => percent(t.progress_pct) !== null || done(t.status) || normal(t.status) === 'not started')
   const dated = tasks.length > 0 && tasks.every(t => {
     const start = isoDay(t.planned_start || t.start_date)
@@ -323,16 +392,30 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const useTaskProgress = measured && (!snapshot || lastTaskUpdate >= reportTime(snapshot) || isoDay(lastTaskUpdate) === snapshot.report_date)
   const actual = useTaskProgress ? calculateProjectProgress(tasks) : percent(snapshot?.snapshot_actual_progress)
   const isMaster = (r: Revision) => !r.block_id && !r.delivery_package_id && (!r.package_name || /^(master|project programme|overall)$/i.test(r.package_name.trim()))
-  const master = (data.revisions ?? []).find(isMaster)
-  const target = isoDay(master?.current_finish) ?? isoDay(master?.planned_finish)
-    ?? isoDay(project.handover_date) ?? isoDay(project.planned_completion_date)
+  const master = revisions.find(isMaster)
+  const masterTarget = isoDay(master?.current_finish) ?? isoDay(master?.planned_finish)
+  const recordedTarget = masterTarget ?? isoDay(project.handover_date) ?? isoDay(project.planned_completion_date)
+  const matchesProgramme = !masterTarget || tasks.some(t => isoDay(t.planned_finish || t.finish_date) === masterTarget)
+  const asOf = new Date(`${today}T12:00:00+01:00`)
+  const scheduleResult = measured && dated && matchesProgramme && data.revisions !== null
+    ? calculateForecastV2(normalizeProjectState({
+      project: { ...project, handover_date: recordedTarget },
+      tasks: tasks.map(task => ({ ...task, progress_pct: taskProgress(task) })),
+      deliveryPackages: data.packages ?? [], today: asOf,
+    }), asOf)
+    : null
+  const forecastResult = data.packages !== null || tasks.every(task => !task.delivery_package_id) ? scheduleResult : null
+  const target = recordedTarget ?? isoDay(forecastResult?.targetDate?.toISOString())
+
   const planned = useTaskProgress
-    ? dated && (!master || !target || tasks.some(t => isoDay(t.planned_finish || t.finish_date) === target))
-      ? calculateProjectPlannedProgress(tasks, new Date(`${today}T12:00:00+01:00`)) : null
+    ? dated && matchesProgramme && data.revisions !== null
+      ? calculateProjectPlannedProgress(tasks, asOf) : null
     : percent(snapshot?.snapshot_planned_progress)
-  const forecast = isoDay(master?.forecast_finish)
+  const estimatedFinish = isoDay(forecastResult?.forecastDate?.toISOString())
+  const forecast = estimatedFinish ?? isoDay(master?.forecast_finish)
+  const forecastBasis = estimatedFinish ? 'Recovery Forecast' : forecast ? 'Recorded forecast' : null
   const variance = target && forecast ? dayDifference(forecast, target) : null
-  const overduePackage = (data.revisions ?? []).some(r => {
+  const overduePackage = (forecastResult?.packagePositions ?? []).some(pkg => pkg.packageId !== '__unassigned__' && pkg.delayDays > 0) || revisions.some(r => {
     const plannedFinish = isoDay(r.current_finish || r.planned_finish)
     const forecastFinish = isoDay(r.forecast_finish)
     return !isMaster(r) && plannedFinish && forecastFinish && forecastFinish > plannedFinish
@@ -355,7 +438,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const constraints = active ? constraintsFor(data, activeReports, today, includeFinance) : []
   const rating: Rating = withdrawn(project.status) ? 'Withdrawn' : complete ? 'On track / done' :
     stalled || overdue || (variance ?? 0) > 0 || overduePackage || ['off track', 'critical'].includes(normal(project.status)) ? 'Off track' :
-    constraints.length || behind || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
+    constraints.length || behind || (scheduleResult?.maximumActivityDelayDays ?? 0) > 0 || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
     (actual !== null && progressGap !== null) || activeReports.some(r => ['on track', 'ahead'].includes(normal(r.status))) ? 'On track / done' : 'Unrated'
   const documents = latestDocuments((data.documents ?? []).filter(r => normal(r.type) === 'report' && !['draft', 'void', 'superseded', 'rejected'].includes(normal(r.status))))
   const updates = [
@@ -368,7 +451,13 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   ].filter(update => update.date && update.date <= today && update.text).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
   const photosScope = reports.map(r => String(r.id))
   return {
-    project, rating, stalled, behind, actual, planned, progressGap, target, forecast, variance, overdue, overdueDays, constraints,
+    project, rating, active, complete, stalled, behind, actual, planned, progressGap, target, forecast, forecastBasis, variance, overdue, overdueDays, constraints,
+    maximumActivityDelay: active ? scheduleResult?.maximumActivityDelayDays ?? null : null,
+    overdueActivities: active ? scheduleResult?.overdueActivities ?? null : null,
+    scheduleSeverity: active ? scheduleResult?.scheduleSeverity ?? null : null,
+    highRisks: data.risks?.length ? data.risks.filter(highRisk).length : null,
+    progressHistory: reportedProgress(data.reports ?? [], today),
+    timeline: active ? upcomingEvents(data, tasks, target, today) : [],
     primary: constraints.find(item => item.reason),
     updates, photosScope, documents,
     commercial: includeFinance ? commercialPosition(project, data, actual) : null,
