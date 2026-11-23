@@ -122,15 +122,4 @@ export async function updateProjectTask(
   return saved
 }
 
-export async function deleteProjectTask(
-  projectId: number | string,
-  taskId: string
-) {
-  const { error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', taskId)
-    .eq('project_id', projectId)
-
-  if (error) throw error
-}
+export { deleteProjectTask } from '@/features/schedule/api'
