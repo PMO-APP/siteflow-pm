@@ -2,8 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useAccessSession } from '@/access/AccessSessionProvider'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { supabase } from '@/lib/supabase'
+import { listManagementActions } from '@/services/managementActionService'
 import {
-  type Approval, type Contract, type CostNote, type Data, type Design, type DesignPhoto,
+  type Approval, type Decision, type Milestone, type Package, type Contract, type CostNote, type Data, type Design, type DesignPhoto,
   type DocumentRow, type Finance, type Payment, type Photo, type Procurement, type Project,
   type Report, type ReportPhoto, type Revision, type Risk, type TaskRow, type Variation,
   isoDay, lagosDay, projectPosition,
@@ -25,6 +26,7 @@ export function useManagementAccess() {
     loading,
     workspaceId: session.workspaceId,
     userId: session.userId,
+    canManage: permitted && can('notifications.announce', context),
     includeFinance: permitted && COMMERCIAL_ROLES.has(session.role || '') && can('costing.view', context),
   }
 }
@@ -82,7 +84,7 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
   const projects = await readPages<Project>((from, to) => supabase.from('projects').select('*')
     .eq('workspace_id', workspaceId).is('archived_at', null).order('id').range(from, to).abortSignal(signal))
   const ids = projects.map(p => p.id)
-  const [tasks, reports, revisions, finance, payments, contracts, variations, design, costNotes, approvals, procurement, risks, documents, designPhotos, portfolios] = await Promise.all([
+  const [tasks, reports, revisions, finance, payments, contracts, variations, design, costNotes, approvals, procurement, risks, documents, designPhotos, portfolios, packages, milestones, decisions, actions] = await Promise.all([
     readScoped<TaskRow>('tasks', ids, signal),
     readScoped<Report>('weekly_reports', ids, signal),
     readScoped<Revision>('schedule_revisions', ids, signal, 'project_id', { is_active: true }),
@@ -98,6 +100,10 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     readScoped<DocumentRow>('documents', ids, signal),
     readScoped<DesignPhoto>('design_collaboration_files', ids, signal, 'project_id', { context_type: 'weekly' }),
     readScoped<{ id: number; name?: string | null }>('portfolios', [...new Set(projects.flatMap(p => p.portfolio_id == null ? [] : [p.portfolio_id]))], signal, 'id'),
+    readScoped<Package>('delivery_packages', ids, signal),
+    readScoped<Milestone>('project_milestones', ids, signal),
+    readScoped<Decision>('executive_decisions', [workspaceId], signal, 'workspace_id'),
+    listManagementActions(workspaceId).catch(() => null),
   ])
   const today = lagosDay()
   const grouped = {
@@ -106,6 +112,8 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     variations: byProject<Variation>(variations), design: byProject(design), costNotes: byProject<CostNote>(costNotes),
     approvals: byProject(approvals), procurement: byProject(procurement), risks: byProject(risks),
     documents: byProject(documents),
+    packages: byProject(packages?.filter(pkg => !pkg.archived_at) ?? null),
+    milestones: byProject(milestones),
   }
   const rows = projects.map(project => {
     const data = Object.fromEntries(Object.entries(grouped).map(([key, records]) => [
@@ -135,8 +143,11 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     })
   }
   return {
-    rows, photos, today, portfolioNames: new Map((portfolios ?? []).map(p => [String(p.id), p.name || `Portfolio ${p.id}`])),
-    incomplete: Object.values(grouped).some(rows => rows === null) || reportPhotos === null || designPhotos === null,
+    rows, photos, today,
+    decisions: decisions?.filter(row => row.project_id == null || ids.includes(Number(row.project_id))) ?? null,
+    actions: actions?.filter(row => row.projectId == null || ids.includes(row.projectId)) ?? null,
+    portfolioNames: new Map((portfolios ?? []).map(p => [String(p.id), p.name || `Portfolio ${p.id}`])),
+    incomplete: Object.entries(grouped).some(([key, records]) => key !== 'milestones' && records === null) || reportPhotos === null || designPhotos === null,
   }
 }
 export type ManagementData = Awaited<ReturnType<typeof loadManagement>>
