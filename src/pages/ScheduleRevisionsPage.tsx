@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { revisionTaskNumber } from '@/features/schedule/controlledProgramme'
 import { CheckCircle, FileSpreadsheet, Upload } from 'lucide-react'
 import { EnterprisePageHero, EnterpriseNotice } from '@/components/ui/enterprise'
 import { supabase } from '@/lib/supabase'
@@ -268,7 +269,7 @@ export default function ScheduleRevisionsPage() {
     // Baseline dates are captured once before the first revision is applied.
     const { data: currentTasks, error: taskReadError } = await supabase
       .from('tasks')
-      .select('id, task_number, name, start_date, finish_date, baseline_start_date, baseline_finish_date, delivery_package_id')
+      .select('id, task_number, name, start_date, finish_date, baseline_start_date, baseline_finish_date, delivery_package_id, compacted_revision_id, compacted_revision_task_number')
       .eq('project_id', projectId)
       .order('task_number', { ascending: true })
 
@@ -290,7 +291,8 @@ export default function ScheduleRevisionsPage() {
       if (!inRevisionScope) continue
 
       const taskName = normalise(task.name)
-      const taskNumber = Number(task.task_number)
+      const originalNumber = revisionTaskNumber(task, id)
+      const taskNumber = originalNumber == null ? NaN : Number(originalNumber)
       const numbered = Number.isFinite(taskNumber)
         ? programmeActivities.filter((item: any) => Number(item.task_number) === taskNumber)
         : []
