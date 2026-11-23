@@ -121,7 +121,7 @@ function Portfolio({
       <nav aria-label="Page sections">
         <a href="#constraints">Constraints</a><a href="#delivery">Delivery</a>
         {includeFinance && <a href="#commercial">Cost and progress</a>}
-        <a href="#trends">Trends</a><a href="#actions">Actions</a><a href="#visual-updates">Photos</a>
+        <a href="#trends">Trends</a><a href="#actions">Actions</a><a href="#visual-updates">Site Photos</a>
       </nav>
     </div>
     {data.incomplete && <p className="mi-notice" role="status"><AlertCircle size={18} aria-hidden />Some records are unavailable. Blank figures indicate missing information.</p>}
@@ -282,7 +282,7 @@ function Portfolio({
     {actionMessage && <p className="mi-notice" role="status">{actionMessage}</p>}
     <ManagementActions actions={actions} decisions={decisions} projects={data.rows.map(row => row.project)}
       canManage={canManage} onCreate={() => setDraft({ projectId: project })} onRefresh={refresh} />
-    <ReportGallery rows={rows} photos={data.photos} onDocuments={row => open(row, '/app/documents')} />
+    <ReportGallery rows={rows} photos={data.photos} historyReports={data.historyReports} historyDesignPhotos={data.historyDesignPhotos} />
     {draft && canManage && <ManagementActionDrawer workspaceId={workspaceId} projects={rows.map(row => row.project)}
       draft={draft} createdByName={author} onClose={() => setDraft(null)} onSaved={notificationError => {
         setDraft(null)
