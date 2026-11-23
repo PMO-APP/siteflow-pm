@@ -14,6 +14,8 @@ export type ControlledRevision = {
 type RevisableActivity = {
   name?: string | null
   task_number?: number | null
+  compacted_revision_id?: string | null
+  compacted_revision_task_number?: number | null
   delivery_package_id?: string | number | null
   start_date?: string | null
   finish_date?: string | null
@@ -22,6 +24,14 @@ type RevisableActivity = {
   dependencies?: string | null
   responsible?: string | null
   is_milestone?: boolean | null
+}
+
+export function usesCompactedNumbers(task: RevisableActivity, revisionId: ControlledRevision['id']) {
+  return task.compacted_revision_id === String(revisionId)
+}
+
+export function revisionTaskNumber(task: RevisableActivity, revisionId: ControlledRevision['id']) {
+  return usesCompactedNumbers(task, revisionId) ? task.compacted_revision_task_number : task.task_number
 }
 
 export function latestControlledRevisions<T extends ControlledRevision>(revisions: T[]) {
@@ -43,7 +53,8 @@ export function applyControlledProgramme<T extends RevisableActivity>(tasks: T[]
     if (!revision || !activities.length) return task
 
     const taskName = normaliseActivityName(task.name)
-    const taskNumber = Number(task.task_number)
+    const number = revisionTaskNumber(task, revision.id)
+    const taskNumber = number == null ? NaN : Number(number)
     const numbered = Number.isFinite(taskNumber)
       ? activities.filter(activity => Number(activity.task_number) === taskNumber)
       : []
@@ -59,7 +70,7 @@ export function applyControlledProgramme<T extends RevisableActivity>(tasks: T[]
       finish_date: activity.finish_date || task.finish_date,
       planned_start: activity.start_date || task.planned_start || task.start_date,
       planned_finish: activity.finish_date || task.planned_finish || task.finish_date,
-      dependencies: activity.dependencies ?? task.dependencies,
+      dependencies: usesCompactedNumbers(task, revision.id) ? task.dependencies : activity.dependencies ?? task.dependencies,
       responsible: activity.responsible ?? task.responsible,
       is_milestone: activity.is_milestone || task.is_milestone,
       controlled_revision_id: revision.id,
