@@ -1,6 +1,7 @@
 import { calculateForecastV2 } from '@/core/intelligence/forecast/forecastV2'
 import { normalizeProjectState } from '@/core/intelligence/normalizers/projectStateNormalizer'
 import { applyControlledProgramme, latestControlledRevisions, type ControlledRevision } from '@/features/schedule/controlledProgramme'
+import type { RevisionProgrammeActivity } from '@/features/schedule/revisionProgramme'
 import { calculateProjectPlannedProgress, calculateProjectProgress, taskProgress, type ProgressTask } from '@/core/metrics/progressMetrics'
 
 type Amount = number | string | null
@@ -24,10 +25,15 @@ export type Project = {
   overall_owner_email?: string | null
   updated_at?: string | null
 }
-export type TaskRow = RecordRow & ProgressTask & {
+type PackageReference = {
+  delivery_package_id?: string | number | null
+  block_id?: string | number | null
+  package_name?: string | null
+}
+export type TaskRow = RecordRow & ProgressTask & PackageReference & {
   name?: string
   task_number?: number | null
-  delivery_package_id?: string | number | null
+  actual_finish?: string | null
   delay_reason?: string | null
   recovery_action?: string | null
   responsible?: string | null
@@ -54,18 +60,23 @@ export type Report = RecordRow & {
   sent_to_pmo_at?: string
 }
 export type Revision = RecordRow & ControlledRevision & { package_name?: string; current_finish?: string; planned_finish?: string; forecast_finish?: string; approval_status?: string; status?: string }
-export type Package = RecordRow & { archived_at?: string | null }
-export type Milestone = RecordRow & { title?: string; name?: string; milestone_name?: string; planned_date?: string; target_date?: string; due_date?: string; status?: string }
+export type Package = RecordRow & { name?: string | null; code?: string | null; status?: string | null; planned_finish?: string | null; archived_at?: string | null }
+export type ProjectBlock = RecordRow & { block_name?: string | null; package_name?: string | null; planned_finish?: string | null; status?: string | null; is_active?: boolean }
+export type Handover = RecordRow & PackageReference & { status?: string | null; target_handover_date?: string | null; actual_handover_date?: string | null }
+export type Milestone = RecordRow & PackageReference & { title?: string; name?: string; milestone_name?: string; planned_date?: string; target_date?: string; due_date?: string; status?: string }
 export type Decision = { id: string; project_id: number | null; portfolio_id?: number | null; decision: string; rationale?: string; owner_name?: string; due_date?: string; status?: string }
-export type TimelineEvent = { id: string; title: string; date: string; module: string; kind: string }
+export type TimelineEvent = {
+  id: string; title: string; date: string; module: string; kind: string
+  packageName?: string; overdueDays?: number
+}
 export type Finance = RecordRow & { type: string; amount: Amount; currency?: string | null; direction?: string; status?: string; certified_date?: string; payment_date?: string }
 export type Payment = RecordRow & { payment_title?: string; amount: Amount; payment_status?: string; due_date?: string; paid_date?: string; remarks?: string }
 export type Contract = RecordRow & { contract_value: Amount; status?: string; contract_type?: string }
 export type Variation = RecordRow & { amount: Amount; status?: string }
 export type Design = RecordRow & { report_week: string; title: string; description?: string; category?: string; consultant_name?: string; status?: string; management_attention?: boolean; due_date?: string }
 export type CostNote = RecordRow & { report_week: string; item_title: string; description?: string; section?: string; status?: string }
-export type Approval = RecordRow & { title?: string; status?: string; deadline?: string; due_date?: string; required_date?: string; approver?: string }
-export type Procurement = RecordRow & { name?: string; status?: string; required_on_site?: string; delivery_date?: string; expected_delivery_date?: string; required_date?: string; supplier?: string }
+export type Approval = RecordRow & PackageReference & { title?: string; status?: string; deadline?: string; due_date?: string; required_date?: string; approver?: string }
+export type Procurement = RecordRow & PackageReference & { name?: string; status?: string; required_on_site?: string; delivery_date?: string; expected_delivery_date?: string; required_date?: string; supplier?: string }
 export type Risk = RecordRow & { title?: string; status?: string; risk_score?: number; score?: number; severity?: string; rating?: string; owner?: string; mitigation_action?: string }
 export type DocumentRow = RecordRow & { title: string; type: string; storage_path?: string; file_type?: string; file_size_kb?: number; revision_date?: string; status?: string; approval_status?: string; review_status?: string; issued_for?: string; drawing_number?: string; document_number?: string; discipline?: string; description?: string }
 export type ReportPhoto = { id: string | number; report_id: string | number; photo_url?: string; photo_name?: string; caption?: string; created_at?: string; report_type?: string | null }
@@ -75,6 +86,8 @@ export type ReportDocument = { excerpt: string | null; photos: Photo[] }
 export type Data = {
   tasks: TaskRow[] | null
   packages?: Package[] | null
+  blocks?: ProjectBlock[] | null
+  handovers?: Handover[] | null
   milestones?: Milestone[] | null
   reports: Report[] | null
   revisions: Revision[] | null
@@ -191,26 +204,179 @@ function highRisk(item: Risk) {
       ['high', 'critical'].includes(normal(item.severity || item.rating)))
 }
 
-function upcomingEvents(data: Data, tasks: TaskRow[], target: string | null, today: string) {
-  const events: TimelineEvent[] = []
-  const add = (id: string, title: string, value: string | null | undefined, module: string, kind: string) => {
-    const date = isoDay(value)
-    if (date && date >= today) events.push({ id, title, date, module, kind })
+const packageKey = (value?: string | null) => normal(value).replace(/[–—]/g, '-').replace(/\s+/g, ' ')
+const packageLabel = (name?: string | null) => name?.trim() || ''
+const isPackageName = (name?: string | null) => !!packageKey(name) && !/^(?:master|project wide|project programme|overall)$/.test(packageKey(name))
+const handoverTitle = (title?: string | null) => /\b(?:hand[- ]*over|handing[- ]+over)\b/i.test(title ?? '') &&
+  !/\b(?:pre[- ]*hand|inspection|preparation|checklist|readiness|documentation|snagging)/i.test(title ?? '')
+const completionTitle = (title?: string | null) => /^(?:completion|(?:target|project|package|practical|substantial|works|overall) completion)$/i.test(title?.trim() ?? '')
+const deliveryClosed = (status?: string | null) => done(status) || withdrawn(status) || !open(status)
+const taskFinish = (task: TaskRow) => isoDay(task.planned_finish) ?? isoDay(task.finish_date)
+const milestoneTitle = (item: Milestone) => item.title || item.name || item.milestone_name || 'Project milestone'
+const milestoneDate = (item: Milestone) => isoDay(item.due_date) ?? isoDay(item.target_date) ?? isoDay(item.planned_date)
+const taskDone = (task: TaskRow) => taskProgress(task) >= 100 || !!isoDay(task.actual_finish)
+function latestDay(values: (string | null | undefined)[]) {
+  return values.reduce<string | null>((latest, value) => {
+    const day = isoDay(value)
+    return day && (!latest || day > latest) ? day : latest
+  }, null)
+}
+
+type DeliveryScope = {
+  id: string
+  name: string
+  code?: string | null
+  excluded?: boolean
+  recordedFinish?: string | null
+  status?: string | null
+  handover?: Handover
+  revision?: Revision
+  activities: TaskRow[]
+  milestones: Milestone[]
+}
+
+function upcomingEvents(data: Data, tasks: TaskRow[], revisions: Revision[], target: string | null, recordedTarget: string | null, today: string) {
+  const scopes: DeliveryScope[] = []
+  const scopedById = new Map<string, DeliveryScope>()
+  const createScope = (id: string, name: string, fields: Partial<DeliveryScope> = {}) => {
+    const scope: DeliveryScope = { id, name, activities: [], milestones: [], ...fields }
+    scopes.push(scope)
+    scopedById.set(id, scope)
+    return scope
   }
-  add('target', 'Target completion', target, '/app/recovery', 'Target')
+  const byName = (name?: string | null) => {
+    const key = packageKey(name)
+    return key ? scopes.filter(scope => packageKey(scope.name) === key || packageKey(scope.code) === key) : []
+  }
+  const uniqueName = (name?: string | null) => {
+    const matches = byName(name)
+    return matches.length === 1 ? matches[0] : undefined
+  }
+  const byReference = (item: PackageReference) =>
+    scopedById.get(String(item.delivery_package_id ?? '')) ?? scopedById.get(String(item.block_id ?? '')) ?? uniqueName(item.package_name)
+  const hasScope = (item: PackageReference) => item.delivery_package_id != null || item.block_id != null || isPackageName(item.package_name)
+
+  for (const pkg of data.packages ?? []) {
+    createScope(String(pkg.id), packageLabel(pkg.name) || packageLabel(pkg.code) || 'Unnamed package', {
+      code: pkg.code, recordedFinish: pkg.planned_finish, status: pkg.status,
+      excluded: Boolean(pkg.archived_at) || withdrawn(pkg.status),
+    })
+  }
+  for (const block of data.blocks ?? []) {
+    const name = packageLabel(block.package_name) || packageLabel(block.block_name)
+    if (!name) continue
+    const scope = scopedById.get(String(block.id)) ?? uniqueName(name) ?? createScope(String(block.id), name, {
+      recordedFinish: block.planned_finish, status: block.status,
+      excluded: block.is_active === false || withdrawn(block.status),
+    })
+    scopedById.set(String(block.id), scope)
+    scope.recordedFinish ??= block.planned_finish
+  }
+  for (const revision of revisions) {
+    const id = revision.delivery_package_id ?? revision.block_id
+    const name = packageLabel(revision.package_name)
+    if (id == null && !isPackageName(name)) continue
+    const scope = byReference(revision) ?? (name && byName(name).length === 0
+      ? createScope(id != null ? String(id) : `revision:${revision.id}`, name) : undefined)
+    if (scope) {
+      if (id != null) scopedById.set(String(id), scope)
+      scope.revision ??= revision
+    }
+  }
+  const handovers = [...(data.handovers ?? [])].sort((a, b) =>
+    (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''))
+  for (const handover of handovers) {
+    const name = packageLabel(handover.package_name)
+    const scope = byReference(handover) ?? (name && byName(name).length === 0 ? createScope(`handover:${handover.id}`, name) : undefined)
+    if (scope) scope.handover ??= handover
+  }
+  for (const task of tasks) byReference(task)?.activities.push(task)
+  for (const item of data.milestones ?? []) byReference(item)?.milestones.push(item)
+
+  const events = new Map<string, TimelineEvent>()
+  const deliveryDates = new Set<string>()
+  const add = (id: string, title: string, value: string | null | undefined, module: string, kind: string, scope?: DeliveryScope, delivery = false) => {
+    const date = isoDay(value)
+    if (!date || scope?.excluded || (date < today && !delivery)) return
+    const label = scope?.code && packageKey(scope.code) !== packageKey(scope.name)
+      ? `${scope.name} (${scope.code})` : scope?.name
+    const key = `${scope?.id ?? 'project'}:${kind}:${date}:${normal(title)}`
+    if (scope && delivery) deliveryDates.add(date)
+    if (!events.has(key)) events.set(key, { id: `${id}:${key}`, title, date, module, kind, packageName: label, overdueDays: date < today ? dayDifference(today, date) : undefined })
+  }
+
+  for (const scope of scopes.filter(item => !item.excluded)) {
+    const { handover, revision, activities, milestones } = scope
+    const deliveryMilestones = milestones.filter(item => handoverTitle(milestoneTitle(item)))
+    const scheduledHandovers = activities.filter(task => handoverTitle(task.name))
+    const revisionHandovers = Array.isArray(revision?.programme_activities)
+      ? (revision.programme_activities as RevisionProgrammeActivity[]).filter(activity => handoverTitle(activity.name))
+      : []
+    const revisedFinish = isoDay(revision?.current_finish) ?? isoDay(revision?.planned_finish)
+    const revisedHandover = latestDay(revisionHandovers.map(activity => activity.finish_date))
+    const programmeHandover = latestDay(scheduledHandovers.map(taskFinish))
+    const registeredHandover = latestDay(deliveryMilestones.map(milestoneDate))
+    const handoverDate = revisedHandover ?? (revision && (programmeHandover || registeredHandover || handover) ? revisedFinish : null)
+      ?? programmeHandover ?? isoDay(handover?.target_handover_date) ?? registeredHandover
+
+    const scheduledCompletions = activities.filter(task => completionTitle(task.name))
+    const completionMilestones = milestones.filter(item => completionTitle(milestoneTitle(item)))
+    const packageDone = deliveryClosed(scope.status) || (activities.length > 0 && activities.every(taskDone))
+    const handoverDone = handover
+      ? deliveryClosed(handover.status) || !!isoDay(handover.actual_handover_date)
+      : deliveryClosed(scope.status) || scheduledHandovers.some(task =>
+        taskFinish(task) === programmeHandover && taskDone(task)) ||
+        deliveryMilestones.some(item => milestoneDate(item) === registeredHandover && deliveryClosed(item.status))
+    const completionTarget = revisedFinish ?? latestDay(completionMilestones.map(milestoneDate))
+      ?? latestDay(scheduledCompletions.map(taskFinish)) ?? isoDay(scope.recordedFinish)
+    const completion = completionTarget ?? (handoverDate ? null : latestDay(activities.map(taskFinish)))
+    const completionDone = packageDone || scheduledCompletions.some(task => taskFinish(task) === completion && taskDone(task))
+      || completionMilestones.some(item => milestoneDate(item) === completion && deliveryClosed(item.status))
+
+    if (handoverDate) deliveryDates.add(handoverDate)
+    if (completion) deliveryDates.add(completion)
+    if (!handoverDone) add('handover', 'Package handover', handoverDate, handover ? '/app/handover' : '/app/recovery', 'Handover', scope, true)
+    if (!completionDone && !handoverDone && completion !== handoverDate) {
+      add('completion', completionTarget ? 'Package completion target' : 'Scheduled package finish', completion, '/app/recovery', 'Completion', scope, true)
+    }
+  }
+
+  // A roll-up inferred from the latest package should not reappear as another handover.
+  const projectTarget = scopes.some(scope => !scope.excluded) ? recordedTarget : target
+  const standaloneTaskHandover = tasks.some(task => !hasScope(task) && task.is_milestone && !taskDone(task)
+    && handoverTitle(task.name) && taskFinish(task) === projectTarget)
+  const standaloneMilestoneHandover = (data.milestones ?? []).some(item => !hasScope(item) && !deliveryClosed(item.status)
+    && handoverTitle(milestoneTitle(item)) && milestoneDate(item) === projectTarget)
+  if (projectTarget && !deliveryDates.has(projectTarget) && !standaloneTaskHandover && !standaloneMilestoneHandover) {
+    add('target', 'Project completion target', projectTarget, '/app/recovery', 'Target')
+  }
+  const retainedMilestone = (title: string, date: string | null, scope?: DeliveryScope) => {
+    if (!handoverTitle(title) && !completionTitle(title)) return true
+    return !scope && !!date && !deliveryDates.has(date) && !(completionTitle(title) && date === projectTarget)
+  }
   for (const task of tasks) {
-    if (task.is_milestone && taskProgress(task) < 100) add(`task:${task.id}`, task.name || 'Programme milestone', task.planned_finish || task.finish_date, '/app/schedule', 'Milestone')
+    const scope = byReference(task)
+    const title = task.name || 'Programme milestone'
+    const date = taskFinish(task)
+    if ((scope || !hasScope(task)) && task.is_milestone && !taskDone(task) && retainedMilestone(title, date, scope)) {
+      add(`task:${task.id}`, title, date, '/app/schedule', 'Milestone', scope)
+    }
   }
   for (const item of data.milestones ?? []) {
-    if (open(item.status)) add(`milestone:${item.id}`, item.title || item.name || item.milestone_name || 'Project milestone', item.due_date || item.target_date || item.planned_date, '/app/schedule', 'Milestone')
+    const scope = byReference(item)
+    const title = milestoneTitle(item)
+    const date = milestoneDate(item)
+    if ((scope || !hasScope(item)) && !deliveryClosed(item.status) && retainedMilestone(title, date, scope)) {
+      add(`milestone:${item.id}`, title, date, '/app/schedule', 'Milestone', scope)
+    }
   }
   for (const item of data.approvals ?? []) {
-    if (open(item.status)) add(`approval:${item.id}`, item.title || 'Approval due', item.deadline || item.due_date || item.required_date, '/app/approvals', 'Approval')
+    if (open(item.status)) add(`approval:${item.id}`, item.title || 'Approval due', item.deadline || item.due_date || item.required_date, '/app/approvals', 'Approval', byReference(item))
   }
   for (const item of data.procurement ?? []) {
-    if (open(item.status)) add(`procurement:${item.id}`, item.name || 'Procurement delivery', item.required_on_site || item.expected_delivery_date || item.required_date, '/app/procurement', 'Procurement')
+    if (open(item.status)) add(`procurement:${item.id}`, item.name || 'Procurement delivery', item.required_on_site || item.expected_delivery_date || item.required_date, '/app/procurement', 'Procurement', byReference(item))
   }
-  return [...new Map(events.map(item => [`${item.kind}:${item.date}:${normal(item.title)}`, item])).values()]
+  return [...events.values()]
 }
 const latestDocuments = (documents: DocumentRow[]) => latestBy(documents,
   r => [normal(r.discipline), normal(r.drawing_number || r.document_number || r.title)].join(':'),
@@ -377,6 +543,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const projectReports = reports.filter(masterReport)
   const snapshot = projectReports.find(r => percent(r.snapshot_actual_progress) !== null)
   const revisions = latestControlledRevisions(data.revisions ?? [])
+  const activePackages = data.packages?.filter(pkg => !pkg.archived_at) ?? []
   const tasks = applyControlledProgramme(data.tasks ?? [], revisions)
     .filter(t => !t.is_summary && !['cancelled', 'canceled'].includes(normal(t.status)))
   const measured = tasks.length > 0 && tasks.every(t => percent(t.progress_pct) !== null || done(t.status) || normal(t.status) === 'not started')
@@ -391,7 +558,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   }, '')
   const useTaskProgress = measured && (!snapshot || lastTaskUpdate >= reportTime(snapshot) || isoDay(lastTaskUpdate) === snapshot.report_date)
   const actual = useTaskProgress ? calculateProjectProgress(tasks) : percent(snapshot?.snapshot_actual_progress)
-  const isMaster = (r: Revision) => !r.block_id && !r.delivery_package_id && (!r.package_name || /^(master|project programme|overall)$/i.test(r.package_name.trim()))
+  const isMaster = (r: Revision) => !r.block_id && !r.delivery_package_id && !isPackageName(r.package_name)
   const master = revisions.find(isMaster)
   const masterTarget = isoDay(master?.current_finish) ?? isoDay(master?.planned_finish)
   const recordedTarget = masterTarget ?? isoDay(project.handover_date) ?? isoDay(project.planned_completion_date)
@@ -401,7 +568,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     ? calculateForecastV2(normalizeProjectState({
       project: { ...project, handover_date: recordedTarget },
       tasks: tasks.map(task => ({ ...task, progress_pct: taskProgress(task) })),
-      deliveryPackages: data.packages ?? [], today: asOf,
+      deliveryPackages: activePackages, today: asOf,
     }), asOf)
     : null
   const forecastResult = data.packages !== null || tasks.every(task => !task.delivery_package_id) ? scheduleResult : null
@@ -424,8 +591,8 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     const date = isoDay(r.report_date)
     return date && dayDifference(today, date) >= 0 && dayDifference(today, date) <= 14
   })
-  const complete = done(project.status) || Boolean(isoDay(project.actual_completion_date))
-    || (useTaskProgress ? tasks.every(task => taskProgress(task) >= 100) : actual === 100)
+  const recordedProjectCompletion = done(project.status) || Boolean(isoDay(project.actual_completion_date))
+  const complete = recordedProjectCompletion || (useTaskProgress ? tasks.every(task => taskProgress(task) >= 100) : actual === 100)
   const active = !withdrawn(project.status) && !complete
   const stalled = active && (hold(project.status) || activeReports.some(r => (hold(r.status) || /\b(?:work|site|project) (?:is |remains )?(?:stalled|on hold|suspended)\b/i.test(r.status_summary || '')) && (!lastTaskUpdate || reportTime(r) >= lastTaskUpdate)))
   const overdueDays = active && target && target < today ? dayDifference(today, target) : null
@@ -450,6 +617,8 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     ...documents.map(r => ({ key: `doc:${r.id}`, date: isoDay(r.revision_date || r.created_at), text: shortText(r.description) })),
   ].filter(update => update.date && update.date <= today && update.text).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
   const photosScope = reports.map(r => String(r.id))
+  const timeline = withdrawn(project.status) || recordedProjectCompletion ? []
+    : upcomingEvents(data, tasks, revisions, target, recordedTarget, today).filter(event => active || !!event.packageName)
   return {
     project, rating, active, complete, stalled, behind, actual, planned, progressGap, target, forecast, forecastBasis, variance, overdue, overdueDays, constraints,
     maximumActivityDelay: active ? scheduleResult?.maximumActivityDelayDays ?? null : null,
@@ -457,7 +626,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     scheduleSeverity: active ? scheduleResult?.scheduleSeverity ?? null : null,
     highRisks: data.risks?.length ? data.risks.filter(highRisk).length : null,
     progressHistory: reportedProgress(data.reports ?? [], today),
-    timeline: active ? upcomingEvents(data, tasks, target, today) : [],
+    timeline,
     primary: constraints.find(item => item.reason),
     updates, photosScope, documents,
     commercial: includeFinance ? commercialPosition(project, data, actual) : null,
