@@ -252,3 +252,82 @@ test('preconstruction can surface upcoming tenders and approvals with incomplete
   assert.equal(upcoming.overdue, false)
   assert.deepEqual(upcoming.timeline.map(item => item.title), ['Design review', 'Tender issue'])
 })
+
+test('identical delivery dates stay separate for distinct packages while duplicate milestones collapse', () => {
+  const parkVillas = { ...project, project_name: 'Park Villas', handover_date: '2026-12-31' }
+  const row = projectPosition(parkVillas, {
+    ...empty,
+    packages: [
+      { ...entry, id: 'b9', name: 'Blocks B9–B12 & B14', planned_finish: '2026-12-31' },
+      { ...entry, id: 'b13', name: 'Block B13', planned_finish: '2026-12-31' },
+    ],
+    tasks: [
+      { ...entry, id: 'h9', name: 'Handover', delivery_package_id: 'b9', is_milestone: true, finish_date: '2026-12-31', progress_pct: 0 },
+      { ...entry, id: 'h13', name: 'Handover', delivery_package_id: 'b13', is_milestone: true, finish_date: '2026-12-31', progress_pct: 0 },
+      { ...entry, id: 'master', name: 'Handover', is_milestone: true, finish_date: '2026-12-31', progress_pct: 0 },
+    ],
+    milestones: [{ ...entry, title: 'Handover', block_id: 'b9', due_date: '2026-12-31' }],
+  }, day, false)
+  assert.deepEqual(row.timeline.map(event => [event.packageName, event.title, event.date]), [
+    ['Blocks B9–B12 & B14', 'Package handover', '2026-12-31'],
+    ['Block B13', 'Package handover', '2026-12-31'],
+  ])
+  assert.notEqual(row.timeline[0].id, row.timeline[1].id)
+})
+
+test('an active package revision supersedes old handover dates without moving another block', () => {
+  const row = projectPosition({ ...project, handover_date: '2027-01-15' }, {
+    ...empty,
+    packages: [
+      { ...entry, id: 'schedule-b9', name: 'Blocks B9–B12 & B14', planned_finish: '2026-12-15' },
+      { ...entry, id: 'b13', name: 'Block B13', planned_finish: '2026-12-18' },
+    ],
+    blocks: [{ ...entry, id: 'legacy-b9', block_name: 'Blocks B9–B12 & B14' }],
+    revisions: [{
+      ...entry, id: 'revision-b9', block_id: 'legacy-b9', current_finish: '2026-12-31',
+      programme_activities: [{ name: 'Handover to client', finish_date: '2026-12-31' }],
+    }],
+    handovers: [{ ...entry, package_name: 'Blocks B9-B12 & B14', target_handover_date: '2026-12-15', status: 'In Progress' }],
+    milestones: [{ ...entry, delivery_package_id: 'schedule-b9', title: 'Handover', due_date: '2026-12-15' }],
+  }, day, false)
+  assert.deepEqual(row.timeline.map(event => [event.packageName, event.date]), [
+    ['Blocks B9–B12 & B14', '2026-12-31'], ['Block B13', '2026-12-18'], [undefined, '2027-01-15'],
+  ])
+})
+
+test('only outstanding deliveries become overdue, including handovers without a schedule package', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    packages: [
+      { ...entry, id: 'a1', name: 'Block A1', status: 'Completed', planned_finish: '2026-10-31' },
+      { ...entry, id: 'a2', name: 'Block A2', planned_finish: '2026-10-31' },
+      { ...entry, id: 'old', name: 'Archived package', archived_at: '2026-11-10', planned_finish: '2026-10-30' },
+    ],
+    handovers: [
+      { ...entry, id: 'h1', package_name: 'Block A1', target_handover_date: '2026-11-10', status: 'In Progress' },
+      { ...entry, id: 'h2', package_name: 'Block A2', target_handover_date: '2026-11-10', actual_handover_date: '2026-11-12', status: 'Handed Over' },
+      { ...entry, id: 'h3', package_name: 'Standalone handover', target_handover_date: day, status: 'Pending' },
+      { ...entry, id: 'h4', package_name: 'Archived package', target_handover_date: '2026-11-01', status: 'In Progress' },
+    ],
+    tasks: [{ ...entry, delivery_package_id: 'a1', name: 'Final works', status: 'Completed' }],
+  }, day, false)
+  assert.deepEqual(row.timeline.map(event => [event.packageName, event.title, event.overdueDays]), [
+    ['Block A1', 'Package handover', 10], ['Standalone handover', 'Package handover', undefined],
+  ])
+})
+
+test('a single project handover on its target date appears once and upcoming linked milestones retain scope', () => {
+  const single = projectPosition(project, {
+    ...empty, milestones: [{ ...entry, title: 'Project handover', due_date: project.handover_date }],
+  }, day, false)
+  assert.deepEqual(single.timeline.map(event => event.title), ['Project handover'])
+  const multi = projectPosition(project, {
+    ...empty,
+    packages: [{ ...entry, id: 'a1', name: 'Block A1' }, { ...entry, id: 'b1', name: 'Block B1' }],
+    milestones: [
+      { ...entry, id: 'm1', block_id: 'a1', title: 'Utility approval', due_date: '2026-12-10' },
+      { ...entry, id: 'm2', block_id: 'b1', title: 'Utility approval', due_date: '2026-12-10' },
+    ],
+  }, day, false)
+  assert.deepEqual(multi.timeline.filter(event => event.title === 'Utility approval').map(event => event.packageName), ['Block A1', 'Block B1'])
+})
