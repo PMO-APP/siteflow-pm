@@ -1,0 +1,254 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { build } from 'esbuild'
+
+const compiled = await build({
+  entryPoints: ['src/features/management/model.ts'],
+  bundle: true,
+  write: false,
+  platform: 'node',
+  format: 'esm',
+})
+const { portfolioProgress, projectPosition } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`)
+
+const day = '2026-11-20'
+const project = { id: 1, project_name: 'Example', status: 'Active', handover_date: '2026-12-31' }
+const empty = {
+  tasks: [], reports: [], revisions: [], finance: [], payments: [], contracts: [], variations: [],
+  design: [], costNotes: [], approvals: [], procurement: [], risks: [], documents: [],
+}
+const entry = { id: 'a', project_id: 1 }
+
+test('confirmed disbursement, approved budget movement and the paid/physical gap are distinct', () => {
+  const row = projectPosition({ ...project, initial_budget: 100, approved_budget: 125 }, {
+    ...empty,
+    tasks: [{ ...entry, progress_pct: 50 }],
+    finance: [
+      { ...entry, type: 'Payment', amount: 100, status: 'Paid' },
+      { ...entry, type: 'Payment', amount: 15, status: 'Approved' },
+      { ...entry, type: 'Valuation', amount: 90, status: 'Certified' },
+    ],
+    payments: [{ ...entry, amount: 100, payment_status: 'Paid' }],
+  }, day, true)
+  assert.equal(row.commercial.paid, 100)
+  assert.equal(row.commercial.outstanding, 15)
+  assert.equal(row.commercial.certified, 90)
+  assert.equal(row.commercial.paidPct, 80)
+  assert.equal(row.commercial.gap, 30)
+  assert.equal(row.commercial.growth, 25)
+})
+
+test('contract values are a labelled fallback and only approved variations change the comparison', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    contracts: [{ ...entry, contract_value: 100, status: 'Active' }],
+    variations: [
+      { ...entry, amount: 25, status: 'Approved' },
+      { ...entry, amount: 75, status: 'Pending' },
+    ],
+  }, day, true)
+  assert.equal(row.commercial.basis, 'Contract value')
+  assert.equal(row.commercial.current, 125)
+  assert.equal(row.commercial.paid, null)
+  assert.equal(row.forecast, null)
+})
+
+test('a recent stalled report can identify funding, while an outstanding payment alone cannot', () => {
+  const data = { ...empty, payments: [{ ...entry, due_date: '2026-11-01', amount: 100, payment_status: 'Pending', payment_title: 'Valuation' }] }
+  const unconfirmed = projectPosition({ ...project, status: 'Stuck' }, data, day, true)
+  assert.equal(unconfirmed.stalled, true)
+  assert.equal(unconfirmed.primary, undefined)
+  const reported = projectPosition(project, {
+    ...data,
+    reports: [{ ...entry, report_date: day, status: 'Stuck', status_summary: 'Work is stalled for funding.' }],
+  }, day, true)
+  assert.equal(reported.stalled, true)
+  assert.equal(reported.primary.category, 'Funding / payment')
+  assert.equal(reported.rating, 'Off track')
+})
+
+test('later task updates and a newer scoped report supersede older progress and constraints', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    tasks: [{ ...entry, updated_at: `${day}T08:00:00Z`, progress_pct: 80, start_date: '2026-11-01', finish_date: '2026-12-31' }],
+    reports: [
+      { ...entry, discipline: 'Housebuild', report_date: '2026-11-17', status: 'Stuck', pending_issues: 'Work is stalled for funding.' },
+      { ...entry, id: 'b', discipline: 'Housebuild', report_date: '2026-11-19', status: 'On Track', snapshot_actual_progress: 50 },
+    ],
+  }, day, true)
+  assert.equal(row.actual, 80)
+  assert.equal(row.stalled, false)
+  assert.equal(row.constraints.length, 0)
+  assert.deepEqual(row.photosScope, ['b'])
+})
+
+test('missing evidence never becomes a zero, an on-track rating or a forecast date', () => {
+  const row = projectPosition(project, empty, day, true)
+  assert.equal(row.actual, null)
+  assert.equal(row.rating, 'Unrated')
+  assert.equal(row.commercial.growth, null)
+  assert.equal(row.forecast, null)
+  assert.equal(row.target, '2026-12-31')
+})
+
+test('actual progress below plan marks an unfinished project behind before its target', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    tasks: [{ ...entry, start_date: '2026-11-01', finish_date: '2026-12-01', progress_pct: 20 }],
+  }, day, true)
+  assert.equal(row.behind, true)
+  assert.equal(row.overdue, false)
+  assert.ok(row.progressGap < 0)
+})
+
+test('the active project programme target takes precedence and projects can be behind and past date', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    revisions: [{ ...entry, current_finish: '2026-11-10', forecast_finish: '2026-12-20' }],
+    tasks: [{ ...entry, start_date: '2026-11-01', finish_date: '2026-11-10', progress_pct: 70 }],
+  }, day, true)
+  assert.equal(row.behind, true)
+  assert.equal(row.overdueDays, 10)
+  assert.equal(row.target, '2026-11-10')
+})
+
+test('completion dates due today, completed projects and withdrawals do not count as past date', () => {
+  assert.equal(projectPosition({ ...project, handover_date: day }, empty, day, true).overdue, false)
+  const data = { ...empty, tasks: [{ ...entry, status: 'Not Started', start_date: '2026-10-01', finish_date: '2026-11-01' }] }
+  for (const status of ['Completed', 'Withdrawn']) {
+    const row = projectPosition({ ...project, handover_date: '2026-11-01', status }, data, day, true)
+    assert.equal(row.overdue, false)
+    assert.equal(row.behind, false)
+  }
+  const row = projectPosition({ ...project, handover_date: '2026-11-01', actual_completion_date: '2026-11-05' }, data, day, true)
+  assert.equal(row.overdue, false)
+})
+
+test('one small unfinished activity can leave a project past date when progress rounds to 100%', () => {
+  const row = projectPosition({ ...project, handover_date: '2026-11-01' }, {
+    ...empty,
+    tasks: [
+      { ...entry, progress_pct: 100, weight_pct: 1000 },
+      { ...entry, id: 'small', progress_pct: 0, weight_pct: 1 },
+    ],
+  }, day, true)
+  assert.equal(row.actual, 100)
+  assert.equal(row.overdueDays, 19)
+})
+
+test('a recent project-wide behind report is used when a comparable progress gap is unavailable', () => {
+  const data = {
+    ...empty,
+    reports: [{ ...entry, report_date: day, status: 'Behind', status_summary: 'No work due to late delivery of materials.' }],
+  }
+  const row = projectPosition(project, data, day, true)
+  assert.equal(row.behind, true)
+  assert.equal(row.progressGap, null)
+  assert.equal(row.primary.category, 'Procurement')
+  assert.equal(row.primary.recordedOn, day)
+  const packageOnly = projectPosition(project, {
+    ...data,
+    reports: data.reports.map(report => ({ ...report, package_name: 'Package B' })),
+  }, day, true)
+  assert.equal(packageOnly.behind, false)
+})
+
+test('Project Controls provides reasons, while unrelated open procurement stays an issue', () => {
+  const row = projectPosition({ ...project, handover_date: '2026-11-01' }, {
+    ...empty,
+    tasks: [
+      { ...entry, name: 'Road drainage', progress_pct: 35, delay_reason: 'Awaiting approved drawings', responsible: 'Site lead' },
+      { ...entry, id: 'closed', name: 'Excavation', status: 'Completed', delay_reason: 'Earlier mobilisation delay' },
+    ],
+    reports: [{ ...entry, report_date: day, pending_issues: 'No delay due to procurement.' }],
+    procurement: [{ ...entry, name: 'Unlinked order', required_on_site: '2026-11-01', status: 'Pending' }],
+  }, day, true)
+  assert.equal(row.primary.source, 'Project Controls · Road drainage')
+  assert.equal(row.primary.owner, 'Site lead')
+  assert.equal(row.constraints.filter(item => item.reason).length, 1)
+  assert.ok(row.constraints.some(item => item.text === 'Unlinked order' && !item.reason))
+})
+
+
+test('programme days, activity days and estimated completion use the current plan independently', () => {
+  const data = {
+    ...empty,
+    revisions: [{ ...entry, current_finish: '2026-11-24', programme_activities: [
+      { task_number: 1, name: 'Road drainage', start_date: '2026-11-11', finish_date: '2026-11-12' },
+      { task_number: 2, name: 'Water main', start_date: '2026-11-22', finish_date: '2026-11-24' },
+    ] }],
+    tasks: [
+      { ...entry, id: 'drain', task_number: 1, name: 'Road drainage', progress_pct: 50, start_date: '2026-05-01', finish_date: '2026-05-10' },
+      { ...entry, id: 'main', task_number: 2, name: 'Water main', progress_pct: 0, start_date: '2026-11-22', finish_date: '2026-11-24', predecessor_ids: ['drain'] },
+      { ...entry, id: 'completed', task_number: 3, name: 'Survey', status: 'Completed', start_date: '2026-09-01', finish_date: '2026-09-04' },
+      { ...entry, id: 'removed', task_number: 4, name: 'Temporary works', status: 'Cancelled', start_date: '2026-09-01', finish_date: '2026-09-04' },
+    ],
+  }
+  const onDate = projectPosition(project, data, day, true)
+  assert.equal(onDate.maximumActivityDelay, 8)
+  assert.equal(onDate.overdueActivities, 1)
+  assert.equal(onDate.scheduleSeverity, 'Watch')
+  assert.equal(onDate.forecast, '2026-11-24')
+  assert.equal(onDate.variance, 0)
+  assert.equal(onDate.overdue, false)
+
+  const later = projectPosition(project, data, '2026-11-23', true)
+  assert.equal(later.maximumActivityDelay, 11)
+  assert.equal(later.variance, 2)
+  assert.equal(later.forecastBasis, 'Recovery Forecast')
+  assert.equal(later.overdue, false)
+})
+
+test('an unmatched active programme keeps the live forecast and activity delay unverified', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    revisions: [{ ...entry, current_finish: '2026-12-31' }],
+    tasks: [{ ...entry, progress_pct: 40, start_date: '2026-10-01', finish_date: '2026-11-10' }],
+  }, day, true)
+  assert.equal(row.target, '2026-12-31')
+  assert.equal(row.maximumActivityDelay, null)
+  assert.equal(row.forecast, null)
+  assert.equal(row.planned, null)
+})
+
+test('missing paid amounts remain blank while an explicitly recorded zero is retained', () => {
+  const budget = { ...project, approved_budget: 1000 }
+  const pending = { ...entry, type: 'Payment', status: 'Approved', amount: 120 }
+  const paid = { ...entry, id: 'p', type: 'Payment', status: 'Paid', amount: 0 }
+  assert.equal(projectPosition(budget, { ...empty, finance: [pending] }, day, true).commercial.paidPct, null)
+  assert.equal(projectPosition(budget, { ...empty, finance: [pending, paid] }, day, true).commercial.paidPct, 0)
+})
+
+test('the progress chart pairs reports by date across the same projects', () => {
+  const point = (report_date, actual, planned) => ({ ...entry, id: report_date, report_date, snapshot_actual_progress: actual, snapshot_planned_progress: planned })
+  const first = projectPosition(project, { ...empty, reports: [
+    point('2026-11-06', 40, 50), point('2026-11-13', 50, 60), point('2026-11-20', 65, 70),
+  ] }, day, false)
+  const second = projectPosition({ ...project, id: 2 }, { ...empty, reports: [
+    point('2026-11-06', 20, 30), point('2026-11-13', 28, 40),
+    { ...point('2026-11-20', 90, 100), package_name: 'Package A' },
+  ] }, day, false)
+  const missing = projectPosition({ ...project, id: 3 }, empty, day, false)
+  assert.deepEqual(portfolioProgress([first, second, missing]), [
+    { date: '2026-11-06', actual: 30, planned: 40, coverage: 2 },
+    { date: '2026-11-13', actual: 39, planned: 50, coverage: 2 },
+  ])
+})
+
+test('preconstruction can surface upcoming tenders and approvals with incomplete cost and programme data', () => {
+  const upcoming = projectPosition({ id: 2, project_name: 'Design stage', status: 'Planning' }, {
+    ...empty,
+    milestones: [{ ...entry, name: 'No planned date', created_at: '2026-11-21T10:00:00Z' }],
+    procurement: [{ ...entry, name: 'Tender issue', status: 'Pending', required_on_site: '2026-11-25' }],
+    approvals: [
+      { ...entry, title: 'Design review', status: 'Submitted', deadline: '2026-11-24' },
+      { ...entry, id: 'closed', title: 'Already approved', status: 'Approved', deadline: '2026-11-28' },
+      { ...entry, id: 'past', title: 'Old approval', status: 'Pending', deadline: '2026-11-15' },
+    ],
+  }, day, true)
+  assert.equal(upcoming.commercial.paidPct, null)
+  assert.equal(upcoming.actual, null)
+  assert.equal(upcoming.maximumActivityDelay, null)
+  assert.equal(upcoming.overdue, false)
+  assert.deepEqual(upcoming.timeline.map(item => item.title), ['Design review', 'Tender issue'])
+})
