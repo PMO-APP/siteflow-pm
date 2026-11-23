@@ -79,7 +79,7 @@ test('later task updates and a newer scoped report supersede older progress and 
   assert.equal(row.actual, 80)
   assert.equal(row.stalled, false)
   assert.equal(row.constraints.length, 0)
-  assert.deepEqual(row.photosScope, ['b'])
+  assert.deepEqual(row.sitePhotos.reportIds, ['b'])
 })
 
 test('missing evidence never becomes a zero, an on-track rating or a forecast date', () => {
@@ -330,4 +330,54 @@ test('a single project handover on its target date appears once and upcoming lin
     ],
   }, day, false)
   assert.deepEqual(multi.timeline.filter(event => event.title === 'Utility approval').map(event => event.packageName), ['Block A1', 'Block B1'])
+})
+
+test('site photos include the latest reporting week across report disciplines and retain older documents for history', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    reports: [
+      { ...entry, id: 'old-block', block_id: 'B13', report_date: '2026-09-02', workflow_status: 'Approved' },
+      { ...entry, id: 'new-housebuild', discipline: 'Housebuild', report_date: '2026-11-18', workflow_status: 'Approved' },
+      { ...entry, id: 'new-mep', discipline: 'Mechanical', report_date: '2026-11-20', workflow_status: 'Submitted' },
+    ],
+    documents: [
+      { ...entry, id: 'old-word', title: 'Project update', type: 'Report', revision_date: '2026-11-13', status: 'Superseded' },
+      { ...entry, id: 'new-word', title: 'Project update', type: 'Report', revision_date: '2026-11-19', status: 'Approved' },
+    ],
+    designSubmissions: [
+      { ...entry, report_week: '2026-11-20', status: 'Submitted', snapshot_data: { progressEvidence: [{ id: 'design-latest' }] } },
+    ],
+  }, '2026-11-23', false)
+  assert.equal(row.sitePhotos.week, '2026-11-20')
+  assert.deepEqual(row.sitePhotos.reportIds, ['new-mep', 'new-housebuild'])
+  assert.deepEqual(row.sitePhotos.documents.map(document => document.id), ['new-word'])
+  assert.deepEqual(row.sitePhotos.historyDocuments.map(document => document.id), ['old-word', 'new-word'])
+  assert.deepEqual(row.sitePhotos.designEvidenceIds, ['design-latest'])
+})
+
+test('a more recent submitted report without evidence does not carry older photos forward', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    reports: [{ ...entry, id: 'previous-report', report_date: '2026-11-13', workflow_status: 'Approved' }],
+    documents: [{ ...entry, title: 'Previous photos', type: 'Report', revision_date: '2026-11-13' }],
+    designSubmissions: [{
+      ...entry, report_week: '2026-11-20', status: 'Submitted', snapshot_data: { progressEvidence: [] },
+    }],
+  }, '2026-11-20', false)
+  assert.equal(row.sitePhotos.week, '2026-11-20')
+  assert.deepEqual(row.sitePhotos.reportIds, [])
+  assert.deepEqual(row.sitePhotos.documents, [])
+  assert.deepEqual(row.sitePhotos.designEvidenceIds, [])
+})
+
+test('a draft does not displace the latest report with an open reporting week', () => {
+  const row = projectPosition(project, {
+    ...empty,
+    reports: [
+      { ...entry, id: 'draft', report_date: '2026-11-23', workflow_status: 'Draft' },
+      { ...entry, id: 'published', report_date: '2026-11-20', workflow_status: 'Locked' },
+    ],
+  }, '2026-11-23', false)
+  assert.equal(row.sitePhotos.week, '2026-11-20')
+  assert.deepEqual(row.sitePhotos.reportIds, ['published'])
 })
