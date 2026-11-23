@@ -4,10 +4,10 @@ import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { supabase } from '@/lib/supabase'
 import { listManagementActions } from '@/services/managementActionService'
 import {
-  type Approval, type Decision, type Handover, type Milestone, type Package, type ProjectBlock, type Contract, type CostNote, type Data, type Design, type DesignPhoto,
+  type Approval, type Decision, type Handover, type Milestone, type Package, type ProjectBlock, type Contract, type CostNote, type Data, type Design, type DesignPhoto, type DesignSubmission,
   type DocumentRow, type Finance, type Payment, type Photo, type Procurement, type Project,
   type Report, type ReportPhoto, type Revision, type Risk, type TaskRow, type Variation,
-  isoDay, lagosDay, projectPosition,
+  isoDay, lagosDay, photoReportingWeek, projectPosition,
 } from './model'
 
 const PAGE_SIZE = 500
@@ -80,11 +80,43 @@ const knownReportPhotoUrl = (value?: string) => {
   }
 }
 
+export type SitePhotoReport = Pick<Report, 'id' | 'project_id' | 'report_date'>
+
+async function loadReportPhotos(reports: SitePhotoReport[], signal: AbortSignal): Promise<Photo[] | null> {
+  const reportById = new Map(reports.map(report => [String(report.id), report]))
+  const reportPhotos = await readScoped<ReportPhoto>('report_photos', [...reportById.keys()], signal, 'report_id')
+  if (!reportPhotos) return null
+  return reportPhotos.flatMap(photo => {
+    const report = reportById.get(String(photo.report_id))
+    const date = isoDay(report?.report_date)
+    const src = knownReportPhotoUrl(photo.photo_url)
+    if (!report || !date || !src || (photo.report_type && photo.report_type.toLowerCase() !== 'ipd')) return []
+    return [{
+      id: `ipd:${photo.id}`, projectId: report.project_id, src,
+      title: photo.caption || photo.photo_name || 'Site photograph', date,
+    }]
+  })
+}
+
+export function useHistoricalReportPhotos(reports: SitePhotoReport[], enabled: boolean) {
+  const { permitted, workspaceId, userId } = useManagementAccess()
+  return useQuery({
+    queryKey: ['site-photo-history', workspaceId, userId, reports.map(report => [report.id, report.project_id, report.report_date])],
+    queryFn: async ({ signal }) => {
+      const photos = await loadReportPhotos(reports, signal)
+      if (!photos) throw new Error('Photo history could not be loaded')
+      return photos
+    },
+    enabled: enabled && permitted && reports.length > 0,
+    staleTime: 30_000,
+  })
+}
+
 async function loadManagement(workspaceId: string, includeFinance: boolean, signal: AbortSignal) {
   const projects = await readPages<Project>((from, to) => supabase.from('projects').select('*')
     .eq('workspace_id', workspaceId).is('archived_at', null).order('id').range(from, to).abortSignal(signal))
   const ids = projects.map(p => p.id)
-  const [tasks, reports, revisions, finance, payments, contracts, variations, design, costNotes, approvals, procurement, risks, documents, designPhotos, portfolios, packages, blocks, handovers, milestones, decisions, actions] = await Promise.all([
+  const [tasks, reports, revisions, finance, payments, contracts, variations, design, costNotes, approvals, procurement, risks, documents, designPhotos, designSubmissions, portfolios, packages, blocks, handovers, milestones, decisions, actions] = await Promise.all([
     readScoped<TaskRow>('tasks', ids, signal),
     readScoped<Report>('weekly_reports', ids, signal),
     readScoped<Revision>('schedule_revisions', ids, signal, 'project_id', { is_active: true }),
@@ -99,6 +131,7 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     readScoped<Risk>('risks', ids, signal),
     readScoped<DocumentRow>('documents', ids, signal),
     readScoped<DesignPhoto>('design_collaboration_files', ids, signal, 'project_id', { context_type: 'weekly' }),
+    readScoped<DesignSubmission>('design_report_submissions', ids, signal),
     readScoped<{ id: number; name?: string | null }>('portfolios', [...new Set(projects.flatMap(p => p.portfolio_id == null ? [] : [p.portfolio_id]))], signal, 'id'),
     readScoped<Package>('delivery_packages', ids, signal),
     readScoped<ProjectBlock>('project_blocks', ids, signal),
@@ -114,6 +147,7 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     variations: byProject<Variation>(variations), design: byProject(design), costNotes: byProject<CostNote>(costNotes),
     approvals: byProject(approvals), procurement: byProject(procurement), risks: byProject(risks),
     documents: byProject(documents),
+    designSubmissions: byProject(designSubmissions),
     packages: byProject(packages),
     blocks: byProject(blocks),
     handovers: byProject(handovers),
@@ -125,33 +159,41 @@ async function loadManagement(workspaceId: string, includeFinance: boolean, sign
     ])) as Data
     return projectPosition(project, data, today, includeFinance)
   })
-  const reportById = new Map((reports ?? []).map(r => [String(r.id), r]))
-  const reportPhotos = await readScoped<ReportPhoto>('report_photos', rows.flatMap(r => r.photosScope), signal, 'report_id')
-  const photos: Photo[] = []
-  for (const photo of reportPhotos ?? []) {
-    const report = reportById.get(String(photo.report_id))
-    const url = knownReportPhotoUrl(photo.photo_url)
-    if (!report || !url || (photo.report_type && photo.report_type.toLowerCase() !== 'ipd')) continue
-    photos.push({
-      id: `ipd:${photo.id}`, projectId: report.project_id, src: url,
-      title: photo.caption || photo.photo_name || 'Site photograph',
-      date: isoDay(report.report_date) || isoDay(photo.created_at) || '',
-    })
-  }
+  const historyReports = (reports ?? []).flatMap(report => {
+    const day = isoDay(report.report_date)
+    return day && day <= today ? [{ id: report.id, project_id: report.project_id, report_date: day }] : []
+  })
+  const latestReportIds = new Set(rows.flatMap(row => row.sitePhotos.reportIds))
+  const latestDesignReports = new Map(rows
+    .filter(row => row.sitePhotos.designWeek && row.sitePhotos.designWeek === row.sitePhotos.week)
+    .map(({ project, sitePhotos }) => [String(project.id), {
+      week: sitePhotos.designWeek,
+      ids: sitePhotos.designEvidenceIds === null ? null : new Set(sitePhotos.designEvidenceIds),
+    }]))
+  const reportPhotos = await loadReportPhotos(historyReports.filter(report => latestReportIds.has(String(report.id))), signal)
+  const photos: Photo[] = reportPhotos ?? []
+  const historyDesignPhotos: Photo[] = []
+  const currentWeek = photoReportingWeek(today)!
   for (const photo of designPhotos ?? []) {
     if (!photo.storage_path || !/\.(jpeg|jpg|png|webp|gif|avif)$/i.test(photo.file_name)) continue
-    photos.push({
+    const date = isoDay(photo.context_id) ?? isoDay(photo.created_at)
+    if (!date) continue
+    const week = photoReportingWeek(date)
+    if (!week || week > currentWeek) continue
+    const entry = {
       id: `design:${photo.id}`, projectId: photo.project_id, path: photo.storage_path,
-      title: photo.caption || photo.location || photo.file_name,
-      date: isoDay(photo.context_id) || isoDay(photo.created_at) || '',
-    })
+      title: photo.caption || photo.location || photo.file_name, date,
+    }
+    historyDesignPhotos.push(entry)
+    const report = latestDesignReports.get(String(photo.project_id))
+    if (report?.week === week && (report.ids === null || report.ids.has(String(photo.id)))) photos.push(entry)
   }
   return {
-    rows, photos, today,
+    rows, photos, historyReports, historyDesignPhotos, today,
     decisions: decisions?.filter(row => row.project_id == null || ids.includes(Number(row.project_id))) ?? null,
     actions: actions?.filter(row => row.projectId == null || ids.includes(row.projectId)) ?? null,
     portfolioNames: new Map((portfolios ?? []).map(p => [String(p.id), p.name || `Portfolio ${p.id}`])),
-    incomplete: Object.entries(grouped).some(([key, records]) => !['milestones', 'blocks', 'handovers'].includes(key) && records === null) || reportPhotos === null || designPhotos === null,
+    incomplete: Object.entries(grouped).some(([key, records]) => !['milestones', 'blocks', 'handovers', 'designSubmissions'].includes(key) && records === null) || reportPhotos === null || designPhotos === null,
   }
 }
 export type ManagementData = Awaited<ReturnType<typeof loadManagement>>
