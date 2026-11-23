@@ -66,6 +66,8 @@ export interface Task {
   project_id?: number
   id: string
   task_number?: number
+  compacted_revision_id?: string | null
+  compacted_revision_task_number?: number | null
   name: string
   phase: string
   discipline: ScheduleDiscipline
