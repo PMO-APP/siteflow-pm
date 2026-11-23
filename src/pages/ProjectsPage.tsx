@@ -34,6 +34,8 @@ import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { PMOCorexDialog, type PMOCorexDialogVariant } from '@/components/ui/PMOCorexDialog'
 import PersonalWorkspacePanel from '@/components/personalization/PersonalWorkspacePanel'
 import { useAccessSession } from '@/access/AccessSessionProvider'
+import { useWorkspace } from '@/workspace/WorkspaceProvider'
+import { projectCreationScope, workspaceOrganizations } from '@/workspace/projectCreationScope'
 import { loadPortfolioProjectHealth, isAtRiskProject, isCriticalProject, isHealthyProject, needsHealthAttention, type PortfolioProjectHealth } from '@/services/portfolioHealthService'
 
 const PROJECT_STATUSES = [
@@ -102,6 +104,9 @@ const INTERNAL_ROLE_LABELS: Record<string, string> = {
 
 export default function ProjectsPage() {
   const { session: accessSession, can } = useAccessSession()
+  const { activeWorkspace } = useWorkspace()
+  const creationWorkspaceId = !accessSession.loading && activeWorkspace?.id === accessSession.workspaceId
+    ? accessSession.workspaceId : null
   const [projects, setProjects] = useState<any[]>([])
   const [reportsOpen, setReportsOpen] = useState(false)
   const [projectTasks, setProjectTasks] = useState<any[]>([])
@@ -120,6 +125,7 @@ export default function ProjectsPage() {
   const [canEditProjects, setCanEditProjects] = useState(false)
   const [canDeleteItems, setCanDeleteItems] = useState(false)
 
+  const [creatingItem, setCreatingItem] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
@@ -160,6 +166,30 @@ export default function ProjectsPage() {
   const [phaseFilter, setPhaseFilter] = useState('All')
   const [attentionFilter, setAttentionFilter] = useState<'All' | 'Attention' | 'Healthy'>('All')
   const [assignedOnly, setAssignedOnly] = useState(false)
+
+  const creationOrganizations = useMemo(
+    () => workspaceOrganizations(creationWorkspaceId, organizations, [...portfolios, ...projects, ...archivedProjects]),
+    [creationWorkspaceId, organizations, portfolios, projects, archivedProjects],
+  )
+  const creationOrganization = creationOrganizations.find(org => String(org.id) === String(selectedOrgId)) ?? creationOrganizations[0]
+  const creationPortfolios = portfolios.filter(portfolio =>
+    !!creationWorkspaceId && !!creationOrganization &&
+    (!portfolio.workspace_id || portfolio.workspace_id === creationWorkspaceId) &&
+    (portfolio.organization_id == null || String(portfolio.organization_id) === String(creationOrganization.id))
+  )
+
+  function creationOrganizationField() {
+    return <>
+      <FieldLabel>Organization</FieldLabel>
+      {creationOrganizations.length > 1 ? <select aria-label="Organization" className="hub-input mb-4"
+        value={creationOrganization.id} onChange={event => {
+          setSelectedOrgId(event.target.value)
+          setSelectedPortfolioId('')
+        }}>
+        {creationOrganizations.map(organization => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+      </select> : <div className="hub-readonly-field mb-4">{creationOrganization?.name ?? 'Organization link unavailable'}</div>}
+    </>
+  }
 
   const [dialog, setDialog] = useState<DialogState>({ open: false, title: '', message: '', inputValue: '', busy: false })
   const dialogResolver = useRef<((value: boolean) => void) | null>(null)
@@ -578,73 +608,91 @@ export default function ProjectsPage() {
     await loadHub()
   }
 
+  function showCreationError(title: string, message: string) {
+    showNotice({ variant: 'warning', title, message, confirmLabel: 'Close' })
+  }
+
   async function createPortfolio() {
-    const organizationId = selectedOrgId || organizations[0]?.id || null
-
-    if (!canCreateItems || !newPortfolioName.trim()) return
-
-    if (!organizationId) {
-      showNotice({ variant: 'warning', title: 'Workspace organization missing', message: 'Run portfolio_recovery.sql in the Supabase SQL Editor, then refresh this page.', confirmLabel: 'Understood' })
+    if (!canCreateItems || creatingItem || !newPortfolioName.trim()) return
+    if (!creationWorkspaceId || !creationOrganization) {
+      showCreationError('Workspace organization missing', 'This workspace needs a verified organization link before you can create a portfolio.')
       return
     }
 
-    const { data: createdPortfolio, error } = await supabase
-      .from('portfolios')
-      .insert({
-        name: newPortfolioName.trim(),
-        organization_id: organizationId,
-      })
-      .select('*')
-      .single()
+    setCreatingItem(true)
+    try {
+      const { data: createdPortfolio, error } = await supabase
+        .from('portfolios')
+        .insert({
+          name: newPortfolioName.trim(),
+          organization_id: creationOrganization.id,
+          workspace_id: creationWorkspaceId,
+        })
+        .select('*')
+        .single()
 
-    if (error) {
-      showNotice({ variant: 'danger', title: 'Portfolio could not be created', message: error.message, confirmLabel: 'Close' })
-      return
+      if (error) {
+        showCreationError('Portfolio could not be created', error.message)
+        return
+      }
+
+      if (createdPortfolio) {
+        setPortfolios(current => [...current, createdPortfolio])
+        setSelectedPortfolioId(createdPortfolio.id)
+      }
+
+      setNewPortfolioName('')
+      setShowPortfolioModal(false)
+      await loadHub()
+    } catch (error) {
+      showCreationError('Portfolio could not be created', error instanceof Error ? error.message : 'Portfolio creation failed.')
+    } finally {
+      setCreatingItem(false)
     }
-
-    if (createdPortfolio) {
-      setPortfolios(current => [...current, createdPortfolio])
-      setSelectedPortfolioId(createdPortfolio.id)
-    }
-
-    setNewPortfolioName('')
-    setSelectedOrgId(organizationId)
-    setShowPortfolioModal(false)
-    await loadHub()
   }
 
   async function createProject() {
-    if (!canCreateItems || !newProjectName.trim()) return
-
-    const { error } = await supabase.from('projects').insert({
-      project_name: newProjectName.trim(),
-      status: newProjectStatus,
-      phase: newProjectPhase,
-      organization_id: selectedOrgId || organizations[0]?.id || null,
-      portfolio_id: selectedPortfolioId || null,
-      overall_owner_email: newOverallOwnerEmail.trim().toLowerCase() || null,
-      housebuild_owner_email: newHousebuildOwnerEmail.trim().toLowerCase() || null,
-      mep_owner_email: newMepOwnerEmail.trim().toLowerCase() || null,
-      infrastructure_owner_email:
-        newInfrastructureOwnerEmail.trim().toLowerCase() || null,
-    })
-
-    if (error) {
-      showNotice({ variant: 'danger', title: 'Action could not be completed', message: error.message, confirmLabel: 'Close' })
+    if (!canCreateItems || creatingItem || !newProjectName.trim()) return
+    if (!creationWorkspaceId || !creationOrganization) {
+      showCreationError('Workspace organization missing', 'This workspace needs a verified organization link before you can create a project.')
       return
     }
 
-    setNewProjectName('')
-    setNewProjectStatus('Planning')
-    setNewProjectPhase('Concept')
-    setSelectedOrgId('')
-    setSelectedPortfolioId('')
-    setNewOverallOwnerEmail('')
-    setNewHousebuildOwnerEmail('')
-    setNewMepOwnerEmail('')
-    setNewInfrastructureOwnerEmail('')
-    setShowProjectModal(false)
-    loadHub()
+    setCreatingItem(true)
+    try {
+      const scope = projectCreationScope(creationWorkspaceId, creationOrganization.id, selectedPortfolioId, portfolios)
+      const { error } = await supabase.from('projects').insert({
+        ...scope,
+        project_name: newProjectName.trim(),
+        status: newProjectStatus,
+        phase: newProjectPhase,
+        overall_owner_email: newOverallOwnerEmail.trim().toLowerCase() || null,
+        housebuild_owner_email: newHousebuildOwnerEmail.trim().toLowerCase() || null,
+        mep_owner_email: newMepOwnerEmail.trim().toLowerCase() || null,
+        infrastructure_owner_email: newInfrastructureOwnerEmail.trim().toLowerCase() || null,
+      })
+
+      if (error) {
+        showCreationError('Project could not be created', error.message)
+        return
+      }
+
+      setNewProjectName('')
+      setNewProjectStatus('Planning')
+      setNewProjectPhase('Concept')
+      setSelectedOrgId('')
+      setSelectedPortfolioId('')
+      setNewOverallOwnerEmail('')
+      setNewHousebuildOwnerEmail('')
+      setNewMepOwnerEmail('')
+      setNewInfrastructureOwnerEmail('')
+      setShowProjectModal(false)
+      await loadHub()
+    } catch (error) {
+      showCreationError('Project could not be created', error instanceof Error ? error.message : 'Project creation failed.')
+    } finally {
+      setCreatingItem(false)
+    }
   }
 
   const userRoles = memberships.map(m => String(m.role || '').toLowerCase().trim())
@@ -1039,7 +1087,7 @@ export default function ProjectsPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedOrgId(organizations[0]?.id || '')
+                  setSelectedOrgId(creationOrganizations[0]?.id ?? '')
                   setShowPortfolioModal(true)
                 }}
                 className="flex min-h-[180px] flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-[#bfe1dc] bg-[#f7fcfb] p-6 text-center transition hover:-translate-y-1 hover:border-[#08B5A6] hover:bg-[#effaf8]"
@@ -1054,7 +1102,7 @@ export default function ProjectsPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedOrgId(organizations[0]?.id || '')
+                  setSelectedOrgId(creationOrganizations[0]?.id ?? '')
                   setSelectedPortfolioId('')
                   setShowProjectModal(true)
                 }}
@@ -1234,22 +1282,22 @@ export default function ProjectsPage() {
 
       {showPortfolioModal && canCreateItems && (
         <Modal title="Create Portfolio" onClose={() => setShowPortfolioModal(false)}>
-          <FieldLabel>Organization</FieldLabel>
-          <div className="hub-readonly-field mb-4">{workspaceName}</div>
+          {creationOrganizationField()}
           <FieldLabel>Portfolio name</FieldLabel>
           <input className="hub-input mb-5" placeholder="e.g. Luxury Projects" value={newPortfolioName} onChange={e => setNewPortfolioName(e.target.value)} />
-          <button className="hub-primary-button w-full justify-center" onClick={createPortfolio}>Create Portfolio</button>
+          <button className="hub-primary-button w-full justify-center" onClick={createPortfolio} disabled={creatingItem}>{creatingItem ? 'Creating…' : 'Create Portfolio'}</button>
         </Modal>
       )}
 
       {showProjectModal && canCreateItems && (
         <Modal title="Create Project" onClose={() => setShowProjectModal(false)}>
-          <FieldLabel>Organization</FieldLabel>
-          <div className="hub-readonly-field mb-4">{workspaceName}</div>
+          {creationOrganizationField()}
           <FieldLabel>Portfolio</FieldLabel>
           <select className="hub-input mb-4" value={selectedPortfolioId} onChange={e => setSelectedPortfolioId(e.target.value || '')}>
             <option value="">Select portfolio</option>
-            {portfolios.filter(p => !selectedOrgId || !p.organization_id || String(p.organization_id) === String(selectedOrgId)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {creationPortfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id} disabled={!portfolio.workspace_id}>
+              {portfolio.name}{portfolio.workspace_id ? '' : ' (workspace link missing)'}
+            </option>)}
           </select>
           <FieldLabel>Project name</FieldLabel>
           <input className="hub-input mb-4" placeholder="Project name" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} />
@@ -1258,7 +1306,7 @@ export default function ProjectsPage() {
             <div><FieldLabel>Phase</FieldLabel><select className="hub-input mb-4" value={newProjectPhase} onChange={e => setNewProjectPhase(e.target.value)}>{PROJECT_PHASES.map(p => <option key={p}>{p}</option>)}</select></div>
           </div>
           <OwnerFields workspaceId={accessSession.workspaceId} values={[newOverallOwnerEmail, newHousebuildOwnerEmail, newMepOwnerEmail, newInfrastructureOwnerEmail]} setters={[setNewOverallOwnerEmail, setNewHousebuildOwnerEmail, setNewMepOwnerEmail, setNewInfrastructureOwnerEmail]} />
-          <button className="hub-primary-button mt-5 w-full justify-center" onClick={createProject}>Create Project</button>
+          <button className="hub-primary-button mt-5 w-full justify-center" onClick={createProject} disabled={creatingItem}>{creatingItem ? 'Creating…' : 'Create Project'}</button>
         </Modal>
       )}
 
