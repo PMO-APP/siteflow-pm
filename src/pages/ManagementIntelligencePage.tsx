@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, AlertCircle, PauseCircle, LayoutGrid, RefreshCw, Wallet } from 'lucide-react'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, ArrowUpRight, AlertCircle, PauseCircle, LayoutGrid, RefreshCw, Wallet, Expand, Plus } from 'lucide-react'
 import { PMOCorexLogo } from '@/components/brand/PMOCorexLogo'
 import { openProject } from '@/lib/openProject'
 import { useWorkspace } from '@/workspace/WorkspaceProvider'
 import { useManagementAccess, useManagementData, type ManagementData } from '@/features/management/data'
 import { isoDay, ratings, type ProjectPosition } from '@/features/management/model'
+import { useAuthStore } from '@/store/auth'
+import { Boardroom, PortfolioTimeline, PortfolioTrend, ProjectPressure } from '@/features/management/PortfolioVisuals'
+import { ManagementActions, ManagementActionDrawer, type ActionDraft } from '@/features/management/ManagementActions'
 import ReportGallery from '@/features/management/ReportGallery'
 import './ManagementIntelligencePage.css'
 
@@ -47,11 +50,19 @@ function Status({ row }: { row: ProjectPosition }) {
     {row.stalled && <span className="mi-tag red"><PauseCircle size={13} aria-hidden />Stalled</span>}</span>
 }
 
-function Portfolio({ data, includeFinance }: { data: ManagementData; includeFinance: boolean }) {
+function Portfolio({
+  data, includeFinance, canManage, workspaceId, workspaceName, boardroom, exitBoardroom, refresh,
+}: {
+  data: ManagementData; includeFinance: boolean; canManage: boolean; workspaceId: string; workspaceName: string
+  boardroom: boolean; exitBoardroom: () => void; refresh: () => Promise<unknown>
+}) {
   const navigate = useNavigate()
   const [portfolio, setPortfolio] = useState('')
   const [project, setProject] = useState('')
   const [band, setBand] = useState<Band>('All projects')
+  const [draft, setDraft] = useState<ActionDraft | null>(null)
+  const [actionMessage, setActionMessage] = useState('')
+  const author = useAuthStore(state => state.user?.full_name || state.user?.email || 'Management')
   const scope = useMemo(() => data.rows
     .filter(row => (!portfolio || String(row.project.portfolio_id ?? 'none') === portfolio) && (!project || String(row.project.id) === project))
     .sort((a, b) => ratings.indexOf(a.rating) - ratings.indexOf(b.rating) || Number(b.stalled) - Number(a.stalled) || (a.project.project_name || '').localeCompare(b.project.project_name || '')), [data.rows, portfolio, project])
@@ -68,7 +79,16 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
     })
   }
   const reasonCounts = [...categories].sort(([a], [b]) => a.localeCompare(b))
-  const attention = rows.filter(row => row.behind || row.overdue || row.stalled || row.rating === 'Off track' || row.constraints.length > 0)
+  const attention = rows.filter(row => row.behind || row.overdue || row.stalled || row.rating === 'Off track' || row.constraints.length > 0 || (row.maximumActivityDelay ?? 0) > 0)
+    .sort((a, b) => Number(b.overdue) - Number(a.overdue) || Number(b.stalled) - Number(a.stalled) ||
+      Math.max(b.variance ?? 0, 0) - Math.max(a.variance ?? 0, 0) ||
+      (b.overdueDays ?? 0) - (a.overdueDays ?? 0) || (b.maximumActivityDelay ?? 0) - (a.maximumActivityDelay ?? 0))
+  const selectedIds = new Set(rows.map(row => Number(row.project.id)))
+  const wholeWorkspace = !project && !portfolio && band === 'All projects'
+  const actions = data.actions?.filter(item => item.projectId == null ? wholeWorkspace : selectedIds.has(item.projectId)) ?? null
+  const decisions = data.decisions?.filter(item => item.project_id == null
+    ? wholeWorkspace || (!project && !!portfolio && String(item.portfolio_id) === portfolio)
+    : selectedIds.has(Number(item.project_id))) ?? null
   const tiles: { label: string; key: Band; css: string }[] = [
     { label: 'Projects', key: 'All projects', css: 'navy' },
     { label: 'Off track', key: 'Off track', css: 'red' },
@@ -81,6 +101,9 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
   function open(row: ProjectPosition, destination = '/app') {
     openProject(navigate, row.project, destination)
   }
+
+  if (boardroom) return <Boardroom rows={rows} workspace={workspaceName} onClose={exitBoardroom} onOpen={open}
+    openDecisions={decisions?.filter(item => !['completed', 'cancelled', 'canceled', 'closed'].includes((item.status || '').toLowerCase())).length ?? null} />
 
   return <>
     <div className="mi-filter-bar">
@@ -97,7 +120,8 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
       </select></label>
       <nav aria-label="Page sections">
         <a href="#constraints">Constraints</a><a href="#delivery">Delivery</a>
-        {includeFinance && <a href="#commercial">Cost and progress</a>}<a href="#visual-updates">Photos</a>
+        {includeFinance && <a href="#commercial">Cost and progress</a>}
+        <a href="#trends">Trends</a><a href="#actions">Actions</a><a href="#visual-updates">Photos</a>
       </nav>
     </div>
     {data.incomplete && <p className="mi-notice" role="status"><AlertCircle size={18} aria-hidden />Some records are unavailable. Blank figures indicate missing information.</p>}
@@ -140,11 +164,13 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
         {attention.map(row => {
           const reasons = row.constraints.filter(item => item.reason)
           const related = row.constraints.filter(item => !item.reason)
-          const deliveryAlert = row.behind || row.overdue || row.stalled
+          const deliveryAlert = row.behind || row.overdue || row.stalled || (row.maximumActivityDelay ?? 0) > 0
           const facts = [
             row.overdueDays !== null && `${row.overdueDays} ${row.overdueDays === 1 ? 'day' : 'days'} past ${date(row.target)}`,
             row.behind && (row.actual !== null && row.planned !== null && (row.progressGap ?? 0) < 0
               ? `${row.actual}% actual vs ${row.planned}% planned` : 'Reported behind programme'),
+            row.variance !== null && row.variance > 0 && `${row.variance}d beyond target in the ${row.forecastBasis === 'Recorded forecast' ? 'recorded forecast' : 'recovery estimate'}`,
+            row.overdueActivities !== null && row.overdueActivities > 0 && `${row.overdueActivities} overdue ${row.overdueActivities === 1 ? 'activity' : 'activities'} · longest ${row.maximumActivityDelay}d`,
             row.primary?.text || (deliveryAlert ? 'Reason unrecorded' : related[0]?.text || 'Review delivery forecast'),
           ].filter(Boolean)
           const describe = (item: ProjectPosition['constraints'][number]) => <li key={`${item.category}:${item.text}`}>
@@ -161,7 +187,12 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
               {reasons.length > 0 && <div><h3>Recorded reasons</h3><ul>{reasons.map(describe)}</ul></div>}
               {related.length > 0 && <div><h3>Related open issues</h3><ul>{related.map(describe)}</ul></div>}
               {!row.primary?.owner && row.project.overall_owner_email && <p>Project contact {row.project.overall_owner_email}</p>}
-              <button className="mi-text-button" onClick={() => open(row)}>Open project <ArrowUpRight size={16} /></button>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                <button className="mi-text-button" onClick={() => open(row)}>Open project <ArrowUpRight size={16} /></button>
+                {canManage && <button type="button" className="mi-text-button" onClick={() => setDraft({ projectId: String(row.project.id), title: row.primary?.text })}>
+                  <Plus size={16} /> Assign action
+                </button>}
+              </div>
             </div>
           </details>
         })}
@@ -178,7 +209,7 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
       </div>
       <div className="mi-table-scroll" tabIndex={0} aria-label="Project delivery table" role="region">
         <table className="mi-table mi-delivery-table">
-          <thead><tr><th scope="col">Project</th><th scope="col">Delivery status</th><th scope="col">Latest update</th><th scope="col">Physical / planned</th><th scope="col">Target / forecast</th></tr></thead>
+          <thead><tr><th scope="col">Project</th><th scope="col">Delivery status</th><th scope="col">Latest update</th><th scope="col">Physical / planned</th><th scope="col">Activity delay</th><th scope="col">Target / forecast</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.project.id}>
             <th scope="row"><button className="mi-text-button" onClick={() => open(row)}>{row.project.project_name} <ArrowUpRight size={14} /></button><small>{row.project.phase || 'Stage unrecorded'}</small></th>
             <td><Status row={row} /></td>
@@ -191,10 +222,18 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
               </details>}
             </td>
             <td><strong>{percent(row.actual)}</strong> / {percent(row.planned)}{row.progressGap !== null && <small className={row.progressGap < 0 ? 'mi-negative' : ''}>{signed(row.progressGap, ' pp')}</small>}</td>
-            <td>{date(row.target)}{row.overdueDays !== null && <span className="mi-negative"> · {row.overdueDays}d past</span>}<small>
-              {row.forecast ? <>{date(row.forecast)} {row.variance !== null ? `(${signed(row.variance, 'd')})` : ''}</>
-                : <button className="mi-text-button" onClick={() => open(row, '/app/recovery')}>Forecast unverified <ArrowUpRight size={13} /></button>}
-            </small></td>
+            <td>{row.maximumActivityDelay === null ? '—' : <>
+              <strong>{row.maximumActivityDelay}d max</strong>
+              <small>{row.overdueActivities} overdue · {row.scheduleSeverity}</small>
+            </>}</td>
+            <td>{date(row.target)}{row.overdueDays !== null && <span className="mi-negative"> · {row.overdueDays}d past</span>}<div className="mi-forecast">
+              {row.complete ? 'Complete' : row.forecast ? <>
+                {date(row.forecast)} {row.variance !== null ? `(${signed(row.variance, 'd')})` : ''}
+                <small>{row.forecastBasis === 'Recovery Forecast' ? 'Recovery estimate' : row.forecastBasis}</small>
+              </> : row.active && row.target ? <button className="mi-text-button" onClick={() => open(row, '/app/recovery')}>
+                Forecast unverified <ArrowUpRight size={13} />
+              </button> : '—'}
+            </div></td>
           </tr>)}</tbody>
         </table>
       </div>
@@ -235,7 +274,22 @@ function Portfolio({ data, includeFinance }: { data: ManagementData; includeFina
       </div>
       <p className="mi-footnote">Positive gap means payments run ahead of recorded physical progress. Review the payment terms and any advances when assessing the gap.</p>
     </section>}
+    <PortfolioTrend rows={rows} />
+    <div className="mi-visual-grid">
+      <ProjectPressure rows={rows} onOpen={open} />
+      <PortfolioTimeline rows={rows} today={data.today} onOpen={open} />
+    </div>
+    {actionMessage && <p className="mi-notice" role="status">{actionMessage}</p>}
+    <ManagementActions actions={actions} decisions={decisions} projects={data.rows.map(row => row.project)}
+      canManage={canManage} onCreate={() => setDraft({ projectId: project })} onRefresh={refresh} />
     <ReportGallery rows={rows} photos={data.photos} onDocuments={row => open(row, '/app/documents')} />
+    {draft && canManage && <ManagementActionDrawer workspaceId={workspaceId} projects={rows.map(row => row.project)}
+      draft={draft} createdByName={author} onClose={() => setDraft(null)} onSaved={notificationError => {
+        setDraft(null)
+        setActionMessage(notificationError ? 'Action saved. PMOCorex could not send the notifications.' : 'Management action issued.')
+        void refresh()
+      }} />}
+
   </>
 }
 
@@ -243,6 +297,17 @@ export default function ManagementIntelligencePage() {
   const access = useManagementAccess()
   const query = useManagementData(access)
   const { activeWorkspace } = useWorkspace()
+  const [search] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const boardroom = search.get('mode') === 'boardroom'
+  const workspaceName = activeWorkspace?.name || 'Workspace'
+  const toggleBoardroom = () => {
+    const params = new URLSearchParams(search)
+    if (boardroom) params.delete('mode')
+    else params.set('mode', 'boardroom')
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true, preventScrollReset: true })
+  }
   if (access.loading) return <p className="p-8 text-sm text-slate-600">Checking workspace access…</p>
   if (!access.permitted) return <Navigate to="/projects" replace />
   return <div className="mi-page">
@@ -252,18 +317,23 @@ export default function ManagementIntelligencePage() {
     </header>
     <main className="mi-wrap mi-main">
       <div className="mi-hero">
-        <div><div className="mi-workspace">{activeWorkspace?.name || 'Workspace'}</div>
+        <div><div className="mi-workspace">{workspaceName}</div>
           <h1>Management Intelligence</h1><p>Portfolio delivery, cost and decisions in one view.</p></div>
         <div className="mi-refresh">
           {query.dataUpdatedAt > 0 && <span>Refreshed {new Intl.DateTimeFormat('en-NG', { timeZone: 'Africa/Lagos', hour: 'numeric', minute: '2-digit' }).format(query.dataUpdatedAt)}</span>}
-          <button type="button" className="mi-back" onClick={() => void query.refetch()} disabled={query.isFetching}>
-            <RefreshCw size={16} className={query.isFetching ? 'motion-safe:animate-spin' : ''} />{query.isFetching ? 'Updating…' : 'Refresh'}
-          </button>
+          <div className="mi-hero-buttons">
+            <button type="button" className="mi-back" onClick={() => void query.refetch()} disabled={query.isFetching}>
+              <RefreshCw size={16} className={query.isFetching ? 'motion-safe:animate-spin' : ''} />{query.isFetching ? 'Updating…' : 'Refresh'}
+            </button>
+            {query.data && <button type="button" className="mi-back" onClick={toggleBoardroom}><Expand size={16} /> Boardroom mode</button>}
+          </div>
         </div>
       </div>
       {query.isPending && <p className="mi-empty" role="status">Loading portfolio information…</p>}
       {query.isError && <p className="mi-notice" role="alert"><AlertCircle size={18} aria-hidden />Could not refresh the portfolio. {query.data ? 'Showing the last available position.' : 'Try refreshing again.'}</p>}
-      {query.data && <Portfolio key={access.workspaceId} data={query.data} includeFinance={access.includeFinance} />}
+      {query.data && <Portfolio key={access.workspaceId} data={query.data} includeFinance={access.includeFinance}
+        canManage={access.canManage} workspaceId={access.workspaceId!} workspaceName={workspaceName} boardroom={boardroom}
+        exitBoardroom={toggleBoardroom} refresh={() => query.refetch()} />}
     </main>
   </div>
 }
