@@ -10,6 +10,7 @@ import type { Task } from '@/types'
 import { activityBuilders } from '@/core/activity/activityBuilders'
 import { recordActivitySafely } from '@/core/activity/activityService'
 import {
+  clearProjectSchedule,
   createProjectTask,
   deleteProjectTask,
   fetchProjectTask,
@@ -100,17 +101,36 @@ export const useUpdateTask = () => {
   })
 }
 
+function invalidateSchedule(queryClient: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: scheduleQueryKeys.all }),
+    queryClient.invalidateQueries({ queryKey: ['active-schedule-revision'] }),
+    queryClient.invalidateQueries({ queryKey: ['management-intelligence'] }),
+  ])
+}
+
 export const useDeleteTask = () => {
-  const qc = useQueryClient()
+  const queryClient = useQueryClient()
   const { projectId } = useProjectStore()
 
   return useMutation({
     mutationFn: async (id: string) => {
       if (!projectId) throw new Error('No project selected')
-      await deleteProjectTask(projectId, id)
+      return deleteProjectTask(projectId, id)
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: scheduleQueryKeys.project(projectId) })
+    onSuccess: () => invalidateSchedule(queryClient),
+  })
+}
+
+export const useClearSchedule = () => {
+  const queryClient = useQueryClient()
+  const { projectId } = useProjectStore()
+
+  return useMutation({
+    mutationFn: async (packageId: string | null) => {
+      if (!projectId) throw new Error('No project selected')
+      return clearProjectSchedule(projectId, packageId)
     },
+    onSuccess: () => invalidateSchedule(queryClient),
   })
 }
