@@ -86,18 +86,50 @@ export function ProjectPressure({ rows, onOpen }: { rows: ProjectPosition[]; onO
 
 export function PortfolioTimeline({ rows, today, onOpen }: { rows: ProjectPosition[]; today: string; onOpen: OpenProject }) {
   const events = rows.flatMap(row => row.timeline.map(event => ({ ...event, row })))
-    .sort((a, b) => dayDifference(a.date, b.date)).slice(0, 12)
+    .sort((a, b) => dayDifference(a.date, b.date))
+  const overdue = events.filter(event => event.date < today)
+  const upcoming = events.filter(event => event.date >= today)
+
+  function eventList(items: typeof events) {
+    return <ul className="mi-timeline">{items.map(event => {
+      const projectName = event.row.project.project_name
+      const deliveryName = event.packageName ? `${projectName} · ${event.packageName}` : projectName
+      return <li key={`${event.row.project.id}:${event.id}`}>
+        <div>
+          <time dateTime={event.date}>{fullDate(event.date)}{event.date === today ? ' · Today' : ''}</time>
+          {event.overdueDays != null && <small className="mi-timeline-overdue">{event.overdueDays} {event.overdueDays === 1 ? 'day' : 'days'} overdue</small>}
+        </div>
+        <div className="min-w-0">
+          <button className="mi-text-button" type="button" onClick={() => onOpen(event.row, event.module)}
+            aria-label={`${deliveryName}, ${event.title}`}>
+            {deliveryName} <ArrowUpRight size={14} />
+          </button>
+          <small>{event.title}</small>
+        </div>
+      </li>
+    })}</ul>
+  }
+
   return <section id="timeline" className="mi-panel scroll-mt-6" aria-labelledby="timeline-heading">
     <div className="mi-section-heading">
-      <div><h2 id="timeline-heading">Upcoming dates</h2><p>Completion targets, milestones, approvals and procurement.</p></div>
+      <div><h2 id="timeline-heading">Upcoming dates</h2><p>Package handovers, completion targets, milestones, approvals and procurement.</p></div>
       <CalendarDays aria-hidden />
     </div>
-    <ul className="mi-timeline">{events.map(event => <li key={`${event.row.project.id}:${event.id}`}>
-      <time dateTime={event.date}>{fullDate(event.date)}{event.date === today ? ' · Today' : ''}</time>
-      <div><button className="mi-text-button" type="button" onClick={() => onOpen(event.row, event.module)}>{event.title} <ArrowUpRight size={14} /></button>
-        <small>{event.row.project.project_name} · {event.kind}</small></div>
-    </li>)}</ul>
-    {!events.length && <p className="mi-empty">No upcoming dates recorded in this selection.</p>}
+    {overdue.length > 0 && <section className="mb-4" aria-labelledby="timeline-overdue">
+      <h3 id="timeline-overdue">Overdue package deliveries</h3>
+      {eventList(overdue.slice(0, 4))}
+      {overdue.length > 4 && <details className="mt-2">
+        <summary className="mi-text-button cursor-pointer">Show {overdue.length - 4} more overdue</summary>
+        {eventList(overdue.slice(4))}
+      </details>}
+    </section>}
+    {overdue.length > 0 && upcoming.length > 0 && <h3>Coming up</h3>}
+    {eventList(upcoming.slice(0, 12))}
+    {upcoming.length > 12 && <details className="mt-2">
+      <summary className="mi-text-button cursor-pointer">Show {upcoming.length - 12} more dates</summary>
+      {eventList(upcoming.slice(12))}
+    </details>}
+    {!upcoming.length && <p className="mi-empty">No upcoming dates recorded in this selection.</p>}
   </section>
 }
 
