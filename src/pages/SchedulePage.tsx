@@ -25,6 +25,10 @@ import { useProjectStore } from '@/store/project'
 import { useMembershipStore } from '@/store/membership'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useTasks } from '@/hooks/useTasks'
+import { useClearSchedule } from '@/features/schedule/hooks'
+import { revisionTaskNumber, usesCompactedNumbers } from '@/features/schedule/controlledProgramme'
+import { useAuthStore } from '@/store/auth'
+import { logAudit } from '@/lib/audit'
 import { useScheduleImport } from '@/features/schedule/imports'
 import BulkRecoverySetup from '@/features/schedule/BulkRecoverySetup'
 import { useAccessSession } from '@/access/AccessSessionProvider'
@@ -51,7 +55,11 @@ const FOCUS_MODES: FocusMode[] = ['Executive', 'Planner', 'Site', 'Recovery']
 export default function SchedulePage() {
   const { projectId, projectName } = useProjectStore()
   const role = useMembershipStore(state => state.role)
-  const { can } = useAccessSession()
+  const { can, session } = useAccessSession()
+  const { user } = useAuthStore()
+  const clearSchedule = useClearSchedule()
+  const canClearSchedule = can('project.delete', { scopeType: 'project', scopeId: projectId }) &&
+    ['workspace_admin', 'admin'].includes(session.role?.toLowerCase() || '')
 
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
   const [focusMode, setFocusMode] = useState<FocusMode>('Executive')
@@ -169,7 +177,8 @@ export default function SchedulePage() {
     const activities = activeRevision.programme_activities as any[]
     const taskNumberCounts = new Map<number, number>()
     overallTasks.forEach(task => {
-      const n = Number(task.task_number)
+      const number = revisionTaskNumber(task, activeRevision.id)
+      const n = number == null ? NaN : Number(number)
       if (Number.isFinite(n)) taskNumberCounts.set(n, (taskNumberCounts.get(n) || 0) + 1)
     })
     const revisionNumberCounts = new Map<number, number>()
@@ -186,7 +195,8 @@ export default function SchedulePage() {
       const taskPhase = normalise(task.phase)
       const sameName = activities.filter(activity => normalise(activity.name) === taskName)
       const samePhaseAndName = sameName.filter(activity => !taskPhase || !normalise(activity.phase) || normalise(activity.phase) === taskPhase)
-      const n = Number(task.task_number)
+      const number = revisionTaskNumber(task, activeRevision.id)
+      const n = number == null ? NaN : Number(number)
       const uniqueNumber = Number.isFinite(n) && taskNumberCounts.get(n) === 1 && revisionNumberCounts.get(n) === 1
         ? activities.find(activity => Number(activity.task_number) === n)
         : undefined
@@ -203,7 +213,7 @@ export default function SchedulePage() {
         finish_date: activity.finish_date || task.finish_date,
         planned_start: activity.start_date || (task as any).planned_start || task.start_date,
         planned_finish: activity.finish_date || (task as any).planned_finish || task.finish_date,
-        dependencies: activity.dependencies ?? task.dependencies,
+        dependencies: usesCompactedNumbers(task, activeRevision.id) ? task.dependencies : activity.dependencies ?? task.dependencies,
         responsible: activity.responsible ?? task.responsible,
         is_milestone: Boolean(activity.is_milestone) || task.is_milestone,
         controlled_revision_id: activeRevision.id,
@@ -333,6 +343,47 @@ export default function SchedulePage() {
     setModalTask(task)
   }
 
+  const wholeProject = disciplineTab === 'Overall' && selectedPackageId === 'all'
+  const clearablePackage = canManageScheduleUpload ? selectedPackage : undefined
+  const canClearCurrentSchedule = canClearSchedule && (wholeProject
+    ? allTasks.length > 0
+    : !!clearablePackage && allTasks.some(task => task.delivery_package_id === clearablePackage.id))
+
+  async function confirmClearSchedule() {
+    if (!canClearCurrentSchedule || !projectId || importBusy || clearSchedule.isPending) return
+    const packageId = wholeProject ? null : clearablePackage?.id
+    if (packageId === undefined) return
+    const name = wholeProject ? projectName || String(projectId) : clearablePackage!.name
+    const scope = wholeProject ? 'project schedule' : 'package schedule'
+    const confirmation = wholeProject ? 'CLEAR PROJECT SCHEDULE' : 'CLEAR PACKAGE SCHEDULE'
+    const typed = await pmoPrompt({
+      title: `Clear ${scope}?`,
+      message: `This permanently removes all activities from ${name} and deactivates the affected programme revisions. Check the scope before confirming.`,
+      tone: 'error',
+      inputLabel: `Type ${confirmation} to confirm`,
+      confirmLabel: 'Clear schedule',
+      cancelLabel: 'Cancel',
+    })
+    if (typed?.trim() !== confirmation) {
+      if (typed !== null) pmoToast({ title: 'Confirmation did not match', message: 'Enter the exact confirmation text to clear the schedule.', tone: 'warning' })
+      return
+    }
+    try {
+      const count = await clearSchedule.mutateAsync(packageId)
+      setImportNotice('')
+      if (count > 0) {
+        await logAudit(user, 'DELETE', 'Schedule', packageId ?? String(projectId), `Cleared ${count} activities from ${name}`)
+      }
+      pmoToast({
+        title: count > 0 ? 'Schedule cleared' : 'Schedule already empty',
+        message: count > 0 ? `${count} activities removed from ${name}.` : `${name} has no activities to remove.`,
+        tone: 'success',
+      })
+    } catch (error) {
+      pmoToast({ title: 'Schedule could not be cleared', message: error instanceof Error ? error.message : 'Unable to clear schedule.', tone: 'error' })
+    }
+  }
+
   const handleBackupUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
@@ -349,7 +400,7 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    if (importBusy) { event.target.value = ''; return }
+    if (importBusy || clearSchedule.isPending) { event.target.value = ''; return }
     setImportBusy(true); setImportNotice('Importing programme…')
     try {
       const count = await importExcel(file, activeDiscipline, selectedPackageId)
@@ -365,7 +416,7 @@ export default function SchedulePage() {
     if (!canManageScheduleUpload || !activeDiscipline) { event.target.value = ''; return }
     const file = event.target.files?.[0]
     if (!file) return
-    if (importBusy) { event.target.value = ''; return }
+    if (importBusy || clearSchedule.isPending) { event.target.value = ''; return }
     setImportBusy(true); setImportNotice('Importing programme…')
     try {
       const count = await importXml(file, activeDiscipline, selectedPackageId)
@@ -601,11 +652,18 @@ export default function SchedulePage() {
               <select className="rounded-xl border border-[#dfe3e7] bg-white px-3 py-2.5 text-xs text-[#536170]" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="">All status</option>{['Not Started','In Progress','Completed','On Hold','Blocked'].map(status => <option key={status}>{status}</option>)}</select>
               <SlidersHorizontal size={16} className="text-[#8b97a1]" />
               {canManageScheduleUpload && <div className="ml-auto flex flex-wrap gap-2">
-                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Excel<input type="file" hidden accept=".xlsx,.xls,.csv" disabled={importBusy} onChange={handleScheduleUpload} /></label>
-                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />{importBusy ? "Importing…" : "XML"}<input type="file" hidden accept=".xml" disabled={importBusy} onChange={handleXmlScheduleUpload} /></label>{importNotice && <span role="status" aria-live="polite" className="max-w-sm text-xs text-slate-600">{importNotice}</span>}
+                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Excel<input type="file" hidden accept=".xlsx,.xls,.csv" disabled={importBusy || clearSchedule.isPending} onChange={handleScheduleUpload} /></label>
+                <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />{importBusy ? "Importing…" : "XML"}<input type="file" hidden accept=".xml" disabled={importBusy || clearSchedule.isPending} onChange={handleXmlScheduleUpload} /></label>{importNotice && <span role="status" aria-live="polite" className="max-w-sm text-xs text-slate-600">{importNotice}</span>}
                 <label className="cursor-pointer rounded-xl border border-[#dfe3e7] px-3 py-2.5 text-xs font-semibold text-[#536170] hover:border-[#9da9b3]"><Upload size={13} className="mr-1.5 inline" />Backup<input type="file" hidden accept=".pdf,.mpp" onChange={handleBackupUpload} /></label>
-                <button className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0d2e4d]" onClick={() => openTaskModal('new')}><Plus size={14} className="mr-1.5 inline" />Add task</button>
+                <button className="rounded-xl bg-[#123a60] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0d2e4d]" disabled={clearSchedule.isPending} onClick={() => openTaskModal('new')}><Plus size={14} className="mr-1.5 inline" />Add task</button>
               </div>}
+              {canClearCurrentSchedule && (
+                <button type="button" className="rounded-xl border border-red-200 px-3 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  disabled={importBusy || clearSchedule.isPending} onClick={() => void confirmClearSchedule()}>
+                  <Trash2 size={13} className="mr-1.5 inline" />
+                  {clearSchedule.isPending ? 'Clearing…' : wholeProject ? 'Clear project schedule' : 'Clear package schedule'}
+                </button>
+              )}
             </div>
           </div>
 
