@@ -104,7 +104,7 @@ async function extractWordReport(buffer: ArrayBuffer, document: DocumentRow): Pr
       id: `word:${document.id}:${path}`,
       projectId: document.project_id,
       title: docProps?.getAttribute('descr') || docProps?.getAttribute('title') || document.title,
-      date: isoDay(document.revision_date || document.created_at) || '',
+      date: isoDay(document.revision_date) ?? isoDay(document.created_at) ?? '',
       src: URL.createObjectURL(new Blob([photo], { type: mime })),
     })
     if (photos.length >= MAX_PHOTOS) break
