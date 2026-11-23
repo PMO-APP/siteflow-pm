@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpRight, Camera, FileText, X } from 'lucide-react'
+import { ArrowLeft, Camera, History, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useHistoricalReportPhotos, type SitePhotoReport } from './data'
 import { isWordReport, readWordReport } from './reportDocuments'
-import { isoDay, type DocumentRow, type Photo, type ProjectPosition, type ReportDocument } from './model'
+import { isoDay, photoReportingWeek, type DocumentRow, type Photo, type ProjectPosition } from './model'
 
 function usePhotoUrl(photo: Photo | undefined) {
   const [signed, setSigned] = useState<{ path: string; url: string | null }>()
@@ -32,97 +33,142 @@ function dateLabel(day?: string | null) {
 }
 
 function useWordPhotos(documents: DocumentRow[]) {
-  const [reports, setReports] = useState<Map<string, ReportDocument>>(new Map())
-  const signature = JSON.stringify(documents.map(d => [d.id, d.storage_path, d.updated_at, d.revision_date, d.title]))
+  const [result, setResult] = useState<{ signature: string; photos: Photo[] }>()
+  const signature = JSON.stringify(documents.map(d => [d.id, d.storage_path, d.updated_at, d.revision_date, d.created_at, d.title]))
   const currentDocuments = useRef(documents)
   currentDocuments.current = documents
   useEffect(() => {
     const controller = new AbortController()
     const photoUrls = new Set<string>()
-    setReports(new Map())
-    for (const document of currentDocuments.current) {
-      void readWordReport(document, controller.signal).then(report => {
-        for (const photo of report.photos) {
-          if (!photo.src) continue
-          if (controller.signal.aborted) URL.revokeObjectURL(photo.src)
-          else photoUrls.add(photo.src)
-        }
-        if (!controller.signal.aborted) setReports(current => new Map(current).set(String(document.id), report))
-      }).catch(() => {})
+    const reports = currentDocuments.current
+    setResult({ signature, photos: [] })
+
+    async function loadReports() {
+      // Bound concurrent downloads when a portfolio has several report files.
+      for (let i = 0; i < reports.length && !controller.signal.aborted; i += 4) {
+        await Promise.all(reports.slice(i, i + 4).map(async document => {
+          try {
+            const { photos } = await readWordReport(document, controller.signal)
+            for (const photo of photos) {
+              if (!photo.src) continue
+              if (controller.signal.aborted) URL.revokeObjectURL(photo.src)
+              else photoUrls.add(photo.src)
+            }
+            if (photos.length && !controller.signal.aborted) {
+              setResult(current => current?.signature === signature ? { signature, photos: [...current.photos, ...photos] } : current)
+            }
+          } catch {
+            // Continue rendering photos from the other reports.
+          }
+        }))
+      }
     }
+
+    void loadReports()
     return () => {
       controller.abort()
       photoUrls.forEach(url => URL.revokeObjectURL(url))
     }
   }, [signature])
-  return reports
+  return result?.signature === signature ? result.photos : []
 }
 
-export default function ReportGallery({ rows, photos, onDocuments }: {
-  rows: ProjectPosition[]
+function PhotoGrid({ photos, documents, projects, emptyMessage }: {
   photos: Photo[]
-  onDocuments: (row: ProjectPosition) => void
+  documents: DocumentRow[]
+  projects: Map<string, ProjectPosition>
+  emptyMessage: string
 }) {
   const [photoLimit, setPhotoLimit] = useState(12)
-  const [documentLimit, setDocumentLimit] = useState(8)
   const [selected, setSelected] = useState<string | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
-  const projects = useMemo(() => new Map(rows.map(row => [String(row.project.id), row])), [rows])
-  const documents = rows.flatMap(row => row.documents).sort((a, b) =>
-    (b.revision_date || b.created_at || '').localeCompare(a.revision_date || a.created_at || ''))
-  const extracted = useWordPhotos(documents.filter(isWordReport).slice(0, documentLimit))
-  const shownPhotos = [...photos.filter(photo => projects.has(String(photo.projectId))), ...Array.from(extracted.values()).flatMap(report => report.photos)]
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const embeddedPhotos = useWordPhotos(documents)
+  const shownPhotos = [...photos, ...embeddedPhotos].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
   const photo = shownPhotos.find(item => item.id === selected)
-  const report = documents.find(item => `report:${item.id}` === selected)
-  const detail = report && extracted.get(String(report.id))
-  const dialogTitle = photo?.title || report?.title
-  const dialogProject = projects.get(String(photo?.projectId ?? report?.project_id))
+  const projectName = (photo: Photo) => projects.get(String(photo.projectId))?.project.project_name
+
   useEffect(() => {
-    if (dialogTitle && !dialog.current?.open) dialog.current?.showModal()
-    if (!dialogTitle && dialog.current?.open) dialog.current.close()
-  }, [dialogTitle])
+    if (photo && !dialog.current?.open) dialog.current?.showModal()
+    if (!photo && dialog.current?.open) dialog.current.close()
+  }, [photo])
+
+  return <>
+    {shownPhotos.length ? <div className="mi-gallery">
+      {shownPhotos.slice(0, photoLimit).map(item => <button key={item.id} type="button" className="mi-photo" onClick={() => setSelected(item.id)}>
+        <PhotoImage photo={item} />
+        <span className="mi-photo-caption">
+          <strong>{projectName(item)}</strong>
+          <span>{item.title}</span>
+          <small>{dateLabel(item.date)}</small>
+        </span>
+      </button>)}
+    </div> : <p className="mi-empty">{emptyMessage}</p>}
+    {shownPhotos.length > photoLimit && <button type="button" className="mi-text-button mt-4" onClick={() => setPhotoLimit(n => n + 12)}>Show more photos</button>}
+    <dialog ref={dialog} className="mi-dialog" aria-labelledby="mi-photo-preview-title" onClose={() => setSelected(null)}
+      onClick={event => { if (event.target === dialog.current) dialog.current?.close() }}>
+      {photo && <div className="mi-dialog-content">
+        <header><h3 id="mi-photo-preview-title">{photo.title}</h3><button autoFocus type="button" aria-label="Close preview" onClick={() => dialog.current?.close()}><X size={21} /></button></header>
+        <PhotoImage photo={photo} full />
+        <p>{projectName(photo)} · {dateLabel(photo.date)}</p>
+      </div>}
+    </dialog>
+  </>
+}
+
+const documentWeek = (document: DocumentRow) =>
+  photoReportingWeek(isoDay(document.revision_date) ?? isoDay(document.created_at))
+
+export default function ReportGallery({ rows, photos, historyReports, historyDesignPhotos }: {
+  rows: ProjectPosition[]
+  photos: Photo[]
+  historyReports: SitePhotoReport[]
+  historyDesignPhotos: Photo[]
+}) {
+  const [showHistory, setShowHistory] = useState(false)
+  const [selectedWeek, setSelectedWeek] = useState('')
+  const projects = useMemo(() => new Map(rows.map(row => [String(row.project.id), row])), [rows])
+  const latestPhotos = photos.filter(photo => projects.has(String(photo.projectId)))
+  const latestDocuments = rows.flatMap(row => row.sitePhotos.documents).filter(isWordReport)
+  const archiveDesignPhotos = historyDesignPhotos.filter(photo => projects.has(String(photo.projectId)))
+  const archiveReports = historyReports.filter(report => projects.has(String(report.project_id)))
+  const archiveDocuments = rows.flatMap(row => row.sitePhotos.historyDocuments).filter(isWordReport)
+  const weeks = [...new Set([
+    ...archiveDesignPhotos.map(photo => photoReportingWeek(photo.date)),
+    ...archiveReports.map(report => photoReportingWeek(report.report_date)),
+    ...archiveDocuments.map(documentWeek),
+  ].filter((week): week is string => week !== null))].sort().reverse()
+  const week = weeks.includes(selectedWeek) ? selectedWeek : (weeks[0] ?? '')
+  const weekReports = archiveReports.filter(report => photoReportingWeek(report.report_date) === week)
+  const archiveQuery = useHistoricalReportPhotos(weekReports, showHistory)
+  const galleryKey = [...projects.keys()].sort().join(',')
 
   return (
     <section id="visual-updates" aria-labelledby="visual-heading" className="mi-panel scroll-mt-6">
-      <div className="mi-section-heading">
-        <div><h2 id="visual-heading">Site photos and reports</h2><p>See the latest site evidence and read uploaded reports.</p></div>
-        <Camera aria-hidden />
+      <div className="mi-section-heading flex-wrap">
+        <div><h2 id="visual-heading">Site Photos</h2><p>Photos from each project’s latest reporting week.</p></div>
+        <button type="button" className="mi-back" aria-controls="mi-gallery-history" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)}>
+          {showHistory ? <><ArrowLeft size={16} /> Back to latest photos</> : <><History size={16} /> Gallery History</>}
+        </button>
       </div>
-      {shownPhotos.length ? <div className="mi-gallery">
-        {shownPhotos.slice(0, photoLimit).map(item => <button key={item.id} type="button" className="mi-photo" onClick={() => setSelected(item.id)}>
-          <PhotoImage photo={item} />
-          <span className="mi-photo-caption">
-            <strong>{projects.get(String(item.projectId))?.project.project_name}</strong>
-            <span>{item.title}</span>
-            <small>{dateLabel(item.date)}</small>
-          </span>
-        </button>)}
-      </div> : <p className="mi-empty">No site photos to display for these projects.</p>}
-      {shownPhotos.length > photoLimit && <button className="mi-text-button mt-4" onClick={() => setPhotoLimit(n => n + 12)}>Show more photos</button>}
-      {documents.length > 0 && <div className="mi-document-list">
-        <h3>Uploaded reports</h3>
-        {documents.slice(0, documentLimit).map(doc => {
-          const row = projects.get(String(doc.project_id))
-          if (!row) return null
-          return <button type="button" key={doc.id} className="mi-document" onClick={() => setSelected(`report:${doc.id}`)}>
-            <FileText size={18} aria-hidden />
-            <span><strong>{doc.title}</strong><small>{row.project.project_name} · {dateLabel(isoDay(doc.revision_date || doc.created_at))}</small></span>
-            <ArrowUpRight size={17} aria-hidden />
-          </button>
-        })}
-        {documents.length > documentLimit && <button className="mi-text-button" onClick={() => setDocumentLimit(n => n + 8)}>Show more reports</button>}
-      </div>}
-      <dialog ref={dialog} className="mi-dialog" aria-labelledby="mi-preview-title" onClose={() => setSelected(null)} onClick={event => { if (event.target === dialog.current) dialog.current?.close() }}>
-        {dialogTitle && <div className="mi-dialog-content">
-          <header><h3 id="mi-preview-title">{dialogTitle}</h3><button autoFocus type="button" aria-label="Close preview" onClick={() => dialog.current?.close()}><X size={21} /></button></header>
-          {photo && <><PhotoImage photo={photo} full /><p>{dialogProject?.project.project_name} · {dateLabel(photo.date)}</p></>}
-          {report && <><p>{dialogProject?.project.project_name} · {dateLabel(isoDay(report.revision_date || report.created_at))}</p>
-            {(detail?.excerpt || report.description) && <div className="mi-excerpt whitespace-pre-line">{detail?.excerpt || report.description}</div>}
-            {dialogProject && <button className="mi-text-button" onClick={() => onDocuments(dialogProject)}>Open project documents <ArrowUpRight size={16} /></button>}
-          </>}
-        </div>}
-      </dialog>
+      <div id="mi-gallery-history" hidden={!showHistory}>
+        {showHistory && <>
+          <div className="mi-filter-bar mb-4">
+            <h3>Gallery History</h3>
+            {weeks.length > 0 && <label>Week ending
+              <select value={week} onChange={event => setSelectedWeek(event.target.value)}>
+                {weeks.map(day => <option key={day} value={day}>{dateLabel(day)}</option>)}
+              </select>
+            </label>}
+          </div>
+          <PhotoGrid key={`${galleryKey}:${week}`} projects={projects}
+            photos={[...archiveDesignPhotos.filter(photo => photoReportingWeek(photo.date) === week), ...(archiveQuery.data ?? [])]}
+            documents={archiveDocuments.filter(report => documentWeek(report) === week)}
+            emptyMessage={archiveQuery.isFetching ? 'Loading photos for this reporting week…' : 'No photos available for this reporting week.'} />
+          {archiveQuery.isError && <p className="mi-empty" role="alert">Some photos could not be loaded. <button type="button" className="mi-text-button" onClick={() => void archiveQuery.refetch()}>Try again</button></p>}
+        </>}
+      </div>
+      {!showHistory && <PhotoGrid key={galleryKey} projects={projects} photos={latestPhotos} documents={latestDocuments}
+        emptyMessage="No photos in the latest reports for these projects." />}
     </section>
   )
 }
