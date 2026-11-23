@@ -89,11 +89,17 @@ export async function deleteProjectTask(
   projectId: number | string,
   taskId: string
 ) {
-  const { error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', taskId)
-    .eq('project_id', projectId)
+  const { data, error } = await supabase.rpc('admin_delete_schedule_task', {
+    p_project_id: Number(projectId), p_task_id: taskId,
+  })
+  if (error) throw new Error(error.message)
+  return data === true
+}
 
-  if (error) throw error
+export async function clearProjectSchedule(projectId: string | number, packageId: string | null) {
+  const { data, error } = await supabase.rpc('admin_clear_schedule', {
+    p_project_id: Number(projectId), p_delivery_package_id: packageId, p_whole_project: packageId === null,
+  })
+  if (error) throw new Error(error.message)
+  return Number(data)
 }
