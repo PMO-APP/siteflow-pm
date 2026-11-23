@@ -21,7 +21,7 @@ type TourStep = {
 
 const STEPS: TourStep[] = [
   { id:'welcome', title:'Welcome to PMOCorex', body:'This guide will take you from the Workspace Hub into a live project so you can learn where the important controls are without needing someone beside you.', route:'/projects', placement:'center' },
-  { id:'command', title:'All Project Command Center', body:'Use this workspace-level control room for cross-project health, delivery pressure, risks and executive intervention.', target:'[data-tour="all-project-command-center"]', route:'/projects', placement:'bottom' },
+  { id:'command', title:'Management Intelligence', body:'Review delivery, constraints, trends and management actions across the portfolio.', target:'[data-tour="management-intelligence"]', route:'/projects', placement:'bottom' },
   { id:'portfolios', title:'Your portfolios', body:'Projects are grouped into delivery environments here. Use portfolios to organise and filter the workspace.', target:'[data-tour="portfolio-overview"]', route:'/projects', placement:'top' },
   { id:'focus', title:'Your work today', body:'This shows projects assigned, delegated or under your authority, plus active work and projects needing attention.', target:'[data-tour="my-work-today"]', route:'/projects', placement:'top' },
   { id:'open-project', title:'Enter a project', body:'Click Open on a project in the Project Register. The guide will continue inside that project automatically.', target:'[data-tour="project-open"]', route:'/projects', interaction:true, placement:'top' },
