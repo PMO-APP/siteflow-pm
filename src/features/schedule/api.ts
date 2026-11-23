@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Task } from '@/types'
 import { publishTaskMutationEvents } from '@/services/events/domainEventPublishers'
-import { normaliseActivityName, type RevisionProgrammeActivity } from './revisionProgramme'
+import { applyControlledProgramme } from './controlledProgramme'
 
 export async function fetchProjectTasks(projectId: number | string) {
   const { data, error } = await supabase
@@ -31,44 +31,7 @@ export async function fetchProjectTasks(projectId: number | string) {
     throw revisionError
   }
 
-  const revisions = activeRevisions || []
-  if (!revisions.length) return baseTasks
-
-  return baseTasks.map(task => {
-    // Package revisions control only their own contractor/package programme.
-    // A project-wide revision is applied to the consolidated master in SchedulePage,
-    // never sprayed across underlying contractor programmes where task numbers can repeat.
-    const revision = task.delivery_package_id
-      ? revisions.find(item => item.block_id && String(item.block_id) === String(task.delivery_package_id))
-      : revisions.find(item => !item.block_id)
-    const activities = (revision?.programme_activities || []) as RevisionProgrammeActivity[]
-    if (!revision || !activities.length) return task
-
-    const taskName = normaliseActivityName(task.name)
-    const taskNumber = Number(task.task_number)
-    const numbered = Number.isFinite(taskNumber)
-      ? activities.filter(activity => Number(activity.task_number) === taskNumber)
-      : []
-    const named = activities.filter(activity => normaliseActivityName(activity.name) === taskName)
-    // Within one package, task number is the strongest identity. Name is the
-    // fallback for legacy imports. Ambiguous matches are deliberately ignored.
-    const activity = numbered.length === 1 ? numbered[0] : named.length === 1 ? named[0] : undefined
-    if (!activity) return task
-
-    return {
-      ...task,
-      start_date: activity.start_date || task.start_date,
-      finish_date: activity.finish_date || task.finish_date,
-      planned_start: activity.start_date || (task as any).planned_start || task.start_date,
-      planned_finish: activity.finish_date || (task as any).planned_finish || task.finish_date,
-      dependencies: activity.dependencies ?? task.dependencies,
-      responsible: activity.responsible ?? task.responsible,
-      is_milestone: activity.is_milestone || task.is_milestone,
-      controlled_revision_id: revision.id,
-      controlled_revision_no: revision.revision_no,
-      controlled_revision_name: revision.revision_name,
-    } as Task
-  })
+  return applyControlledProgramme(baseTasks, activeRevisions ?? [])
 }
 
 export async function createProjectTask(
