@@ -44,6 +44,7 @@ export type TaskRow = RecordRow & ProgressTask & PackageReference & {
 }
 export type Report = RecordRow & {
   report_date: string
+  workflow_status?: string | null
   discipline?: string
   delivery_package_id?: string | number | null
   block_id?: string | number | null
@@ -80,6 +81,7 @@ export type Procurement = RecordRow & PackageReference & { name?: string; status
 export type Risk = RecordRow & { title?: string; status?: string; risk_score?: number; score?: number; severity?: string; rating?: string; owner?: string; mitigation_action?: string }
 export type DocumentRow = RecordRow & { title: string; type: string; storage_path?: string; file_type?: string; file_size_kb?: number; revision_date?: string; status?: string; approval_status?: string; review_status?: string; issued_for?: string; drawing_number?: string; document_number?: string; discipline?: string; description?: string }
 export type ReportPhoto = { id: string | number; report_id: string | number; photo_url?: string; photo_name?: string; caption?: string; created_at?: string; report_type?: string | null }
+export type DesignSubmission = RecordRow & { report_week: string; status?: string | null; snapshot_data?: { progressEvidence?: { id: string | number }[] } | null }
 export type DesignPhoto = RecordRow & { file_name: string; storage_path: string; caption?: string; location?: string; context_id?: string }
 export type Photo = { id: string; projectId: number; title: string; date: string; src?: string; path?: string }
 export type ReportDocument = { excerpt: string | null; photos: Photo[] }
@@ -96,6 +98,7 @@ export type Data = {
   contracts: Contract[] | null
   variations: Variation[] | null
   design: Design[] | null
+  designSubmissions?: DesignSubmission[] | null
   costNotes: CostNote[] | null
   approvals: Approval[] | null
   procurement: Procurement[] | null
@@ -381,6 +384,51 @@ function upcomingEvents(data: Data, tasks: TaskRow[], revisions: Revision[], tar
 const latestDocuments = (documents: DocumentRow[]) => latestBy(documents,
   r => [normal(r.discipline), normal(r.drawing_number || r.document_number || r.title)].join(':'),
   r => `${r.revision_date || ''}:${r.updated_at || r.created_at || ''}`)
+export function photoReportingWeek(value?: string | null) {
+  const day = isoDay(value)
+  if (!day) return null
+  const date = new Date(day)
+  // Weekly reports use the Friday of their Monday–Sunday reporting week.
+  date.setUTCDate(date.getUTCDate() + 5 - (date.getUTCDay() || 7))
+  return date.toISOString().slice(0, 10)
+}
+
+const draftOrInvalid = (status?: string | null) =>
+  ['draft', 'returned', 'rejected', 'void', 'cancelled', 'canceled'].includes(normal(status))
+
+function reportPhotoScope(data: Data, today: string) {
+  const submittedReports = latestReports((data.reports ?? []).filter(report =>
+    !!isoDay(report.report_date) && report.report_date <= today && !draftOrInvalid(report.workflow_status)))
+  const currentWeek = photoReportingWeek(today)!
+  const designReport = latestBy((data.designSubmissions ?? []).filter(submission => {
+    const week = photoReportingWeek(submission.report_week)
+    return !!week && week <= currentWeek && !draftOrInvalid(submission.status)
+  }), submission => submission.report_week,
+  submission => `${submission.report_week}:${submission.updated_at || submission.created_at || ''}`)[0]
+  const designWeek = photoReportingWeek(designReport?.report_week)
+  const designEvidence = designReport?.snapshot_data?.progressEvidence
+  const documentDay = (document: DocumentRow) => isoDay(document.revision_date) ?? isoDay(document.created_at)
+  const historyDocuments = (data.documents ?? []).filter(document => {
+    const day = documentDay(document)
+    return normal(document.type) === 'report' && !!day && day <= today && !draftOrInvalid(document.status)
+  })
+  const reportDocuments = historyDocuments.filter(document => normal(document.status) !== 'superseded')
+  const weeks = [
+    ...submittedReports.map(report => photoReportingWeek(report.report_date)),
+    ...reportDocuments.map(document => photoReportingWeek(documentDay(document))),
+    designWeek,
+  ].filter((week): week is string => week !== null)
+  const week = weeks.sort().pop() ?? null
+  return {
+    week,
+    designWeek,
+    designEvidenceIds: Array.isArray(designEvidence) ? designEvidence.map(photo => String(photo.id)) : null,
+    reportIds: submittedReports.filter(report => photoReportingWeek(report.report_date) === week).map(report => String(report.id)),
+    documents: latestDocuments(reportDocuments.filter(document => photoReportingWeek(documentDay(document)) === week)),
+    historyDocuments,
+  }
+}
+
 const sum = (values: Amount[]) => values.reduce<number | null>((acc, value) => {
   const next = number(value)
   return acc === null || next === null ? null : acc + next
@@ -616,7 +664,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
       .map(r => ({ key: `cost:${r.id}`, date: isoDay(r.report_week), text: [r.item_title, shortText(r.description)].filter(Boolean).join(' · ') })),
     ...documents.map(r => ({ key: `doc:${r.id}`, date: isoDay(r.revision_date || r.created_at), text: shortText(r.description) })),
   ].filter(update => update.date && update.date <= today && update.text).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4)
-  const photosScope = reports.map(r => String(r.id))
+  const sitePhotos = reportPhotoScope(data, today)
   const timeline = withdrawn(project.status) || recordedProjectCompletion ? []
     : upcomingEvents(data, tasks, revisions, target, recordedTarget, today).filter(event => active || !!event.packageName)
   return {
@@ -628,7 +676,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     progressHistory: reportedProgress(data.reports ?? [], today),
     timeline,
     primary: constraints.find(item => item.reason),
-    updates, photosScope, documents,
+    updates, sitePhotos,
     commercial: includeFinance ? commercialPosition(project, data, actual) : null,
   }
 }
