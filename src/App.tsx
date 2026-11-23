@@ -293,13 +293,7 @@ export default function App() {
 
         <Route
           path="/executive-dashboard"
-          element={
-            <RequireAuth>
-              <RequirePermission action="reports.view">
-                <ExecutiveDashboardPage />
-              </RequirePermission>
-            </RequireAuth>
-          }
+          element={<ExecutiveDashboardPage />}
         />
 
         <Route
