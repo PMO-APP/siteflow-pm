@@ -20,8 +20,9 @@ interface Props {
 export default function TaskModal({ task, onClose, deliveryPackageId, discipline }: Props) {
   const { user } = useAuthStore()
   const { projectId } = useProjectStore()
-  const {can}=useAccessSession()
-  const canDeleteTask=can('project.delete',{scopeType:'project',scopeId:projectId})
+  const { can, session } = useAccessSession()
+  const canDeleteTask = can('project.delete', { scopeType: 'project', scopeId: projectId }) &&
+    ['workspace_admin', 'admin'].includes(session.role?.toLowerCase() || '')
   const create = useCreateTask()
   const update = useUpdateTask()
   const del = useDeleteTask()
@@ -133,10 +134,10 @@ export default function TaskModal({ task, onClose, deliveryPackageId, discipline
   }
 
   const remove = async () => {
-    if (!task || !await pmoConfirm('Delete this task?')) return
+    if (!task || !canDeleteTask || !await pmoConfirm('Delete this activity and renumber the remaining activities in its schedule?')) return
     try {
-      await del.mutateAsync(task.id)
-      await logAudit(user, 'DELETE', 'Schedule', task.id, task.name)
+      const removed = await del.mutateAsync(task.id)
+      if (removed) await logAudit(user, 'DELETE', 'Schedule', task.id, task.name)
       onClose()
     } catch (err: any) {
       console.error('Task delete failed:', err)
@@ -144,7 +145,7 @@ export default function TaskModal({ task, onClose, deliveryPackageId, discipline
     }
   }
 
-  const pending = create.isPending || update.isPending
+  const pending = create.isPending || update.isPending || del.isPending
 
   return (
     <Drawer
@@ -156,7 +157,7 @@ export default function TaskModal({ task, onClose, deliveryPackageId, discipline
       footer={
         <>
           {task && canDeleteTask && (
-            <button className="ui-button ui-button--danger mr-auto" onClick={remove} disabled={del.isPending}>
+            <button className="ui-button ui-button--danger mr-auto" onClick={remove} disabled={pending}>
               <Trash2 size={15} /> Delete task
             </button>
           )}
