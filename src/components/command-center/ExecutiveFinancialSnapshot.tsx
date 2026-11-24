@@ -197,7 +197,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
   if (!permitted) return null
   return <section className="pmx-section-panel" aria-label="Financial health">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, certified work and physical delivery in one view.</p></div>
+      <div><div className="pmx-eyebrow">Commercial control</div><h2 className="mt-1 text-xl font-semibold">Financial health</h2><p className="mt-1 text-sm text-[var(--pmx-muted)]">Payments, certified work and estimated schedule progress in one view.</p></div>
       <button className="pmx-btn-secondary" type="button" onClick={() => navigate('/app/costing')}>Open Costing →</button>
     </div>
     {loading ? <p className="mt-5 text-sm">Loading financial records…</p> : error ? <p role="alert" className="mt-5 text-sm text-amber-700">Financial data unavailable. Check Costing register access. {error}</p> : figures.currencyConflict ? <p role="alert" className="mt-5 text-sm text-amber-700">Multiple currencies detected. Financial totals are withheld until the records are reconciled into one reporting currency.</p> : <>
@@ -210,7 +210,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
           <span className="text-xs text-[var(--pmx-muted)]">Management snapshot</span>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <div><div className="text-xs text-[var(--pmx-muted)]">Physical completion</div><strong>{progressKnown ? `${progress.toFixed(1)}%` : 'Awaiting data'}</strong></div>
+          <div><div className="text-xs text-[var(--pmx-muted)]">Estimated schedule progress</div><strong>{progressKnown ? `${progress.toFixed(1)}%` : 'Awaiting data'}</strong></div>
           <div><div className="text-xs text-[var(--pmx-muted)]">Approved budget disbursed</div><strong>{figures.currencyConflict || figures.paymentPct === null ? 'Awaiting verified data' : `${figures.paymentPct.toFixed(1)}%`}</strong></div>
           <div><div className="text-xs text-[var(--pmx-muted)]">Certified value less payments</div><strong>{figures.currencyConflict || figures.paidCertifiedGap === null ? 'Awaiting verified data' : money(-figures.paidCertifiedGap, figures.currency)}</strong></div>
         </div>
@@ -222,7 +222,7 @@ export default function ExecutiveFinancialSnapshot({ physicalProgress }: { physi
                 : figures.paidCertifiedGap !== null && figures.paidCertifiedGap < 0
                   ? 'Certified work exceeds recorded payments. Review unpaid certificates and payment commitments with Costing.'
                   : 'Recorded payments and certified value are equal.'}
-              {' '}Budget disbursement and physical progress are different measures; their percentage-point difference is not proof of overpayment or underperformance.
+              {' '}Budget disbursement and estimated schedule progress are different measures; their percentage-point difference is not proof of overpayment or underperformance.
             </p>}
         {figures.budget !== null && figures.paid !== null && figures.paid > figures.budget &&
           <p role="alert" className="mt-2 text-xs font-semibold text-red-700">Recorded payments exceed approved budget by {money(figures.paid - figures.budget, figures.currency)}. Costing reconciliation required.</p>}
