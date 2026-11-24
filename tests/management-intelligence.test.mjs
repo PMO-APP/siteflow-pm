@@ -128,8 +128,8 @@ test('one small unfinished activity can leave a project past date when progress 
   const row = projectPosition({ ...project, handover_date: '2026-11-01' }, {
     ...empty,
     tasks: [
-      { ...entry, progress_pct: 100, weight_pct: 1000 },
-      { ...entry, id: 'small', progress_pct: 0, weight_pct: 1 },
+      { ...entry, progress_pct: 100, weight_pct: 99.9 },
+      { ...entry, id: 'small', progress_pct: 0, weight_pct: 0.1 },
     ],
   }, day, true)
   assert.equal(row.actual, 100)
