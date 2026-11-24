@@ -1,35 +1,10 @@
+import { calculateProgressPosition, executableTasks, taskProgress } from '@/core/metrics/progressMetrics'
 import { differenceInDays } from 'date-fns'
 import type { ProjectState } from '@/core/intelligence/models/ProjectState'
 import { isPast, toDate, toISO } from './dateUtils'
 
-function clamp(value: number, min = 0, max = 100) {
-  return Math.min(max, Math.max(min, value))
-}
-
 function id(value: unknown) {
   return value === null || value === undefined ? '' : String(value)
-}
-
-function progress(task: any) {
-  if (task.status === 'Completed') return 100
-  if (task.status === 'Not Started') return 0
-  return clamp(Number(task.progress_pct || 0))
-}
-
-function weightedProgress(tasks: any[]) {
-  if (!tasks.length) return 0
-  const totalWeight = tasks.reduce((sum, task) => sum + Number(task.weight_pct || 0), 0)
-
-  if (totalWeight <= 0) {
-    return Math.round(tasks.reduce((sum, task) => sum + progress(task), 0) / tasks.length)
-  }
-
-  const earned = tasks.reduce(
-    (sum, task) => sum + Number(task.weight_pct || 0) * (progress(task) / 100),
-    0
-  )
-
-  return Math.round((earned / totalWeight) * 100)
 }
 
 function predecessors(value: unknown): string[] {
@@ -77,6 +52,7 @@ export function normalizeProjectState({
     deliveryPackages.map(pkg => [id(pkg.id), pkg])
   )
 
+  tasks = executableTasks(tasks)
   const activities = tasks.map(task => ({
     id: id(task.id),
     taskNumber: Number(task.task_number || 0),
@@ -84,7 +60,7 @@ export function normalizeProjectState({
     discipline: task.discipline || null,
     phase: task.phase || task.stage || null,
     status: task.status || null,
-    progress: progress(task),
+    progress: taskProgress(task),
     weight: Number(task.weight_pct || 0),
     plannedStart: toISO(task.planned_start || task.start_date),
     plannedFinish: toISO(task.planned_finish || task.finish_date),
@@ -114,14 +90,8 @@ export function normalizeProjectState({
     activities.map(item => toDate(item.plannedFinish)).filter(Boolean).sort((a: any, b: any) => b.getTime() - a.getTime())[0] ||
     null
 
-  const actual = weightedProgress(tasks)
-  const planned =
-    scheduleStart && scheduleFinish
-      ? clamp(Math.round(
-          (differenceInDays(today, scheduleStart) /
-            Math.max(1, differenceInDays(scheduleFinish, scheduleStart))) * 100
-        ))
-      : 0
+  const position = calculateProgressPosition(tasks, today)
+  const { actual, planned } = position
 
   const openSnags = snags.filter(item => !['Closed', 'Resolved'].includes(item.status || ''))
   const criticalSnags = openSnags.filter(item =>
@@ -199,7 +169,7 @@ export function normalizeProjectState({
       })),
       totalActivities: activities.length,
       completedActivities: activities.filter(item => item.progress >= 100).length,
-      overdueActivities: activities.filter(item => isPast(item.plannedFinish, today) && item.progress < 100).length,
+      overdueActivities: position.overdue,
       weightedProgress: actual,
       plannedProgress: planned,
       variancePercent: actual - planned,
