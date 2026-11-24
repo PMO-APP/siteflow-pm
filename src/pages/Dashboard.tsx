@@ -36,7 +36,7 @@ import { useProjectHealth } from '@/hooks/useProjectHealth'
 import { HealthDetailsDrawer, ProjectHealthCard } from '@/components/health'
 import { ProjectTimelinePanel } from '@/components/intelligence/ProjectTimelinePanel'
 import { AutonomousIntelligencePanel } from '@/components/intelligence/AutonomousIntelligencePanel'
-import { calculateProjectProgress, taskProgress } from '@/core/metrics/progressMetrics'
+import { calculateProjectProgress, calculateProjectPlannedProgress, taskProgress } from '@/core/metrics/progressMetrics'
 import { getRevisionTargetDate, isRevisedProgramme, useActiveScheduleRevision } from '@/hooks/useActiveScheduleRevision'
 
 const colorPool = [
@@ -300,9 +300,7 @@ export default function Dashboard() {
     ? clamp(Math.round((elapsed / totalDays) * 100))
     : 0
 
-  const plannedPct = hasTimeline
-    ? clamp(Math.round((elapsed / totalDays) * 100))
-    : 0
+  const plannedPct = calculateProjectPlannedProgress(tasks, today)
 
   const done = tasks.filter((t: any) => getTaskProgress(t) >= 100).length
   const inProg = tasks.filter((t: any) => getTaskStatus(t) === 'In Progress').length
