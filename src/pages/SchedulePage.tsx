@@ -1,3 +1,4 @@
+import BOQCertification from "@/features/schedule/BOQCertification"
 import MeasuredPhysicalProgress from "@/features/schedule/MeasuredPhysicalProgress"
 import ProgressWeighting from "@/features/schedule/ProgressWeighting"
 import {
@@ -551,6 +552,7 @@ export default function SchedulePage() {
       <div className="mx-auto max-w-[1600px] space-y-5">
         {canConfigurePackages && projectId != null && <ProgressWeighting key={String(projectId)} tasks={projectTasks} projectId={projectId} packageNames={Object.fromEntries(deliveryPackages.map(p=>[p.id,p.name]))}/>}
         {canConfigurePackages && projectId != null && <MeasuredPhysicalProgress key={`measured-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
+        {canConfigurePackages && projectId != null && <BOQCertification key={`boq-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
         <section className="overflow-hidden rounded-[24px] border border-[#dfe3e7] bg-white">
           <div className="grid lg:grid-cols-[1fr_320px]">
             <div className="p-6 sm:p-8 lg:p-10">
