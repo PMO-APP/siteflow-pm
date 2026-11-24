@@ -45,6 +45,8 @@ export const useCreateTask = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: scheduleQueryKeys.project(projectId) })
+      qc.invalidateQueries({ queryKey: ['management-intelligence'] })
+      qc.invalidateQueries({ queryKey: ['project-health', projectId] })
     },
   })
 }
@@ -94,6 +96,8 @@ export const useUpdateTask = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: scheduleQueryKeys.project(projectId) })
+      qc.invalidateQueries({ queryKey: ['management-intelligence'] })
+      qc.invalidateQueries({ queryKey: ['project-health', projectId] })
       qc.invalidateQueries({ queryKey: ['weekly_reports', projectId] })
       qc.invalidateQueries({ queryKey: ['activity-feed', projectId] })
       qc.invalidateQueries({ queryKey: ['project-health-history', projectId] })
@@ -106,6 +110,7 @@ function invalidateSchedule(queryClient: ReturnType<typeof useQueryClient>) {
     queryClient.invalidateQueries({ queryKey: scheduleQueryKeys.all }),
     queryClient.invalidateQueries({ queryKey: ['active-schedule-revision'] }),
     queryClient.invalidateQueries({ queryKey: ['management-intelligence'] }),
+    queryClient.invalidateQueries({ queryKey: ['project-health'] }),
   ])
 }
 
