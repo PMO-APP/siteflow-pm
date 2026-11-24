@@ -1,3 +1,4 @@
+import { calculateProjectProgress, calculateProjectPlannedProgress } from '@/core/metrics/progressMetrics'
 import { differenceInCalendarDays } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import {
@@ -102,51 +103,6 @@ function progressOf(task: Record<string, any>) {
   const status = text(task.status)
   if (status === 'completed' || status === 'complete') return 100
   return Math.max(0, Math.min(100, number(task.progress_pct ?? task.progress)))
-}
-
-function weightedProgress(tasks: Record<string, any>[]) {
-  if (!tasks.length) return 0
-  const totalWeight = tasks.reduce(
-    (sum, task) => sum + Math.max(0, number(task.weight_pct ?? task.weight)),
-    0,
-  )
-  if (totalWeight <= 0) {
-    return tasks.reduce((sum, task) => sum + progressOf(task), 0) / tasks.length
-  }
-  return tasks.reduce(
-    (sum, task) =>
-      sum + Math.max(0, number(task.weight_pct ?? task.weight)) * progressOf(task),
-    0,
-  ) / totalWeight
-}
-
-function plannedProgress(
-  tasks: Record<string, any>[],
-  project: Record<string, any> | null,
-  now: Date,
-) {
-  const datedTasks = tasks
-    .map(task => ({
-      start: validDate(task.planned_start ?? task.start_date),
-      finish: validDate(task.planned_finish ?? task.finish_date),
-    }))
-    .filter(item => item.start && item.finish) as Array<{ start: Date; finish: Date }>
-
-  const taskStart = datedTasks.length
-    ? new Date(Math.min(...datedTasks.map(item => item.start.getTime())))
-    : null
-  const taskFinish = datedTasks.length
-    ? new Date(Math.max(...datedTasks.map(item => item.finish.getTime())))
-    : null
-  const start = validDate(project?.start_date) ?? taskStart
-  const finish =
-    validDate(project?.handover_date ?? project?.finish_date ?? project?.end_date) ??
-    taskFinish
-
-  if (!start || !finish || finish <= start) return 0
-  const total = Math.max(1, differenceInCalendarDays(finish, start))
-  const elapsed = Math.max(0, Math.min(total, differenceInCalendarDays(now, start)))
-  return (elapsed / total) * 100
 }
 
 function forecastVarianceDays(
@@ -350,8 +306,8 @@ export async function getProjectHealth(
   const input: HealthInput = {
     ...(tasksResult.available
       ? {
-          scheduleProgress: weightedProgress(tasks),
-          plannedProgress: plannedProgress(tasks, project, now),
+          scheduleProgress: calculateProjectProgress(tasks),
+          plannedProgress: calculateProjectPlannedProgress(tasks, now),
           overdueTasks: overdueTasks.length,
           totalTasks: tasks.length,
           criticalDelayedTasks: criticalDelayedTasks.length,
