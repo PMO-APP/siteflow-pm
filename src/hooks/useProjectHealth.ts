@@ -1,3 +1,4 @@
+import { calculateProjectProgress, calculateProjectPlannedProgress, taskProgress } from '@/core/metrics/progressMetrics'
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { differenceInDays } from 'date-fns'
@@ -10,24 +11,8 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
 }
 
-function getTaskProgress(task: any): number {
-  if (task.status === 'Completed') return 100
-  if (task.status === 'Not Started') return 0
-  return clamp(Number(task.progress_pct || 0))
-}
-
-function calcWeightedProgress(tasks: any[]) {
-  if (!tasks.length) return 0
-  const totalWeight = tasks.reduce((sum, task) => sum + Number(task.weight_pct || 0), 0)
-  if (totalWeight === 0) {
-    return Math.round(tasks.reduce((sum, task) => sum + getTaskProgress(task), 0) / tasks.length)
-  }
-  const earnedWeight = tasks.reduce(
-    (sum, task) => sum + (Number(task.weight_pct || 0) * getTaskProgress(task)) / 100,
-    0,
-  )
-  return Math.round((earnedWeight / totalWeight) * 100)
-}
+const getTaskProgress = taskProgress
+const calcWeightedProgress = calculateProjectProgress
 
 function getTaskDate(task: any, key: 'start' | 'finish') {
   const value = key === 'start'
@@ -54,7 +39,7 @@ function buildLegacyScheduleHealth(taskData: any[], projectData: any[], projectI
   const plannedFinish = project?.handover_date ? new Date(project.handover_date) : getTaskDate(lastScheduleTask, 'finish')
   const totalDays = projectStart && plannedFinish ? Math.max(1, differenceInDays(plannedFinish, projectStart)) : 0
   const elapsedDays = projectStart && plannedFinish ? clamp(differenceInDays(today, projectStart), 0, totalDays) : 0
-  const plannedProgress = totalDays > 0 ? clamp(Math.round((elapsedDays / totalDays) * 100)) : 0
+  const plannedProgress = calculateProjectPlannedProgress(tasks, today)
   const actualProgress = calcWeightedProgress(tasks)
   const delayedTasks = tasks.filter(task => {
     const finish = getTaskDate(task, 'finish')
