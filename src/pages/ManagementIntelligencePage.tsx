@@ -209,7 +209,7 @@ function Portfolio({
       </div>
       <div className="mi-table-scroll" tabIndex={0} aria-label="Project delivery table" role="region">
         <table className="mi-table mi-delivery-table">
-          <thead><tr><th scope="col">Project</th><th scope="col">Delivery status</th><th scope="col">Latest update</th><th scope="col">Physical / planned</th><th scope="col">Activity delay</th><th scope="col">Target / forecast</th></tr></thead>
+          <thead><tr><th scope="col">Project</th><th scope="col">Delivery status</th><th scope="col">Latest update</th><th scope="col">Actual / planned</th><th scope="col">Activity delay</th><th scope="col">Target / forecast</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.project.id}>
             <th scope="row"><button className="mi-text-button" onClick={() => open(row)}>{row.project.project_name} <ArrowUpRight size={14} /></button><small>{row.project.phase || 'Stage unrecorded'}</small></th>
             <td><Status row={row} /></td>
@@ -221,10 +221,10 @@ function Portfolio({
                 <ul>{row.updates.slice(1).map(update => <li className="mt-2" key={update.key}>{update.text}<small>{date(update.date)}</small></li>)}</ul>
               </details>}
             </td>
-            <td><strong>{percent(row.actual)}</strong> / {percent(row.planned)}{row.progressGap !== null && <small className={row.progressGap < 0 ? 'mi-negative' : ''}>{signed(row.progressGap, ' pp')}</small>}</td>
+            <td><strong>{percent(row.actual)}</strong> / {percent(row.planned)}{row.progressGap !== null && <small className={row.progressGap < 0 ? 'mi-negative' : ''}>{signed(row.progressGap, ' pp')}</small>}<small>{row.basis}</small></td>
             <td>{row.maximumActivityDelay === null ? '—' : <>
               <strong>{row.maximumActivityDelay}d max</strong>
-              <small>{row.overdueActivities} overdue · {row.scheduleSeverity}</small>
+              <small>{row.overdueActivities} overdue · {row.scheduleSeverity}</small>{row.lateStarts > 0 && <small>{row.lateStarts} late starts</small>}
             </>}</td>
             <td>{date(row.target)}{row.overdueDays !== null && <span className="mi-negative"> · {row.overdueDays}d past</span>}<div className="mi-forecast">
               {row.complete ? 'Complete' : row.forecast ? <>
@@ -246,7 +246,7 @@ function Portfolio({
       </div>
       <div className="mi-table-scroll" tabIndex={0} aria-label="Cost and progress table" role="region">
         <table className="mi-table mi-cost-table">
-          <thead><tr><th scope="col">Project / cost basis</th><th scope="col">Initial cost</th><th scope="col">Current approved cost</th><th scope="col">Change</th><th scope="col">Certified work</th><th scope="col">Paid</th><th scope="col">Paid / physical</th><th scope="col">Gap</th><th scope="col">Approved variations</th><th scope="col">Outstanding payments</th><th scope="col">Cost to complete</th></tr></thead>
+          <thead><tr><th scope="col">Project / cost basis</th><th scope="col">Initial cost</th><th scope="col">Current approved cost</th><th scope="col">Change</th><th scope="col">Certified work</th><th scope="col">Paid</th><th scope="col">Paid / schedule progress</th><th scope="col">Gap</th><th scope="col">Approved variations</th><th scope="col">Outstanding payments</th><th scope="col">Cost to complete</th></tr></thead>
           <tbody>{rows.map(row => {
             const money = row.commercial
             if (!money) return null
@@ -272,7 +272,7 @@ function Portfolio({
           })}</tbody>
         </table>
       </div>
-      <p className="mi-footnote">Positive gap means payments run ahead of recorded physical progress. Review the payment terms and any advances when assessing the gap.</p>
+      <p className="mi-footnote">Positive gap means payments run ahead of recorded schedule progress (not verified physical delivery). Review the payment terms and any advances when assessing the gap.</p>
     </section>}
     <PortfolioTrend rows={rows} />
     <div className="mi-visual-grid">
