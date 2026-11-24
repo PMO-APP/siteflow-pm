@@ -18,3 +18,13 @@ export function proposeWeights(rows:WeightRow[], groups?:Record<string,number>) 
   for(let i=0;i<remainder;i++) units[order[i%order.length].i]++
   return rows.map((r,i)=>({id:r.id,weight_pct:units[i]/10000}))
 }
+
+// Package scope values are converted to project-level activity weights.
+export function proposePackageWeights(rows:(WeightRow & {packageId:string})[], packageValues:Record<string,number>, groups?:Record<string,number>) {
+ const ids=[...new Set(rows.map(r=>r.packageId))];
+ const packageWeights=proposeWeights(ids.map(id=>({id,category:'',value:packageValues[id]??0})));
+ if(packageWeights.some(p=>p.weight_pct<=0)) throw new Error('Enter positive scope values for every package');
+ const combined=packageWeights.flatMap(p=>proposeWeights(rows.filter(r=>r.packageId===p.id),groups).map(r=>({id:r.id,category:'',value:r.weight_pct*p.weight_pct/100})));
+ const byId=new Map(proposeWeights(combined).map(r=>[r.id,r]));
+ return rows.map(r=>byId.get(r.id)!);
+}
