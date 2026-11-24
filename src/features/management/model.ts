@@ -2,7 +2,7 @@ import { calculateForecastV2 } from '@/core/intelligence/forecast/forecastV2'
 import { normalizeProjectState } from '@/core/intelligence/normalizers/projectStateNormalizer'
 import { applyControlledProgramme, latestControlledRevisions, type ControlledRevision } from '@/features/schedule/controlledProgramme'
 import type { RevisionProgrammeActivity } from '@/features/schedule/revisionProgramme'
-import { calculateProjectPlannedProgress, calculateProjectProgress, taskProgress, type ProgressTask } from '@/core/metrics/progressMetrics'
+import { calculateProjectPlannedProgress, calculateProjectProgress, progressBasis, activityTiming, taskProgress, type ProgressTask } from '@/core/metrics/progressMetrics'
 
 type Amount = number | string | null
 type RecordRow = { id: string | number; project_id: number; updated_at?: string | null; created_at?: string | null }
@@ -604,7 +604,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     const timestamp = task.updated_at || task.created_at || ''
     return timestamp > last ? timestamp : last
   }, '')
-  const useTaskProgress = measured && (!snapshot || lastTaskUpdate >= reportTime(snapshot) || isoDay(lastTaskUpdate) === snapshot.report_date)
+  const useTaskProgress = measured
   const actual = useTaskProgress ? calculateProjectProgress(tasks) : percent(snapshot?.snapshot_actual_progress)
   const isMaster = (r: Revision) => !r.block_id && !r.delivery_package_id && !isPackageName(r.package_name)
   const master = revisions.find(isMaster)
@@ -630,10 +630,10 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const forecast = estimatedFinish ?? isoDay(master?.forecast_finish)
   const forecastBasis = estimatedFinish ? 'Recovery Forecast' : forecast ? 'Recorded forecast' : null
   const variance = target && forecast ? dayDifference(forecast, target) : null
-  const overduePackage = (forecastResult?.packagePositions ?? []).some(pkg => pkg.packageId !== '__unassigned__' && pkg.delayDays > 0) || revisions.some(r => {
+  const overduePackage = (forecastResult?.packagePositions ?? []).some(pkg => pkg.packageId !== '__unassigned__' && pkg.delayDays > 14) || revisions.some(r => {
     const plannedFinish = isoDay(r.current_finish || r.planned_finish)
     const forecastFinish = isoDay(r.forecast_finish)
-    return !isMaster(r) && plannedFinish && forecastFinish && forecastFinish > plannedFinish
+    return !isMaster(r) && plannedFinish && forecastFinish && dayDifference(forecastFinish, plannedFinish) > 14
   })
   const activeReports = reports.filter(r => {
     const date = isoDay(r.report_date)
@@ -651,9 +651,11 @@ export function projectPosition(project: Project, data: Data, today: string, inc
     ? progressGap < 0
     : ['behind', 'behind programme', 'behind schedule', 'delayed'].includes(normal(project.status)) || reportsBehind)
   const constraints = active ? constraintsFor(data, activeReports, today, includeFinance) : []
+  const timing = activityTiming(tasks, asOf)
+  const basis = useTaskProgress ? progressBasis(tasks) : 'Report snapshot · unverified basis'
   const rating: Rating = withdrawn(project.status) ? 'Withdrawn' : complete ? 'On track / done' :
-    stalled || overdue || (variance ?? 0) > 0 || overduePackage || ['off track', 'critical'].includes(normal(project.status)) ? 'Off track' :
-    constraints.length || behind || (scheduleResult?.maximumActivityDelayDays ?? 0) > 0 || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
+    stalled || overdue || (variance ?? 0) > 14 || overduePackage || (scheduleResult?.maximumActivityDelayDays ?? 0) > 14 || ['off track', 'critical'].includes(normal(project.status)) ? 'Off track' :
+    constraints.length || behind || timing.lateStarts > 0 || (variance ?? 0) > 0 || (scheduleResult?.maximumActivityDelayDays ?? 0) > 0 || ['delayed', 'at risk', 'watch'].includes(normal(project.status)) || activeReports.some(r => ['behind', 'delayed', 'at risk'].includes(normal(r.status))) ? 'Watch' :
     (actual !== null && progressGap !== null) || activeReports.some(r => ['on track', 'ahead'].includes(normal(r.status))) ? 'On track / done' : 'Unrated'
   const documents = latestDocuments((data.documents ?? []).filter(r => normal(r.type) === 'report' && !['draft', 'void', 'superseded', 'rejected'].includes(normal(r.status))))
   const updates = [
@@ -668,7 +670,7 @@ export function projectPosition(project: Project, data: Data, today: string, inc
   const timeline = withdrawn(project.status) || recordedProjectCompletion ? []
     : upcomingEvents(data, tasks, revisions, target, recordedTarget, today).filter(event => active || !!event.packageName)
   return {
-    project, rating, active, complete, stalled, behind, actual, planned, progressGap, target, forecast, forecastBasis, variance, overdue, overdueDays, constraints,
+    project, rating, active, complete, stalled, behind, actual, planned, basis, lateStarts: timing.lateStarts, progressGap, target, forecast, forecastBasis, variance, overdue, overdueDays, constraints,
     maximumActivityDelay: active ? scheduleResult?.maximumActivityDelayDays ?? null : null,
     overdueActivities: active ? scheduleResult?.overdueActivities ?? null : null,
     scheduleSeverity: active ? scheduleResult?.scheduleSeverity ?? null : null,
