@@ -1,3 +1,4 @@
+import ProgressWeighting from "@/features/schedule/ProgressWeighting"
 import {
   Upload,
   Plus,
@@ -547,6 +548,7 @@ export default function SchedulePage() {
   return (
     <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 sm:-m-6 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
+        {canConfigurePackages && <ProgressWeighting key={String(projectId)} tasks={projectTasks}/>}
         <section className="overflow-hidden rounded-[24px] border border-[#dfe3e7] bg-white">
           <div className="grid lg:grid-cols-[1fr_320px]">
             <div className="p-6 sm:p-8 lg:p-10">
