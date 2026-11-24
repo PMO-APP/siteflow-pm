@@ -222,7 +222,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
         </div>
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            ['Actual progress', `${progress}%`, `Planned ${planned}%`],
+            ['Schedule progress', `${progress}%`, `Planned ${planned}%`],
             [multiPackage ? 'Master forecast finish' : 'Forecast completion', !forecast.forecastDate ? 'Unverified' : incompleteForecast ? 'Incomplete' : formatDate(forecast.forecastDate), multiPackage ? `Latest package target ${formatDate(forecast.targetDate)}` : `Forecast engine target ${formatDate(forecast.targetDate)}`],
             ['Maximum activity delay', `${forecast.maximumActivityDelayDays} calendar days`, `${forecast.overdueActivities} overdue unfinished activities · ${forecast.scheduleSeverity}`],
             ['Completion variance', forecast.completionVarianceDays == null ? 'Unverified' : `${forecast.completionVarianceDays} calendar days`, 'Forecast completion vs approved target'],
@@ -258,7 +258,7 @@ export default function RoleBasedCommandCenter({ project }: { project?: any }) {
           <button className="ml-2 underline" onClick={() => navigate('/app/schedule')}>Review programme</button>
         </div>}
         <div className="mt-5 rounded-xl bg-[var(--pmx-surface-2)] p-4">
-          <div className="mb-3 flex justify-between text-sm"><strong>Progress against programme</strong><span className={gap < 0 ? 'text-rose-600' : 'text-emerald-600'}>{validProgress ? `${gap > 0 ? '+' : ''}${gap.toFixed(1)} percentage points` : 'Review progress data'}</span></div>
+          <div className="mb-3 flex justify-between text-sm"><strong>Estimated progress against programme</strong><span className={gap < 0 ? 'text-rose-600' : 'text-emerald-600'}>{validProgress ? `${gap > 0 ? '+' : ''}${gap.toFixed(1)} percentage points` : 'Review progress data'}</span></div>
           {[['Actual', progress, 'bg-sky-700'], ['Planned', planned, 'bg-slate-400']].map(([label, value, color]) => <div key={String(label)} className="mb-3"><div className="mb-1 flex justify-between text-xs"><span>{label}</span><span>{value}%</span></div><div className="h-2 rounded-full bg-slate-200"><div className={`h-2 rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, Number(value)))}%` }} /></div></div>)}
         </div>
       </section>
