@@ -5,7 +5,7 @@ import {supabase} from '@/lib/supabase'
 import type {Task} from '@/types'
 import {executableTasks} from '@/core/metrics/progressMetrics'
 export default function BOQCertification({tasks,projectId}:{tasks:Task[],projectId:number|string}){
- const qc=useQueryClient(),[open,setOpen]=useState(false),[raw,setRaw]=useState(''),[mapping,setMapping]=useState<Record<string,string>>({}),[id,setId]=useState(''),[qty,setQty]=useState(''),[note,setNote]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
+ const qc=useQueryClient(),[open,setOpen]=useState(true),[raw,setRaw]=useState(''),[mapping,setMapping]=useState<Record<string,string>>({}),[id,setId]=useState(''),[qty,setQty]=useState(''),[note,setNote]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
  const [block,setBlock]=useState(0),[warnings,setWarnings]=useState<string[]>([]),[confirmed,setConfirmed]=useState(false)
  async function upload(file:File){setConfirmed(false);setRaw('');setMapping({});try{const result=extractBOQ(await file.arrayBuffer(),block);setWarnings(result.warnings);setRaw(result.rows.map(r=>[r.code,r.description.replace(/\s+/g,' '),r.unit,r.quantity,r.rate].join('\t')).join('\n'));setMapping(Object.fromEntries(result.rows.map(r=>[r.code,proposeMapping(r.description,executableTasks(tasks).filter(t=>!t.is_milestone))])));setMessage(`${result.rows.length} priced rows extracted. Review document identity, scope and mapping.`)}catch(e){setMessage(String(e))}}
  const items=useQuery({queryKey:['boq-items',projectId],enabled:open,queryFn:async()=>{const {data,error}=await supabase.from('boq_items').select('*').eq('project_id',projectId).order('id');if(error)throw error;return data||[]}})
