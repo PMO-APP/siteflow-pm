@@ -64,6 +64,7 @@ export default function SchedulePage() {
   const canClearSchedule = can('project.delete', { scopeType: 'project', scopeId: projectId }) &&
     ['workspace_admin', 'admin'].includes(session.role?.toLowerCase() || '')
 
+  const [controlTab, setControlTab] = useState('Schedule')
   const [disciplineTab, setDisciplineTab] = useState<DisciplineTab>('Overall')
   const [focusMode, setFocusMode] = useState<FocusMode>('Executive')
   const [view, setView] = useState<View>('list')
@@ -550,9 +551,11 @@ export default function SchedulePage() {
   return (
     <div className="min-h-screen bg-[#f6f5f1] text-[#18212b] -m-4 sm:-m-6 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1600px] space-y-5">
-        {canConfigurePackages && projectId != null && <ProgressWeighting key={String(projectId)} tasks={projectTasks} projectId={projectId} packageNames={Object.fromEntries(deliveryPackages.map(p=>[p.id,p.name]))}/>}
-        {canConfigurePackages && projectId != null && <MeasuredPhysicalProgress key={`measured-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
-        {canConfigurePackages && projectId != null && <BOQCertification key={`boq-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
+        {canConfigurePackages && projectId != null && <nav className="flex flex-wrap gap-2 rounded-xl border bg-white p-3" aria-label="Schedule controls">{['Schedule','BOQ Register','Progress Weighting','Measurements'].map(tab=><button key={tab} onClick={()=>setControlTab(tab)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${controlTab===tab?'bg-[#123a60] text-white':'text-slate-600 hover:bg-slate-100'}`}>{tab}</button>)}</nav>}
+        {canConfigurePackages && projectId != null && controlTab === 'Progress Weighting' && <ProgressWeighting key={String(projectId)} tasks={projectTasks} projectId={projectId} packageNames={Object.fromEntries(deliveryPackages.map(p=>[p.id,p.name]))}/>}
+        {canConfigurePackages && projectId != null && controlTab === 'Measurements' && <MeasuredPhysicalProgress key={`measured-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
+        {canConfigurePackages && projectId != null && controlTab === 'BOQ Register' && <BOQCertification key={`boq-${projectId}`} tasks={projectTasks} projectId={projectId}/>}
+        <div className={canConfigurePackages && controlTab !== 'Schedule' ? 'hidden' : 'space-y-5'}>
         <section className="overflow-hidden rounded-[24px] border border-[#dfe3e7] bg-white">
           <div className="grid lg:grid-cols-[1fr_320px]">
             <div className="p-6 sm:p-8 lg:p-10">
@@ -718,6 +721,7 @@ export default function SchedulePage() {
             </table>
           </div>}
         </section>
+        </div>
       </div>
 
       {modalTask !== null && canManageScheduleUpload && <TaskModal task={modalTask === 'new' ? null : modalTask} onClose={() => setModalTask(null)} deliveryPackageId={selectedPackageId !== 'all' ? selectedPackageId : undefined} discipline={activeDiscipline} />}
