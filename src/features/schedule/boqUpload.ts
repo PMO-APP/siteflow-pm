@@ -28,3 +28,9 @@ export function contextualMapping(row:Extracted,tasks:{id:string|number;name:str
  for(const [scope,activity] of rules){if(!scope.test(text))continue;const matches=tasks.filter(t=>activity.test(t.name));if(matches.length===1)return String(matches[0].id);if(matches.length>1)return '';}
  return proposeMapping(text,tasks);
 }
+
+export function comparePricing(buffer:ArrayBuffer){
+ const results=[];
+ for(let block=0;block<10;block++){const r=extractBOQ(buffer,block);if(r.rows.length)results.push({block,count:r.rows.length,value:r.rows.reduce((sum,row)=>sum+row.quantity*row.rate,0),warnings:r.warnings});}
+ return results;
+}
